@@ -16,8 +16,6 @@
 #include "perishable.h"
 #include "perishable_expiry.h"
 
-#include <iostream>
-
 bool perishable::_enabled = false;
 std::uint64_t perishable::_initial = 0;
 std::uint64_t perishable::_time_to_live = 0;

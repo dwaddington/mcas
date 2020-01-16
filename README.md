@@ -1,13 +1,14 @@
 # MCAS
 
-Memory Centric Active Storage is a high-performance key-value store designed for persistent memory storage (although it can be used with DRAM and POSIX file-based storage also).
+Memory Centric Active Storage is a high-performance key-value store designed for persistent memory storage.
 
 The key attributes of the solution are:
 
 1. High-performance key-value store based on hash-table primary index and optional secondary indices.
-2. Support for both RDMA and traditional TCP/IP network transports.
-3. Zero-copy transfer capable with RDMA and GPU-Direct capable.
-4. Support for C++ and Python clients. 
+2. Support for Intel Optane DC Persistent Memory or conventional DRAM (without persistence).
+3. Support for both RDMA and traditional TCP/IP network transports.
+4. Zero-copy transfer capable with RDMA and GPU-Direct capable.
+5. Support for C++ and Python clients. 
 
 ## Documentation
 

@@ -21,8 +21,6 @@
 #include "fabric_generic_grouped.h"
 #include "fabric_types.h" /* addr_ep_t */
 
-#include <unistd.h> /* ssize_t */
-
 #include <cstdint> /* uint{16,32,64}_t */
 #include <functional> /* function */
 #include <mutex> /* unique_lock */

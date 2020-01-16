@@ -1,7 +1,15 @@
 /*
- * (C) Copyright IBM Corporation 2018, 2019. All rights reserved.
- * US Government Users Restricted Rights - Use, duplication or disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
- */
+   Copyright [2019] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 #include <type_traits> /* is_base_of */
 
@@ -22,6 +30,7 @@ template <typename Allocator>
 			((n*3U)/base_segment_size == 0 ? 1U : segment_layout::log2((3U * n)/base_segment_size))
 		)
 		, _sc{}
+		, _ase{}
 	{
 		do_initial_allocation(av_);
 	}
@@ -29,19 +38,19 @@ template <typename Allocator>
 template <typename Allocator>
 	void impl::persist_map<Allocator>::do_initial_allocation(Allocator av_)
 	{
-		using void_allocator_t = typename Allocator::template rebind<void>::other;
-
 		if ( _segment_count._actual.is_stable() )
 		{
 			if ( _segment_count._actual.value() == 0 )
 			{
-				auto ptr =
-					bucket_allocator_t(av_).allocate(
-						base_segment_size
-						, segment_align
-						, typename void_allocator_t::const_pointer()
-						, "persist_control_segment_0"
-					);
+#if USE_CC_HEAP == 4
+				/* ERROR: local memory owner can leak */
+#endif
+				persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
+				bucket_allocator_t(av_).allocate(
+					ptr
+					, base_segment_size
+					, segment_align
+				);
 				new ( &*ptr ) bucket_aligned_t[base_segment_size];
 				_sc[0].bp = ptr;
 				_segment_count._actual.incr();
@@ -53,13 +62,15 @@ template <typename Allocator>
 			{
 				auto segment_size = base_segment_size<<(ix-1U);
 
-				auto ptr =
-					bucket_allocator_t(av_).allocate(
-						segment_size
-						, segment_align
-						, typename void_allocator_t::const_pointer()
-						, "persist_control_segment_n"
-					);
+#if USE_CC_HEAP == 4
+				/* ERROR: local memory owner can leak */
+#endif
+				persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
+				bucket_allocator_t(av_).allocate(
+					ptr
+					, segment_size
+					, segment_align
+				);
 				new (&*ptr) bucket_aligned_t[base_segment_size << (ix-1U)];
 				_sc[ix].bp = ptr;
 				_segment_count._actual.incr();
@@ -70,6 +81,7 @@ template <typename Allocator>
 		}
 	}
 
+#if USE_CC_HEAP == 3
 template <typename Allocator>
 	void impl::persist_map<Allocator>::reconstitute(Allocator av_)
 	{
@@ -95,3 +107,4 @@ template <typename Allocator>
 
 		}
 	}
+#endif

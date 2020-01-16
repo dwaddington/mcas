@@ -12,6 +12,7 @@
 */
 #include "connection_handler.h"
 #include "mcas_config.h"
+#include "shard.h"
 
 namespace mcas
 {
@@ -77,7 +78,7 @@ int Connection_handler::tick()
         break;
       }
       case MSG_TYPE_CLOSE_SESSION: {
-        if (option_DEBUG > 2) PMAJOR("Shard: CLOSE_SESSION!");
+        if (option_DEBUG > 2) PMAJOR("Shard: CLOSE_SESSION");
         free_recv_buffer();
         response = TICK_RESPONSE_CLOSE;
         break;
@@ -167,17 +168,24 @@ int Connection_handler::tick()
 
       const auto msg =
         mcas::Protocol::message_cast(iob->base())->ptr_cast<Message_handshake>();
-
+      
       if(msg->get_status() != S_OK)
         throw General_exception("handshake status != S_OK (%d)", msg->get_status());
 
+      /* set authentication token ; TODO - verify token with AAA */
+      set_auth_id(msg->auth_id); 
+      
       auto reply_iob = allocate();
       assert(reply_iob);
+
       auto reply_msg =
-        new (reply_iob->base()) mcas::Protocol::Message_handshake_reply(auth_id(),
+        new (reply_iob->base()) mcas::Protocol::Message_handshake_reply(iob->length(),
+                                                                        auth_id(),
                                                                         1 /* seq */,
                                                                         max_message_size(),
-                                                                        reinterpret_cast<uint64_t>(this));
+                                                                        reinterpret_cast<uint64_t>(this),
+                                                                        nullptr, // cert
+                                                                        0);
       /* post response */
       reply_iob->set_length(reply_msg->msg_len);
       post_send_buffer(reply_iob);

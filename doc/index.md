@@ -13,4 +13,8 @@
 ## Benchmarking
 * [kvstore-perf benchmark](./benchmarking.md)
 
+## Deployment
+* [Docker Containerization](./docker.md)
+* [Kubernetes Deployment](./kubernetes.md)
+* [Virtualization with QEMU/KVM](./VM_deployment.md)
 

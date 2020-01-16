@@ -8,9 +8,6 @@
 
 #include <chrono>
 #include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <vector>
 
 class Experiment_IOPS : public Core::Tasklet
 { 

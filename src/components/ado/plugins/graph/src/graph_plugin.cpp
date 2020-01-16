@@ -16,13 +16,13 @@
 #include <common/dump_utils.h>
 #include <common/cycles.h>
 #include <api/interfaces.h>
-#include <iostream>
+#include <sstream>
 #include <string.h>
 #include <ccpm/value.h>
 #include <ccpm/record.h>
 #include <ccpm/immutable_string_table.h>
 #include "graph_plugin.h"
-
+#include <EASTL/list.h>
 //#include <flatbuffers/flatbuffers.h>
 
 status_t ADO_graph_plugin::register_mapped_memory(void * shard_vaddr,
@@ -74,33 +74,151 @@ status_t ADO_graph_plugin::do_work(uint64_t work_key,
   return S_OK;
 }
 
+inline void * ptrinc(void * ptr, size_t n) {
+  return static_cast<void*>(static_cast<byte*>(ptr) + n);
+}
+
+template <typename T> class List_node;
+
+struct Edge
+{
+public:
+  Edge() : src(nullptr), dst(nullptr), amount(0.0f) {}
+
+  // fields
+  void * src;
+  void * dst;
+  float  amount;
+
+  void assign(void *s, void *d, float a) {
+    src = s; dst = d; amount = a;
+    pmem_persist(this, sizeof(Edge));
+  }
+  
+  std::string print() {
+    std::stringstream ss;
+    ss << std::hex << src << " " << std::hex << dst << " " << amount;
+    return ss.str();
+  }
+};
+  
+template <typename T>
+class List_node : public eastl::list<T>
+{
+public:
+  List_node<T>() : eastl::list<T>() {
+  }
+  // List_node<T> * next;
+  // List_node<T> * prev;
+
+  // List_node() : T(), next(nullptr), prev(nullptr) {
+  //   pmem_persist(this, sizeof(List_node<T>));
+  // }
+
+  // void print() {
+  //   auto p = this;
+  //   do {
+  //     PMAJOR("Node (%p): %p %p : %s", p, p->next, p->prev, Edge::print().c_str());
+  //     p = p->next;
+  //   }
+  //   while(p);
+  // }
+
+  // void push_front(List_node<T>* node) {
+  //   assert(node);
+  //   if(prev)
+  //     throw API_exception("node not root");
+  //   auto curr_next = next;
+  //   next = node;
+  //   node->next = curr_next;
+  //   pmem_persist(this, sizeof(List_node<T>));
+  // }
+};
+
+using namespace ccpm;
+
+
+static uint64_t count = 2;
 status_t ADO_graph_plugin::handle_transaction(const Graph_ADO_protocol::Transaction * transaction,
                                               uint64_t work_key,
                                               void * value,
                                               size_t value_len)
 {
-  using namespace ccpm;
 
   static bool first = true;
-  PLOG("transaction: %s %s", transaction->target()->c_str(), transaction->source()->c_str());
+  PMAJOR("transaction: %s %s", transaction->target()->c_str(), transaction->source()->c_str());
   assert(value_len >= sizeof(Cow_value_pointer<int>));
 
-  Cow_value_pointer<int> cvp(value, value_len, TYPE_POINTER, first);
-  if(first || cvp.get_current_version()->ptr == nullptr) {
-    PLOG("rebuilt:");
-    Cow_value_pointer<int>::Persistent_version * pv;
-    unsigned slot = cvp.get_new_version_slot(pv);
-    pv->ptr = new (allocate_memory(work_key, 64, 8)) int;
-    pv->length = sizeof(int);
-    cvp.atomic_commit_version(slot);
+  using Allocator = EASTL_keyed_memory_allocator;
+    
+  /* memory allocator attached to a key */
+  static Keyed_memory_allocator mm("my-allocator", work_key, _cb, first);
+  Allocator heap(&mm);
+  //  heap.set_inner_allocator(&mm);
+  
+  using Element = uint64_t;
+  using List = eastl::list<Element, Allocator>;
+  eastl::list<Element, Allocator> * edges;
+  if(first) {
+    edges = new (mm.allocate(sizeof(List))) List(heap);
+    *(reinterpret_cast<List **>(value)) = edges;
     first = false;
   }
   else {
-    PLOG("existing:");
+    edges = *(reinterpret_cast<List **>(value));
+    edges->set_allocator(heap);
   }
-  cvp.dump_info();
+
+  PLOG("edges @%p", edges);
   
-  asm("int3");
+  edges->push_front(count++);
+  mm.persist();
+  
+  for(auto& i : *edges) {
+    PLOG("edge: %lu", i);
+  }
+  PLOG("---");
+
+  // /* get hold of root node or create a new one */
+  // List_node<Edge> * root_node;  
+  // if(first) {
+  //   first = false;
+  //   root_node = new (mm.allocate()) List_node<Edge>;
+  //   *(reinterpret_cast<List_node<Edge> **>(value)) = root_node;
+  // }
+  // else {
+  //   root_node = *(reinterpret_cast<List_node<Edge> **>(value));
+  // }
+#if 0
+  /* open nodes */
+  status_t rc;
+  void * src_value = nullptr, * dst_value = nullptr;
+  size_t src_len = 0, dst_len = 0;
+
+  PLOG("opening key (%s)", transaction->source()->c_str());
+  rc =_cb.open_key(work_key,
+                        transaction->source()->c_str(),
+                        0, //Component::IADO_plugin::FLAGS_PERMANENT_LOCK,
+                        src_value,
+                        src_len);
+  PINF("Source node: rc=%d src_value=%p src_len=%lu", rc, src_value, src_len);
+                        
+
+  PLOG("opening key (%s)", transaction->target()->c_str());
+  rc =_cb.open_key(work_key,
+                        transaction->target()->c_str(),
+                        0, //Component::IADO_plugin::FLAGS_PERMANENT_LOCK,
+                        dst_value,
+                        dst_len);
+  PINF("Dest node: rc=%d dst_value=%p dst_len=%lu", rc, dst_value, dst_len);
+
+  /* create new node and add to list */
+  auto new_node = new (mm.allocate()) List_node<Edge>();
+  new_node->assign(dst_value, src_value, transaction->amount());
+  root_node->push_front(new_node);
+
+  root_node->print();
+#endif
   return S_OK;
 }
                                   

@@ -21,19 +21,40 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/types.h>
+#include <csignal> /* non-docker only */
+#include <memory>
+#include <set>
 
 #define PROX_TO_ADO 1
 #define RECV_EXIT 2
 #define RECV_COMPLETE 3
 
-using namespace std;
-using namespace Component;
+namespace std
+{
+template <>
+struct default_delete<DOCKER>
+{
+  void operator()(DOCKER *d);
+};
+}
 
-class ADO_proxy : public IADO_proxy {
+class ADO_proxy : public Component::IADO_proxy {
 public:
-  ADO_proxy(Component::IKVStore::pool_t pool_id, const std::string &filename,
-            std::vector<std::string> &args, std::string cores, int memory,
-            float core_number, numa_node_t numa_zone);
+  static constexpr size_t MAX_ALLOWED_DEFERRED_LOCKS = 32;
+  
+  ADO_proxy(const uint64_t auth_id,
+            Component::IKVStore * kvs,
+            Component::IKVStore::pool_t pool_id,
+            const std::string &pool_name,
+            const size_t pool_size,
+            const unsigned int pool_flags,
+            const uint64_t expected_obj_count,
+            const std::string &filename,
+            std::vector<std::string> &args,
+            std::string cores,
+            int memory,
+            float core_number,
+            numa_node_t numa_zone);
 
   virtual ~ADO_proxy();
 
@@ -49,36 +70,84 @@ public:
   }
 
   void unload() override {
-    kill();
+    //    kill();
     delete this;
   }
 
-  status_t bootstrap_ado() override;
+  status_t bootstrap_ado(bool opened_existing) override;
+
+  status_t send_op_event(Component::ADO_op op) override;
 
   status_t send_memory_map(uint64_t token, size_t size,
                            void *value_vaddr) override;
 
   status_t send_work_request(const uint64_t work_request_key,
                              const std::string &work_key_str,
-                             const void *value_addr, const size_t value_len,
+                             const void *value_addr,
+                             const size_t value_len,
+                             const void *detached_value,
+                             const size_t detached_value_len,
                              const void *invocation_data,
-                             const size_t invocation_data_len) override;
+                             const size_t invocation_data_len,
+                             const bool new_root) override;
 
 
   bool check_work_completions(uint64_t& request_key,
                               status_t& out_status,
-                              void *& out_response, /* use ::free to release */
-                              size_t & out_response_length) override;
+                              void *& response,
+                              size_t & response_len,
+                              Component::IADO_plugin::response_buffer_vector_t& response_buffers) override;
 
-  bool check_table_ops(uint64_t &work_request_id,
-                       int &op,
+  status_t recv_callback_buffer(Buffer_header *& out_buffer) override;
+
+  void free_callback_buffer(void * buffer) override;
+
+  bool check_table_ops(const void * buffer,
+                       uint64_t &work_request_id,
+                       Component::ADO_op &op,
                        std::string &key,
                        size_t &value_len,
                        size_t &value_alignment,
                        void *& addr) override;
 
-  void send_table_op_response(const status_t s, const void *value_addr,
+  bool check_index_ops(const void * buffer,
+                       std::string& key_expression,
+                       offset_t& begin_pos,
+                       int& find_type,
+                       uint32_t max_comp) override;
+
+  bool check_vector_ops(const void * buffer,
+                        epoch_time_t& t_begin,
+                        epoch_time_t& t_end) override;
+
+  bool check_pool_info_op(const void * buffer) override;
+
+  bool check_iterate(const void * buffer,
+                     epoch_time_t& t_begin,
+                     epoch_time_t& t_end,
+                     Component::IKVStore::pool_iterator_t& iterator) override;
+
+  bool check_op_event_response(const void * buffer,
+                               Component::ADO_op& op) override;
+  
+  void send_table_op_response(const status_t s,
+                              const void *value_addr,
                               size_t value_len) override;
+
+  void send_find_index_response(const status_t status,
+                                const offset_t matched_position,
+                                const std::string& matched_key) override;
+
+  void send_vector_response(const status_t status,
+                            const Component::IADO_plugin::Reference_vector& rv) override;
+
+  void send_iterate_response(const status_t rc,
+                             const Component::IKVStore::pool_iterator_t iterator,
+                             const Component::IKVStore::pool_reference_t reference) override;
+
+  void send_pool_info_response(const status_t status,
+                               const std::string& info) override;
+  
 
   bool has_exited() override;
 
@@ -87,36 +156,58 @@ public:
   void add_deferred_unlock(const uint64_t work_key,
                            const Component::IKVStore::key_t key) override;
 
-  void
-  get_deferred_unlocks(const uint64_t work_key,
-                       std::vector<Component::IKVStore::key_t> &keys) override;
+  status_t update_deferred_unlock(const uint64_t work_request_id,
+                                  const Component::IKVStore::key_t key) override;
 
-  std::string ado_id() const { return container_id; }
+  void get_deferred_unlocks(const uint64_t work_key,
+                            std::vector<Component::IKVStore::key_t> &keys) override;
 
-  Component::IKVStore::pool_t pool_id() const { return _pool_id; }
+  void add_life_unlock(const Component::IKVStore::key_t key) override;
+
+  status_t remove_life_unlock(const Component::IKVStore::key_t key) override;
+  
+  void release_life_locks() override;
+
+
+  std::string ado_id() const override { return container_id; }
+
+  const std::string& pool_name() const override { return _pool_name; }
+
+  Component::IKVStore::pool_t pool_id() const override { return _pool_id; }
 
 private:
   status_t kill();
   void launch();
 
+  uint64_t                              _auth_id;
+  Component::IKVStore*                  _kvs;
+  Component::IKVStore::pool_t           _pool_id;
+  const std::string                     _pool_name;
+  const size_t                          _pool_size;
+  const unsigned int                    _pool_flags;
+  const uint64_t                        _expected_obj_count;
   std::unique_ptr<ADO_protocol_builder> _ipc;
-  std::string _cores;
-  float _core_number;
-  std::string _filename;
-  vector<string> _args;
-  Component::IKVStore::pool_t _pool_id;
-  std::string _channel_name;
-  int _memory;
-  numa_node_t _numa;
-  std::map<uint64_t, std::vector<Component::IKVStore::key_t>> _deferred_unlocks;
-  unsigned _outstanding_wr = 0;
+  std::string                           _cores;
+  float                                 _core_number;
+  std::string                           _filename;
+  std::vector<std::string>              _args;
+  std::string                           _channel_name;
+  int                                   _memory;
+  numa_node_t                           _numa;
+  std::map<uint64_t, std::set<Component::IKVStore::key_t>> _deferred_unlocks;
+  std::set<Component::IKVStore::key_t>  _life_unlocks;
+  unsigned                              _outstanding_wr = 0;
+  std::string                           container_id;
+  pid_t                                 _pid; // Non-docker only
+  
+  static void child_exit(int, siginfo_t *, void *);
+  static sig_atomic_t _exited; // Non-docker only
 
-  /* these need renaming */
-  work_id_t id;
-  string container_id;
-  pid_t pid;
-  key_t key;
-  DOCKER *docker;
+  class docker_destroyer {
+  public:
+    void operator()(DOCKER *d) { docker_destroy(d); }
+  };
+  std::unique_ptr<DOCKER> docker; // Docker only
 };
 
 class ADO_proxy_factory : public Component::IADO_proxy_factory {
@@ -135,12 +226,33 @@ public:
   void unload() override { delete this; }
 
   virtual Component::IADO_proxy *
-  create(Component::IKVStore::pool_t pool_id, const std::string &filename,
-         std::vector<std::string> &args, std::string cores, int memory,
-         float cpu_num, numa_node_t numa_zone) override {
+  create(const uint64_t auth_id,
+         Component::IKVStore * kvs,
+         Component::IKVStore::pool_t pool_id,
+         const std::string &pool_name,
+         const size_t pool_size,
+         const unsigned int pool_flags,
+         const uint64_t expected_obj_count,
+         const std::string &filename,
+         std::vector<std::string> &args,
+         std::string cores,
+         int memory,
+         float cpu_num,
+         numa_node_t numa_zone) override
+  {
     Component::IADO_proxy *obj =
-        static_cast<Component::IADO_proxy *>(new ADO_proxy(
-            pool_id, filename, args, cores, memory, cpu_num, numa_zone));
+      static_cast<Component::IADO_proxy *>(new ADO_proxy(auth_id,kvs,
+                                                         pool_id,
+                                                         pool_name,
+                                                         pool_size,
+                                                         pool_flags,
+                                                         expected_obj_count,
+                                                         filename,
+                                                         args,
+                                                         cores,
+                                                         memory,
+                                                         cpu_num,
+                                                         numa_zone));
     assert(obj);
     obj->add_ref();
     return obj;

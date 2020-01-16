@@ -5,23 +5,27 @@ project(component-adoplugin-kite CXX)
 set(CMAKE_CXX_STANDARD 11)
 
 enable_language(CXX C ASM)
-set(GCC_COVERAGE_COMPILE_FLAGS "-g -O2 -fPIC")
 
 file(GLOB SOURCES src/*.cpp)
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
-add_compile_options(-g -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings)
-
-add_library(${PROJECT_NAME} SHARED ${SOURCES})
+add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
 
 include_directories(../../../../lib/common/include/)
 include_directories(../../../)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/src)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 
-target_link_libraries(${PROJECT_NAME} common pthread numa dl rt)
+link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # libpmem
+link_directories(${CMAKE_INSTALL_PREFIX}/lib) # pmem tbb tbbmalloc
 
-set_target_properties(${PROJECT_NAME} PROPERTIES
-  INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+
+target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
+target_link_libraries(${PROJECT_NAME} common pthread numa dl rt pmem)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
 install (TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 

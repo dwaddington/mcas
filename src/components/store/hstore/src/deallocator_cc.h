@@ -16,9 +16,11 @@
 #define COMANCHE_HSTORE_DEALLOCATOR_CC_H
 
 #include "heap_cc.h"
+#include "persistent.h"
 #include "persister_cc.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
+#include <type_traits> /* true_type, false_type */
 
 template <typename T, typename Persister>
 	class deallocator_cc;
@@ -27,28 +29,14 @@ template <>
 	class deallocator_cc<void, persister>
 	{
 	public:
-		using pointer = void *;
-		using const_pointer = const void *;
 		using value_type = void;
-		template <typename U>
-			struct rebind
-			{
-				using other = deallocator_cc<U, persister>;
-			};
 	};
 
 template <typename Persister>
 	class deallocator_cc<void, Persister>
 	{
 	public:
-		using pointer = void *;
-		using const_pointer = const void *;
 		using value_type = void;
-		template <typename U>
-			struct rebind
-			{
-				using other = deallocator_cc<U, Persister>;
-			};
 	};
 
 template <typename T, typename Persister = persister>
@@ -57,29 +45,12 @@ template <typename T, typename Persister = persister>
 	{
 		heap_cc _pool;
 	public:
-		using size_type = std::size_t;
-		using difference_type = std::ptrdiff_t;
-		using pointer = T*;
-		using const_pointer = const T*;
-		using reference = T &;
-		using const_reference = const T &;
 		using value_type = T;
-
-	template <typename U>
-		struct rebind
-		{
-			using other = deallocator_cc<U, Persister>;
-		};
-
-		explicit deallocator_cc(void *area_, std::size_t size_, Persister p_ = Persister())
-			: Persister(p_)
-			, _pool(area_, size_)
-		{}
-
-		explicit deallocator_cc(void *area_, Persister p_ = Persister())
-			: Persister(p_)
-			, _pool(area_)
-		{}
+		using persister_type = Persister;
+		using size_type = std::size_t;
+		using pointer_type = persistent_t<value_type *>;
+		using propagate_on_container_move_assignment = std::true_type;
+		using is_always_equal = std::false_type;
 
 		explicit deallocator_cc(const heap_cc &pool_, Persister p_ = Persister()) noexcept
 			: Persister(p_)
@@ -95,31 +66,24 @@ template <typename T, typename Persister = persister>
 
 		deallocator_cc &operator=(const deallocator_cc &e_) = delete;
 
-		pointer address(reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-		const_pointer address(const_reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-
+		/* For crash consistency testing only.
+		 * Some deallocations are for pointers which are themselves
+		 * marked persistent, and which are passed as such to the
+		 * deallocator. */
 		void deallocate(
-			pointer p
+			pointer_type & p
 			, size_type sz_
 		)
 		{
-			_pool.free(p, sizeof(T) * sz_);
-		}
-
-		auto max_size() const
-		{
-			return 8; /* reminder to provide a proper max size value */
+			/* What we might like to say, if persistent_t had the intelligence:
+			 * _pool->free(static_pointer_cast<void *>(&p), sizeof(T) * sz_);
+			 */
+			_pool->free(reinterpret_cast<persistent_t<void *> *>(&p), sizeof(T) * sz_);
 		}
 
 		void persist(const void *ptr, size_type len, const char * = nullptr) const
 		{
-			Persister::persist(ptr, len);
+			persister_type::persist(ptr, len);
 		}
 
 		auto pool() const

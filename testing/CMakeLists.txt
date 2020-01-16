@@ -1,5 +1,10 @@
 cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
+if(BOOTSTRAP_DEPS)
+else(BOOTSTRAP_DEPS)
 add_subdirectory(libnop)
 add_subdirectory(regression)
 add_subdirectory(ado-test)
+add_subdirectory(kv-test)
+add_subdirectory(eastl-test)
+endif(BOOTSTRAP_DEPS)

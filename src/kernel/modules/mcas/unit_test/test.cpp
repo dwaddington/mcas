@@ -1,11 +1,9 @@
 #include <api/ado_itf.h>
 #include <api/components.h>
-#include <chrono>
 #include <common/str_utils.h>
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <nupm/dax_map.h>
 #include <nupm/mcas_mod.h>
 #include <thread>
@@ -50,7 +48,7 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
   
   nupm::revoke_memory(token);
   size_t size = g_size;
-  char *pop = (char *)ddm.create_region(1234, 0, size);
+  char *pop = static_cast<char *>(ddm.create_region(1234, 0, size));
   memset(pop, 0, size);
   PLOG("touched memory.");
   strcpy(pop, "Hello!");
@@ -63,9 +61,9 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
 
 TEST_F(IADO_manager_proxy_test, Map) {
   size_t size = g_size;
-  char *addr = (char *)nupm::mmap_exposed_memory(token, size, ((void *)0xa00000000));
+  char *addr = static_cast<char *>(nupm::mmap_exposed_memory(token, size, reinterpret_cast<void *>(0xa00000000)));
   ASSERT_TRUE(addr);
-  PLOG("reading memory: %s, size: %d", addr, size);
+  PLOG("reading memory: %s, size: %zu", addr, size);
   strcpy(addr, "World!");
   PLOG("I have changed the memory: %s",addr);
 }

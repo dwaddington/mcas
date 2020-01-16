@@ -4,7 +4,7 @@ project(kernel-module-mcas)
 
 configure_file(Makefile.in ${CMAKE_CURRENT_SOURCE_DIR}/Makefile)
 
-#add_subdirectory(unit_test)
+add_subdirectory(unit_test)
 
 
 

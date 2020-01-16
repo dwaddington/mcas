@@ -4,6 +4,7 @@
 #define _MULTI_THREADED
 #include <common/exceptions.h>
 #include <pthread.h>
+#include <stdexcept>
 
 namespace Common
 {
@@ -39,17 +40,15 @@ class RWLock_guard {
 
  public:
   RWLock_guard(RWLock &lock, int mode = READ) : _lock(lock) {
-    int rc;
     if (mode == WRITE) {
       if (_lock.write_lock() != 0)
-        throw General_exception("failed to take write lock");
+        throw std::range_error("failed to take write lock");
     }
     else if (mode == READ) {
       if (_lock.read_lock() != 0)
-        throw General_exception("failed to take read lock");
+        throw std::range_error("failed to take read lock");
     }
-    else
-      throw API_exception("unexpected RWLock_guard mode (mode=%d)", mode);
+    else throw Logic_exception("unexpected RWLock_guard mode");
   }
 
   ~RWLock_guard() noexcept(false) {

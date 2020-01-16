@@ -16,6 +16,7 @@
 #define COMANCHE_HSTORE_SESSION_H
 
 #include "atomic_controller.h"
+#include "as_emplace.h"
 #include "construction_mode.h"
 
 #pragma GCC diagnostic push
@@ -28,6 +29,119 @@
 
 class Devdax_manager;
 
+struct lock_result
+{
+	enum class e_state
+	{
+		extant, created, not_created
+	} state;
+	Component::IKVStore::key_t key;
+	void *value;
+	std::size_t value_len;
+};
+
+#if USE_CC_HEAP == 4
+template <typename A>
+	class tentative_allocation_state;
+
+/* allocator making use of tentative_allocation_state */
+template <typename A>
+	struct tentative_allocator
+		: public A
+	{
+		using traits_type = std::allocator_traits<A>;
+		using value_type = typename traits_type::value_type;
+		using size_type = typename traits_type::size_type;
+
+		tentative_allocation_state<A> *tas;
+		tentative_allocator(const A &a_, tentative_allocation_state<A> *tas_)
+			: A(a_)
+			, tas(tas_)
+		{}
+
+		tentative_allocator(const tentative_allocator &) = default;
+		tentative_allocator& operator=(const tentative_allocator &) = default;
+
+		void allocate(
+			persistent<value_type *> & p_
+			, size_type s_
+			, size_type alignment_
+		);
+
+		void allocate(
+			value_type * & p_
+			, size_type s_
+			, size_type alignment_
+		);
+
+		template <typename U> struct rebind {
+			using other = tentative_allocator<typename traits_type::template rebind_alloc<U>>;
+		};
+	};
+
+/* tentative (and transient) allocation state */
+template <typename A>
+	class tentative_allocation_state
+	{
+		impl::allocation_state_emplace *_ase;
+		unsigned _allocation_index;
+		tentative_allocator<A> _a;
+	public:
+		tentative_allocation_state(const A &a_, impl::allocation_state_emplace *ase_)
+			: _ase(ase_)
+			, _allocation_index(0)
+			, _a(a_, this)
+		{}
+		tentative_allocation_state(const tentative_allocation_state &) = delete;
+		tentative_allocation_state& operator=(const tentative_allocation_state &) = delete;
+		auto allocator() const { return _a; }
+
+		/* record either of the two allocations which might occur during an emplace */
+		void record_allocation(void *p_)
+		{
+			if ( p_ )
+			{
+				assert(_allocation_index < 2);
+				_ase->record_allocation(_allocation_index, p_);
+				++_allocation_index;
+			}
+		}
+
+		~tentative_allocation_state()
+		{
+			_ase->clear(_a);
+		}
+	};
+
+template <typename A>
+	void tentative_allocator<A>::allocate(
+		persistent<value_type *> & p_
+		, size_type s_
+		, size_type alignment_
+	)
+	{
+		A::allocate(p_, s_, alignment_);
+		if ( p_ )
+		{
+			tas->record_allocation(p_);
+		}
+	}
+
+template <typename A>
+	void tentative_allocator<A>::allocate(
+		value_type * & p_
+		, size_type s_
+		, size_type alignment_
+	)
+	{
+		A::allocate(p_, s_, alignment_);
+		if ( p_ )
+		{
+			tas->record_allocation(p_);
+		}
+	}
+#endif
+
 /* open_pool_handle, alloc_t, table_t */
 template <typename Handle, typename Allocator, typename Table, typename LockType>
 	class session
@@ -37,9 +151,13 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		using lock_type_t = LockType;
 		using key_t = typename table_t::key_type;
 		using mapped_t = typename table_t::mapped_type;
+		using allocator_type = Allocator;
 		Allocator _heap;
 		table_t _map;
 		impl::atomic_controller<table_t> _atomic_state;
+#if USE_CC_HEAP == 4
+		impl::allocation_state_emplace *_ase;
+#endif
 		bool _debug;
 
 		class lock_impl
@@ -114,7 +232,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		template <typename OID, typename Persist>
 			explicit session(
 				OID
-#if USE_CC_HEAP == 1 || USE_CC_HEAP == 2
+#if USE_CC_HEAP == 2
 					heap_oid_
 #endif
 				, const pool_path &path_
@@ -125,23 +243,20 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			: Handle(std::move(pop_))
 			, _heap(
 				Allocator(
-#if USE_CC_HEAP == 0
-					this->pool()
-#elif USE_CC_HEAP == 1
-					*new
-						(pmemobj_direct(heap_oid_))
-						heap_cc(static_cast<char *>(pmemobj_direct(heap_oid_) + sizeof(heap_cc)))
-#elif USE_CC_HEAP == 2
+#if USE_CC_HEAP == 2
 					*new
 						(pmemobj_direct(heap_oid_))
 						heap_co(heap_oid_)
-#else /* USE_CC_HEAP */
+#elif USE_CC_HEAP == 3 || USE_CC_HEAP == 4
 					this->pool() /* not used */
 #endif /* USE_CC_HEAP */
 				)
 			)
 			, _map(persist_data_, _heap)
 			, _atomic_state(*persist_data_, _map)
+#if USE_CC_HEAP == 4
+			, _ase(&persist_data_->eas())
+#endif
 			, _debug(debug_)
 		{}
 
@@ -159,12 +274,15 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			)
 			, _map(&this->pool()->persist_data(), mode_, _heap)
 			, _atomic_state(this->pool()->persist_data(), _map, mode_)
+#if USE_CC_HEAP == 4
+			, _ase(&this->pool()->persist_data().ase())
+#endif
 			, _debug(debug_)
 		{}
 
 		~session()
 		{
-#if USE_CC_HEAP == 3
+#if USE_CC_HEAP == 3 || USE_CC_HEAP == 4
 			this->pool()->quiesce();
 #endif
 		}
@@ -182,6 +300,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		)
 		{
 			auto cvalue = static_cast<const char *>(value);
+#if USE_CC_HEAP == 3
 
 			return
 				map().emplace(
@@ -189,6 +308,23 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					, std::forward_as_tuple(key.begin(), key.end(), this->allocator())
 					, std::forward_as_tuple(cvalue, cvalue + value_len, this->allocator())
 				);
+#elif USE_CC_HEAP == 4
+			/* Start of an emplace. Storage allocated by this->allocator()
+			 * is to be disclaimed upon a restart unless
+			 *  (1) verified in-use by the map, or
+			 *  (2) forgotten by the tentative allocator going out of scope.
+			 */
+			tentative_allocation_state<allocator_type> tas(this->allocator(), _ase);
+
+			return
+				map().emplace(
+					std::piecewise_construct
+					, std::forward_as_tuple(key.begin(), key.end(), tas.allocator())
+					, std::forward_as_tuple(cvalue, cvalue + value_len, tas.allocator())
+				);
+#else
+#error unsupported USE_CC_HEAP
+#endif
 		}
 
 		void update_by_issue_41(
@@ -270,9 +406,9 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		}
 
 		void resize_mapped(
-                       const std::string &key
-                       , std::size_t new_mapped_len
-                       , std::size_t alignment
+			const std::string &key
+			, std::size_t new_mapped_len
+			, std::size_t alignment
 		)
 		{
 			definite_lock<std::string> dl(this->map(), key);
@@ -296,54 +432,100 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto lock(
 			const std::string &key
 			, lock_type_t type
-			, void *& out_value
-			, std::size_t & out_value_len
-		) -> Component::IKVStore::key_t
+			, void *const value
+			, const std::size_t value_len
+		) -> lock_result
 		{
+#if USE_CC_HEAP == 3
 			const auto p_key = key_t(key.begin(), key.end(), this->allocator());
-
 			try
 			{
 				mapped_t &val = this->map().at(p_key);
-				if ( ! try_lock(this->map(), type, p_key) )
-				{
-					return Component::IKVStore::KEY_NONE;
-				}
-				out_value = val.data();
-				out_value_len = val.size();
+				return {
+					lock_result::e_state::extant
+					, try_lock(this->map(), type, p_key)
+						? new lock_impl(key)
+						: Component::IKVStore::KEY_NONE
+					, val.data()
+					, val.size()
+				};
 			}
+#elif USE_CC_HEAP == 4
+			tentative_allocation_state<allocator_type> tas(this->allocator(), _ase);
+			const auto p_key = key_t(key.begin(), key.end(), tas.allocator());
+			try
+			{
+				mapped_t &val = this->map().at(p_key);
+				return {
+					lock_result::e_state::extant
+					, try_lock(this->map(), type, p_key)
+						? new lock_impl(key)
+						: Component::IKVStore::KEY_NONE
+					, val.data()
+					, val.size()
+				};
+			}
+#else
+#error unsupported USE_CC_HEAP
+#endif
 			catch ( const std::out_of_range & )
 			{
-				/* if the key is not found, we create it and
-				* allocate value space equal in size to out_value_len
-				*/
-				if ( _debug )
+				/* if the key is not found
+				 * we create it and allocate value space equal in size to
+				 * value_len
+				 */
+				if (
+					true
+/* Change: "key is not found AND the input length is not zero" */
+#if 1
+					&&
+					value_len != 0
+#endif
+				)
 				{
-					PLOG(PREFIX "allocating object %zu bytes", __func__, out_value_len);
+					if ( _debug )
+					{
+						PLOG(PREFIX "allocating object %zu bytes", __func__, value_len);
+					}
+
+#if USE_CC_HEAP == 3
+					auto r =
+						this->map().emplace(
+							std::piecewise_construct
+							, std::forward_as_tuple(p_key)
+							, std::forward_as_tuple(value_len, this->allocator())
+						);
+
+#elif USE_CC_HEAP == 4
+					auto r =
+						this->map().emplace(
+							std::piecewise_construct
+							, std::forward_as_tuple(p_key)
+							, std::forward_as_tuple(value_len, tas.allocator())
+						);
+
+#else
+#error unsupported USE_CC_HEAP
+#endif
+					if ( ! r.second )
+					{
+						return { lock_result::e_state::extant, Component::IKVStore::KEY_NONE, value, value_len };
+					}
+
+					return {
+						lock_result::e_state::created
+						, try_lock(this->map(), type, p_key)
+							? new lock_impl(key)
+							: Component::IKVStore::KEY_NONE
+						, r.first->second.data()
+						, r.first->second.size()
+					};
 				}
-
-				auto r =
-					this->map().emplace(
-						std::piecewise_construct
-						, std::forward_as_tuple(p_key)
-						, std::forward_as_tuple(out_value_len, this->allocator())
-					);
-
-				if ( ! r.second )
+				else
 				{
-					return Component::IKVStore::KEY_NONE;
-				}
-
-				out_value = r.first->second.data();
-				out_value_len = r.first->second.size();
-
-				if ( ! try_lock(this->map(), type, p_key) )
-				{
-					assert(nullptr == "try_lock should always return true for a new key");
-					return Component::IKVStore::KEY_NONE;
+					return { lock_result::e_state::not_created, Component::IKVStore::KEY_NONE, value, value_len };
 				}
 			}
-			return new lock_impl(key);
 		}
 
 		auto unlock(Component::IKVStore::key_t key_) -> status_t
@@ -418,17 +600,17 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto map(
 			std::function
 			<
-				int(const std::string &key, const void *val, std::size_t val_len)
+				int(const void * key, std::size_t key_len,
+				const void * val, std::size_t val_len)
 			> function
 		) -> void
 		{
 			for ( auto &mt : this->map() )
 			{
 				const auto &pstring = mt.first;
-				/* C++17 note: std::string_view would avoid the temporary */
-				std::string s(static_cast<const char *>(pstring.data()), pstring.size());
 				const auto &mapped = mt.second;
-				function(s, mapped.data(), mapped.size());
+				function(reinterpret_cast<const void*>(pstring.data()),
+				pstring.size(), mapped.data(), mapped.size());
 			}
 
 		}
@@ -465,19 +647,21 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			, std::size_t alignment
 		)
 		{
-			if ( alignment < sizeof(void*) )
+			if ( alignment != 0 && alignment < sizeof(void*) )
 			{
-				throw std::invalid_argument("alignment < sizeof(*void*)");
+				throw std::invalid_argument("alignment < sizeof(void*)");
 			}
 			if ( (alignment & (alignment - 1)) != 0 )
 			{
 				throw std::invalid_argument("alignment is not a power of 2");
 			}
-			if ( size % alignment != 0 )
-			{
-				throw std::invalid_argument("alignment does not divide size");
-			}
-			return allocator().allocate(size, alignment);
+
+#if USE_CC_HEAP == 4
+			/* ERROR: leaks memory on a crash */
+#endif
+			persistent_t<char *> p = nullptr;
+			allocator().allocate(p, size, alignment);
+			return p;
 		}
 
 		void free_memory(
@@ -485,7 +669,11 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			, size_t size
 		)
 		{
-			allocator().deallocate(static_cast<char *>(const_cast<void *>(addr)), size, std::max(std::size_t(1), size));
+			persistent_t<char *> p = static_cast<char *>(const_cast<void *>(addr));
+#if USE_CC_HEAP == 4
+			/* ERROR: leaks memory on a crash */
+#endif
+			allocator().deallocate(p, size);
 		}
 
 		unsigned percent_used() const

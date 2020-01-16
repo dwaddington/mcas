@@ -70,8 +70,22 @@ public:
                                   void * local_vaddr,
                                   size_t len) override;
 
-
-  status_t do_work(const uint64_t work_key,
+  /**
+   * @brief      Main call into plugin
+   *
+   * @param[in]  work_key               The work key
+   * @param[in]  key                    The key
+   * @param      shard_value_vaddr      The shard value vaddr
+   * @param[in]  value_len              The value length
+   * @param[in]  in_work_request        In work request
+   * @param[in]  in_work_request_len    In work request length
+   * @param      out_work_response      The out work response
+   * @param      out_work_response_len  The out work response length
+   *
+   * @return     { S_OK on success }
+   */
+  status_t do_work(ADO_protocol_buffer::space_ptr_t & buffer,
+                   const uint64_t work_key,
                    const std::string& key,
                    void * shard_value_vaddr,
                    size_t value_len,
@@ -93,7 +107,7 @@ private:
                          const size_t alignment) {
     void * ptr = nullptr;
     status_t rc;
-    if((rc=_cb.allocate_pool_memory_func(work_id, size, alignment, ptr)) != S_OK)
+    if((rc=_cb.allocate_pool_memory(work_id, size, alignment, ptr)) != S_OK)
       throw General_exception("allocate memory callback failed (%d)", rc);
     return ptr;
   }
@@ -101,7 +115,7 @@ private:
   void free_memory(const uint64_t work_id,
                    const size_t size,
                    void * addr) {
-    if(_cb.free_pool_memory_func(work_id, size, addr) != S_OK)
+    if(_cb.free_pool_memory(work_id, size, addr) != S_OK)
       throw General_exception("free memory callback failed");
   }
 

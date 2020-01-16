@@ -36,13 +36,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void hexdump(const void *data, const unsigned len) {
-  printf("HEXDUMP----------------------------------------------");
+void hexdump(const void *data, const size_t len) {
+  printf("HEXDUMP-(%p)---------------------------------------------", data);
   assert(len > 0);
-  uint8_t *d = (uint8_t *) data;
-  for (unsigned i = 0; i < len; i++) {
+  const uint8_t *d = static_cast<const uint8_t *>(data);
+  for (size_t i = 0; i < len; i++) {
     if (i % 16 == 0) {
-      printf("\n0x%x:\t", i);
+      printf("\n0x%zx:\t", i);
     }
     printf("%x%x ", 0xf & (d[i] >> 4), 0xf & d[i]);
   }
@@ -50,13 +50,13 @@ void hexdump(const void *data, const unsigned len) {
   fflush(0);
 }
 
-void asciidump(const void *data, const unsigned len) {
-  printf("ASCIIDUMP----------------------------------------------");
+void asciidump(const void *data, const size_t len) {
+  printf("ASCIIDUMP-(%p)---------------------------------------------", data);
   assert(len > 0);
-  uint8_t *d = (uint8_t *) data;
-  for (unsigned i = 0; i < len; i++) {
+  const uint8_t *d = static_cast<const uint8_t *>(data);
+  for (size_t i = 0; i < len; i++) {
     if (i % 16 == 0) {
-      printf("\n0x%x:\t", i);
+      printf("\n0x%zx:\t", i);
     }
     printf("%c%c ", 0xf & (d[i] >> 4), 0xf & d[i]);
   }

@@ -401,7 +401,7 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   assert(self->_mcas);
   assert(self->_pool);
 
-  std::string request(command, strlen(command));
+  std::string request(command);
   assert(request.size() > 0);
 
   std::string out_response;
@@ -607,10 +607,7 @@ static PyObject * pool_find_key(Pool* self, PyObject *args, PyObject *kwds)
     return tuple;
   }
   else if(hr == E_FAIL) {
-    auto tuple = PyTuple_New(2);
-    PyTuple_SetItem(tuple, 0, Py_None);
-    PyTuple_SetItem(tuple, 1, Py_None);
-    return tuple;
+    return Py_None;
   }
   else {
     std::stringstream ss;

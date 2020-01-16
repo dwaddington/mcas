@@ -12,9 +12,17 @@
 */
 
 /*< #included in shard.cpp */
+#include "resource_unavailable.h"
+#include "mcas_config.h"
+#include "config_file.h" // includes rapidjson
+#include <sstream>
 #include <api/ado_itf.h>
 #include <nupm/mcas_mod.h>
+#include <common/errors.h>
+#include <common/exceptions.h>
 #include <cstdint> /* PRIu64 */
+
+#pragma GCC diagnostic push
 
 #ifdef PROFILE
 #include <gperftools/profiler.h>
@@ -22,10 +30,16 @@
 
 //#define SHORT_CIRCUIT_ADO_HANDLING
 
-status_t Shard::conditional_bootstrap_ado_process(Connection_handler* handler,
+status_t Shard::conditional_bootstrap_ado_process(Component::IKVStore* kvs,
+                                                  Connection_handler* handler,
                                                   Component::IKVStore::pool_t pool_id,
-                                                  Component::IADO_proxy *& ado)
+                                                  Component::IADO_proxy*& ado,
+                                                  pool_desc_t& desc)
 {
+  assert(pool_id);
+  assert(kvs);
+  assert(handler);
+  
   /* ADO processes are instantiated on a per-pool basis.  First
      check if an ADO process already exists.
   */
@@ -40,11 +54,20 @@ status_t Shard::conditional_bootstrap_ado_process(Connection_handler* handler,
     args.push_back(_default_ado_plugin);
 
     //    if (option_DEBUG > 2)
-    PLOG("Launching ADO path: (%s), plugin (%s)", _default_ado_path.c_str(), _default_ado_plugin.c_str());
+    PINF("Launching ADO path: (%s), plugin (%s)", _default_ado_path.c_str(), _default_ado_plugin.c_str());
 
-    ado = _i_ado_mgr->create(pool_id, _default_ado_path, args, 0);
+    ado = _i_ado_mgr->create(handler->auth_id(),
+                             kvs,
+                             pool_id,
+                             desc.name, // pool name
+                             desc.size, // pool_size,
+                             desc.flags, // const unsigned int pool_flags,
+                             desc.expected_obj_count, //const uint64_t expected_obj_count,
+                             _default_ado_path,
+                             args,
+                             0);
 
-    if (option_DEBUG > 2)
+    if (_debug_level > 2)
       PLOG("ADO process launched OK.");
 
     assert(ado);
@@ -57,38 +80,37 @@ status_t Shard::conditional_bootstrap_ado_process(Connection_handler* handler,
 
   /* conditionally bootstrap ADO */
   if(bootstrap) {
-    auto rc = ado->bootstrap_ado();
+    auto rc = ado->bootstrap_ado(desc.opened_existing);
     if(rc != S_OK) {
       return rc;
     }
 
     /* exchange memory mapping information */
-    if(nupm::check_mcas_kernel_module()) {
+    if(check_xpmem_module()) { //nupm::check_mcas_kernel_module()) {
 
       std::vector<::iovec> regions;
       auto rc = _i_kvstore->get_pool_regions(pool_id, regions);
-      if(rc != S_OK)
+      if(rc != S_OK) {
+        PWRN("cannot get pool regions; unable to map to ADO");
         return rc;
+      }
 
       for(auto& r: regions) {
 
-        /* expose memory - for the moment use the address as the token */
-        uint64_t token = reinterpret_cast<uint64_t>(r.iov_base);
+        r.iov_len = round_up_page(r.iov_len); // hack
+        xpmem_segid_t seg_id = ::xpmem_make(r.iov_base,
+                                                r.iov_len,
+                                                XPMEM_PERMIT_MODE,
+                                                reinterpret_cast<void *>(0666));
+        if(seg_id == -1)
+          throw Logic_exception("xpmem_make failed unexpectedly");
 
-        nupm::revoke_memory(token); /*remove any existing registrations */
-        if(nupm::expose_memory(token,
-                               r.iov_base,
-                               r.iov_len) != S_OK) {
-          PWRN("Shard: failed to expose memory to ADO");
-          continue;
-        }
-        ado->send_memory_map(token, r.iov_len, r.iov_base);
+        ado->send_memory_map(seg_id, r.iov_len, r.iov_base);
 
-        if (option_DEBUG > 2)
-          PLOG("Shard: exposed region: %p %lu", r.iov_base, r.iov_len);
+        if (_debug_level > 2)
+          PLOG("Shard_ado: exposed region: %p %lu", r.iov_base, r.iov_len);
       }
     }
-
 
 #if defined(PROFILE) && defined(PROFILE_POST_ADO)
     PLOG("Starting profiler");
@@ -102,13 +124,21 @@ status_t Shard::conditional_bootstrap_ado_process(Connection_handler* handler,
 void Shard::process_put_ado_request(Connection_handler* handler,
                                     Protocol::Message_put_ado_request* msg)
 {
-  Component::IADO_proxy * ado;
-  status_t rc;
+  using namespace Component;
   
+  IADO_proxy * ado = nullptr;
+  status_t rc;
+  IKVStore::key_t key_handle = 0;
+  auto locktype = IKVStore::STORE_LOCK_WRITE;
+  void * value = nullptr;
+  size_t value_len = 0;
+  bool new_root = false;
+
   static const auto error_func = [&](const char * message) {
     auto response_iob = handler->allocate();
     auto response = new (response_iob->base())
     Protocol::Message_ado_response(response_iob->length(),
+                                   E_FAIL,
                                    handler->auth_id(),
                                    msg->request_id,
                                    const_cast<char*>(message),
@@ -128,41 +158,117 @@ void Shard::process_put_ado_request(Connection_handler* handler,
     return;
   }
 
-  conditional_bootstrap_ado_process(handler, msg->pool_id, ado);
+  /* ADO should already be running */
+  ado = _ado_map[msg->pool_id].first;
+  assert(ado);
 
-  assert(msg->value_len() > 0);
-
-  rc = _i_kvstore->put(msg->pool_id,
-                       msg->key(),
-                       msg->value(),
-                       msg->value_len());
-  if(rc != S_OK)
-    throw General_exception("put_ado_invoke: put failed");
-  
-  Component::IKVStore::key_t key_handle;
-  auto locktype = Component::IKVStore::STORE_LOCK_ADO;
-  void * value = nullptr;
-  size_t value_len;
-  
-  if(_i_kvstore->lock(msg->pool_id,
-                      msg->key(),
-                      locktype,
-                      value,
-                      value_len,
-                      key_handle) != S_OK) {
-      error_func("ADO!ALREADY_LOCKED");
-      return;
+  if(msg->value_len() == 0) {
+    error_func("ADO!ZERO_VALUE_LEN");
+    return;
   }
 
-  if(key_handle == Component::IKVStore::KEY_NONE)
-    throw Logic_exception("lock gave KEY_NONE");
+  /* option ADO_FLAG_NO_OVERWRITE means that we don't copy
+     value in if the key-value already exists */
+  bool value_already_exists = false;
+  if((msg->flags & IMCAS::ADO_FLAG_NO_OVERWRITE) ||
+     (msg->flags & IMCAS::ADO_FLAG_DETACHED)) {
 
-  if (option_DEBUG > 2)
+    std::vector<uint64_t> answer;
+    std::string key(msg->key());
+    
+    if(_i_kvstore->get_attribute(msg->pool_id,
+                                 IKVStore::Attribute::VALUE_LEN,
+                                 answer,
+                                 &key) != IKVStore::E_KEY_NOT_FOUND) {
+      /* already exists */
+      value_already_exists = true;
+    }
+  }
+
+  /* if ADO_FLAG_DETACHED and we need to create root value */
+  if((msg->flags & IMCAS::ADO_FLAG_DETACHED) && (msg->root_val_len > 0)) {
+      value_len = msg->root_val_len;
+
+      status_t s = _i_kvstore->lock(msg->pool_id,
+                                    msg->key(),
+                                    locktype,
+                                    value,
+                                    value_len,
+                                    key_handle);
+      if(s < S_OK) {
+        error_func("ADO!ALREADY_LOCKED");
+        return;
+      }
+      if(key_handle == IKVStore::KEY_NONE)
+        throw Logic_exception("lock gave KEY_NONE");
+
+      new_root = (s == S_OK_CREATED) ? true : false;
+  }
+
+  void * detached_val_ptr = nullptr;
+  size_t detached_val_len = 0;
+
+  /* NOTE: this logic needs reviewing to ensure appropriate
+     semantics for different flag combinations */
+  
+  if(msg->flags & IMCAS::ADO_FLAG_DETACHED) {
+    /* detached value request */
+    rc = _i_kvstore->allocate_pool_memory(msg->pool_id,
+                                          msg->value_len(),
+                                          8, /* alignment */
+                                          detached_val_ptr);
+    if(rc != S_OK) {
+      PWRN("allocate_pool_memory for detached value failed (len=%lu, rc=%d)", msg->value_len(), rc);
+      error_func("ADO!OUT_OF_MEMORY");
+      return;
+    }
+    detached_val_len = msg->value_len();
+    memcpy(detached_val_ptr, msg->value(), detached_val_len);
+
+    if (_debug_level > 2)
+      PLOG("Shard_ado: allocated detached memory (%p,%lu)", detached_val_ptr, detached_val_len);
+  }
+  else if(value_already_exists && (msg->flags & IMCAS::ADO_FLAG_NO_OVERWRITE)) {
+    /* do nothing, drop through */
+  }
+  else {
+    /* write value passed with invocation message */
+    rc = _i_kvstore->put(msg->pool_id,
+                         msg->key(),
+                         msg->value(),
+                         msg->value_len());
+    if(rc != S_OK)
+      throw Logic_exception("put_ado_invoke: put failed");
+  }
+
+  /*------------------------------------------------------------------ 
+     Lock kv pair if needed, then create a work request and send to 
+     the ADO process via UIPC
+  */
+  if(!value) { /* now take the lock if not already locked */
+    if(_i_kvstore->lock(msg->pool_id,
+                        msg->key(),
+                        locktype,
+                        value,
+                        value_len,
+                        key_handle) != S_OK) {
+      error_func("ADO!ALREADY_LOCKED");
+      return;
+    }
+    if(key_handle == IKVStore::KEY_NONE)
+      throw Logic_exception("lock gave KEY_NONE");
+  }
+
+  if(_debug_level > 2)
     PLOG("Shard_ado: locked KV pair (value=%p, value_len=%lu)", value, value_len);
 
   /* register outstanding work */
   auto wr = _wr_allocator.allocate();
-  *wr = { msg->pool_id, key_handle, locktype, msg->request_id, msg->flags };
+  *wr = { msg->pool_id,
+          key_handle,
+          locktype,
+          msg->request_id,
+          msg->flags };
 
   auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
   _outstanding_work.insert(wr_key);
@@ -172,23 +278,32 @@ void Shard::process_put_ado_request(Connection_handler* handler,
   /* now send the work request */
   ado->send_work_request(wr_key,
                          msg->key(),
-                         value, value_len,
+                         value,
+                         value_len,
+                         detached_val_ptr,
+                         detached_val_len,
                          msg->request(),
-                         msg->request_len());
+                         msg->request_len(),
+                         new_root);
 
-  if (option_DEBUG > 2)
+  if (_debug_level > 2)
     PLOG("Shard_ado: sent work request (len=%lu, key=%lx)", msg->request_len(), wr_key);
 }
+
+
 
 void Shard::process_ado_request(Connection_handler* handler,
                                 Protocol::Message_ado_request* msg)
 {
-  Component::IADO_proxy * ado;
+  using namespace Component;
   
+  IADO_proxy * ado;
+
   static const auto error_func = [&](const char * message) {
     auto response_iob = handler->allocate();
     auto response = new (response_iob->base())
     Protocol::Message_ado_response(response_iob->length(),
+                                   E_FAIL,
                                    handler->auth_id(),
                                    msg->request_id,
                                    const_cast<char*>(message),
@@ -197,6 +312,9 @@ void Shard::process_ado_request(Connection_handler* handler,
     response_iob->set_length(response->message_size());
     handler->post_send_buffer(response_iob);
   };
+
+  if(_debug_level > 2)
+    PLOG("Shard_ado: process_ado_request");
 
 #ifdef SHORT_CIRCUIT_ADO_HANDLING
   error_func("ADO!SC");
@@ -208,34 +326,100 @@ void Shard::process_ado_request(Connection_handler* handler,
     return;
   }
 
-  conditional_bootstrap_ado_process(handler, msg->pool_id, ado);
+  if(msg->flags & IMCAS::ADO_FLAG_DETACHED) { /* not valid for plain invoke_ado */
+    error_func("ADO!INVALID_ARGS");
+    return;
+  }
 
-  /* get key-value pair */
   void * value = nullptr;
   size_t value_len = msg->ondemand_val_len;
+  
+  /* handle ADO_FLAG_CREATE_ONLY - no invocation to ADO is made */
+  if(msg->flags & IMCAS::ADO_FLAG_CREATE_ONLY) {
 
-  // if(value_len == 0) {
-  //   error_func("ADO!E_INVAL");
-  //   return;
-  // }
-
-  Component::IKVStore::key_t key_handle;
-  auto locktype = Component::IKVStore::STORE_LOCK_ADO;
-  if(_i_kvstore->lock(msg->pool_id,
-                      msg->key(),
-                      locktype,
-                      value,
-                      value_len,
-                      key_handle) != S_OK)
-    {
-      error_func("ADO!ALREADY_LOCKED");
+    std::vector<uint64_t> answer;
+    std::string key(msg->key());
+    if(_i_kvstore->get_attribute(msg->pool_id,
+                                 IKVStore::Attribute::VALUE_LEN,
+                                 answer,
+                                 &key) != IKVStore::E_KEY_NOT_FOUND) {
+      error_func("ADO!ALREADY_EXISTS");
+      if(_debug_level > 1)
+        PWRN("process_ado_request: ADO_FLAG_CREATE_ONLY, key already exists");
       return;
     }
+    
+    IKVStore::key_t key_handle;
+    status_t s = _i_kvstore->lock(msg->pool_id,
+                                  msg->key(),
+                                  IKVStore::STORE_LOCK_READ,
+                                  value,
+                                  value_len,
+                                  key_handle);
+    if(s < S_OK) {
+      error_func("ADO!ALREADY_LOCKED");
+      if(_debug_level > 1)
+        PWRN("process_ado_request: key already locked");
+      return;
+    }
+    
+    if(_i_kvstore->unlock(msg->pool_id, key_handle) != S_OK)
+      throw Logic_exception("unable to unlock after lock");
 
-  if(key_handle == Component::IKVStore::KEY_NONE)
+    /* copy value address into response */
+    auto response_iob = handler->allocate();
+    auto response = new (response_iob->base())
+      Protocol::Message_ado_response(response_iob->length(),
+                                     S_OK,
+                                     handler->auth_id(),
+                                     msg->request_id,
+                                     &value, 
+                                     sizeof(value));
+    response->set_status(S_OK);
+    response_iob->set_length(response->message_size());
+    handler->post_send_buffer(response_iob);
+    return;
+  }
+
+  /* check for ADO_FLAG_CREATE_ON_DEMAND */
+  // if(!(msg->flags & IMCAS::ADO_FLAG_CREATE_ON_DEMAND)) {
+  //   std::vector<uint64_t> answer;
+  //   std::string key(msg->key());
+  //   if(_i_kvstore->get_attribute(msg->pool_id,
+  //                                IKVStore::Attribute::VALUE_LEN,
+  //                                answer,
+  //                                &key) != IKVStore::E_KEY_NOT_FOUND) {
+  //     error_func("ADO!ALREADY_EXISTS");
+  //     if(option_DEBUG > 1)
+  //       PWRN("process_ado_request: key already exists with ADO_FLAG_CREATE_ON_DEMAND");
+  //     return;
+  //   }
+  // }
+
+  /*  ADO should already be running */
+  ado = _ado_map[msg->pool_id].first;
+  assert(ado);
+
+  /* get key-value pair */
+  IKVStore::key_t key_handle;
+  auto locktype = IKVStore::STORE_LOCK_WRITE;
+  status_t s = _i_kvstore->lock(msg->pool_id,
+                                msg->key(),
+                                locktype,
+                                value,
+                                value_len,
+                                key_handle);
+  if(s < S_OK) {
+    error_func("ADO!ALREADY_LOCKED");
+    if(_debug_level > 1)
+      PWRN("process_ado_request: key already locked");
+    return;
+  }
+
+  if(key_handle == IKVStore::KEY_NONE)
     throw Logic_exception("lock gave KEY_NONE");
 
-  if (option_DEBUG > 2)
+  if (_debug_level > 2)
     PLOG("Shard_ado: locked KV pair (value=%p, value_len=%lu)", value, value_len);
 
   /* register outstanding work */
@@ -251,10 +435,12 @@ void Shard::process_ado_request(Connection_handler* handler,
   ado->send_work_request(wr_key,
                          msg->key(),
                          value, value_len,
+                         nullptr, 0,
                          msg->request(),
-                         msg->request_len());
+                         msg->request_len(),
+                         (s == S_OK_CREATED));
 
-  if (option_DEBUG > 2)
+  if (_debug_level > 2)
     PLOG("Shard_ado: sent work request (len=%lu, key=%lx)", msg->request_len(), wr_key);
 
   /* for "asynchronous" calls we don't send a message
@@ -266,231 +452,547 @@ void Shard::process_ado_request(Connection_handler* handler,
 }
 
 
-/** 
- * Handle messages coming back from the ADO process
- * 
+/**
+ * Handle messages coming back from the ADO process.
+ *
  */
 void Shard::process_messages_from_ado()
 {
+  using namespace Component;
+  
   for(auto record: _ado_map) { /* for each ADO process */
 
-    Component::IADO_proxy* ado = record.second.first;
+    IADO_proxy* ado = record.second.first;
     Connection_handler * handler = record.second.second;
 
     assert(ado);
     assert(handler);
 
     {
+      work_request_key_t request_key = 0;
+      status_t response_status = E_FAIL;
       void * response = nullptr;
       size_t response_len = 0;
-      work_request_key_t request_key = 0;
-      status_t response_status;
-
-      /* work completion */
-      while(ado->check_work_completions(request_key, response_status, response, response_len)) {
-
-        auto work_item = _outstanding_work.find(request_key);
-        if( work_item == _outstanding_work.end() )
-          throw General_exception("bad record key from ADO (0x%" PRIx64 ")", request_key);
-
-        auto request_record = request_key_to_record(request_key);
-
-        if (option_DEBUG > 2)
-          PMAJOR("Shard: collected WORK completion (request_record=%p)", request_record);
-
-        _outstanding_work.erase(work_item);
-
-        /* unlock the KV pair */
-        if( _i_kvstore->unlock(request_record->pool,
-                               request_record->key_handle) != S_OK)
-          throw Logic_exception("unlock for KV after ADO work completion failed");
-
-        if (option_DEBUG > 2)
-          PLOG("Unlocked KV pair (pool=%lx, key_handle=%p)", request_record->pool, request_record->key_handle);
-
-        /* unlock deferred locks, e.g., resulting from table operation create */
+      
+      IADO_plugin::response_buffer_vector_t response_buffers;
+      /* ADO work completion */
+      while (ado->check_work_completions(request_key,
+                                         response_status,
+                                         response,
+                                         response_len,
+                                         response_buffers))
         {
-          std::vector<Component::IKVStore::key_t> keys_to_unlock;
-          ado->get_deferred_unlocks(request_key, keys_to_unlock);
-          for(auto k: keys_to_unlock) {
-            if(_i_kvstore->unlock(request_record->pool, k) != S_OK)
-              throw Logic_exception("deferred unlock failed");
-            PLOG("Shard: deferred unlock (%p)", static_cast<void*>(k));
-          }
-        }
+          if(response_status > 0 || response_status < E_ERROR_BASE)
+            response_status = E_FAIL;
+          
+          if(_debug_level > 2)
+            PLOG("Shard_ado: check_work_completions(response_status=%d, response_len=%lu,response_buffers=%lu)",
+               response_status, response_len, response_buffers.size());
+          
+          auto work_item = _outstanding_work.find(request_key);
+          if( work_item == _outstanding_work.end() )
+            throw General_exception("bad work request key from ADO (0x%" PRIx64 ")", request_key);
 
-        /* for async, save failed requests */
-        if(request_record->is_async())  {
+          auto request_record = request_key_to_record(request_key);
 
-          /* if the ADO operation response is bad, safe it for
-             later, otherwise don't do anything */
-          if(response_status != S_OK) {
-            if(option_DEBUG > 2)
-              PWRN("Shard: saving ADO completion failure");
-            _failed_async_requests.push_back(request_record);
+          if (_debug_level > 2) {
+            PMAJOR("Shard_ado: collected WORK completion (request_record=%p response_len=%lu)", request_record, response_len);
+            for(auto r: response_buffers) {
+              PMAJOR("Shard_ado: returning pool reference (%p,%lu)",r.ptr,r.len);
+            }
           }
-          else {
-            if(option_DEBUG > 2)
-              PWRN("Shard: async ADO completion OK!");
-          }
-        }
-        else /* for sync, give response */
+
+          _outstanding_work.erase(work_item);
+
+          /* unlock the KV pair */
+          if( _i_kvstore->unlock(request_record->pool,
+                                 request_record->key_handle) != S_OK)
+            throw Logic_exception("unlock for KV after ADO work completion failed");
+
+          if (_debug_level > 2)
+            PLOG("Shard_ado: unlocked KV pair (pool=%lx, key_handle=%p)", request_record->pool, request_record->key_handle);
+
+          /* unlock deferred locks, e.g., resulting from table operation create */
           {
-            auto iob = handler->allocate();
-
-            auto response_msg = new (iob->base())
-              Protocol::Message_ado_response(iob->length(),
-                                             handler->auth_id(),
-                                             request_record->request_id,
-                                             response, /* this will copy the response data */
-                                             response_len);
-
-            response_msg->set_status(S_OK);
-            iob->set_length(response_msg->message_size());
-            handler->post_send_buffer(iob);
-
-            ::free(response); /* free response data allocated by ADO plugin */
+            std::vector<IKVStore::key_t> keys_to_unlock;
+            ado->get_deferred_unlocks(request_key, keys_to_unlock);
+            for(auto k: keys_to_unlock) {
+              if(_i_kvstore->unlock(request_record->pool, k) != S_OK)
+                throw Logic_exception("deferred unlock failed");
+              PLOG("Shard_ado: deferred unlock (%p)", static_cast<void*>(k));
+            }
           }
-        _wr_allocator.free_wr(request_record);
-      }
+
+          /* for async, save failed requests */
+          if(request_record->is_async())  {
+
+            /* if the ADO operation response is bad, safe it for
+               later, otherwise don't do anything */
+            if(response_status < S_OK) {
+              if(_debug_level > 2)
+                PWRN("Shard_ado: saving ADO completion failure");
+              _failed_async_requests.push_back(request_record);
+            }
+            else {
+              if(_debug_level > 2)
+                PWRN("Shard_ado: async ADO completion OK!");
+            }
+          }
+          else /* for sync, give response */
+            {
+              auto iob = handler->allocate();
+
+              auto response_msg = new (iob->base())
+                Protocol::Message_ado_response(iob->length(),
+                                               response_status,
+                                               handler->auth_id(),
+                                               request_record->request_id,
+                                               response, /* this will copy the response data */
+                                               response_len);
+
+              /* TODO: for the moment copy pool buffers in, we should
+                 be able to do zero copy though.
+               */
+              size_t appended_buffer_size = 0;
+              for(auto& rb: response_buffers) {
+                response_msg->append_buffer(rb.ptr, boost::numeric_cast<uint32_t>(rb.len));
+                appended_buffer_size += rb.len;
+              }
+            
+              iob->set_length(response_msg->message_size());
+              
+              handler->post_send_buffer(iob);
+              ::free(response); /* free response data allocated by ADO plugin */
+            }
+          _wr_allocator.free_wr(request_record);
+        }
     }
 
-    /* table requests (e.g., create new KV pair) */
-    uint64_t work_id;
-    int op;
-    std::string key;
-    size_t value_len;
-    size_t align;
-    void * addr;
+    uint64_t work_id = 0; /* maps to record of pool, key handle, lock type, request id etc. */
+    ADO_op op = ADO_op::UNDEFINED;
+    std::string key, key_expression;
+    size_t value_len = 0;
+    size_t align_or_flags = 0;
+    void * addr = nullptr;
+    offset_t begin_pos = 0;
+    int find_type = 0;
+    uint32_t max_comp = 0;
+    epoch_time_t t_begin = 0, t_end = 0;
+    Component::IKVStore::pool_iterator_t iterator = nullptr;
+    
+    Buffer_header * buffer;
 
-    while(ado->check_table_ops(work_id, op, key, value_len, align, addr))
+    /* process callbacks from ADO */
+    while(ado->recv_callback_buffer(buffer) == S_OK)
       {
-        switch(op) {
-        case Component::IADO_proxy::OP_CREATE:
-        case Component::IADO_proxy::OP_OPEN:
-          {
-            PLOG("Shard: received table op create/open");
-            Component::IKVStore::key_t key_handle;
-            void * value = nullptr;
+      /* handle TABLE OPERATIONS */
+      if(ado->check_table_ops(buffer,
+                              work_id,
+                              op,
+                              key,
+                              value_len,
+                              align_or_flags,
+                              addr))
+        {
+          switch(op) {
+          case ADO_op::CREATE:
+            {
+              std::vector<uint64_t> val;
+              if(_i_kvstore->get_attribute(ado->pool_id(),
+                                           IKVStore::VALUE_LEN,
+                                           val,
+                                           &key) != IKVStore::E_KEY_NOT_FOUND) {
+                if(_debug_level > 2)
+                  PERR("Shard_ado: table op CREATE, key-value pair already exists");
 
-            if(_i_kvstore->lock(ado->pool_id(),
-                                key,
-                                Component::IKVStore::STORE_LOCK_ADO,
-                                value,
-                                value_len,
-                                key_handle) != S_OK)
-              throw General_exception("ADO OP_CREATE/OP_OPEN request failed");
+                if(align_or_flags & IKVStore::FLAGS_CREATE_ONLY) {
+                  ado->send_table_op_response(E_ALREADY_EXISTS, nullptr, 0);
+                  break;
+                }
+              }
+              goto open; /* stop compiler complaining about flow through*/
+            }
+          case ADO_op::OPEN:
+            open:
+            {
+              if(_debug_level > 2)
+                PLOG("Shard_ado: received table op create/open (%s)", key.c_str());
 
-            if(option_DEBUG > 2)
-              PLOG("Shard: locked KV pair (%p, %p,%lu)", static_cast<void*>(key_handle), value, value_len);
+              IKVStore::key_t key_handle;
+              void * value = nullptr;
 
-            ado->add_deferred_unlock(work_id, key_handle);
-            ado->send_table_op_response(S_OK, static_cast<void*>(value), value_len);
+              bool invoke_completion_unlock = !(align_or_flags & IADO_plugin::FLAGS_PERMANENT_LOCK);
+
+              status_t rc = _i_kvstore->lock(ado->pool_id(),
+                                             key,
+                                             IKVStore::STORE_LOCK_WRITE,
+                                             value,
+                                             value_len,
+                                             key_handle);
+
+              if(rc < S_OK || key_handle == nullptr) {  /* to fix, store should return error code */
+                if(_debug_level > 2 || true)
+                  PLOG("Shard_ado: locked failed");
+                ado->send_table_op_response(rc, reinterpret_cast<void*>(-1L), 0);
+              }
+              else
+                {
+                  if(_debug_level > 2)
+                    PLOG("Shard_ado: locked KV pair (keyhandle=%p, value=%p,len=%lu) invoke_completion_unlock=%d",
+                         static_cast<void*>(key_handle), value, value_len, invoke_completion_unlock);
+
+                  add_index_key(ado->pool_id(), key);
+
+                  /* auto-unlock means we add a deferred unlock that happens after
+                     the ado invocation (identified by work_id) has completed. */
+                  if(invoke_completion_unlock) {
+                    if(work_id == 0) {
+                      ado->send_table_op_response(E_INVAL, reinterpret_cast<void*>(-1L), 0);
+                    }
+                    else {
+                      try {
+                        ado->add_deferred_unlock(work_id, key_handle);
+                      }
+                      catch(std::range_error e) {
+                        ado->send_table_op_response(E_MAX_REACHED,
+                                                    reinterpret_cast<void*>(-1L), 0);
+                      }
+                    }
+                  }
+                  else {
+                    /* life locks unlock when the ADO process closes down */
+                    ado->add_life_unlock(key_handle);
+                  }
+
+                  assert(reinterpret_cast<uint64_t>(addr) <= 1);
+
+                  ado->send_table_op_response(S_OK, static_cast<void*>(value), value_len);
+                }
+            }
             break;
-          }
-        case Component::IADO_proxy::OP_ERASE:
-          {
-            if(option_DEBUG > 2)
-              PLOG("Shard: received table op erase");
-            status_t rc = _i_kvstore->erase(ado->pool_id(), key);
-            if(rc != S_OK)
-              PWRN("Shard_ado: OP_ERASE failed (key=%s)", key.c_str());
-          
-            ado->send_table_op_response(rc);
+          case ADO_op::ERASE:
+            {
+              if(_debug_level > 2)
+                PLOG("Shard_ado: received table op erase");
+              ado->send_table_op_response(_i_kvstore->erase(ado->pool_id(), key));
+            }
             break;
-          }
-        case Component::IADO_proxy::OP_RESIZE:
-          {
-            if(option_DEBUG > 2)
-              PLOG("Shard: received table op resize value (work_id=%p)", work_id);
-            
-            status_t rc;
-            work_request_t * wr = nullptr;
-            /* check resize isn't on current work request. if so,
-               we need to unlock and then relock */
-            auto work_item = _outstanding_work.find(work_id);
-          
-            if(work_item != _outstanding_work.end()) {
-              wr = request_key_to_record(work_id);
-              assert(wr);
+          case ADO_op::VALUE_RESIZE:
+            {
+              if(_debug_level > 2)
+                PLOG("Shard_ado: received table op resize value (work_id=%p)",
+                     reinterpret_cast<const void *>(work_id));
+
+              /* for resize, we need unlock, resize, and then relock */
+              auto work_item = _outstanding_work.find(work_id);
+
+              if(work_item == _outstanding_work.end()) {
+                ado->send_table_op_response(E_INVAL);
+                break;
+              }
+
+              /* use the work id to get the key handle */
+              work_request_t * wr = request_key_to_record(work_id);
+              status_t rc;
+              
+              if(!wr)
+                throw Logic_exception("unable to get request from work_id");
+
               if((rc = _i_kvstore->unlock(ado->pool_id(), wr->key_handle))!= S_OK) {
                 ado->send_table_op_response(rc);
                 break;
               }
-              if(option_DEBUG > 2)
-                PLOG("Shard: table op resize, unlocked");
-            }
-            else {
-              ado->send_table_op_response(E_FAIL);
-              break;
-            }
 
-            /* perform resize */
-            void * new_value = nullptr;
-            size_t new_value_len = 0;
-            rc = _i_kvstore->resize_value(ado->pool_id(),
-                                          key,
-                                          value_len,
-                                          align);
+              if(_debug_level > 2)
+                PLOG("Shard_ado: table op resize, unlocked");
 
-            /* relock if needded */
-            if(wr)  {
-              if(_i_kvstore->lock(ado->pool_id(),
-                                  key,
-                                  Component::IKVStore::STORE_LOCK_ADO,
-                                  new_value,
-                                  new_value_len,
-                                  wr->key_handle) != S_OK)
+              /* perform resize */
+              void * new_value = nullptr;
+              size_t new_value_len = 0;
+              auto old_key_handle = wr->key_handle;
+              rc = _i_kvstore->resize_value(ado->pool_id(),
+                                            key,
+                                            value_len,
+                                            align_or_flags);
+              
+
+              if ( _i_kvstore->lock(ado->pool_id(),
+                                    key,
+                                    IKVStore::STORE_LOCK_WRITE,
+                                    new_value,
+                                    new_value_len,
+                                    wr->key_handle /* update key handle in record */) != S_OK )
                 throw Logic_exception("ADO OP_RESIZE request failed to relock");
 
-              if(option_DEBUG > 2)
-                PLOG("Shard: table op resize, re-locked");
-            }
-          
-            ado->send_table_op_response(rc, new_value, new_value_len);
-            break;
-          }
-        case Component::IADO_proxy::OP_ALLOC:
-          {
-            status_t rc;
-            // auto work_item = _outstanding_work.find(work_id);
-            // if(work_item == _outstanding_work.end()) {
-            //   ado->send_table_op_response(E_INVAL);
-            //   break;
-            // }
-
-            void * out_addr = nullptr;
-            rc = _i_kvstore->allocate_pool_memory(ado->pool_id(),
-                                                 value_len,
-                                                 align,
-                                                 out_addr);
-
-            if(option_DEBUG > 2)
-              PLOG("Shard: allocate_pool_memory align=%lu rc=%d addr=%p",
-                   align, rc, out_addr);
-            ado->send_table_op_response(rc, out_addr);
-            break;
-          }
-        case Component::IADO_proxy::OP_FREE:
-          {
-            status_t rc;
-            auto work_item = _outstanding_work.find(work_id);
-            if(work_item == _outstanding_work.end() || addr == nullptr) {
-              ado->send_table_op_response(E_INVAL);
+              /* update deferred locks */
+              if(ado->update_deferred_unlock(work_id, wr->key_handle) != S_OK) {
+                if(ado->remove_life_unlock(old_key_handle) == S_OK)
+                  ado->add_life_unlock(wr->key_handle);
+              }
+              
+              ado->send_table_op_response(rc, new_value, new_value_len);
               break;
             }
+          case ADO_op::ALLOCATE_POOL_MEMORY:
+            {
+              status_t rc;
+              assert(work_id == 0);
+              /* work request is not needed */
+              void * out_addr = nullptr;
+              rc = _i_kvstore->allocate_pool_memory(ado->pool_id(),
+                                                    value_len,
+                                                    align_or_flags,
+                                                    out_addr);
 
-            rc = _i_kvstore->free_pool_memory(ado->pool_id(), addr);
-            if(option_DEBUG > 2)
-              PLOG("Shard: allocate_pool_memory free rc=%d", rc);
-            ado->send_table_op_response(rc);
-            
+              if(_debug_level > 2)
+                PLOG("Shard_ado: allocate_pool_memory align_or_flags=%lu rc=%d addr=%p",
+                     align_or_flags, rc, out_addr);
+              ado->send_table_op_response(rc, out_addr);
+            }
             break;
+          case ADO_op::FREE_POOL_MEMORY:
+            {
+              assert(work_id == 0);
+              /* work request is not needed */
+              if(value_len == 0) {
+                ado->send_table_op_response(E_INVAL);
+                break;
+              }
+
+              status_t rc = _i_kvstore->free_pool_memory(ado->pool_id(), addr, value_len);
+              if(_debug_level > 2)
+                PLOG("Shard_ado : allocate_pool_memory free rc=%d", rc);
+              
+              if(rc != S_OK)
+                PWRN("Shard_ado: Table operation OP_FREE failed");
+              
+              ado->send_table_op_response(rc);
+            }
+            break;
+          default:
+            throw Logic_exception("unknown table op code");
           }
+          // end of if(check_table_ops..
+        }
+      else if(ado->check_pool_info_op(buffer)) {
+        using namespace rapidjson;
+
+        uint64_t expected_obj_count = 0;
+        size_t pool_size = 0;
+        unsigned int pool_flags = 0;
+        handler->pool_manager().get_pool_info(ado->pool_id(),
+                                              expected_obj_count,
+                                              pool_size,
+                                              pool_flags);
+        
+        try {
+          Document doc;
+          doc.SetObject();
+          
+          Value pool_size_v(pool_size);
+          doc.AddMember("pool_size", pool_size_v, doc.GetAllocator());
+          Value expected_obj_count_v(expected_obj_count);
+          doc.AddMember("expected_obj_count", expected_obj_count_v, doc.GetAllocator());
+          Value pool_flags_v(pool_flags);
+          doc.AddMember("pool_flags", pool_flags_v, doc.GetAllocator());
+          std::vector<uint64_t> v64;
+          if(_i_kvstore->get_attribute(ado->pool_id(),
+                                       IKVStore::Attribute::COUNT, v64) == S_OK) {
+            Value obj_count_v(v64[0]);
+            doc.AddMember("current_object_count", obj_count_v, doc.GetAllocator());
+          }
+          std::stringstream ss;
+          OStreamWrapper osw(ss);
+          Writer<OStreamWrapper> writer(osw);
+          doc.Accept(writer);
+          ado->send_pool_info_response(S_OK, ss.str());
+        }
+        catch(...) {
+          throw Logic_exception("pool info JSON creation failed");
+        }
+      }
+      else if(ado->check_op_event_response(buffer, op)) {
+        switch(op) {
+        case ADO_op::POOL_DELETE: {
+
+          /* close pool, then delete */
+          if((_i_kvstore->close_pool(ado->pool_id()) != S_OK) ||
+             (_i_kvstore->delete_pool(ado->pool_name()) != S_OK))
+            throw Logic_exception("unable to delete pool after POOL DELETE op event");
+
+          if(_debug_level > 2)
+            PLOG("POOL DELETE op event completion");
+
+          break;
+        }
         default:
-          throw Logic_exception("unknown table op code");
+          throw Logic_exception("unknown op event");
+        }
+      }
+      else if(ado->check_iterate(buffer, t_begin, t_end, iterator)) {
+
+        Component::IKVStore::pool_reference_t ref;
+        if(!iterator) {
+          iterator = _i_kvstore->open_pool_iterator(ado->pool_id());
         }
 
+        if(!iterator) { /* still no iterator, component doesn't support */
+          ado->send_iterate_response(E_NOT_IMPL, iterator, ref);
+        }
+        else {
+          status_t rc;
+          bool time_match = false;
+          do {
+            rc = _i_kvstore->deref_pool_iterator(ado->pool_id(),
+                                                 iterator,
+                                                 t_begin, /* time constraints */
+                                                 t_end,
+                                                 ref,
+                                                 time_match,
+                                                 true);
+          
+            if(rc == E_OUT_OF_BOUNDS) {
+              _i_kvstore->close_pool_iterator(ado->pool_id(), iterator);
+              break;
+            }
+          }
+          while(!time_match);
+          
+          ado->send_iterate_response(rc, iterator, ref);
+        }
       }
+      else if(ado->check_vector_ops(buffer, t_begin, t_end)) {
+
+        /* WARNING: this could block the shard thread. we may 
+           neeed to make it a "task" - but we can't do this 
+           without a map iterator that can be restarted.
+        */
+        /* vector operation, collect all key-value pointers */
+        status_t rc;
+        size_t count = 0;
+        void * buffer = nullptr;
+        IADO_plugin::Reference_vector v;
+
+        /* allocate memory from pool for the vector */
+        if(t_begin > 0 || t_end > 0) {
+          /* we have to map first to get count */
+          rc = _i_kvstore->map(ado->pool_id(),
+                               [&count](const void * ,
+                                        const size_t ,
+                                        const void * ,
+                                        const size_t ,
+                                        const tsc_time_t) -> int
+                                 {
+                                   count++;
+                                   return 0;
+                                 }, t_begin, t_end);
+          if(_debug_level > 2)
+            PLOG("map time constraints: count=%lu", count);
+        }
+        else {
+          count = _i_kvstore->count(ado->pool_id());
+        }
+
+        auto buffer_size = IADO_plugin::Reference_vector::size_required(count);
+        rc = _i_kvstore->allocate_pool_memory(ado->pool_id(),
+                                              buffer_size,
+                                              0,
+                                              buffer);
+
+        
+        if(rc != S_OK) {
+          ado->send_vector_response(rc, IADO_plugin::Reference_vector());
+        }
+        else
+        {
+          /* populate vector */
+          IADO_plugin::kv_reference_t * ptr = static_cast<IADO_plugin::kv_reference_t*>(buffer);
+          size_t check = 0;
+
+          if(t_begin == 0 && t_end == 0) {
+            rc = _i_kvstore->map(ado->pool_id(), [count, &check,&ptr](const void * key,
+                                                                      const size_t key_len,
+                                                                      const void * value,
+                                                                      const size_t value_len) -> int
+                               {
+                                 assert(key);
+                                 assert(key_len);
+                                 assert(value);
+                                 assert(value_len);
+                                 if(check > count) return -1;
+                                 ptr->key = const_cast<void*>(key);
+                                 ptr->key_len = key_len;
+                                 ptr->value = const_cast<void*>(value);
+                                 ptr->value_len = value_len;
+                                 ptr++;
+                                 check++;
+                                 return 0;
+                               });
+          }
+          else {
+            rc = _i_kvstore->map(ado->pool_id(),
+                                 [count, &check, &ptr](const void * key,
+                                                      const size_t key_len,
+                                                      const void * value,
+                                                      const size_t value_len,
+                                                      const tsc_time_t timestamp) -> int
+                                 {
+                                   assert(key);
+                                   assert(key_len);
+                                   assert(value);
+                                   assert(value_len);
+                                   if(check > count) return -1;
+                                   ptr->key = const_cast<void*>(key);
+                                   ptr->key_len = key_len;
+                                   ptr->value = const_cast<void*>(value);
+                                   ptr->value_len = value_len;
+                                   ptr++;
+                                   check++;
+                                   return 0;
+                                 }, t_begin, t_end);
+          }
+
+          ado->send_vector_response(rc,
+                                    IADO_plugin::Reference_vector(count,
+                                                                  buffer,
+                                                                  buffer_size));
+        }
+      }
+      else if(ado->check_index_ops(buffer,
+                                   key_expression,
+                                   begin_pos,
+                                   find_type,
+                                   max_comp)) {
+        status_t rc;
+        auto i_kvindex = lookup_index(ado->pool_id());
+
+        if(!i_kvindex) {
+          PWRN("ADO index operation: no index enabled");
+          ado->send_find_index_response(E_NO_INDEX, 0, "noindex");
+        }
+        else {
+          std::string matched_key;
+          offset_t matched_pos = -1;
+
+          rc = i_kvindex->find(key_expression,
+                               begin_pos,
+                               IKVIndex::convert_find_type(find_type),
+                               matched_pos,
+                               matched_key,
+                               MAX_INDEX_COMPARISONS);
+
+          ado->send_find_index_response(rc, matched_pos, matched_key);
+        }
+      }
+      else {
+        throw Logic_exception("Shard_ado: bad op request from ADO plugin");
+      }
+
+      /* release buffer */
+      ado->free_callback_buffer(buffer);
+    }
   }
 }
+
+
+#pragma GCC diagnostic pop

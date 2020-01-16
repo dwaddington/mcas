@@ -46,24 +46,26 @@ status_t RamRBTree::find(const std::string& key_expression,
                          std::string&       out_matched_key,
                          unsigned           max_comparisons)
 {
-  std::regex r(key_expression);
   if (begin_position >= _index.size()) {
-    throw std::out_of_range("begin_postion out of bounds");
+    return E_FAIL;
   }
 
   offset_t end_position = _index.size();
   unsigned attempts =0;
   switch (find_type) {
     case FIND_TYPE_REGEX:
-      for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
-        string key = RamRBTree::get(out_matched_pos);
-        if (regex_match(key, r)) {
+      {
+        std::regex r(key_expression);
+        for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
+          string key = RamRBTree::get(out_matched_pos);
+          if (regex_match(key, r)) {
           out_matched_key = key;
           return S_OK;
-        }
-        else {
-          if(++attempts > max_comparisons)
-            return E_MAX_REACHED;
+          }
+          else {
+            if(++attempts > max_comparisons)
+              return E_MAX_REACHED;
+          }
         }
       }
       break;
@@ -90,9 +92,12 @@ status_t RamRBTree::find(const std::string& key_expression,
       }
       break;
     case FIND_TYPE_NEXT:
+      if(begin_position >= end_position)
+        return E_FAIL;
       out_matched_key = get(begin_position);
+      out_matched_pos = begin_position;
       return S_OK;
-      break;
+      break;      
   }
 
   return E_FAIL;

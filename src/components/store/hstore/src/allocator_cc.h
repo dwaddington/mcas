@@ -20,6 +20,7 @@
 #include "bad_alloc_cc.h"
 #include "heap_cc.h"
 #include "persister_cc.h"
+#include "persistent.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
 
@@ -32,15 +33,7 @@ template <>
 	{
 	public:
 		using deallocator_type = deallocator_cc<void, persister>;
-		using typename deallocator_type::pointer;
-		using typename deallocator_type::const_pointer;
 		using typename deallocator_type::value_type;
-
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_cc<U, persister>;
-			};
 	};
 
 template <typename Persister>
@@ -49,15 +42,8 @@ template <typename Persister>
 	{
 	public:
 		using deallocator_type = deallocator_cc<void, Persister>;
-		using typename deallocator_type::pointer;
-		using typename deallocator_type::const_pointer;
 		using typename deallocator_type::value_type;
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_cc<U, Persister>;
-			};
-	};
+};
 
 template <typename T, typename Persister = persister>
 	class allocator_cc
@@ -65,27 +51,9 @@ template <typename T, typename Persister = persister>
 	{
 	public:
 		using deallocator_type = deallocator_cc<T, Persister>;
-		using size_type = std::size_t;
-		using difference_type = std::ptrdiff_t;
-		using typename deallocator_type::pointer;
-		using typename deallocator_type::const_pointer;
-		using reference = T &;
-		using const_reference = const T &;
-		using typename deallocator_type::value_type; // = T;
-
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_cc<U, Persister>;
-			};
-
-		explicit allocator_cc(void *area_, std::size_t size_, Persister p_ = Persister())
-			: deallocator_cc<T, Persister>(area_, size_, p_)
-		{}
-
-		explicit allocator_cc(void *area_, Persister p_ = Persister())
-			: deallocator_cc<T, Persister>(area_, p_)
-		{}
+		using typename deallocator_type::size_type;
+		using typename deallocator_type::value_type;
+		using typename deallocator_type::pointer_type;
 
 		allocator_cc(const heap_cc &pool_, Persister p_ = Persister()) noexcept
 			: deallocator_cc<T, Persister>(pool_, (p_))
@@ -100,30 +68,20 @@ template <typename T, typename Persister = persister>
 
 		allocator_cc &operator=(const allocator_cc &a_) = delete;
 
-#if 0
-		/* deprecated in C++20 */
-		pointer address(reference x) const noexcept
+		void allocate(
+			pointer_type & p_
+			, size_type s_
+			, size_type alignment_
+		)
 		{
-			return pointer(&x);
-		}
-		const_pointer address(const_reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-#endif
-		auto allocate(
-			size_type s
-			, typename allocator_cc<void, Persister>::const_pointer /* hint */ =
-				typename allocator_cc<void, Persister>::const_pointer{}
-			, const char * = nullptr
-		) -> pointer
-		{
-			auto ptr = this->pool().malloc(s * sizeof(T));
-			if ( ptr == 0 )
+			this->pool()->alloc(reinterpret_cast<persistent_t<void *> *>(&p_), s_ * sizeof(T), alignment_);
+			/* Error: this check is too late;
+			 * most of the intersting information is gone.
+			 */
+			if ( p_ == 0 )
 			{
-				throw bad_alloc_cc(0, s, sizeof(T));
+				throw bad_alloc_cc(s_, sizeof(T), alignment_);
 			}
-			return static_cast<pointer>(ptr);
 		}
 	};
 

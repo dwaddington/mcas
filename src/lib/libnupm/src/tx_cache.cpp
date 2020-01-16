@@ -19,18 +19,16 @@
  *
  */
 
-#include <assert.h>
+#include "tx_cache.h"
+
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/spinlocks.h>
-#include <signal.h>
 #include <boost/icl/split_interval_map.hpp>
-#include <iostream>
+#include <cassert>
+#include <csignal>
 #include <map>
 #include <stdexcept>
-#include <utility>
-
-#include "tx_cache.h"
 
 using namespace boost::icl;
 

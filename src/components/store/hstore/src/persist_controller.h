@@ -62,9 +62,7 @@ namespace impl
 				}
 				catch ( const perishable_expiry & )
 				{
-#if TEST_HSTORE_PERISHABLE
-					hop_hash_log::write(__func__, " perishable_expiry");
-#endif
+					hop_hash_log<TEST_HSTORE_PERISHABLE>::write(__func__, " perishable_expiry");
 				}
 			}
 		};
@@ -73,8 +71,10 @@ namespace impl
 		class persist_controller
 			: public Allocator
 		{
-			using persist_data_t = persist_map<Allocator>;
-			using value_type = typename Allocator::value_type;
+
+			using allocator_type = Allocator;
+			using persist_data_t = persist_map<allocator_type>;
+			using value_type = typename allocator_type::value_type;
 		public:
 			using size_type = std::size_t;
 			using bix_t = std::size_t; /* sufficient for all bucket indexes */
@@ -101,7 +101,7 @@ namespace impl
 			}
 
 		public:
-			explicit persist_controller(const Allocator &av, persist_data_t *persist, construction_mode mode);
+			explicit persist_controller(const allocator_type &av, persist_data_t *persist, construction_mode mode);
 
 			persist_controller(const persist_controller &) = delete;
 			auto operator=(
@@ -128,6 +128,18 @@ namespace impl
 			void persist_size();
 			void persist_existing_segments(const char *what = "old segments");
 			void persist_new_segment(const char *what = "new segments");
+			auto record_owner_addr_and_bitmask(
+				persistent_atomic_t<owner::value_type> *pmask_
+				, owner::value_type mask_
+			)
+			{
+				return
+					_persist->ase().record_owner_addr_and_bitmask(
+						pmask_
+						, mask_
+						, *static_cast<allocator_type *>(this)
+					);
+			}
 
 			auto segment_count_actual() const
 			{

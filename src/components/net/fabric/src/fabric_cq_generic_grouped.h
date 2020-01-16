@@ -28,8 +28,6 @@
 #include <rdma/fi_domain.h> /* f1_cq_err_entry */
 #pragma GCC diagnostic pop
 
-#include <unistd.h> /* ssize_t */
-
 #include <cstdint> /* uint{32,64}_t */
 #include <mutex>
 #include <set>
@@ -55,7 +53,7 @@ class Fabric_cq_generic_grouped
   std::mutex _m_comm_cq_set;
   std::set<Fabric_cq_grouped *> _comm_cq_set;
 
-  ssize_t cq_read_locked(void *buf, std::size_t count) noexcept;
+  std::ptrdiff_t cq_read_locked(void *buf, std::size_t count) noexcept;
 
 public:
   explicit Fabric_cq_generic_grouped(
@@ -110,8 +108,8 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_cq_readerr fail
    */
   ::fi_cq_err_entry get_cq_comp_err();
-  ssize_t cq_read(void *buf, std::size_t count) noexcept;
-  ssize_t cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept;
+  std::ptrdiff_t cq_read(void *buf, std::size_t count) noexcept;
+  std::ptrdiff_t cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept;
   void queue_completion(Fabric_cq_grouped *cq, ::status_t status, const Fabric_cq::fi_cq_entry_t &cq_entry);
 };
 

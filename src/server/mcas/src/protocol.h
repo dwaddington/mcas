@@ -89,14 +89,6 @@ enum {
   OP_MAX         = 0xFF
 };
 
-// enum {
-//   S_OK = 0,
-//   E_KEY_EXISTS = 1,
-//   E_BAD_POOL = 2,
-//   E_BAD_KEY = 3,
-//   E_FAIL = 0xFE;
-//   STATUS_MAX = 0xFF };
-
 enum {
   IO_READ      = 0x1,
   IO_WRITE     = 0x2,
@@ -130,12 +122,12 @@ struct Message {
 
   status_t get_status() const
   {
-    return 0xFFFFFF00 & status_delta;
+    return -1 * status_delta;
   }
   
-  void print()
+  void print() const
   {
-    PLOG("Message:%p auth_id:%lu msg_len=%u type=%x", this, auth_id, msg_len, type_id);
+    PLOG("Message:%p auth_id:%lu msg_len=%u type=%x", static_cast<const void *>(this), auth_id, msg_len, type_id);
   }
 
   /* Convert the response to the expected type after verifying that the
@@ -200,10 +192,11 @@ struct Message_pool_request : public Message {
                        uint64_t           auth_id,
                        uint64_t           request_id,
                        size_t             pool_size,
+                       size_t             expected_object_count,
                        uint8_t            op,
                        const std::string& pool_name)
       : Message(auth_id, id, op), pool_size(pool_size),
-        expected_object_count(0)
+        expected_object_count(expected_object_count)
   {
     assert(op);
     assert(this->op);
@@ -224,8 +217,9 @@ struct Message_pool_request : public Message {
                        uint64_t auth_id,
                        uint64_t request_id,
                        uint8_t  op)
-      : Message_pool_request(buffer_size, auth_id, request_id, 0, op, "")
+    : Message_pool_request(buffer_size, auth_id, request_id, 0, 0, op, "")
   {
+    pool_id = 0;
   }
 
   const char* pool_name() const { return data; }
@@ -335,19 +329,19 @@ struct Message_IO_request : public Message {
   {
   }
 
-  const char* key() const { return &data[0]; }
-  const char* cmd() const { return &data[0]; }
-  const char* value() const { return &data[key_len + 1]; }
+  inline const char* key() const { return &data[0]; }
+  inline const char* cmd() const { return &data[0]; }
+  inline const char* value() const { return &data[key_len + 1]; }
 
-  size_t get_key_len() const { return key_len; }
-  size_t get_value_len() const { return val_len; }
+  inline size_t get_key_len() const { return key_len; }
+  inline size_t get_value_len() const { return val_len; }
 
   void set_key_value_len(size_t       buffer_size,
                          const void*  key,
                          const size_t key_len,
                          const size_t value_len)
   {
-    if (unlikely((key_len + 1 + (sizeof *this)) > buffer_size))
+    if (UNLIKELY((key_len + 1 + (sizeof *this)) > buffer_size))
       throw API_exception(
           "%s::%s - insufficient buffer for "
           "key-value_len pair (key_len=%lu) (val_len=%lu)",
@@ -366,7 +360,7 @@ struct Message_IO_request : public Message {
                          const size_t p_value_len)
   {
     assert(buffer_size > 0);
-    if (unlikely((p_key_len + p_value_len + 1 + (sizeof *this)) >
+    if (UNLIKELY((p_key_len + p_value_len + 1 + (sizeof *this)) >
                  buffer_size))
       throw API_exception(
           "%s::%s - insufficient buffer for "
@@ -472,7 +466,7 @@ struct Message_INFO_response : public Message {
   const char * c_str() const { return static_cast<const char*>(data); }
 
   void set_value(size_t buffer_size, const void * value, size_t len) {
-    if (unlikely((len + 1 + (sizeof *this)) > buffer_size))
+    if (UNLIKELY((len + 1 + (sizeof *this)) > buffer_size))
       throw API_exception("%s::%s - insufficient buffer (value len=%lu)", description, __func__, len);
 
     memcpy(data, value, len); /* only copy key and set value length */
@@ -513,24 +507,40 @@ struct Message_handshake : public Message {
 ////////////////////////////////////////////////////////////////////////
 // HANDSHAKE REPLY
 
+enum {
+  HANDSHAKE_REPLY_FLAG_CERT=0x1,
+};
+
 struct Message_handshake_reply : public Message {
   static constexpr uint8_t id = MSG_TYPE_HANDSHAKE_REPLY;
   static constexpr const char *description = "Message_handshake_reply";
 
-  Message_handshake_reply(uint64_t auth_id,
+  Message_handshake_reply(size_t buffer_size,
+                          uint64_t auth_id,
                           uint64_t sequence,
                           uint64_t session_id,
-                          size_t   mms)
+                          size_t   max_message_size,
+                          unsigned char * x509_cert_ptr,
+                          uint32_t x509_cert_len)
       : Message(auth_id, id), seq(sequence),
-        session_id(session_id), max_message_size(mms)
+        session_id(session_id), max_message_size(max_message_size),
+        x509_cert_len(x509_cert_len)
   {
-    msg_len = (sizeof *this);
+    msg_len = boost::numeric_cast<uint32_t>(sizeof(Message_handshake_reply)) + x509_cert_len;
+    if(msg_len > buffer_size)
+      throw Logic_exception("%s::%s - insufficient buffer for Message_handshake_reply",
+                            description, __func__);
+    if(x509_cert_ptr && (x509_cert_len > 0)) {
+      memcpy(x509_cert, x509_cert_ptr, x509_cert_len);
+    }
   }
 
-    // fields
-  uint64_t seq;
-  uint64_t session_id;
-  size_t   max_message_size;
+  // fields
+  uint64_t      seq;
+  uint64_t      session_id;
+  size_t        max_message_size; /* RDMA max message size in bytes */
+  uint32_t      x509_cert_len;
+  unsigned char x509_cert[];
 
 } __attribute__((packed));
 
@@ -600,9 +610,6 @@ struct Message_ado_request : public Message {
     flags(flags)
     
   {
-    assert(invocation_data);
-    assert(invocation_data_len > 0);
-    
     this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data_len);
     key_len = key.size();
     msg_len = boost::numeric_cast<decltype(msg_len)>(message_size());
@@ -614,7 +621,9 @@ struct Message_ado_request : public Message {
 
     memcpy(data, key.c_str(), key.size());
     data[key_len] = '\0';
-    memcpy(&data[key_len+1], invocation_data, invocation_data_len);
+
+    if(invocation_data_len > 0)
+      memcpy(&data[key_len+1], invocation_data, invocation_data_len);
   }
   
   size_t message_size() const { return sizeof(Message_ado_request) + key_len + invocation_data_len + 1; }
@@ -650,12 +659,14 @@ struct Message_put_ado_request : public Message {
                           size_t invocation_data_len,                          
                           const void * value,
                           size_t value_len,
+                          size_t root_len,
                           uint32_t flags) :
     Message(auth_id, id),
     request_id(request_id),
     pool_id(pool_id),
     flags(flags),
-    val_len(value_len)
+    val_len(value_len),
+    root_val_len(root_len)
   {
     assert(invocation_data);
     assert(invocation_data_len > 0);
@@ -666,7 +677,6 @@ struct Message_put_ado_request : public Message {
     key_len = key.size();
     msg_len = boost::numeric_cast<decltype(msg_len)>(message_size());
     
-    
     if (buffer_size < message_size())
       throw API_exception("%s::%s - insufficient buffer for Message_ado_request",
                           description, __func__);
@@ -674,16 +684,26 @@ struct Message_put_ado_request : public Message {
     memcpy(data, key.c_str(), key.size());
     data[key_len] = '\0'; /* gratuitous terminate of key string */
     byte * ptr = static_cast<byte*>(&data[key_len+1]);
+    
+    /* copy in invocation data */
     memcpy(ptr, invocation_data, invocation_data_len);
+
+    /* copy in value_len */
     memcpy(ptr + invocation_data_len, value, value_len);
+
+    val_addr = reinterpret_cast<uint64_t>(value);
   }
   
-  size_t message_size() const { return sizeof(Message_ado_request) + key_len + 1 + invocation_data_len + val_len; }
+  size_t message_size() const {
+    return sizeof(Message_put_ado_request) + key_len + 1 + invocation_data_len + val_len;
+  }
+  
   const char* key() const { return reinterpret_cast<const char*>(data); }
   const void * request() const { return static_cast<const void*>(&data[key_len+1]); }
   const void * value() const { return static_cast<const void*>(static_cast<const byte *>(request()) + invocation_data_len); }
   size_t request_len() const { return this->invocation_data_len; }
   size_t value_len() const { return this->val_len; }
+  size_t root_len() const { return this->root_val_len; }
   bool is_async() const { return flags & Component::IMCAS::ADO_FLAG_ASYNC; }
   
   // fields
@@ -693,6 +713,8 @@ struct Message_put_ado_request : public Message {
   uint32_t invocation_data_len; /*< does not include null terminator */
   uint32_t flags;
   uint64_t val_len;
+  uint64_t val_addr;
+  uint64_t root_val_len;
   uint8_t  data[];
   
 } __attribute__((packed));
@@ -705,13 +727,16 @@ struct Message_ado_response : public Message {
   static constexpr const char *description = "Message_ado_response";
 
   Message_ado_response(size_t buffer_size,
+                       status_t status,
                        uint64_t auth_id,
                        uint64_t request_id,
                        void * response_data,
-                       size_t response_data_len) :   Message(auth_id, id),
-                                                     request_id(request_id) {
-
-
+                       size_t response_data_len)
+    :   Message(auth_id, id),
+        request_id(request_id)
+  {
+    set_status(status);
+    
     response_len = boost::numeric_cast<decltype(response_len)>(response_data_len);
 
     if (buffer_size < message_size())
@@ -720,15 +745,19 @@ struct Message_ado_response : public Message {
 
     msg_len = boost::numeric_cast<decltype(msg_len)>(message_size());
 
-    if(response_len > 0) {
+    if(response_data && response_len > 0) {
       memcpy(data, response_data, response_len);
       data[response_len] = '\0';
     }
   }
   
-  size_t message_size() const { return sizeof(Message_ado_response) + response_len + 1; }
-  const uint8_t * response() const { return data; }
-  size_t response_length() const { return response_len; }
+  void append_buffer(void * buffer, uint32_t buffer_len) {
+    memcpy(&data[response_len], buffer, buffer_len);
+    response_len += boost::numeric_cast<uint32_t>(buffer_len);
+  }
+  
+  inline size_t message_size() const { return sizeof(Message_ado_response) + response_len + 1; }
+  inline const uint8_t * response() const { return data; }
   
   // fields
   uint64_t request_id; /*< id or sender timestamp counter */

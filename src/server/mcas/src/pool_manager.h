@@ -10,8 +10,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __mcas_POOL_MANAGER_H__
-#define __mcas_POOL_MANAGER_H__
+#ifndef __MCAS_POOL_MANAGER_H__
+#define __MCAS_POOL_MANAGER_H__
 
 #include <api/kvstore_itf.h>
 #include <map>
@@ -19,30 +19,33 @@
 
 namespace mcas
 {
-using Connection_base = Fabric_connection_base;
 
 /**
    Pool_manager tracks open pool handles on a per-shard basis
  */
 class Pool_manager {
 private:
-  static constexpr bool option_DEBUG = false;
-  
+  const unsigned option_DEBUG = mcas::Global::debug_level;
+
 public:
   using pool_t = Component::IKVStore::pool_t;
 
-  Pool_manager() {}
+  Pool_manager() {
+  }
 
   /**
    * Determine if pool is open and valid
    *
-   * @param pool Pool path
+   * @param pool Pool name
+   *
+   * @return true of pool is open
    */
-  bool check_for_open_pool(const std::string& path, pool_t& out_pool)
+  bool check_for_open_pool(const std::string& pool_name, pool_t& out_pool) const
   {
-    auto i = _name_map.find(path);
-    if (i == _name_map.end()) {
-      PLOG("check_for_open_pool (%s) false", path.c_str());
+    auto i = _map_n2p.find(pool_name);
+    if (i == _map_n2p.end()) {
+      if(option_DEBUG)
+        PLOG("check_for_open_pool (%s) false", pool_name.c_str());
       out_pool = 0;
       return false;
     }
@@ -50,11 +53,13 @@ public:
     auto j = _open_pools.find(i->second);
     if(j != _open_pools.end()) {
       out_pool = i->second;
-      PLOG("check_for_open_pool (%s) true", path.c_str());
+      if(option_DEBUG)
+        PLOG("check_for_open_pool (%s) true", pool_name.c_str());
       return true;
     }
     out_pool = 0;
-    PLOG("check_for_open_pool (%s) false", path.c_str());
+    if(option_DEBUG)
+      PLOG("check_for_open_pool (%s) false", pool_name.c_str());
     return false;
   }
 
@@ -63,24 +68,60 @@ public:
    *
    * @param pool Pool identifier
    */
-  void register_pool(const std::string& path, pool_t pool)
+  void register_pool(const std::string& pool_name,
+                     pool_t pool,
+                     uint64_t expected_obj_count,
+                     size_t size,
+                     unsigned int flags)
   {
     assert(pool);
-    if (_open_pools.find(pool) != _open_pools.end())
+    if(_open_pools.find(pool) != _open_pools.end())
       throw General_exception("pool already registered");
 
     _open_pools[pool] = 1;
-    _name_map[path]   = pool;
+    _map_n2p[pool_name] = pool;
+    _map_p2n[pool] = pool_name;
+    _pool_info[pool] = {expected_obj_count, size, flags};
+
+    if(option_DEBUG)
+      PLOG("(+) registered pool (%p) ref:%u pm=%p",
+           reinterpret_cast<void*>(pool), _open_pools[pool], this);
   }
 
+  /**
+   * Get pool information
+   *
+   * @param pool Pool identifier
+   * @param expected_obj_count Expected object count
+   * @param size Size of pool
+   * @param flags Creation flags
+   */
+  void get_pool_info(const pool_t pool,
+                     uint64_t& expected_obj_count,
+                     size_t& size,
+                     unsigned int& flags)
+  {
+    auto i = _pool_info.find(pool);
+    if(i != _pool_info.end()) {
+      expected_obj_count = i->second.expected_obj_count;
+      size = i->second.size;
+      flags = i->second.flags;
+    }
+  }
+
+  /**
+   * Add reference count to open pool
+   *
+   * @param pool Pool identifier
+   */
   void add_reference(pool_t pool)
   {
     if (_open_pools.find(pool) == _open_pools.end())
       throw Logic_exception("add reference to pool that is not open");
-    else {
-      _open_pools[pool] += 1;
-      if(option_DEBUG) PLOG("pool (%p) ref:%u", reinterpret_cast<void*>(pool), _open_pools[pool]);
-    }
+
+    _open_pools[pool] += 1;
+    if(option_DEBUG)
+      PLOG("(+) inc pool (%p) ref:%u", reinterpret_cast<void*>(pool), _open_pools[pool]);
   }
 
   /**
@@ -92,44 +133,53 @@ public:
    */
   bool release_pool_reference(pool_t pool)
   {
-    if (_open_pools.find(pool) == _open_pools.end())
-      throw Logic_exception("release_pool_reference on invalid pool");
+    auto i = _open_pools.find(pool);
+    if (i == _open_pools.end())
+      throw std::invalid_argument("invalid pool handle");
 
-    _open_pools[pool] -= 1;
+    i->second -= 1; // _open_pools[pool]
     
     if(option_DEBUG)
-      PLOG("pool (%p) ref:%u", reinterpret_cast<void*>(pool), _open_pools[pool]);
+      PLOG("(-) release pool (%p) ref:%u", reinterpret_cast<void*>(pool), _open_pools[pool]);
     
-    if(_open_pools[pool] == 0) {
-      _open_pools.erase(pool);
+    if(i->second == 0) {
+      /* zero reference count; erase entries */
+      _open_pools.erase(i);
+      _map_n2p.erase(_map_p2n[pool]);
+      _map_p2n.erase(pool);
       return true;
     }
     return false;
-    
-    // std::map<pool_t, unsigned>::iterator i = _open_pools.find(pool);
-    // if (i == _open_pools.end())
-    //   throw Logic_exception("release_pool_reference on invalid pool");
-    // if (i->second == 0)
-    //   throw Logic_exception("invalid release, reference is already");
-    // i->second--;
-    // bool is_last = (i->second == 0);
-    // if(is_last) {
-    //   _open_pools.erase(i);
-    //   PLOG("removing pool (%p) from open list", pool);
-    // }
-    // return is_last; /* return true if last reference */
   }
 
   /**
-   *
-   * Remove pool from registration, e.g. on delete
+   * Get current reference count for a pool
    *
    * @param pool Pool identifier
+   *
+   * @return Reference count
    */
-  void blitz_pool_reference(pool_t pool) {
-    _open_pools.erase(pool);
+  auto pool_reference_count(pool_t pool)
+  {
+    auto i = _open_pools.find(pool);
+    if (i == _open_pools.end())
+      throw std::invalid_argument("invalid pool handle");
+
+    return i->second;
   }
 
+  /**
+   * Look up pool name
+   *
+   * @param pool Pool identifier
+   *
+   * @return Pool name string
+   */
+  auto pool_name(pool_t pool)
+  {
+    return _map_p2n[pool];
+  }
+  
   /**
    * Determine if pool is open and valid
    *
@@ -138,25 +188,31 @@ public:
   bool is_pool_open(pool_t pool) const
   {
     auto i = _open_pools.find(pool);
-    if (i != _open_pools.end()) {
+
+    if (i != _open_pools.end())
       return i->second > 0;
-    }
     else
       return false;
   }
 
-  inline const std::map<pool_t, unsigned>& open_pool_set()
+  inline const std::map<pool_t, unsigned>& open_pool_set() const
   {
     return _open_pools;
   }
 
   inline size_t open_pool_count() const { return _open_pools.size(); }
 
- private:
-  std::map<pool_t, unsigned>    _open_pools;
-  std::map<std::string, pool_t> _name_map;
-  //  std::map<pool_t, std::vector<Connection_base::memory_region_t>>
-  //      _memory_regions;
+private:
+  struct pool_info_t {
+    uint64_t expected_obj_count;
+    size_t size;
+    unsigned int flags;
+  };
+
+  std::map<std::string, pool_t>      _map_n2p;
+  std::map<pool_t, std::string>      _map_p2n;
+  std::map<pool_t, unsigned>         _open_pools;
+  std::map<pool_t, pool_info_t>      _pool_info;
 };
 }  // namespace mcas
 

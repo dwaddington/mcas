@@ -64,6 +64,7 @@ class Connection_handler
   enum {
     ACTION_NONE = 0,
     ACTION_RELEASE_VALUE_LOCK,
+    ACTION_POOL_DELETE,
   };
 
  protected:
@@ -118,7 +119,7 @@ class Connection_handler
    * Check for network completions
    *
    */
-  Fabric_connection_base::Completion_state check_network_completions()    
+  Fabric_connection_base::Completion_state check_network_completions()
   {
     auto state = poll_completions();
     if ( state == Fabric_connection_base::Completion_state::ADDED_DEFERRED_LOCK ) {
@@ -152,6 +153,38 @@ class Connection_handler
   }
 
   /**
+   * Peek at pending message from the connection. Used when the resources required
+   * to process a pending nessage may depend on the content of the message.
+   *
+   * @param msg [out] Pointer to base protocol message
+   *
+   * @return Pointer to buffer holding the message or null if there are none
+   */
+  inline mcas::Protocol::Message* peek_pending_msg() const
+  {
+    if (_pending_msgs.empty()) return nullptr;
+    auto iob = _pending_msgs.back();
+    assert(iob);
+    return static_cast<mcas::Protocol::Message*>(iob->base());
+  }
+
+  /**
+   * Discard a pending message from the connection. Used as a complement to
+   * peek_pending_msg
+   *
+   * @param msg [out] Pointer to base protocol message
+   *
+   * @return Pointer to buffer holding the message or null if there are none
+   */
+  inline buffer_t *pop_pending_msg()
+  {
+    assert( ! _pending_msgs.empty() );
+    auto iob = _pending_msgs.back();
+    _pending_msgs.pop_back();
+    return iob;
+  }
+
+  /**
    * Get deferrd action
    *
    * @param action [out] Action
@@ -161,12 +194,12 @@ class Connection_handler
   inline bool get_pending_action(action_t& action)
   {
     if (_pending_actions.empty()) return false;
-  
+
     action = _pending_actions.back();
 
     if(option_DEBUG > 2)
       PLOG("Connection_handler: popped pending action (%u, %p)", action.op, action.parm);
-    
+
     _pending_actions.pop_back();
     return true;
   }
@@ -200,7 +233,7 @@ class Connection_handler
     set_state(POST_MSG_RECV); /* don't wait for this, let it be picked up in
                                  the check_completions cycle */
   }
-
+  
   /**
    * Set up for pending value send/recv
    *
@@ -229,7 +262,8 @@ class Connection_handler
     return mr;
   }  
 
-  inline uint64_t auth_id() const { return reinterpret_cast<uint64_t>(this); /* temp */ }
+  inline uint64_t auth_id() const { return _auth_id; }
+  inline void set_auth_id(uint64_t id) { _auth_id = id; }
 
   inline size_t max_message_size() const { return _max_message_size; }
 
@@ -271,7 +305,7 @@ class Connection_handler
   std::vector<Component::IKVStore::memory_handle_t> _mr_vector;
 
   uint64_t               _tick_count alignas(8) = 0;
-
+  uint64_t               _auth_id = 0;
   std::vector<buffer_t*> _pending_msgs;
   std::vector<action_t>  _pending_actions;
   float                  _freq_mhz;

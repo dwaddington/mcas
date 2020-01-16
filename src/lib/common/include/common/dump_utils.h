@@ -34,7 +34,9 @@
 #ifndef __DUMP_UTILS_H__
 #define __DUMP_UTILS_H__
 
-void hexdump(const void *data, const unsigned len);
-void asciidump(const void *data, const unsigned len);
+#include <cstddef>
+
+void hexdump(const void *data, const size_t len);
+void asciidump(const void *data, const size_t len);
 
 #endif

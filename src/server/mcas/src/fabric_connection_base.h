@@ -96,7 +96,7 @@ class Fabric_connection_base {
     /* set callback debugging here */
     static constexpr bool option_DEBUG = false;
 
-    if (unlikely(st != S_OK)) {
+    if (UNLIKELY(st != S_OK)) {
       PERR("Fabric_connection_base: fabric operation failed st != S_OK (st=%d, context=%p)", st, context);
       PERR("Error: %s", static_cast<char*>(error_data));
       return;
@@ -180,14 +180,6 @@ class Fabric_connection_base {
       free_buffer(b);
     }
   }
-  // void free_recv_buffer()
-  // {
-  //   //    assert(_posted_recv_buffer_outstanding == false);
-  //   assert(_posted_recv_buffer);
-
-  //   free_buffer(_posted_recv_buffer);
-  //   _posted_recv_buffer = nullptr;
-  // }
 
   void post_recv_buffer(buffer_t *buffer)
   {

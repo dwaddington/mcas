@@ -33,6 +33,7 @@
 #include <rdma/fi_cm.h> /* fi_listen */
 #pragma GCC diagnostic pop
 
+#include <unistd.h> /* write */
 #include <netinet/in.h> /* sockaddr_in */
 #include <sys/select.h> /* fd_set, pselect */
 

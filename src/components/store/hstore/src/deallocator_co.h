@@ -16,8 +16,10 @@
 #define COMANCHE_HSTORE_DEALLOCATOR_CO_H
 
 #include "heap_co.h"
-#include "hop_hash_log_.h"
+#include "hop_hash_log.h"
+#if 0
 #include "persister_pmem.h"
+#endif
 #include "pointer_pobj.h"
 #include "store_root.h"
 #include "trace_flags.h"
@@ -32,37 +34,26 @@
 
 #include <cstdlib> /* size_t, ptrdiff_t */
 
-template <typename T, typename Persister = persister_pmem>
+template <typename T, typename Persister>
 	class deallocator_co;
-
+#if 0
 template <>
 	class deallocator_co<void, persister_pmem>
 		: public persister_pmem
 	{
 	public:
-		using pointer = pointer_pobj<void, 0U>;
-		using const_pointer = pointer_pobj<const void, 0U>;
 		using value_type = void;
-		template <typename U, typename P = persister_pmem>
-			struct rebind
-			{
-				using other = deallocator_co<U, P>;
-			};
 	};
-
+#endif
 template <class Persister>
 	class deallocator_co<void, Persister>
 		: public Persister
 	{
 	public:
+		using value_type = void;
+		using difference_type = std::ptrdiff_t;
 		using pointer = pointer_pobj<void, 0U>;
 		using const_pointer = pointer_pobj<const void, 0U>;
-		using value_type = void;
-		template <typename U, typename P = Persister>
-			struct rebind
-			{
-				using other = deallocator_co<U, P>;
-			};
 	};
 
 template <typename T, typename Persister>
@@ -70,19 +61,11 @@ template <typename T, typename Persister>
 		: public Persister
 	{
 	public:
+		using value_type = T;
 		using size_type = std::size_t;
 		using difference_type = std::ptrdiff_t;
 		using pointer = pointer_pobj<T, 0U>;
 		using const_pointer = pointer_pobj<const T, 0U>;
-		using reference = T &;
-		using const_reference = const T &;
-		using value_type = T;
-
-		template <typename U>
-			struct rebind
-			{
-				using other = deallocator_co<U, Persister>;
-			};
 
 		deallocator_co(const Persister = Persister()) noexcept
 		{}
@@ -95,15 +78,6 @@ template <typename T, typename Persister>
 			{}
 
 		deallocator_co &operator=(const deallocator_co &) = delete;
-
-		pointer address(reference x) const noexcept /* to be deprecated */
-		{
-			return pointer(pmemobj_oid(&x));
-		}
-		const_pointer address(const_reference x) const noexcept /* to be deprecated */
-		{
-			return pointer(pmemobj_oid(&x));
-		}
 
 		void deallocate(
 			pointer ptr
@@ -139,6 +113,7 @@ template <typename T, typename Persister>
 			return PMEMOBJ_MAX_ALLOC_SIZE;
 #pragma GCC diagnostic pop
 		}
+
 		void persist(const void *ptr, size_type len, const char * = nullptr)
 		{
 			Persister::persist(ptr, len);

@@ -96,7 +96,7 @@ namespace nupm
   extern thread_local Region_modifications tls_modifications;
 
   /* add region */
-  void region_tracker_add(void * p, size_t p_len, char tag = 'w');
+  void region_tracker_add(const void * p, size_t p_len, char tag = 'w');
   void region_tracker_coalesce_across_TLS();
 
   /* offset_t is uint64_t. Presume that it is meant to be an index into the

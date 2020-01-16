@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_ALLOCATOR_CO_H
-#define COMANCHE_HSTORE_ALLOCATOR_CO_H
+#ifndef MCAS_HSTORE_ALLOCATOR_CO_H
+#define MCAS_HSTORE_ALLOCATOR_CO_H
 
 #include "deallocator_co.h"
 
@@ -35,11 +35,6 @@ template <>
 		using typename deallocator_type::pointer;
 		using typename deallocator_type::const_pointer;
 		using typename deallocator_type::value_type;
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_co<U, persister>;
-			};
 	};
 
 template <typename Persister>
@@ -51,11 +46,6 @@ template <typename Persister>
 		using typename deallocator_type::pointer;
 		using typename deallocator_type::const_pointer;
 		using typename deallocator_type::value_type;
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_co<U, Persister>;
-			};
 	};
 
 template <typename T, typename Persister = persister>
@@ -65,18 +55,11 @@ template <typename T, typename Persister = persister>
 		heap_co *_heap;
 	public:
 		using deallocator_type = deallocator_co<T, Persister>;
-		using size_type = std::size_t;
-		using difference_type = std::ptrdiff_t;
+		using typename deallocator_type::value_type;
+		using typename deallocator_type::size_type;
+		using typename deallocator_type::difference_type;
 		using pointer = pointer_pobj<T, 0U>;
 		using const_pointer = pointer_pobj<const T, 0U>;
-		using reference = T &;
-		using const_reference = const T &;
-		using value_type = T;
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_co<U, Persister>;
-			};
 
 		explicit allocator_co(heap_co &heap_, Persister p_ = Persister())
 			: deallocator_co<T, Persister>(p_)
@@ -92,23 +75,14 @@ template <typename T, typename Persister = persister>
 
 		allocator_co &operator=(const allocator_co &a_) = delete;
 
-#if 0
-		/* deprecated in C++20 */
-		pointer address(reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-		const_pointer address(const_reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-#endif
-
 		auto allocate(
 			size_type s
-			, typename allocator_co<void, Persister>::const_pointer /* hint */ =
-					typename allocator_co<void, Persister>::const_pointer{}
-			, const char * = nullptr
+			, size_type
+#if 0
+				alignment
+#endif
+					= alignof(T)
+
 		) -> pointer
 		{
 			auto oid = heap().malloc(s * sizeof(T));
@@ -118,14 +92,12 @@ template <typename T, typename Persister = persister>
 			}
 			return pointer(oid);
 		}
-		auto max_size() const
-		{
-			return 8; /* ERROR: provide a proper max size value */
-		}
+
 		void persist(const void *ptr, size_type len, const char * = nullptr)
 		{
 			Persister::persist(ptr, len);
 		}
+
 		auto &heap() const
 		{
 			return *_heap;

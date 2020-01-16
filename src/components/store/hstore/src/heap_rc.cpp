@@ -16,15 +16,22 @@
 constexpr unsigned heap_rc_shared_ephemeral::log_min_alignment;
 constexpr unsigned heap_rc_shared_ephemeral::hist_report_upper_bound;
 
-heap_rc_shared_ephemeral::heap_rc_shared_ephemeral(std::size_t capacity_)
+heap_rc_shared_ephemeral::heap_rc_shared_ephemeral()
 	: _heap()
+	, _managed_regions()
 	, _allocated(0)
-	, _capacity(capacity_)
+	, _capacity(0)
 	, _reconstituted()
 	, _hist_alloc()
 	, _hist_inject()
 	, _hist_free()
 {}
+
+void heap_rc_shared_ephemeral::add_managed_region(const ::iovec &r, const unsigned numa_node)
+{
+	_heap.add_managed_region(r.iov_base, r.iov_len, numa_node);
+	_managed_regions.push_back(r);
+}
 
 void *heap_rc_shared::best_aligned(void *a, std::size_t sz_)
 {
@@ -86,10 +93,10 @@ heap_rc_shared::heap_rc_shared(void *pool_, std::size_t sz_, unsigned numa_node_
 	, _numa_node(numa_node_)
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
-	, _eph(std::make_unique<heap_rc_shared_ephemeral>(_pool0.iov_len))
+	, _eph(std::make_unique<heap_rc_shared_ephemeral>())
 {
 	/* cursor now locates the best-aligned region */
-	_eph->_heap.add_managed_region(_pool0.iov_base, _pool0.iov_len, _numa_node);
+	_eph->add_managed_region(_pool0, _numa_node);
 	hop_hash_log<TRACE_HEAP_SUMMARY>::write(
 		__func__, " this ", this
 		, " pool ", _pool0.iov_base, " .. ", iov_limit(_pool0)
@@ -107,9 +114,9 @@ heap_rc_shared::heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_man
 	, _numa_node(this->_numa_node)
 	, _more_region_uuids_size(this->_more_region_uuids_size)
 	, _more_region_uuids(this->_more_region_uuids)
-	, _eph(std::make_unique<heap_rc_shared_ephemeral>(_pool0.iov_len))
+	, _eph(std::make_unique<heap_rc_shared_ephemeral>())
 {
-	_eph->_heap.add_managed_region(_pool0.iov_base, _pool0.iov_len, _numa_node);
+	_eph->add_managed_region(_pool0, _numa_node);
 	hop_hash_log<TRACE_HEAP_SUMMARY>::write(
 		__func__, " this ", this
 		, " pool ", _pool0.iov_base, " .. ", iov_limit(_pool0)
@@ -143,6 +150,11 @@ heap_rc_shared::~heap_rc_shared()
 		throw std::range_error("failed to re-open region " + std::to_string(uuid_));
 	}
 	return iov;
+}
+
+std::vector<::iovec> heap_rc_shared::regions() const
+{
+	return _eph->get_managed_regions();
 }
 
 void *heap_rc_shared::iov_limit(const ::iovec &r)
@@ -223,28 +235,56 @@ void heap_rc_shared::quiesce()
 	_eph.reset(nullptr);
 }
 
-void *heap_rc_shared::alloc(std::size_t sz_, std::size_t alignment_)
+namespace
 {
-	alignment_ = std::max(alignment_, sizeof(void *));
-	sz_ = std::max(sz_, alignment_);
+	/* Round up to (ceiling) power of 2, from Hacker's Delight 3-2 */
+	std::size_t clp2(std::size_t sz_)
+	{
+		--sz_;
+		sz_ |= sz_ >> 1;
+		sz_ |= sz_ >> 2;
+		sz_ |= sz_ >> 4;
+		sz_ |= sz_ >> 8;
+		sz_ |= sz_ >> 16;
+		sz_ |= sz_ >> 32;
+		return sz_ + 1;
+	}
+}
 
-	if ( (alignment_ & (alignment_ - 1U)) != 0 )
+void *heap_rc_shared::alloc(const std::size_t sz_, const std::size_t alignment_)
+{
+	auto alignment = std::max(alignment_, sizeof(void *));
+
+	if ( (alignment & (alignment - 1U)) != 0 )
 	{
 		throw std::invalid_argument("alignment is not a power of 2");
 	}
 
-	/* allocation must be multiple of alignment */
+	auto sz = sz_;
 
-	auto sz = (sz_ + alignment_ - 1U)/alignment_ * alignment_;
+	if ( sz < alignment )
+	{
+		/* round up only to a power of 2, so Rca_LB will find the element
+		 * on free.
+		 */
+		sz = clp2(sz);
+		assert( (sz & (sz - 1)) == 0 );
+		/* Allocation must be a multiple of alignment. In the case,
+		 * adjust alignment. */
+		alignment = std::max(sizeof(void *), sz);
+	}
+
+	/* In any case, sz must be a multiple of alignment. */
+	sz = (sz + alignment - 1U)/alignment * alignment;
 
 	try {
-		auto p = _eph->_heap.alloc(sz, _numa_node, alignment_);
+		auto p = _eph->_heap.alloc(sz, _numa_node, alignment);
 				/* Note: allocation exception from Rca_LB is General_exception, which does not derive
 				 * from std::bad_alloc.
 				 */
 
 		VALGRIND_MEMPOOL_ALLOC(_pool0.iov_base, p, sz);
-		hop_hash_log<TRACE_HEAP>::write(__func__, " pool ", _pool0.iov_base, " addr ", p, " size ", sz_, " -> ", sz);
+		hop_hash_log<TRACE_HEAP>::write(__func__, " pool ", _pool0.iov_base, " addr ", p, " align ", alignment_, " -> ", alignment, " size ", sz_, " -> ", sz);
 		_eph->_allocated += sz;
 		_eph->_hist_alloc.enter(sz);
 		return p;

@@ -11,16 +11,16 @@
    limitations under the License.
 */
 
+#include "rc_alloc_lb.h"
+
+#include "avl_malloc.h"
+#include "slab.h"
+#include "region.h"
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/utils.h>
 #include <numa.h>
 #include <stdexcept>
-
-#include "avl_malloc.h"
-#include "slab.h"
-#include "rc_alloc_lb.h"
-#include "region.h"
 
 namespace nupm
 {
@@ -48,14 +48,15 @@ void *Rca_LB::alloc(size_t size, int numa_node, size_t alignment)
   if (size == 0 || numa_node < 0)
     throw std::invalid_argument("Rca_LB::alloc invalid size or numa node");
 
-  if (alignment > size)
-    throw std::invalid_argument("Rca_LB::alloc alignment cannot be supported");
+  // if (alignment > size)
+  //   throw std::invalid_argument("Rca_LB::alloc alignment cannot be supported");
 
   void * result = _rmap->allocate(size, numa_node, alignment);
   if(result == nullptr) {
     PWRN("Region allocator unable to allocate (size=%lu, alignment=%lu)", size, alignment);
     throw std::bad_alloc();
   }
+  //  PNOTICE("Rca_LB::alloc (%p,%lu)", result, size);
   return result;
 }
 

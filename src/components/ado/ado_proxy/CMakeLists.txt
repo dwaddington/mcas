@@ -7,8 +7,9 @@ set(CMAKE_CXX_STANDARD 14)
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/src)
+include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(../../../lib/common/include)
+include_directories(../../../lib/libadoproto/include)
 include_directories(../../)
 # make sure install references are last
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # docker.h

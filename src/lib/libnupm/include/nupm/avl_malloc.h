@@ -27,12 +27,13 @@
 #error("This is a C++ header")
 #endif
 
+#include "avl_tree.h"
+#include "mr_traits.h"
+#include "slab.h"
 #include <common/stack.h>
 #include <common/types.h>
 #include <common/utils.h>
 #include <vector>
-#include "slab.h"
-#include "avl_tree.h"
 #include <cstdlib> // exit
 
 namespace Core
@@ -51,7 +52,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
   bool _free = true;
   Memory_region* _next = nullptr;
   Memory_region* _prev = nullptr;
-  char _padding; // packed, so 8+8+1+8+8+1 bytes?
+  char _padding; // packed, so 8(vft) + (8+8+2) (Core::AVL_node<Memory_region>) + (8+8+1+8+8+1) = 60 bytes
   //    size_t          _max_free = 0; // TODO: subtree pruning
 
  public:
@@ -87,7 +88,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
   {
     return (addr >= _addr) && (addr < (_addr + _size));
   }
-  
+
   /**
    * Dump information about the region
    *
@@ -99,7 +100,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
     //        _free ? "yes" : "no", Common::chksum32((void*)_addr, _size));
     // }
     // else {
-    PLOG("node [%p]: addr=0x%lx size=%ld free=%s", this, _addr, _size,
+    PLOG("node [%p]: addr=0x%lx size=%ld free=%s", static_cast<const void *>(this), _addr, _size,
          _free ? "yes" : "no");
   }
 
@@ -386,7 +387,7 @@ class AVL_range_allocator {
       root = reinterpret_cast<Core::AVL_node<Core::Memory_region>**>(
           (reinterpret_cast<addr_t>(slab.get_first_element())));
 
-      if (option_DEBUG) PLOG("reconstructed root pointer: %p", root);
+      if (option_DEBUG) PLOG("reconstructed root pointer: %p", static_cast<const void *>(root));
     }
     else {
       /* create root pointer on slab */
@@ -611,7 +612,7 @@ class AVL_range_allocator {
   Memory_region* alloc_at(addr_t addr, size_t size) {
     // find fitting region
     Memory_region* root = static_cast<Memory_region*>(*(_tree->root()));
-    Memory_region* region = root->find_containing_region(root, addr);  
+    Memory_region* region = root->find_containing_region(root, addr);
 
     if (region == nullptr)
       throw API_exception("alloc_at: cannot find containing region (addr=%lx, size=%ld)",
@@ -638,7 +639,7 @@ class AVL_range_allocator {
 
       auto left_size = addr - region->_addr; // new size for left region
       middle = new (_slab.alloc()) Memory_region(addr, region->_size - left_size);
-      
+
       region->_size = left_size;  // make the containing region left chunk
       middle->_next = region->_next;
       middle->_prev = region;
@@ -1062,5 +1063,18 @@ class Region_allocator {
   Core::AVL_range_allocator _range_allocator;
 };
 }  // namespace Core
+
+template <>
+	struct mr_traits<Core::AVL_range_allocator>
+	{
+		static auto allocate(Core::AVL_range_allocator *pmr, unsigned, std::size_t bytes, std::size_t alignment)
+		{
+			return pmr->alloc(bytes, alignment)->addr();
+		}
+		static auto deallocate(Core::AVL_range_allocator *pmr, unsigned, void *p, std::size_t, std::size_t)
+		{
+			return pmr->free(reinterpret_cast<addr_t>(p));
+		}
+	};
 
 #endif  //__CORE_AVL_MALLOC_H__

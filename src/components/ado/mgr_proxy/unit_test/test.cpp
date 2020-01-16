@@ -1,11 +1,10 @@
 #include <api/ado_itf.h>
 #include <api/components.h>
-#include <chrono>
 #include <common/str_utils.h>
 #include <common/utils.h>
 #include <gtest/gtest.h>
-#include <iostream>
-#include <thread>
+#include <memory>
+#include <vector>
 
 using namespace Component;
 using namespace Common;
@@ -29,6 +28,7 @@ protected:
   }
 
   // Objects declared here can be used by all tests in the test case
+  static std::unique_ptr<void> kill_buffer;
   static Component::IADO_manager_proxy *_ado_manager;
   static Component::IADO_proxy *_ado;
 };
@@ -55,7 +55,14 @@ TEST_F(IADO_manager_proxy_test, createADOProx) {
   string filename = "/home/xuluna/workspace/mcas/build/src/server/ado/ado";
   vector<string> args;
   ASSERT_TRUE(_ado_manager);
-  _ado = _ado_manager->create(999, filename, args, 0, 0);
+  _ado = _ado_manager->create(123, // auth id
+                              nullptr,
+                              999,
+                              "pool-name", //      const std::string &pool_name,
+                              MB(1),//      const size_t pool_size,
+                              0,//      const unsigned int pool_flags,
+                              1000,//      const uint64_t expected_obj_count,
+                              filename, args, 0, 0);
   ASSERT_TRUE(_ado);
 }
 

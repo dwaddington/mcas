@@ -1,14 +1,14 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2019] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 #ifndef __API_KVSTORE_ITF__
@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <api/components.h>
+#include <common/types.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
 #include <semaphore.h>
@@ -37,30 +38,34 @@ namespace Component
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+#define DECLARE_OPAQUE_TYPE(NAME) struct Opaque_##NAME { virtual ~Opaque_##NAME() {} }
 /**
  * Key-value interface
  */
 class IKVStore : public Component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0x62f4829f,0x0405,0x4c19,0x9898,0xa3,0xae,0x21,0x5a,0x3e,0xe8);
   // clang-format on
 
- private:
-  struct Opaque_memory_region {
-    virtual ~Opaque_memory_region() {}
-  };
+private:
+  
+  DECLARE_OPAQUE_TYPE(memory_region);
+  DECLARE_OPAQUE_TYPE(key);
+  DECLARE_OPAQUE_TYPE(lock_handle);
 
- public:
+public:
+  
+  DECLARE_OPAQUE_TYPE(pool_iterator);
+
+public:
+  
   using pool_t          = uint64_t;
   using memory_handle_t = Opaque_memory_region*;
-
-  struct Opaque_key {        /* base for implementation lock/key container */
-    virtual ~Opaque_key() {} /* destruction invokes derived destructor */
-  };
-
-  using key_t = Opaque_key*;
-
+  using key_t           = Opaque_key*;
+  using pool_lock_t     = Opaque_lock_handle*;
+  using pool_iterator_t = Opaque_pool_iterator*;
+  
   static constexpr memory_handle_t HANDLE_NONE = nullptr;
   static constexpr key_t           KEY_NONE    = nullptr;
 
@@ -80,14 +85,13 @@ class IKVStore : public Component::IBase {
     FLAGS_MAX_VALUE   = 0x8,
   };
 
-  enum {
-    POOL_ERROR = 0,
-  };
-
+  static constexpr pool_t POOL_ERROR = 0;
+  
   enum class Capability {
     POOL_DELETE_CHECK, /*< checks if pool is open before allowing delete */
     RWLOCK_PER_POOL,   /*< pools are locked with RW-lock */
     POOL_THREAD_SAFE,  /*< pools can be shared across multiple client threads */
+    WRITE_TIMESTAMPS, /*< support for write timestamping */
   };
 
   enum class Op_type {
@@ -98,54 +102,17 @@ class IKVStore : public Component::IBase {
   };
 
   enum Attribute {
-    VALUE_LEN = 1, /* length of a value associated with key */
-    COUNT     = 2,
-    CRC32     = 3, /* get CRC32 of a value */
-    AUTO_HASHTABLE_EXPANSION =
-        4,            /* set to true if the hash table should expand */
-    PERCENT_USED = 5, /* get percent used pool capacity at current size */
-  };
-
-  class Operation {
-    Op_type _type;
-    size_t  _offset;
-
-   protected:
-    Operation(Op_type type, size_t offset) : _type(type), _offset(offset) {}
-
-   public:
-    Op_type type() const noexcept { return _type; }
-    size_t  offset() const noexcept { return _offset; }
-  };
-
-  class Operation_sized : public Operation {
-    size_t _len;
-
-   protected:
-    Operation_sized(Op_type type, size_t offset_, size_t len)
-        : Operation(type, offset_), _len(len)
-    {
-    }
-
-   public:
-    size_t size() const noexcept { return _len; }
-  };
-
-  class Operation_write : public Operation_sized {
-    const void* _data;
-
-   public:
-    Operation_write(size_t offset, size_t len, const void* data)
-        : Operation_sized(Op_type::WRITE, offset, len), _data(data)
-    {
-    }
-    const void* data() const noexcept { return _data; }
+    VALUE_LEN                = 1, /* length of a value associated with key */
+    COUNT                    = 2, /* number of objects */
+    CRC32                    = 3, /* get CRC32 of a value */
+    AUTO_HASHTABLE_EXPANSION = 4, /* set to true if the hash table should expand */
+    PERCENT_USED             = 5, /* get percent used pool capacity at current size */
+    WRITE_EPOCH_TIME         = 6, /* epoch time at which the key-value pair was last written or locked with STORE_LOCK_WRITE */
   };
 
   enum lock_type_t {
     STORE_LOCK_READ  = 1,
     STORE_LOCK_WRITE = 2,
-    STORE_LOCK_ADO = 1,
   };
 
   enum {
@@ -157,6 +124,42 @@ class IKVStore : public Component::IBase {
     E_BAD_ALIGNMENT  = E_ERROR_BASE - 4,
     E_TOO_LARGE      = E_ERROR_BASE - 5,
     E_ALREADY_OPEN   = E_ERROR_BASE - 6,
+  };  
+
+  class Operation {
+    Op_type _type;
+    size_t  _offset;
+
+  protected:
+    Operation(Op_type type, size_t offset) : _type(type), _offset(offset) {}
+
+  public:
+    Op_type type() const noexcept { return _type; }
+    size_t  offset() const noexcept { return _offset; }
+  };
+
+  class Operation_sized : public Operation {
+    size_t _len;
+
+  protected:
+    Operation_sized(Op_type type, size_t offset_, size_t len)
+      : Operation(type, offset_), _len(len)
+    {
+    }
+
+  public:
+    size_t size() const noexcept { return _len; }
+  };
+
+  class Operation_write : public Operation_sized {
+    const void* _data;
+
+  public:
+    Operation_write(size_t offset, size_t len, const void* data)
+      : Operation_sized(Op_type::WRITE, offset, len), _data(data)
+    {
+    }
+    const void* data() const noexcept { return _data; }
   };
 
   /**
@@ -204,7 +207,7 @@ class IKVStore : public Component::IBase {
                              const size_t       size,
                              uint32_t           flags              = 0,
                              uint64_t           expected_obj_count = 0)
-      __attribute__((deprecated))
+    __attribute__((deprecated))
   {
     return create_pool(path + name, size, flags, expected_obj_count);
   }
@@ -248,7 +251,7 @@ class IKVStore : public Component::IBase {
    * @return S_OK on success, E_POOL_NOT_FOUND, E_ALREADY_OPEN if pool cannot be
    * deleted
    */
-  virtual status_t delete_pool(const std::string& name) { return E_NOT_IMPL; }
+  virtual status_t delete_pool(const std::string& name) = 0;
 
   virtual status_t delete_pool(const std::string& path, const std::string& name)
   {
@@ -268,7 +271,7 @@ class IKVStore : public Component::IBase {
   virtual status_t get_pool_regions(const pool_t          pool,
                                     std::vector<::iovec>& out_regions)
   {
-    return E_NOT_SUPPORTED;
+    return E_NOT_SUPPORTED; /* not supported in FileStore */
   }
 
   /**
@@ -400,10 +403,7 @@ class IKVStore : public Component::IBase {
   virtual status_t get_attribute(const pool_t           pool,
                                  const Attribute        attr,
                                  std::vector<uint64_t>& out_value,
-                                 const std::string*     key = nullptr)
-  {
-    return E_NOT_SUPPORTED;
-  }
+                                 const std::string*     key = nullptr) = 0;
 
   /**
    * Set attribute on a pool.
@@ -478,38 +478,41 @@ class IKVStore : public Component::IBase {
   }
 
   /**
-   * Take a lock on an object. If the object does not exist, create it with
-   * value space according to out_value_len (this is very important for mcas
-   * context)
+   * Take a lock on an object. If the object does not exist and inout_value_len
+   * is non-zero, create it with value space according to out_value_len (this
+   * is very important for mcas context). If the object does not exist and
+   * inout_value_len is zero, return E_KEY_NOT_FOUND.
    *
    * @param pool Pool handle
    * @param key Key
    * @param type STORE_LOCK_READ | STORE_LOCK_WRITE
    * @param out_value [out] Pointer to data
-   * @param out_value_len [in-out] Size of data in bytes
+   * @param inout_value_len [in-out] Size of data in bytes
    * @param out_key [out]  Handle to key for unlock
    *
-   * @return S_OK, E_INVAL or other error
+   * @return S_OK, S_CREATED_OK (if created on demand), E_KEY_NOT_FOUND,
+   * or other error
    */
   virtual status_t lock(const pool_t       pool,
                         const std::string& key,
-                        lock_type_t        type,
+                        const lock_type_t  type,
                         void*&             out_value,
-                        size_t&            out_value_len,
+                        size_t&            inout_value_len,
                         key_t&             out_key)
   {
     return E_NOT_SUPPORTED;
   }
 
   /**
-   * Unlock an object
+   * Unlock a key-value pair
    *
    * @param pool Pool handle
    * @param key_handle Handle (opaque) for key
    *
    * @return S_OK, S_MORE (for async), E_INVAL or other error
    */
-  virtual status_t unlock(const pool_t pool, key_t key_handle)
+  virtual status_t unlock(const pool_t pool,
+                          const key_t  key_handle)
   {
     return E_NOT_SUPPORTED;
   }
@@ -559,20 +562,46 @@ class IKVStore : public Component::IBase {
    * Apply functor to all objects in the pool
    *
    * @param pool Pool handle
-   * @param function Functor
+   * @param function Functor to apply
    *
    * @return S_OK, E_POOL_NOT_FOUND
    */
-  virtual status_t map(const pool_t                         pool,
-                       std::function<int(const std::string& key,
-                                         const void*        value,
+  virtual status_t map(const pool_t pool,
+                       std::function<int(const void* key,
+                                         const size_t key_len,
+                                         const void* value,
                                          const size_t value_len)> function)
   {
     return E_NOT_SUPPORTED;
   }
 
   /**
-   * Apply functor to all keys only
+   * Apply functor to all objects in the pool according 
+   * to given time constraints
+   *
+   * @param pool Pool handle
+   * @param function Functor to apply (not in time order). If 
+   *                 functor returns < 0, then map aborts
+   * @param t_begin Time must be after or equal. If set to zero, no constraint.
+   * @param t_end Time must be before or equal. If set to zero, no constraint.
+   *
+   * @return S_OK, E_POOL_NOT_FOUND
+   */  
+  virtual status_t map(const pool_t pool,
+                       std::function<int(const void* key,
+                                         const size_t key_len,
+                                         const void* value,
+                                         const size_t value_len,
+                                         const tsc_time_t timestamp)> function,
+                       const epoch_time_t t_begin,
+                       const epoch_time_t t_end)
+  {
+    return E_NOT_SUPPORTED;
+  }
+
+
+  /**
+   * Apply functor to all keys only. Useful for file_store
    *
    * @param pool Pool handle
    * @param function Functor
@@ -585,6 +614,76 @@ class IKVStore : public Component::IBase {
     return E_NOT_SUPPORTED;
   }
 
+  /* 
+     auto iter = open_pool_iterator(pool);
+
+     while(deref_pool_iterator(iter, ref, true) == S_OK)
+       process_record(ref);
+
+     close_pool_iterator(iter);
+  */                                                
+  
+  struct pool_reference_t {
+    const void* key;
+    size_t key_len;
+    const void* value;
+    size_t value_len;
+    tsc_time_t timestamp; /* zero if not supported */
+  } __attribute__((packed));
+
+
+  /**
+   * Open pool iterator to iterate over objects in pool.
+   *
+   * @param pool Pool handle
+   *
+   * @return Pool iterator or nullptr
+   */
+  virtual pool_iterator_t open_pool_iterator(const pool_t pool)
+  {
+    return nullptr;
+  }
+
+  /**
+   * Deference pool iterator position and optionally increment
+   *
+   * @param pool Pool handle
+   * @param iter Pool iterator
+   * @param t_begin Time must be after or equal. If set to zero, no constraint.
+   * @param t_end Time must be before or equal. If set to zero, no constraint.
+   * @param ref [out] Output reference record
+   * @param ref [out] Set to true if within time bounds
+   * @param increment Move iterator forward one position
+   *
+   * @return S_OK on success and valid reference, E_INVAL (bad iterator), 
+   *   E_OUT_OF_BOUNDS (when attempting to dereference out of bounds
+   *   E_ITERATOR_DISTURBED (when writes have been made since last iteration)
+   */
+  virtual status_t deref_pool_iterator(const pool_t pool,
+                                       pool_iterator_t iter,
+                                       const epoch_time_t t_begin,
+                                       const epoch_time_t t_end,
+                                       pool_reference_t& ref,
+                                       bool& time_match,
+                                       bool increment = true)
+  {
+    return E_NOT_IMPL;
+  }
+
+  /**
+   * Unlock pool, release iterator and associated resources
+   *
+   * @param pool Pool handle
+   * @param iter Pool iterator
+   *
+   * @return S_OK on success, E_INVAL (bad iterator)
+   */
+  virtual status_t close_pool_iterator(const pool_t pool,
+                                       pool_iterator_t iter)
+  {
+    return E_NOT_IMPL;
+  }
+  
   /**
    * Free server-side allocated memory
    *
@@ -603,14 +702,14 @@ class IKVStore : public Component::IBase {
    * 
    * @param pool Pool handle
    * @param size Size in bytes
-   * @param alignment Alignment in bytes, 0 if no alignment is needed
+   * @param alignment Alignment hint in bytes, 0 if no alignment is needed
    * @param out_addr Pointer to allocated region
    * 
    * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND
    */  
   virtual status_t allocate_pool_memory(const pool_t pool,
                                         const size_t size,
-                                        const size_t alignment,
+                                        const size_t alignment_hint,
                                         void*& out_addr)
   {
     return E_NOT_SUPPORTED;
@@ -639,7 +738,10 @@ class IKVStore : public Component::IBase {
    *
    * @return S_OK on success or error otherwise
    */
-  virtual status_t ioctl(const std::string& command) { return E_NOT_SUPPORTED; }
+  virtual status_t ioctl(const std::string& command)
+  {
+    return E_NOT_SUPPORTED;
+  }
 
   /**
    * Debug routine
@@ -652,23 +754,22 @@ class IKVStore : public Component::IBase {
 };
 
 class IKVStore_factory : public Component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xface829f,0x0405,0x4c19,0x9898,0xa3,0xae,0x21,0x5a,0x3e,0xe8);
   // clang-format on
 
   virtual IKVStore* create(const std::string& owner, const std::string& param)
   {
-    throw API_exception(
-        "IKVstore_factory::create(owner,param) not implemented");
+    throw API_exception("IKVstore_factory::create(owner,param) not implemented");
   };
 
   virtual IKVStore* create(const std::string& owner,
                            const std::string& param,
                            const std::string& param2)
   {
-    throw API_exception(
-        "IKVstore_factory::create(owner,param,param2) not implemented");
+    throw API_exception("IKVstore_factory::create(owner,param,param2) "
+                        "not implemented");
   }
 
   virtual IKVStore* create(unsigned           debug_level,
@@ -684,8 +785,8 @@ class IKVStore_factory : public Component::IBase {
   virtual IKVStore* create(unsigned                            debug_level,
                            std::map<std::string, std::string>& params)
   {
-    throw API_exception(
-        "IKVstore_factory::create(debug_level,param-map) not implemented");
+    throw API_exception("IKVstore_factory::create(debug_level,param-map) "
+                        "not implemented");
   }
 };
 

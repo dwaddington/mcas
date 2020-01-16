@@ -26,8 +26,6 @@
 #include <daxctl/libdaxctl.h>
 #include <numa.h>
 #include <experimental/filesystem>
-#include <fstream>
-#include <iostream>
 #include <map>
 #include <string>
 #include <utility>

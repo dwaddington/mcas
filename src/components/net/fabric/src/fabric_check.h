@@ -20,9 +20,7 @@
  *
  */
 
-#include <unistd.h> /* ssize_t */
-
-#include <cstddef> /* size_t */
+#include <cstddef> /* size_t, ptrdiff_t */
 
 /**
  * Fabric/RDMA-based network component
@@ -31,10 +29,12 @@
 
 /* fi_fabric, fi_close (when called on a fabric) and most fi_poll functions FI_SUCCESS; others return 0 */
 unsigned (check_ge_zero)(int r, const char *file, int line);
-std::size_t (check_ge_zero)(ssize_t r, const char *file, int line);
-std::size_t (check_eq)(ssize_t r, ssize_t exp, const char *file, int line);
+std::size_t (check_ge_zero)(std::ptrdiff_t r, const char *file, int line);
+std::size_t (check_eq)(std::ptrdiff_t r, std::ptrdiff_t exp, const char *file, int line);
+std::size_t (check_fail)(std::ptrdiff_t r, const char *file, int line);
 
 #define CHECK_FI_ERR(V) (check_ge_zero)((V), __FILE__, __LINE__)
+#define FORCE_FI_ERR(V) (check_fail)((V), __FILE__, __LINE__)
 #define CHECK_FI_EQ(V,EXP) (check_eq)((V), (EXP), __FILE__, __LINE__)
 
 #endif

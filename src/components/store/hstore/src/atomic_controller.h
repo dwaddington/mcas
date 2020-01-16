@@ -26,16 +26,17 @@ namespace impl
 {
 	template <typename Table>
 		class atomic_controller
-			: private Table::allocator_type::template rebind<mod_control>::other
+			: private std::allocator_traits<typename Table::allocator_type>::template rebind_alloc<mod_control>
 		{
 			using table_t = Table;
 			using allocator_type =
-				typename table_t::allocator_type::template rebind<mod_control>::other;
+				typename std::allocator_traits<typename table_t::allocator_type>::template rebind_alloc<mod_control>;
 
 			using persist_t = persist_atomic<typename Table::value_type>;
 			using mod_key_t = typename persist_t::mod_key_t;
 			persist_t *_persist; /* persist_atomic is a bad name. Should be a noun. */
 			table_t *_map;
+			bool _tick_expired;
 			class update_finisher
 			{
 				impl::atomic_controller<Table> &_ctlr;
@@ -47,6 +48,9 @@ namespace impl
 			void update_finish();
 			void redo_replace();
 			void redo_finish();
+			/* Helpers for the perishable test, to avoid an exception in the finish_update destructor */
+			void tick_expired() { _tick_expired = true; }
+			bool is_tick_expired() { auto r = _tick_expired; _tick_expired = false; return r; }
 		public:
 			atomic_controller(
 				persist_atomic<typename Table::value_type> &persist_

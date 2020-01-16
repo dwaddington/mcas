@@ -3,10 +3,21 @@ cmake_minimum_required(VERSION 3.5)
 option(FORCE_OTT_BUILD "force out of tree build" ON)
 option(BOOTSTRAP_DEPS "bootstrap to build deps" ON)
 option(TEST_HSTORE_PERISHABLE "hstore perishable testing enabled" OFF)
+option(BUILD_RUST "enabled Rust-based dependencies" ON)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR AND FORCE_OTT_BUILD)
     message(FATAL_ERROR "Cannot use in-source build ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}. You should delete any CMakeCache.txt and CMakeFiles and then try out-of-tree build")
 endif(CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR AND FORCE_OTT_BUILD)
+
+# check for Rust installation
+find_program(RUST_COMPILER rustc ~/.cargo/bin/)
+find_program(RUST_CARGO cargo ~/.cargo/bin/)
+if(NOT ${RUST_COMPILER} MATCHES "RUST_COMPILER-NOTFOUND")
+  message("-- Found Rust compiler: ${RUST_COMPILER}")
+  message("-- Found Rust Cargo: ${RUST_CARGO}")
+else()
+  set(BUILD_RUST OFF)
+endif()
 
 set(GCC_COVERAGE_COMPILE_FLAGS "-g -shared-libgcc -DTBB_USE_THREADING_TOOLS")
 set(ENV{MCAS_HOME} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -31,5 +42,6 @@ add_custom_target(bootstrap
 add_subdirectory(src)
 add_subdirectory(testing)
 add_subdirectory(examples)
+add_subdirectory(deploy)
 
 

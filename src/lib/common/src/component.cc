@@ -42,6 +42,9 @@
 #include <component/base.h>
 #include <config.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+
 namespace Component
 {
 bool operator==(const Component::uuid_t &lhs, const Component::uuid_t &rhs) {
@@ -117,9 +120,9 @@ void IBase::release_ref() {
  * @return S_OK on success.
  */
 status_t bind(std::vector<IBase *> components) {
-  for (int i = 0; i < components.size(); i++) {
+  for (size_t i = 0; i < components.size(); i++) {
     assert(components[i]);
-    for (int j = 0; j < components.size(); j++) {
+    for (size_t j = 0; j < components.size(); j++) {
       assert(components[j]);
       if (i == j) continue;
       if (components[i]->bind(components[j]) == -1) {
@@ -132,3 +135,6 @@ status_t bind(std::vector<IBase *> components) {
   return S_OK;
 }
 }  // namespace Component
+
+
+#pragma GCC diagnostic pop

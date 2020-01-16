@@ -23,18 +23,17 @@
 #ifndef __COMMON_SLAB_H__
 #define __COMMON_SLAB_H__
 
-#include <common/chksum.h>
 #include <common/memory.h>
+
+#include "lazy_region.h"
+#include <common/chksum.h>
 #include <algorithm>
 #include <cstring>
 #include <functional>
 #include <iomanip>
-#include <iostream>
 #include <set>
 #include <sstream>
 #include <vector>
-
-#include "lazy_region.h"
 
 namespace Core
 {

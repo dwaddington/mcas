@@ -83,11 +83,11 @@ class Buffer_manager {
 
   buffer_t *allocate()
   {
-    if (unlikely(_free.empty())) throw Program_exception("buffer_manager.h: no shard buffers remaining");
+    if (UNLIKELY(_free.empty())) throw Program_exception("buffer_manager.h: no shard buffers remaining");
     auto iob = _free.back();
     assert(iob->flags == 0);
     _free.pop_back();
-    if (option_DEBUG > 3) PLOG("bm: allocate : %p %lu", iob, _free.size());
+    if (option_DEBUG > 3) PLOG("bm: allocate : %p %lu", static_cast<const void *>(iob), _free.size());
     assert(iob);
     return iob;
   }
@@ -97,7 +97,7 @@ class Buffer_manager {
     assert(iob);
     assert(iob->flags == 0);
 
-    if (option_DEBUG > 3) PLOG("bm: free     : %p", iob);
+    if (option_DEBUG > 3) PLOG("bm: free     : %p", static_cast<const void *>(iob));
     iob->reset_length();
     _free.push_back(iob);
   }

@@ -48,7 +48,7 @@ class Fabric_transport {
       void *        error_data,
       void *        param)
   {
-    if (unlikely(st != S_OK))
+    if (UNLIKELY(st != S_OK))
       throw Program_exception(
           "poll_completions failed unexpectedly (st=%d) (cf=%lx)", st,
           completion_flags);
@@ -192,7 +192,7 @@ class Fabric_transport {
   void post_recv(buffer_t *iob)
   {
     if (option_DEBUG)
-      PLOG("%s: (%p, %p, base=%p, len=%lu)", __func__, iob, iob->desc,
+      PLOG("%s: (%p, %p, base=%p, len=%lu)", __func__, static_cast<const void *>(iob), iob->desc,
            iob->iov->iov_base, iob->iov->iov_len);
 
     iob->reset_length();
@@ -214,7 +214,7 @@ class Fabric_transport {
 
     if (option_DEBUG)
       PLOG("register_direct_memory (%p, %lu, mr=%p, desc=%p)", region,
-           region_len, mr, desc);
+           region_len, static_cast<const void *>(mr), desc);
 
     return reinterpret_cast<Component::IKVStore::memory_handle_t>(buffer);
   }

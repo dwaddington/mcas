@@ -23,17 +23,17 @@
 
 class Devdax_manager;
 
-template <typename PersistData, typename Heap>
+template <typename PersistData, typename Heap, typename HeapAllocator>
   class region
   {
-    static constexpr std::uint64_t magic_value = 0xc74892d72eed493a;
+    static constexpr std::uint64_t magic_value = HeapAllocator::magic_value; // 0xc74892d72eed493a;
   public:
     using heap_type = Heap;
     using persist_data_type = PersistData;
 
   private:
     std::uint64_t magic;
-	std::uint64_t _uuid;
+    std::uint64_t _uuid;
     heap_type _heap;
     persist_data_type _persist_data;
 
@@ -63,7 +63,7 @@ template <typename PersistData, typename Heap>
     )
       : magic(0)
       , _uuid(this->_uuid)
-      , _heap(devdax_manager_)
+      , _heap(devdax_manager_, &this->_persist_data.ase())
       , _persist_data(std::move(this->_persist_data))
     {
       magic = magic_value;
@@ -71,24 +71,22 @@ template <typename PersistData, typename Heap>
     }
 #pragma GCC diagnostic pop
 
-	heap_rc locate_heap() { return heap_rc(&_heap); }
-	persist_data_type &persist_data() { return _persist_data; }
+    HeapAllocator locate_heap() { return HeapAllocator(&_heap); }
+    persist_data_type &persist_data() { return _persist_data; }
     bool is_initialized() const noexcept { return magic == magic_value; }
     unsigned percent_used() const { return _heap.percent_used(); }
-	void quiesce() { _heap.quiesce(); }
-    std::vector<::iovec> get_regions()
+    void quiesce() { _heap.quiesce(); }
+    std::vector<::iovec> get_regions() const
     {
-      std::vector<::iovec> regions;
-      regions.push_back(_heap.region());
-      return regions;
+      return _heap.regions();
     }
-	auto grow(
-		const std::unique_ptr<Devdax_manager> & devdax_manager_
-		, std::size_t increment_
-	) -> std::size_t
-	{
-		return _heap.grow(devdax_manager_, _uuid, increment_);
-	}
+    auto grow(
+      const std::unique_ptr<Devdax_manager> & devdax_manager_
+      , std::size_t increment_
+    ) -> std::size_t
+    {
+      return _heap.grow(devdax_manager_, _uuid, increment_);
+    }
     /* region used by heap_cc follows */
   };
 

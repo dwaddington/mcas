@@ -10,8 +10,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __mcas_PROGRAM_OPTIONS_H__
-#define __mcas_PROGRAM_OPTIONS_H__
+#ifndef __MCAS_PROGRAM_OPTIONS_H__
+#define __MCAS_PROGRAM_OPTIONS_H__
 
 struct Program_options {
   std::string config_file;

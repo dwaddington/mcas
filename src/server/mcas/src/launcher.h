@@ -22,14 +22,16 @@
 #include "shard.h"
 
 namespace mcas {
-class Shard_launcher : public Config_file {
+class Shard_launcher {
 public:
-  Shard_launcher(Program_options &options) : Config_file(options.config_file) {
-    for (unsigned i = 0; i < shard_count(); i++) {
-      PMAJOR("launching shard: core(%d) port(%d) net(%s) (forced-exit=%s)", get_shard_core(i),
-             get_shard_port(i), get_shard("net", i).c_str(), options.forced_exit ? "y":"n");
+  Shard_launcher(Program_options &options) :
+    _config_file(options.config_file)
+  {
+    for (unsigned i = 0; i < _config_file.shard_count(); i++) {
+      PMAJOR("launching shard: core(%d) port(%d) net(%s) (forced-exit=%s)", _config_file.get_shard_core(i),
+             _config_file.get_shard_port(i), _config_file.get_shard("net", i).c_str(), options.forced_exit ? "y":"n");
 
-      auto dax_config = get_shard_dax_config(i);
+      auto dax_config = _config_file.get_shard_dax_config(i);
       std::string dax_config_json;
 
       /* handle DAX config if needed */
@@ -42,22 +44,12 @@ public:
       }
 
       try {
-        _shards.push_back(new mcas::Shard(get_shard_core(i),
-                                          get_shard_port(i),
-                                          get_net_providers(),
-                                          get_shard("device", i),
-                                          get_shard("net", i),
-                                          get_shard("default_backend", i),
-                                          get_shard("index", i),
-                                          get_shard("nvme_device", i),
-                                          get_shard("pm_path", i),
+        _shards.push_back(new mcas::Shard(_config_file,
+                                          i, // shard index
                                           dax_config_json,
-                                          get_shard("default_ado_path", i),
-                                          get_shard("default_ado_plugin", i),
                                           options.debug_level,
-                                          options.forced_exit,
-                                          get_shard_ado_core(i),
-                                          get_shard_ado_core_nu(i)));
+                                          options.forced_exit));
+
       } catch (const std::exception &e) {
         PLOG("shard %d failed to launch: %s", i, e.what());
       }
@@ -83,6 +75,7 @@ public:
   }
 
 private:
+  Config_file                _config_file;
   std::vector<mcas::Shard *> _shards;
 };
 } // namespace mcas

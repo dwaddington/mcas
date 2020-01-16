@@ -30,8 +30,6 @@
 #include <rdma/fi_domain.h> /* fi_cq_err_entry */
 #pragma GCC diagnostic pop
 
-#include <unistd.h> /* ssize_t */
-
 #include <cstdint> /* uint{16,32,64}_t */
 #include <mutex> /* unique_lock */
 #include <set>

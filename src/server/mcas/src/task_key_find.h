@@ -82,9 +82,12 @@ public:
         PLOG("matched: (%s)", _out_key.c_str());
         return S_OK;
       }
+      else {
+        _out_key.clear();
+        return hr;
+      }
     }
     catch(...) {
-      PWRN("Shard::task_key index->find failed");
       return E_FAIL;
     }
     

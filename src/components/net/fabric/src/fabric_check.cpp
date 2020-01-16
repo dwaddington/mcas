@@ -32,6 +32,11 @@
 /* fi_fabric, fi_close (when called on a fabric) and most fi_poll functions FI_SUCCESS; others return 0 */
 static_assert(FI_SUCCESS == 0, "FI_SUCCESS not zero");
 
+std::size_t check_fail(std::ptrdiff_t r, const char *file, int line)
+{
+  throw fabric_runtime_error(unsigned(-r), file, line);
+}
+
 /* most (all?) fabric functions return negative on error and 0 or positive on success */
 unsigned check_ge_zero(int r, const char *file, int line)
 {
@@ -42,7 +47,7 @@ unsigned check_ge_zero(int r, const char *file, int line)
   return unsigned(r);
 }
 
-std::size_t check_ge_zero(ssize_t r, const char *file, int line)
+std::size_t check_ge_zero(std::ptrdiff_t r, const char *file, int line)
 {
   if ( r < 0 )
   {
@@ -51,7 +56,7 @@ std::size_t check_ge_zero(ssize_t r, const char *file, int line)
   return std::size_t(r);
 }
 
-std::size_t check_eq(ssize_t r, ssize_t exp, const char *file, int line)
+std::size_t check_eq(std::ptrdiff_t r, std::ptrdiff_t exp, const char *file, int line)
 {
   if ( r != exp )
   {

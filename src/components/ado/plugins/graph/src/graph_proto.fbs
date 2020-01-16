@@ -74,7 +74,7 @@ union Element
 
 table Message
 {
-  element      : Element;
+  element : Element;
 }
 
 root_type Message;

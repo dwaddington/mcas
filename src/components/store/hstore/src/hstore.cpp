@@ -11,6 +11,14 @@
    limitations under the License.
 */
 
+#include <stdexcept>
+#include <set>
+
+#include <city.h>
+#include <common/errors.h>
+#include <common/exceptions.h>
+#include <common/logging.h>
+#include <common/utils.h>
 
 #include "hstore.h"
 
@@ -20,21 +28,8 @@
 #include "persist_fixed_string.h"
 #include "pool_path.h"
 
-#include <stdexcept>
-#include <set>
-
-#include <city.h>
-#include <common/exceptions.h>
-#include <common/logging.h>
-#include <common/utils.h>
-
-#if USE_PMEM
-#include "hstore_pmem_types.h"
-#include "persister_pmem.h"
-#else
 #include "hstore_nupm_types.h"
 #include "persister_nupm.h"
-#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -73,16 +68,9 @@ namespace
   }
 }
 
-#if USE_CC_HEAP == 1
-#elif USE_CC_HEAP == 2
-#else
+#if USE_CC_HEAP == 3 /* reconstituting allocator */
 template<> struct type_number<impl::mod_control> { static constexpr std::uint64_t value = 4; };
 #endif /* USE_CC_HEAP */
-
-#if 0
-template<> struct type_number<hstore::table_t::value_type> { static constexpr std::uint64_t value = 5; };
-template<> struct type_number<hstore::table_t::base::persist_data_t::bucket_aligned_t> { static constexpr uint64_t value = 6; };
-#endif
 
 /* globals */
 
@@ -123,11 +111,7 @@ auto hstore::move_pool(const Component::IKVStore::pool_t pid) -> std::unique_ptr
 }
 
 hstore::hstore(const std::string &owner, const std::string &name, std::unique_ptr<Devdax_manager> &&mgr_)
-#if USE_PMEM
-  : _pool_manager(std::make_shared<pm>(owner, name, option_DEBUG))
-#else
   : _pool_manager(std::make_shared<pm>(owner, name, std::move(mgr_), option_DEBUG))
-#endif
   , _pools_mutex{}
   , _pools{}
 {
@@ -560,11 +544,28 @@ auto hstore::lock(
 ) -> status_t
 {
   const auto session = static_cast<session_t *>(locate_session(pool));
-  return
-    session
-    ? ( out_key = session->lock(key, type, out_value, out_value_len), S_OK )
-    : E_FAIL
-    ;
+  if(!session) return E_FAIL;
+
+  auto r = session->lock(key, type, out_value, out_value_len);
+
+  out_key = r.key;
+  /* If lock valid, safe to provide access to the key */
+  if ( r.key != Component::IKVStore::KEY_NONE )
+  {
+    out_value = r.value;
+    out_value_len = r.value_len;
+  }
+
+  switch ( r.state )
+  {
+  case lock_result::e_state::created:
+    return S_OK_CREATED;
+  case lock_result::e_state::not_created:
+    return E_KEY_NOT_FOUND;
+  case lock_result::e_state::extant:
+    return S_OK;
+  }
+  return E_KEY_NOT_FOUND;
 }
 
 
@@ -624,7 +625,8 @@ auto hstore::map(
                  pool_t pool,
                  std::function
                  <
-                   int(const std::string &key, const void *val, std::size_t val_len)
+                   int(const void * key, std::size_t key_len,
+                       const void * val, std::size_t val_len)
                  > f_
                  ) -> status_t
 {
@@ -647,7 +649,12 @@ auto hstore::map_keys(
   const auto session = static_cast<session_t *>(locate_session(pool));
 
   return session
-    ? ( session->map([&f_] (const std::string &key, const void *, std::size_t) -> int { f_(key); return 0; }), S_OK )
+    ? ( session->map([&f_] (const void * key, std::size_t key_len,
+                            const void *, std::size_t) -> int
+                     {
+                       f_(std::string(static_cast<const char*>(key), key_len));
+                       return 0;
+                     }), S_OK )
     : int(Component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }

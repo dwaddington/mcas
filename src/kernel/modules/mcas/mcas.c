@@ -22,6 +22,8 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 
+#define PAGE_ROUND_UP(x) ( roundup(x, PAGE_SIZE) )
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,13,0)
 #include <asm/cacheflush.h>
 #else
@@ -137,7 +139,8 @@ static int fetch_exposure(u64 token,
     if (ptr->token == token) {
       *out_paddr = ptr->paddr;
       *out_size = ptr->size;
-      mutex_unlock(&g_exposure_list_lock);      
+      mutex_unlock(&g_exposure_list_lock);
+      pr_info("mcas: got exposure (phys:0x%llx %lu)", *out_paddr, *out_size);
       return 0;
     }
   }
@@ -150,6 +153,7 @@ static long mcas_dev_ioctl(struct file *filp,
                           unsigned long arg)
 {
   long r = -EINVAL;
+  unsigned long size;
   int rc;
 #ifdef DEBUG
   pr_notice("mcas: ioctl (%d) (arg=%lx)\n", ioctl, arg);
@@ -173,9 +177,10 @@ static long mcas_dev_ioctl(struct file *filp,
         pr_err("mcas: copy_from_user failed\n"); 
         return r; 
       }
-      
-      pr_info("mcas: token=%llu vaddr=%llx vaddr_size=%lu\n",
-              msg.token, (unsigned long long) msg.vaddr, msg.vaddr_size);
+
+      size = PAGE_ROUND_UP(msg.vaddr_size);
+      pr_info("mcas: token=%llu vaddr=0x%llx vaddr_size=%lu\n",
+              msg.token, (unsigned long long) msg.vaddr, size);
 
       {
         u64 paddr = 0;
@@ -189,7 +194,7 @@ static long mcas_dev_ioctl(struct file *filp,
         if(add_exposure(task_pid_nr(current),
                         msg.token,
                         paddr,
-                        msg.vaddr_size) != 0) {
+                        size) != 0) {
           return -EINVAL;
         }
         pr_info("walk result: %llx\n", paddr);
@@ -306,6 +311,7 @@ static void vm_close(struct vm_area_struct *vma)
 static struct vm_operations_struct mmap_fops = {
   .open  = vm_open,
   .close = vm_close,
+  .access = generic_access_phys, /* allows GDB access */
   //  .fault = vm_fault
 };
 
@@ -326,7 +332,7 @@ static int mcas_mmap(struct file *file, struct vm_area_struct *vma)
   }
 
   token = vma->vm_pgoff; //>> 12;
-  pr_info("mcas: mmap flags=%lx token=%llx\n", vma->vm_flags, token);
+  pr_info("mcas: mmap flags=%lx token=%llu\n", vma->vm_flags, token);
 
   {
     int rc;
@@ -334,12 +340,21 @@ static int mcas_mmap(struct file *file, struct vm_area_struct *vma)
     size_t out_size;
     rc = fetch_exposure(token, &out_paddr, &out_size);
     if(rc) {
-      pr_err("mcas: bad exposure token (%lu)", token);
+      pr_err("mcas: bad exposure token (%llu)", token);
       return -EFAULT;
     }
     
-    pr_info("mcas: mmap remapping (%llx,%lu)\n", out_paddr, out_size);
-    pr_info("mcas: vm_start=%lx vm_end=%lx delta=%lu\n", vma->vm_start, vma->vm_end, vma->vm_end - vma->vm_start);
+    pr_info("mcas: mmap remapping (0x%llx,%lu)\n", out_paddr, out_size);
+    pr_info("mcas: remap_pfn_range vm_start=%lx vm_end=%lx delta=%lu\n", vma->vm_start, vma->vm_end, vma->vm_end - vma->vm_start);
+
+    vma->vm_ops = &mmap_fops;
+    vma->vm_flags |=
+      VM_LOCKED
+      | VM_SHARED
+      | VM_IO
+      | VM_PFNMAP /* Page-ranges managed without "struct page", just pure PFN */
+      | VM_DONTEXPAND
+      | VM_DONTDUMP;
 
     if (remap_pfn_range(vma, 
                         vma->vm_start,
@@ -352,8 +367,6 @@ static int mcas_mmap(struct file *file, struct vm_area_struct *vma)
   }    
   pr_info("mcas: mmap OK\n");
 
-  vma->vm_ops = &mmap_fops;
-  vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
 
   return 0;
 }

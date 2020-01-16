@@ -17,6 +17,10 @@
 
 /* things to test */
 
+#if defined MCAS_HSTORE_TEST_PERISHABLE
+#define TEST_HSTORE_PERISHABLE MCAS_HSTORE_TEST_PERISHABLE
+#else
 #define TEST_HSTORE_PERISHABLE 0 /* true only when testing crash-consistency */
+#endif
 
 #endif

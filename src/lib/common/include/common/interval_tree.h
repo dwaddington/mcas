@@ -36,7 +36,7 @@
 #define __INTERVAL_TREE_H__
 
 #include <algorithm>
-#include <iostream>
+#include <ostream>
 #include <vector>
 
 namespace Common

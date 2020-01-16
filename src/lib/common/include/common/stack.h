@@ -62,7 +62,7 @@ class Fixed_stack {
 
   void push(T &val) {
     if (_top == _max) {
-      for (unsigned i = 0; i < 20; i++, _top--) PLOG("entry: %p", *_top);
+      for (unsigned i = 0; i < 20; i++, _top--) PLOG("entry: %p", static_cast<const void *>(*_top));
 
       throw General_exception("stack overflow!");
     }

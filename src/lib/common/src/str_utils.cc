@@ -32,9 +32,9 @@
 #include <functional>  //for std::function
 #include <string>
 
-static const unsigned int __seed = (const unsigned int) rdtsc();
+static const unsigned int __seed = static_cast<unsigned int>(rdtsc());
 
-__attribute__((constructor)) static void _init_rand() { srand(rdtsc()); }
+__attribute__((constructor)) static void _init_rand() { srand(static_cast<unsigned int>(rdtsc())); }
 
 namespace Common
 {

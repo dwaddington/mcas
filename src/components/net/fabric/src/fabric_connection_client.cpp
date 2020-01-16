@@ -102,6 +102,9 @@ try
     std::size_t paramlen = 0;
     auto param = nullptr;
     fi_void_connect(ep(), ep_info(), ep_info().dest_addr, param, paramlen);
+    /* ERROR: event will be an FI_NOTIFY if the server is present but has a different provider
+     * that we expect (e.g. sockets vs. verbs). This it not handled here or anywhere else.
+     */
     expect_event_sync(FI_CONNECTED);
   }
 }

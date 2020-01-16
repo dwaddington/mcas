@@ -13,8 +13,9 @@
 #endif
 
 // The fixture for testing class Libnupm.
-class Libnupm_test : public ::testing::Test {
- protected:
+class Libnupm_test : public ::testing::Test
+{
+protected:
   // If the constructor and destructor are not enough for setting up
   // and cleaning up each test, you can define the following methods:
 
@@ -43,7 +44,8 @@ TEST_F(Libnupm_test, RegionModifications)
    * in which region_tracker_add is effective.
    */
   nupm::Region_modifications r;
-  struct {
+  struct
+  {
     char c = 0;
     /* padding here */
     int i = 2;
@@ -95,7 +97,8 @@ TEST_F(Libnupm_test, AVL_allocator)
 
   auto start = std::chrono::high_resolution_clock::now();
   constexpr auto alloc_size = 200;
-  for (unsigned i = 0; i < ITERATIONS; i++) {
+  for (unsigned i = 0; i < ITERATIONS; i++)
+  {
     auto p = a.allocate(alloc_size);
     ASSERT_TRUE(p);
     EXPECT_LE(v, p);
@@ -106,12 +109,13 @@ TEST_F(Libnupm_test, AVL_allocator)
   auto end = std::chrono::high_resolution_clock::now();
   auto secs = std::chrono::duration<double>(end - start).count();
   PINF("AVL_allocator: %lu allocs/sec",
-       static_cast<unsigned long>(double(ITERATIONS) / secs)
-  );
+       static_cast<unsigned long>(double(ITERATIONS) / secs));
 
   PLOG("AVL_allocator: Freeing %zu allocations...", alloc_v.size());
-  for (auto &vv : alloc_v) {
-    a.deallocate(vv, alloc_size);
+
+  for (auto &vv : alloc_v)
+  {
+      a.deallocate(vv, alloc_size);
   }
 }
 
@@ -129,7 +133,7 @@ TEST_F(Libnupm_test, RCA_LB_allocator)
 #if 0 /* a second area would make the EXPECT sanity checks on erturn pointers trickier */
   lb.add_managed_region(v1.get(), region_size, numa_node);
 #endif
-  auto a = nupm::allocator_adaptor<char, nupm::Rca_LB>(lb);
+  nupm::allocator_adaptor<char, nupm::Rca_LB> a(lb);
   const std::size_t ITERATIONS = 100;
   PLOG("AVL_allocator running... %zu allocations", ITERATIONS);
 
@@ -139,7 +143,8 @@ TEST_F(Libnupm_test, RCA_LB_allocator)
   auto start = std::chrono::high_resolution_clock::now();
   constexpr auto alloc_size = 200;
   std::size_t alignment = 8;
-  for (unsigned i = 0; i < ITERATIONS; i++) {
+  for (unsigned i = 0; i < ITERATIONS; i++)
+  {
     auto p = a.allocate(alloc_size, alignment);
     ASSERT_TRUE(p);
     EXPECT_LE(v0.get(), p);
@@ -150,11 +155,11 @@ TEST_F(Libnupm_test, RCA_LB_allocator)
   auto end = std::chrono::high_resolution_clock::now();
   auto secs = std::chrono::duration<double>(end - start).count();
   PINF("AVL_allocator: %lu allocs/sec",
-       static_cast<unsigned long>(double(ITERATIONS) / secs)
-  );
+       static_cast<unsigned long>(double(ITERATIONS) / secs));
 
   PLOG("AVL_allocator: Freeing %zu allocations...", alloc_v.size());
-  for (auto &vv : alloc_v) {
+  for (auto &vv : alloc_v)
+  {
     a.deallocate(vv, alloc_size, alignment);
   }
 }

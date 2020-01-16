@@ -22,6 +22,7 @@
 #ifndef __NUPM_RC_ALLOC_LB__
 #define __NUPM_RC_ALLOC_LB__
 
+#include "mr_traits.h"
 #include <common/memory.h>
 #include <memory>
 #include <string>
@@ -101,4 +102,17 @@ class Rca_LB : public Common::Reconstituting_allocator {
 };
 
 }  // namespace nupm
+
+template <>
+	struct mr_traits<nupm::Rca_LB>
+	{
+		static auto allocate(nupm::Rca_LB *pmr, unsigned numa_node, std::size_t bytes, std::size_t alignment)
+		{
+			return pmr->alloc(bytes, numa_node, alignment);
+		}
+		static auto deallocate(nupm::Rca_LB *pmr, unsigned numa_node, void *p, std::size_t bytes, std::size_t)
+		{
+			return pmr->free(p, numa_node, bytes);
+		}
+	};
 #endif

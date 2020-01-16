@@ -6,7 +6,7 @@ namespace nupm
   thread_local Region_modifications tls_modifications;
 
   /* add region */
-  void region_tracker_add(void * p, size_t p_len, char tag)
+  void region_tracker_add(const void * p, size_t p_len, char tag)
   {
     if ( tracker_active )
     {

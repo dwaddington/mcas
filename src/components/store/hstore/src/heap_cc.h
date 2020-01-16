@@ -12,101 +12,172 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_ALLOCATOR_CC_H
-#define COMANCHE_HSTORE_ALLOCATOR_CC_H
+#ifndef COMANCHE_HSTORE_HEAP_CC_H
+#define COMANCHE_HSTORE_HEAP_CC_H
 
-#include "bad_alloc_cc.h"
-#include "persister_cc.h"
+#include "dax_map.h"
+#include "histogram_log2.h"
+#include "hop_hash_log.h"
+#include "persistent.h"
+#include "persister_nupm.h"
+#include "trace_flags.h"
 
-#include <algorithm> /* min */
-#include <array>
-#include <cstring> /* memset */
+#include <boost/icl/interval_set.hpp>
+#if 0
+#include <valgrind/memcheck.h>
+#else
+#define VALGRIND_CREATE_MEMPOOL(pool, x, y) do {} while(0)
+#define VALGRIND_DESTROY_MEMPOOL(pool) do {} while(0)
+#define VALGRIND_MAKE_MEM_DEFINED(pool, size) do {} while(0)
+#define VALGRIND_MAKE_MEM_UNDEFINED(pool, size) do {} while(0)
+#define VALGRIND_MEMPOOL_ALLOC(pool, addr, size) do {} while(0)
+#define VALGRIND_MEMPOOL_FREE(pool, size) do {} while(0)
+#endif
+#include <ccpm/interfaces.h>
+#include <common/exceptions.h> /* General_exception */
+
+#include <sys/uio.h> /* iovec */
+
+#include <algorithm>
+#include <cassert>
 #include <cstddef> /* size_t, ptrdiff_t */
-#include <sstream> /* ostringstream */
-#include <string>
+#include <memory>
+#include <new> /* std::bad_alloc */
 
-class sbrk_alloc
+namespace impl
 {
-	struct bound
-	{
-		char *_end;
-		void set(char *e) noexcept { _end = e; }
-		char *end() const noexcept { return _end; }
-	};
-	struct state /* persists */
-	{
-		void *_location; /* persists. contains its own expected address */
-		unsigned _sw; /* persists. Initially 0. Toggles between 0 and 1 */
-		char *_limit; /* persists */
-		std::array<bound, 2U> _bounds; /* persists, depends on _sw */
-		bound &current() { return _bounds[_sw]; }
-		bound &other() { return _bounds[1U-_sw]; }
-		char *begin() { return static_cast<char *>(static_cast<void *>(this+1)); }
-		void swap() { _sw = 1U - _sw; }
-		void *limit() const { return _limit; }
-	};
-	bound &current() { return _state->current(); }
-	bound &other() { return _state->other(); }
-	void swap() { _state->swap(); }
-	state *_state;
-	template <typename T>
-		void persist(const T &) {}
-	void restore() const
-	{
-		if ( _state->_location != &_state->_location )
+	class allocation_state_emplace;
+}
+
+namespace ccpm
+{
+	class IHeapGrowable;
+	struct region_vector_t;
+}
+
+class heap_cc_shared_ephemeral
+{
+	std::unique_ptr<ccpm::IHeapGrowable> _heap;
+	std::vector<::iovec> _managed_regions;
+	std::size_t _capacity;
+	std::size_t _allocated;
+
+	using hist_type = util::histogram_log2<std::size_t>;
+	hist_type _hist_alloc;
+	hist_type _hist_inject;
+	hist_type _hist_free;
+
+	static constexpr unsigned log_min_alignment = 3U; /* log (sizeof(void *)) */
+	static_assert(sizeof(void *) == 1U << log_min_alignment, "log_min_alignment does not match sizeof(void *)");
+	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
+	static constexpr unsigned hist_report_upper_bound = 34U;
+
+	void add_managed_region(const ::iovec &r);
+	explicit heap_cc_shared_ephemeral(std::unique_ptr<ccpm::IHeapGrowable> p, const ccpm::region_vector_t &rv);
+	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
+
+	template <bool B>
+		void write_hist(const ::iovec & pool_) const
 		{
-			std::ostringstream s;
-			s << "cc_heap region mapped at " << &_state->_location << " but required to be at " << _state->_location;
-			throw std::runtime_error{s.str()};
+			static bool suppress = false;
+			if ( ! suppress )
+			{
+				hop_hash_log<B>::write(__func__, " pool ", pool_.iov_base);
+				std::size_t lower_bound = 0;
+				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
+				for ( unsigned i = std::max(0U, log_min_alignment); i != limit; ++i )
+				{
+					const std::size_t upper_bound = 1ULL << i;
+					hop_hash_log<B>::write(__func__
+						, " [", lower_bound, "..", upper_bound, "): "
+						, _hist_alloc.data()[i], " ", _hist_inject.data()[i], " ", _hist_free.data()[i]
+						, " "
+					);
+					lower_bound = upper_bound;
+				}
+				suppress = true;
+			}
 		}
-		assert(_state->_sw < _state->_bounds.size());
-	}
 public:
-	explicit sbrk_alloc(void *area, std::size_t sz)
-		: _state(static_cast<state *>(area))
+	friend class heap_cc_shared;
+
+#if 0
+	explicit heap_cc_shared_ephemeral();
+#endif
+	explicit heap_cc_shared_ephemeral(const ccpm::region_vector_t &rv_);
+	explicit heap_cc_shared_ephemeral(const ccpm::region_vector_t &rv_, ccpm::ownership_callback_t f);
+};
+
+class heap_cc_shared
+{
+	::iovec _pool0;
+	unsigned _numa_node;
+	std::size_t _more_region_uuids_size;
+	std::array<std::uint64_t, 1024U> _more_region_uuids;
+	std::unique_ptr<heap_cc_shared_ephemeral> _eph;
+
+public:
+	explicit heap_cc_shared(uint64_t pool0_uuid, const std::unique_ptr<Devdax_manager> &devdax_manager_);
+	explicit heap_cc_shared(void *p, std::size_t sz, unsigned numa_node);
+	explicit heap_cc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_emplace *eas);
+#if 0
+	explicit heap_cc_shared(const ccpm::region_vector_t &rv_);
+#endif
+	heap_cc_shared(const heap_cc_shared &) = delete;
+	heap_cc_shared &operator=(const heap_cc_shared &) = delete;
+
+	~heap_cc_shared();
+
+	static void *iov_limit(const ::iovec &r);
+
+	auto grow(
+		const std::unique_ptr<Devdax_manager> & devdax_manager_
+		, std::uint64_t uuid_
+		, std::size_t increment_
+	) -> std::size_t;
+
+	void quiesce();
+
+	void alloc(persistent_t<void *> *p, std::size_t sz, std::size_t alignment);
+	void free(persistent_t<void *> *p, std::size_t sz);
+
+	unsigned percent_used() const
 	{
-		/* one-time initialization; assumes that initial bytes in area are zeros/nullptr */
-		_state->_limit = static_cast<char *>(area) + sz;
-		_state->_bounds[0].set(_state->begin());
-		_state->_sw = 0;
-		_state->_location = &_state->_location;
-		persist(_state);
+		return
+			unsigned(
+				_eph->_capacity
+				? _eph->_allocated * 100U / _eph->_capacity
+				: 100U
+			);
 	}
-	explicit sbrk_alloc(void *area)
-		: _state(static_cast<state *>(area))
-	{
-		restore();
-	}
-	void *malloc(std::size_t sz)
-	{
-		/* round to double word */
-		sz = (sz + 63UL) & ~63UL;
-		if ( static_cast<std::size_t>(_state->_limit - current().end()) < sz )
-		{
-			return nullptr;
-		}
-		auto p = current().end();
-		auto q = p + sz;
-		other().set(q);
-		persist(other());
-		swap();
-		persist(_state->_sw);
-		return p;
-	}
-	void free(const void *, std::size_t) {}
-	void *area() const { return _state; }
+
+	std::vector<::iovec> regions() const;
 };
 
 class heap_cc
-	: public sbrk_alloc
 {
+	heap_cc_shared *_heap;
+
 public:
-	explicit heap_cc(void *area, std::size_t sz)
-		: sbrk_alloc(area, sz)
-	{}
-	explicit heap_cc(void *area)
-		: sbrk_alloc(area)
-	{}
+	explicit heap_cc(heap_cc_shared *area)
+		: _heap(area)
+	{
+	}
+
+	~heap_cc()
+	{
+	}
+
+	heap_cc(const heap_cc &) noexcept = default;
+
+	heap_cc & operator=(const heap_cc &) = default;
+
+    static constexpr std::uint64_t magic_value = 0x7c84297de2de94a3;
+
+	heap_cc_shared *operator->() const
+	{
+		return _heap;
+	}
 };
 
 #endif

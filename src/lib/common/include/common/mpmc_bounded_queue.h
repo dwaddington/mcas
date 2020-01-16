@@ -209,7 +209,7 @@ public:
    *
    * @return True if enqueued OK. False if blocked, or full.
    */
-  bool enqueue(const T &data) {
+  bool enqueue(const T &data) __attribute__((warn_unused_result)) {
     // _head_seq only wraps at MAX(_head_seq) instead we use a mask to convert
     // the sequence to an array index
     // this is why the ring buffer must be a size which is a power of 2. this
@@ -258,7 +258,7 @@ public:
    *
    * @return Return true on success. False on empty queue.
    */
-  bool dequeue(T &data) {
+  bool dequeue(T &data) __attribute__((warn_unused_result)) {
     size_t tail_seq = _tail_seq.load(std::memory_order_relaxed);
 
     for (;;) {

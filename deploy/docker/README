@@ -1,7 +1,0 @@
-To build an ado image:
-
-1. Follow [instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/) to install
-docker and set up your username into docker group for no-root execution.
-
-2. `docker build -f Dockerfile -t
-res-mcas-docker-local.artifactory.swg-devops.com/ado:latest <MCAS home path>`

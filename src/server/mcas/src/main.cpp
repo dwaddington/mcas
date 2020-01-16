@@ -20,10 +20,22 @@
 
 Program_options g_options;
 
+namespace
+{
+  /* std::ostringstream initializes locale on first use. To avoid race conditions,
+   * force a first use which precedes thread creation.
+   */
+  void init_locale() {
+    std::ostringstream s;
+    s << 0;
+  }
+}
+
 int main(int argc, char *argv[]) {
   namespace po = boost::program_options;
 
   try {
+    init_locale();
     po::options_description desc("Options");
 
     desc.add_options()("help", "Show help")                        //
@@ -51,11 +63,15 @@ int main(int argc, char *argv[]) {
     g_options.forced_exit = vm.count("forced-exit");
     PLOG("forced-exit:%s",  g_options.forced_exit ? "yes" : "no");
 
-    mcas::Global::debug_level = g_options.debug_level =
-        vm["debug"].as<unsigned>();
-    /* The new pointer is discarded. Who owns the ADO_manager? Itself? */
-    //    ADO_manager *manager = new ADO_manager(g_options);
-    new ADO_manager(g_options);
+    mcas::Global::debug_level = g_options.debug_level = vm["debug"].as<unsigned>();
+
+    ADO_manager * mgr;
+    try {
+      mgr = new ADO_manager(g_options);
+    }
+    catch(Config_exception e) {
+      return -1;
+    }
 
     /* launch shards */
     {
@@ -64,8 +80,9 @@ int main(int argc, char *argv[]) {
     }
     PLOG("All shards shutdown");
 
-    //    delete manager;
-  } catch (const po::error &) {
+    delete mgr;
+  }
+  catch (const po::error &) {
     printf("bad command line option\n");
     return -1;
   }

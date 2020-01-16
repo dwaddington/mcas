@@ -176,7 +176,8 @@ TEST_F(KVStore_test, BasicGet0)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PMAJOR("Percent used %u", attr[0]);
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
     }
   }
 
@@ -248,7 +249,7 @@ TEST_F(KVStore_test, BasicPutLocked)
   r = _kvstore->unlock(pool, lk);
   EXPECT_EQ(S_OK, r);
 
-  auto small_size = 16; /* Small, byut large enough to preserve all characters in "Hello world!" */
+  auto small_size = 16; /* Small, but large enough to preserve all characters in "Hello world!" */
 
   /* resize to an inline size. */
   r = _kvstore->resize_value(pool, single_key, 16, small_size);
@@ -315,7 +316,6 @@ TEST_F(KVStore_test, BasicPutLocked)
     }
   }
 
-
   r = _kvstore->resize_value(pool, single_key, 1024, single_value.size());
   EXPECT_EQ(S_OK, r);
   {
@@ -344,6 +344,16 @@ TEST_F(KVStore_test, BasicPutLocked)
     {
       _kvstore->free_memory(value);
     }
+  }
+
+  /* Reqeusted change in behavior: length 0 is now a magic value which means
+   * "do not try to create an element for the key, if not found"
+   */
+  {
+    void *v = nullptr;
+    size_t value_len = 0;
+    r = _kvstore->lock(pool, missing_key, IKVStore::STORE_LOCK_READ, v, value_len, lk);
+    EXPECT_EQ(IKVStore::E_KEY_NOT_FOUND, r);
   }
 
 }
@@ -452,13 +462,14 @@ TEST_F(KVStore_test, BasicMap)
 {
   ASSERT_LT(0, int64_t(pool));
   auto value_len_sum = 0;
-  _kvstore->map(pool,[&value_len_sum](const std::string &key,
-                        const void * value,
-                        const size_t value_len) -> int
+  _kvstore->map(pool,[&value_len_sum](const void * key,
+                                      const size_t key_len,
+                                      const void * value,
+                                      const size_t value_len) -> int
                 {
-					value_len_sum += value_len;
-                    return 0;
-                  });
+                  value_len_sum += value_len;
+                  return 0;
+                });
   EXPECT_EQ(single_value_updated_different_size.length() + many_count_actual * many_value_length, value_len_sum);
 }
 
@@ -494,6 +505,17 @@ TEST_F(KVStore_test, CountByBucket)
 
 TEST_F(KVStore_test, ClosePool)
 {
+  {
+    std::vector<uint64_t> attr;
+    auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
+    EXPECT_EQ(S_OK, r);
+    if ( S_OK == r )
+    {
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
+    }
+  }
+
   if ( pmem_effective )
   {
     _kvstore->close_pool(pool);
@@ -508,6 +530,17 @@ TEST_F(KVStore_test, OpenPool)
     pool = _kvstore->open_pool(pool_name(), 0);
   }
   ASSERT_LT(0, int64_t(pool));
+
+  {
+    std::vector<uint64_t> attr;
+    auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
+    EXPECT_EQ(S_OK, r);
+    if ( S_OK == r )
+    {
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
+    }
+  }
 }
 
 TEST_F(KVStore_test, Size2a)
@@ -611,7 +644,8 @@ TEST_F(KVStore_test, GetMany)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PMAJOR("Percent used %u", attr[0]);
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
     }
   }
 
@@ -699,8 +733,11 @@ TEST_F(KVStore_test, GetRegions)
     EXPECT_EQ(1, v.size());
     if ( 1 == v.size() )
     {
-      std::cerr << "Pool region at " << v[0].iov_base << " len " << v[0].iov_len << "\n";
+      PMAJOR("Pool region at %p len %zu", v[0].iov_base, v[0].iov_len);
       auto iov_base = reinterpret_cast<std::uintptr_t>(v[0].iov_base);
+      /* region no longer needs to be well-aligned, but heap_cc still aligns to a
+       * page boundary.
+       */
       EXPECT_EQ(iov_base & 0xfff, 0);
       EXPECT_GT(v[0].iov_len, many_count_target * 64U * 3U * 2U);
       EXPECT_LT(v[0].iov_len, GB(512));
@@ -808,7 +845,8 @@ TEST_F(KVStore_test, LockMany)
     {
       exclusive_lock m3(&pool);
       auto r3 = _kvstore->lock(pool, key_new, IKVStore::STORE_LOCK_WRITE, value3, value3_len, m3.k);
-      EXPECT_EQ(S_OK, r3);
+      /* Used to return S_OK; no longer does so */
+      EXPECT_EQ(S_OK_CREATED, r3);
       EXPECT_NE(KEY_NONE, m3.k);
       if ( S_OK == r3 && IKVStore::KEY_NONE != m3.k )
       {
@@ -905,7 +943,8 @@ TEST_F(KVStore_test, BasicErase)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Percent used %u", attr[0]);
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
     }
   }
 
@@ -943,16 +982,18 @@ TEST_F(KVStore_test, AllocDealloc)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Percent used %u", attr[0]);
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
     }
   }
 
   void *v = nullptr;
-  auto r = _kvstore->allocate_pool_memory(pool, 100, 32, v);
-  EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* size not a multiple of alignment */
-  r = _kvstore->allocate_pool_memory(pool, 100, 0, v);
+#if 0
+  /* alignment is now a "hint", so 0 alignment is no longer an error */
+  auto r = _kvstore->allocate_pool_memory(pool, 100, 0, v);
   EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* zero aligmnent */
-  r = _kvstore->allocate_pool_memory(pool, 100, 1, v);
+#endif
+  auto r = _kvstore->allocate_pool_memory(pool, 100, 1, v);
   EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* alignment less than sizeof(void *) */
 
   /* allocate various sizes */
@@ -987,8 +1028,13 @@ TEST_F(KVStore_test, AllocDealloc)
   EXPECT_EQ(S_OK, r);
   r = _kvstore->free_pool_memory(pool, v128, 128);
   EXPECT_EQ(S_OK, r);
+#if 0
+  /* Removed: unless the free logic has a sanity check, might
+   * corrupt memory rather than failing.
+   */
   r = _kvstore->free_pool_memory(pool, v128, 128);
   EXPECT_EQ(E_INVAL, r); /* not found */
+#endif
 }
 
 
@@ -1000,7 +1046,8 @@ TEST_F(KVStore_test, DeletePool)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Percent used %u", attr[0]);
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
     }
   }
 

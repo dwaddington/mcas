@@ -10,12 +10,11 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
+
 #ifndef __mcas_SHARD_H__
 #define __mcas_SHARD_H__
 
 #ifdef __cplusplus
-
-#include "fabric_transport.h"
 
 #include <api/ado_itf.h>
 #include <api/components.h>
@@ -23,20 +22,25 @@
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
 
+#include "fabric_transport.h"
+#include "security.h"
 #include "connection_handler.h"
 #include "mcas_config.h"
 #include "pool_manager.h"
 #include "task_key_find.h"
 #include "types.h"
+#include "config_file.h"
 #include <common/cpu.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
+#include <xpmem.h> /* XPMEM kernel module */
 #include <list>
 #include <set>
 #include <thread>
 #include <unordered_map>
 
 namespace mcas {
+
 class Connection_handler;
 
 /* Adapter point */
@@ -56,34 +60,50 @@ private:
     size_t value_size;
   };
 
+  struct pool_desc_t {
+    std::string name;
+    size_t size;
+    unsigned int flags;
+    size_t expected_obj_count;
+    bool opened_existing;
+  };      
+
   using pool_t = Component::IKVStore::pool_t;
   using buffer_t = Shard_transport::buffer_t;
   using index_map_t = std::unordered_map<pool_t, Component::IKVIndex *>;
   using locked_value_map_t = std::unordered_map<const void *, lock_info_t>;
   using task_list_t = std::list<Shard_task *>;
 
-  unsigned option_DEBUG;
-
-  const std::string _default_ado_path;
-  const std::string _default_ado_plugin;
+  unsigned _debug_level;
 
 public:
-  Shard(int core, unsigned int port, const std::string provider,
-        const std::string device, const std::string net,
-        const std::string backend, const std::string index,
-        const std::string pci_addr, const std::string pm_path,
-        const std::string dax_config, const std::string default_ado_path,
-        const std::string default_ado_plugin, unsigned debug_level,
-        bool forced_exit, const std::string ado_cores, float ado_core_num)
-      : Shard_transport(provider, net, port),
-        _default_ado_path(default_ado_path),
-        _default_ado_plugin(default_ado_plugin),
-        _forced_exit(forced_exit),
-        _core(core),
-        _thread(&Shard::thread_entry, this, backend, index, pci_addr,
-                dax_config, pm_path, debug_level, ado_cores, ado_core_num) {
-    option_DEBUG = mcas::Global::debug_level = debug_level;
-    _ado_map.reserve(ADO_MAP_RESERVE);
+  Shard(const Config_file& config_file,
+        const unsigned shard_index,
+        const std::string dax_config,
+        const unsigned debug_level,
+        const bool forced_exit)
+  : Shard_transport(config_file.get_net_providers(),
+                    config_file.get_shard("net", shard_index),
+                    config_file.get_shard_port(shard_index)),
+    _debug_level(debug_level),
+    _forced_exit(forced_exit),
+    _core(config_file.get_shard_core(shard_index)),
+    _ado_map(ADO_MAP_RESERVE),
+    _default_ado_path(config_file.get_shard("default_ado_path", shard_index)),
+    _default_ado_plugin(config_file.get_shard("default_ado_plugin", shard_index)),
+    _security(config_file.get_cert_path()),
+    _thread(&Shard::thread_entry,
+            this,
+            config_file.get_shard("default_backend", shard_index),
+            config_file.get_shard("index", shard_index),
+            config_file.get_shard("nvme_device", shard_index),
+            dax_config,
+            config_file.get_shard("pm_path", shard_index),
+            debug_level,
+            config_file.get_shard_ado_core(shard_index),
+            config_file.get_shard_ado_core_nu(shard_index))
+  {
+    mcas::Global::debug_level = debug_level;
   }
 
   ~Shard() {
@@ -180,11 +200,23 @@ private:
   inline size_t session_count() const { return _handlers.size(); }
 
 private:
-  bool ado_enabled() const { return _i_ado_mgr != nullptr; }
-  
-  status_t conditional_bootstrap_ado_process(Connection_handler* handler,
+  bool ado_enabled() const {
+    return (_i_ado_mgr && !_default_ado_plugin.empty());
+  }
+
+  auto get_ado_interface(pool_t pool_id) {
+    auto i = _ado_map.find(pool_id);
+    if(i != _ado_map.end())
+      return (*i).second.first;
+    else throw Logic_exception("get_ado_interface failed");
+  }
+
+
+  status_t conditional_bootstrap_ado_process(Component::IKVStore* kvs,
+                                             Connection_handler* handler,
                                              Component::IKVStore::pool_t pool_id,
-                                             Component::IADO_proxy *& ado);
+                                             Component::IADO_proxy *& ado,
+                                             pool_desc_t& desc);
   
   /* per-shard statistics */
   Component::IMCAS::Shard_stats _stats alignas(8);
@@ -252,7 +284,7 @@ private:
   } _wr_allocator;
 
   using ado_map_t = std::unordered_map<Component::IKVStore::pool_t,
-                             std::pair<Component::IADO_proxy*,Connection_handler*>>;
+                                       std::pair<Component::IADO_proxy*,Connection_handler*>>;
 
   using work_request_key_t = uint64_t;
 
@@ -260,22 +292,35 @@ private:
     return reinterpret_cast<work_request_t *>(key);
   }
 
+  /* Shard class members */
   index_map_t*                     _index_map = nullptr;
   bool                             _thread_exit = false;
   bool                             _store_requires_flush = false;
   bool                             _forced_exit;
   unsigned                         _core;
-  std::thread                      _thread;
   size_t                           _max_message_size;
   Component::IKVStore*             _i_kvstore;
-  Component::IADO_manager_proxy*   _i_ado_mgr = nullptr;
+  Component::IADO_manager_proxy*   _i_ado_mgr = nullptr; /*< null indicate non-ADO mode */
   ado_map_t                        _ado_map;
   std::vector<Connection_handler*> _handlers;
   locked_value_map_t               _locked_values;
   task_list_t                      _tasks;
   std::set<work_request_key_t>     _outstanding_work;
   std::vector<work_request_t*>     _failed_async_requests;
+  const std::string                _default_ado_path;
+  const std::string                _default_ado_plugin;
+  Shard_security                   _security;
+  std::thread                      _thread;
+
 };
+
+
+inline bool check_xpmem_module() {
+  int fd = open("/dev/xpmem", O_RDWR, 0666);
+  close(fd);
+  return (fd != -1);
+}
+
 
 } // namespace mcas
 

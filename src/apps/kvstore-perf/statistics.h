@@ -1,10 +1,7 @@
 #ifndef __STATISTICS_H__
 #define __STATISTICS_H__
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
 #include <common/logging.h>
-#pragma GCC diagnostic pop
 
 #include <algorithm>
 #include <cmath>

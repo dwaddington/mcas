@@ -8,10 +8,7 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <api/kvstore_itf.h>
 #pragma GCC diagnostic pop
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
 #include <common/logging.h>
-#pragma GCC diagnostic pop
 #include <common/str_utils.h> /* MB */
 #include <algorithm>
 #include <chrono>
@@ -21,7 +18,7 @@
 #include <stdexcept>
 #include <string>
 
-#define DEFAULT_COMPONENT "filestore"
+#define DEFAULT_COMPONENT "mcas"
 
 namespace
 {
@@ -131,7 +128,7 @@ void ProgramOptions::add_program_options(
   desc_.add_options()
     ("help", "Show help")
     ("test" , po::value<std::string>()->default_value("all"), test_names.c_str())
-    ("component", po::value<std::string>()->default_value(DEFAULT_COMPONENT), "Implementation selection <filestore|pmstore|dawn|nvmestore|mapstore|hstore>. Default: filestore.")
+    ("component", po::value<std::string>()->default_value(DEFAULT_COMPONENT), "Implementation selection <mcas|mapstore|hstore|filestore>. Default: mcas.")
     ("cores", po::value<std::string>()->default_value("0"), "Comma-separated ranges of core indexes to use for test. A range may be specified by a single index, a pair of indexes separated by a hyphen, or an index followed by a colon followed by a count of additional indexes. These examples all specify cores 2 through 4 inclusive: '2,3,4', '2-4', '2:3'. Default: 0.")
     ("devices", po::value<std::string>(), "Comma-separated ranges of devices to use during test. Each identifier is a dotted pair of numa zone and index, e.g. '1.2'. For comaptibility with cores, a simple index number is accepted and implies numa node 0. These examples all specify device indexes 2 through 4 inclusive in numa node 0: '2,3,4', '0.2:3'. These examples all specify devices 2 thourgh 4 inclusive on numa node 1: '1.2,1.3,1.4', '1.2-1.4', '1.2:3'.  When using hstore, the actual dax device names are concatenations of the device_name option with <node>.<index> values specified by this option. In the node 0 example above, with device_name /dev/dax, the device paths are /dev/dax0.2 through /dev/dax0.4 inclusive. Default: the value of cores.")
     ("path", po::value<std::string>()->default_value("./data/"), "Path of directory for pool. Default: \"./data/\"")
@@ -152,14 +149,14 @@ void ProgramOptions::add_program_options(
     ("port", po::value<unsigned>()->default_value(11911), "MCAS server port. Default 11911")
     ("port_increment", po::value<unsigned>(), "Port increment every N instances.")
     ("device_name", po::value<std::string>()->default_value("unused"), "Device name.")
-    ("pci_addr", po::value<std::string>(), "PCI address (e.g. 0b:00.0).")
-    ("nopin", "Do not pin down worker threads to cores")
+    ("pci_addr", po::value<std::string>(), "Storage device PCI address (e.g. 0b:00.0).")
+    ("nopin", "Do not pin down worker threads to cores.")
     ("start_time", po::value<std::string>(), "Delay start time of experiment until specified time (HH:MM, 24 hour format expected.")
-    ("verbose", "Verbose output")
-    ("summary", "Prints summary statement: most frequent latency bin info per core")
+    ("verbose", "Verbose output.")
+    ("summary", "Prints summary statement: most frequent latency bin info per core.")
     ("skip_json_reporting", "disables creation of json report file")
-    ("continuous", "enables never-ending execution, if possible")
-    ("duration", po::value<unsigned>(), "throughput test duration, in seconds")
-    ("report_interval", po::value<unsigned>()->default_value(5), "throughput test report interval, in seconds. Default: 5")
+    ("continuous", "Enables never-ending execution.")
+    ("duration", po::value<unsigned>(), "Throughput test duration, in seconds")
+    ("report_interval", po::value<unsigned>()->default_value(5), "Throughput test report interval, in seconds. Default: 5")
     ;
 }

@@ -121,7 +121,7 @@ namespace impl
 			, public std::unique_lock<SharedMutex>
 		{
 			using base_ref = bucket_ref<Bucket, Owner>;
-			using segment_and_bucket_t = typename base_ref::segment_and_bucket_t;
+			using typename base_ref::segment_and_bucket_t;
 			bucket_unique_lock(
 				Owner &b_
 				, const segment_and_bucket_t &i_
@@ -162,7 +162,7 @@ namespace impl
 		{
 			using base_ref = bucket_ref<Bucket, Referent>;
 			using base_lock = std::shared_lock<SharedMutex>;
-			using segment_and_bucket_t = typename base_ref::segment_and_bucket_t;
+			using typename base_ref::segment_and_bucket_t;
 			bucket_shared_lock(
 				Bucket &b_
 				, const segment_and_bucket_t &i_
@@ -213,8 +213,8 @@ namespace impl
 			std::unique_ptr<bucket_mutexes<Mutex>[]> _bucket_mutexes;
 		public:
 			using base = bucket_control_unlocked<Bucket>;
-			using bucket_aligned_t = typename base::bucket_aligned_t;
-			using six_t = typename base::six_t;
+			using typename base::bucket_aligned_t;
+			using typename base::six_t;
 			explicit bucket_control(
 				six_t index_
 				, bucket_aligned_t *buckets_
@@ -261,33 +261,34 @@ namespace impl
 			, private segment_layout
 			, private
 				persist_controller<
-					typename Allocator::template rebind<
+					typename std::allocator_traits<Allocator>::template rebind_alloc<
 						std::pair<const Key, T>
-					>::other
+					>
 				>
 		{
+			using allocator_traits_type = std::allocator_traits<Allocator>;
 		public:
 			using key_type        = Key;
 			using mapped_type     = T;
 			using value_type      = std::pair<const key_type, mapped_type>;
 			using persist_controller_t =
 				persist_controller<
-					typename Allocator::template rebind<value_type>::other
+					typename allocator_traits_type::template rebind_alloc<value_type>
 				>;
 			using size_type       = typename persist_controller_t::size_type;
 			using hasher          = Hash;
 			using key_equal       = Pred;
 			using allocator_type  = Allocator;
-			using pointer         = typename allocator_type::pointer;
-			using const_pointer   = typename allocator_type::const_pointer;
-			using reference       = typename allocator_type::reference;
-			using const_reference = typename allocator_type::const_reference;
+			using pointer         = typename allocator_traits_type::pointer;
+			using const_pointer   = typename allocator_traits_type::const_pointer;
+			using reference       = value_type &;
+			using const_reference = const value_type &;
 			using iterator        = hop_hash_iterator<hop_hash_base>;
 			using const_iterator  = hop_hash_const_iterator<hop_hash_base>;
 			using local_iterator  = hop_hash_local_iterator<hop_hash_base>;
 			using const_local_iterator = hop_hash_const_local_iterator<hop_hash_base>;
 			using persist_data_t =
-				persist_map<typename Allocator::template rebind<value_type>::other>;
+				persist_map<typename allocator_traits_type::template rebind_alloc<value_type>>;
 		private:
 			using bix_t = size_type; /* sufficient for all bucket indexes */
 			using hash_result_t = typename hasher::result_type;
@@ -298,7 +299,7 @@ namespace impl
 			using bucket_aligned_t = typename bucket_control_t::bucket_aligned_t;
 			static_assert(sizeof(bucket_aligned_t) <= 64, "Bucket size exceeds presumed cache line size (64)");
 			using bucket_allocator_t =
-				typename Allocator::template rebind<bucket_aligned_t>::other;
+				typename allocator_traits_type::template rebind_alloc<bucket_aligned_t>;
 			using owner_unique_lock_t = bucket_unique_lock<bucket_t, owner, SharedMutex>;
 			using owner_shared_lock_t = bucket_shared_lock<bucket_t, owner, SharedMutex>;
 			using content_unique_lock_t = bucket_unique_lock<bucket_t, content_t, SharedMutex>;

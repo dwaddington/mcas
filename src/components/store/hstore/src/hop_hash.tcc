@@ -586,6 +586,7 @@ template <
 						owner_lk.index()
 						, distance_wrapped(owner_lk.index(), b_dst.index())
 						, owner_lk
+						, static_cast<persist_controller_t *>(this)
 					);
 					this->persist_controller_t::persist_owner(owner_lk.ref(), "owner emplace");
 					hop_hash_log<TRACE_MANY>::write(__func__, " bucket ", owner_lk.index()
@@ -841,7 +842,12 @@ template <
 					, " with bucket count ", bucket_count());
 			}
 			assert(owner_pos < owner::size);
-			junior_owner.insert(ix_junior_owner, owner_pos, junior_owner_lk);
+			junior_owner.insert(
+				ix_junior_owner
+				, owner_pos
+				, junior_owner_lk
+				, static_cast<persist_controller_t *>(this)
+			);
 			senior_owner_lk.ref().erase(owner_pos, senior_owner_lk);
 			this->persist_controller_t::persist_owner(junior_owner_lk.ref(), "pass 2 junior owner");
 			this->persist_controller_t::persist_owner(senior_owner_lk.ref(), "pass 2 senior owner");

@@ -30,7 +30,7 @@ add_library(pmem SHARED ${SOURCES})
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx512f")
 
-target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
+#target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)

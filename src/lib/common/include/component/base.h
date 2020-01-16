@@ -157,6 +157,14 @@ class IBase {
    */
   virtual void *query_interface(Component::uuid_t &itf) = 0;
 
+  /**
+   * Template function helper 
+   */
+  template<class T>
+  T * query_interface() {
+    return static_cast<T*>(query_interface(T::iid()));
+  }
+
   /* optional unload */
   virtual void unload() {}
 

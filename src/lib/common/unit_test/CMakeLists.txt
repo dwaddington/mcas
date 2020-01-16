@@ -17,5 +17,5 @@ add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 add_executable(libcommon-test1 test1.cpp)
 target_compile_options(libcommon-test1 PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_compile_options(libcommon-test1 PUBLIC -g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual  -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings) # -Wconversion
-target_link_libraries(libcommon-test1 numa gtest boost_system pthread dl common)  # add profier for google profiler
+target_compile_options(libcommon-test1 PUBLIC -g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2) # -Wconversion
+target_link_libraries(libcommon-test1 numa gtest boost_system pthread dl common)  # add proflier for google profiler

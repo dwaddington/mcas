@@ -12,14 +12,14 @@
 */
 
 
+#include "rc_alloc_avl.h"
+
+#include "avl_malloc.h"
+#include "slab.h"
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <numa.h>
 #include <stdexcept>
-
-#include "avl_malloc.h"
-#include "slab.h"
-#include "rc_alloc_avl.h"
 
 namespace nupm
 {
@@ -71,7 +71,7 @@ class Rca_AVL_internal {
   {
     assert(ptr);
     assert(_allocators[numa_node]);
-    
+
     auto mrp = _allocators[numa_node]->alloc_at(reinterpret_cast<addr_t>(ptr), size);
     if (mrp == nullptr)
       throw General_exception("alloc_at on AVL range allocator failed unexpectedly");

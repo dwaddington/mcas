@@ -16,11 +16,9 @@
 #include <set>
 #include <api/kvindex_itf.h>
 
-using namespace std;
-
 class RamRBTree : public Component::IKVIndex {
  public:
-  RamRBTree(const string& owner, const string& name);
+  RamRBTree(const std::string& owner, const std::string& name);
   RamRBTree();
   virtual ~RamRBTree();
 
@@ -51,7 +49,7 @@ class RamRBTree : public Component::IKVIndex {
                            std::string&       out_matched_key,
                            unsigned           max_comparisons = 0) override;
 private:
-  std::set<string> _index;
+  std::set<std::string> _index;
 };
 
 class RamRBTree_factory : public Component::IKVIndex_factory {

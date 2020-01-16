@@ -23,7 +23,8 @@
 #define __STRUCTURED_COMPONENT_H__
 
 #include <api/ado_itf.h>
-
+#include <structured_proto_generated.h>
+#include <ccpm/interfaces.h>
 
 class ADO_structured_plugin : public Component::IADO_plugin
 {  
@@ -73,15 +74,28 @@ public:
 
   status_t do_work(const uint64_t work_key,
                    const std::string& key,
-                   void * shard_value_vaddr,
+                   void * value,
                    size_t value_len,
-                   const void * in_work_request, /* don't use iovec because of non-const */
+                   void * detached_value,
+                   size_t detached_value_len,
+                   const void * in_work_request,
                    const size_t in_work_request_len,
-                   void*& out_work_response,
-                   size_t& out_work_response_len) override;
-  
+                   bool new_root,
+                   response_buffer_vector_t& response_buffers) override;
 
   status_t shutdown() override;
+
+private:
+
+  status_t process_putvar_command(const Structured_ADO_protocol::PutVariable * command,
+                                  const ccpm::region_vector_t& regions);
+
+
+  status_t process_invoke_command(const Structured_ADO_protocol::Invoke * command,
+                                  const ccpm::region_vector_t& regions,
+                                  void*& out_work_response,
+                                  size_t& out_work_response_len);
+  
 
 };
 

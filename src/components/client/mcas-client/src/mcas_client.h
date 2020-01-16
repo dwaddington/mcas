@@ -61,6 +61,8 @@ class MCAS_client : public virtual Component::IKVStore,
               const std::string& device);
 
  public:
+  using pool_t = Component::IKVStore::pool_t;
+  
   /**
    * Destructor
    *
@@ -109,6 +111,8 @@ class MCAS_client : public virtual Component::IKVStore,
   virtual status_t close_pool(const pool_t pool) override;
 
   virtual status_t delete_pool(const std::string& name) override;
+
+  virtual status_t delete_pool(IKVStore::pool_t pool) override;
 
   virtual status_t configure_pool(const Component::IKVStore::pool_t pool,
                                   const std::string& json) override;
@@ -178,6 +182,7 @@ class MCAS_client : public virtual Component::IKVStore,
                                   size_t request_len,
                                   const void * value,
                                   size_t value_len,
+                                  size_t root_len,
                                   ado_flags_t flags,
                                   std::string& out_response) override;
   
