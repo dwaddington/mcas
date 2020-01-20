@@ -20,7 +20,7 @@
 #include <execinfo.h>
 
 #include <cstdlib>
-#include <iostream>
+#include <ostream>
 #include <memory>
 #include <sstream>
 #include <string>

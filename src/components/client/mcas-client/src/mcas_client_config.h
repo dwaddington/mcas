@@ -14,8 +14,8 @@
 #define __mcas_CLIENT_CONFIG_H__
 
 #if defined(__powerpc64__)
-#define likely(X) X /* TODO: fix for Power */
-#define unlikely(X) X
+#define LIKELY(X) (X) /* TODO: fix for Power */
+#define UNLIKELY(X) (X)
 #endif
 
 namespace mcas

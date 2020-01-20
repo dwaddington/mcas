@@ -6,16 +6,16 @@
             "port" : 11911,
             "net"  : "mlx5_0",
             "default_backend" : "mapstore",
-            "default_ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",            
-            "default_ado_plugin" : "libcomponent-adoplugin-graph.so",
+            "default_ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
+            "default_ado_plugin" : "libcomponent-adoplugin-testing.so",
             "ado_core" : "2",
             "ado_core_number" : 1
         }
     ],
     "net_providers" : "verbs",
     "resources":
-    { 
+    {
             "ado_cores":"6-8",
             "ado_manager_core": 1
-    } 
+    }
 }

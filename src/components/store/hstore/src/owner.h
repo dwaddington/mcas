@@ -15,9 +15,10 @@
 #ifndef _COMANCHE_HSTORE_OWNER_H
 #define _COMANCHE_HSTORE_OWNER_H
 
-#include "trace_flags.h"
 
+#include "hstore_config.h"
 #include "persistent.h"
+#include "trace_flags.h"
 #if TRACED_OWNER
 #include "hop_hash_debug.h"
 #endif
@@ -34,6 +35,8 @@
 
 namespace impl
 {
+	class allocation_state_emplace;
+
 	template <typename Bucket, typename Referent, typename Lock>
 		struct bucket_shared_lock;
 	template <typename Bucket, typename Referent, typename Lock>
@@ -56,6 +59,21 @@ namespace impl
 		std::size_t _pos;
 #endif
 		static value_type mask_from_pos(unsigned pos) { return value_type(1U) << pos; }
+		void insert(
+			const std::size_t
+#if TRACK_POS
+				pos_
+#endif
+			, const unsigned p_
+		)
+		{
+#if TRACK_POS
+			assert(_pos == pos_undefined || _pos == pos_);
+			assert(p_ < size);
+			_pos = pos_;
+#endif
+			_value |= mask_from_pos(p_);
+		}
 	public:
 		explicit owner()
 			: _value(0)
@@ -67,23 +85,29 @@ namespace impl
 		static value_type mask_all_ones() { return mask_from_pos(size) - 1U; }
 		static unsigned rightmost_one_pos(value_type c) { return __builtin_ctzll(c); };
 
-		template<typename Bucket, typename Referent, typename SharedMutex>
+		/* ERROR: it is being a bit lazy to make PersistController as a template parameter.
+		 * Chances are that what we need of the persist_controller_t could be provided
+		 * in a more limited manner.
+		 */
+		template<typename Bucket, typename Referent, typename SharedMutex, typename PersistController>
 			void insert(
-				const std::size_t
-#if TRACK_POS
-					pos_
-#endif
+				const std::size_t pos_
 				, const unsigned p_
 				, bucket_unique_ref<Bucket, Referent, SharedMutex>
-			)
-		{
-#if TRACK_POS
-			assert(_pos == pos_undefined || _pos == pos_);
-			assert(p_ < size);
-			_pos = pos_;
+				, PersistController *
+#if USE_CC_HEAP == 4
+				pc_
 #endif
-			_value |= mask_from_pos(p_);
-		}
+			)
+			{
+#if USE_CC_HEAP == 3
+#elif USE_CC_HEAP == 4
+				pc_->record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
+#else
+#error unknown USE_CC_HEAP
+#endif
+				insert(pos_, p_);
+			}
 		template<typename Bucket, typename Referent, typename SharedMutex>
 			void erase(unsigned p, bucket_unique_ref<Bucket, Referent, SharedMutex>)
 			{

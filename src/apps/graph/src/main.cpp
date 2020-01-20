@@ -96,6 +96,7 @@ void load_transactions(Component::IMCAS* mcas, Component::IKVStore::pool_t pool)
 
   FlatBufferBuilder fbb;
   std::string line;
+  unsigned count = 0;
   
   while(getline(ifs, line)) {
     fbb.Clear();
@@ -134,7 +135,9 @@ void load_transactions(Component::IMCAS* mcas, Component::IKVStore::pool_t pool)
                                    512);
 
     if(rc != S_OK)
-      throw General_exception("failed to put transaction (%d)", rc);      
+      throw General_exception("failed to put transaction (%d)", rc);
+
+    count++;
   }
   PINF("** Loaded transactions OK! (pool count=%lu)", mcas->count(pool));;
   
@@ -312,11 +315,9 @@ void do_load(Component::IMCAS* mcas)
 
   mcas->configure_pool(pool, "AddIndex::VolatileTree");
 
-#if 0
   load_companies(mcas, pool);
   load_atms(mcas, pool);
   load_clients(mcas, pool);
-#endif
   load_transactions(mcas, pool);
   
 #ifdef CHECK

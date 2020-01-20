@@ -19,6 +19,7 @@
 
 #include "bad_alloc_cc.h"
 #include "persister_cc.h"
+#include "persistent.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
 
@@ -31,15 +32,7 @@ template <>
 	{
 	public:
 		using deallocator_type = deallocator_rc<void, persister>;
-		using typename deallocator_type::pointer;
-		using typename deallocator_type::const_pointer;
 		using typename deallocator_type::value_type;
-
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_rc<U, persister>;
-			};
 	};
 
 template <typename Persister>
@@ -48,14 +41,7 @@ template <typename Persister>
 	{
 	public:
 		using deallocator_type = deallocator_rc<void, Persister>;
-		using typename deallocator_type::pointer;
-		using typename deallocator_type::const_pointer;
 		using typename deallocator_type::value_type;
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_rc<U, Persister>;
-			};
 	};
 
 template <typename T, typename Persister = persister>
@@ -64,19 +50,8 @@ template <typename T, typename Persister = persister>
 	{
 	public:
 		using deallocator_type = deallocator_rc<T, Persister>;
-		using size_type = std::size_t;
-		using difference_type = std::ptrdiff_t;
-		using typename deallocator_type::pointer;
-		using typename deallocator_type::const_pointer;
-		using reference = T &;
-		using const_reference = const T &;
-		using typename deallocator_type::value_type; // = T;
-
-		template <typename U>
-			struct rebind
-			{
-				using other = allocator_rc<U, Persister>;
-			};
+		using typename deallocator_type::value_type;
+		using typename deallocator_type::size_type;
 
 		explicit allocator_rc(void *area_, std::size_t size_, Persister p_ = Persister())
 			: deallocator_rc<T, Persister>(area_, size_, p_)
@@ -99,53 +74,40 @@ template <typename T, typename Persister = persister>
 
 		allocator_rc &operator=(const allocator_rc &a_) = delete;
 
-#if 0
-		/* deprecated in C++20 */
-		pointer address(reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-		const_pointer address(const_reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-#endif
-
-#if 0
 		auto allocate(
 			size_type s
-			, typename allocator_rc<void, Persister>::const_pointer /* hint */ =
-				typename allocator_rc<void, Persister>::const_pointer{}
-			, const char * = nullptr
-		) -> pointer
-		{
-			auto ptr = this->pool()->alloc(s * sizeof(T));
-			if ( ptr == 0 )
-			{
-				throw bad_alloc_cc(0, s, sizeof(T));
-			}
-			return static_cast<pointer>(ptr);
-		}
-#endif
-		auto allocate(
-			size_type s
-			, size_type alignment
-			, typename allocator_rc<void, Persister>::const_pointer /* hint */ =
-				typename allocator_rc<void, Persister>::const_pointer{}
-			, const char * = nullptr
-		) -> pointer
+			, size_type alignment = alignof(T)
+		) -> value_type *
 		{
 			auto ptr = this->pool()->alloc(s * sizeof(T), alignment);
 			if ( ptr == 0 )
 			{
 				throw bad_alloc_cc(0, s, sizeof(T));
 			}
-			return static_cast<pointer>(ptr);
+			return static_cast<value_type *>(ptr);
+		}
+
+		void allocatep(
+			persistent<value_type *> &ptr
+			, size_type sz
+			, size_type alignment = alignof(T)
+		)
+		{
+			allocate(ptr, sz, alignment);
+		}
+
+		void allocate(
+			value_type * &ptr
+			, size_type sz
+			, size_type alignment = alignof(T)
+		)
+		{
+			ptr = allocate(sz, alignment);
 		}
 
 		void reconstitute(
 			size_type s
-			, typename allocator_rc<void, Persister>::const_pointer location
+			, const void *location
 			, const char * = nullptr
 		)
 		{
@@ -153,7 +115,7 @@ template <typename T, typename Persister = persister>
 		}
 
 		bool is_reconstituted(
-			typename allocator_rc<void, Persister>::const_pointer location
+			const void *location
 		)
 		{
 			return this->pool()->is_reconstituted(location);

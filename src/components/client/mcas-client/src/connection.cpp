@@ -25,16 +25,16 @@ using namespace Component;
 
 namespace
 {
-  /*
-   * First, cast the response buffer to Message (checking version).
-   * Second, cast the Message to a specific message type (checking message type).
-   */
-  template <typename Type>
-    const Type *response_ptr(void *b)
-    {
-      const auto *const msg = mcas::Protocol::message_cast(b);
-      return msg->ptr_cast<Type>();
-    }
+/*
+ * First, cast the response buffer to Message (checking version).
+ * Second, cast the Message to a specific message type (checking message type).
+ */
+template <typename Type>
+const Type *response_ptr(void *b)
+{
+  const auto *const msg = mcas::Protocol::message_cast(b);
+  return msg->ptr_cast<Type>();
+}
 }
 
 namespace mcas
@@ -53,7 +53,7 @@ Connection_handler::Connection_handler(Connection_base::Transport* connection)
 
 Connection_handler::~Connection_handler()
 {
-  PLOG("Connection_handler::dtor (%p)", this);
+  PLOG("Connection_handler::dtor (%p)", static_cast<const void *>(this));
 }
 
 /* The various embedded returns and throws suggest that the allocated
@@ -104,11 +104,12 @@ Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
 
   try {
     const auto msg = new (iobs->base()) mcas::Protocol::Message_pool_request(iobs->length(),
-                          auth_id(), /* auth id */
-                          ++_request_id,
-                          0,         /* size */
-                          mcas::Protocol::OP_OPEN,
-                          name);
+                                                                             auth_id(), /* auth id */
+                                                                             ++_request_id,
+                                                                             0, /* size */
+                                                                             0, /* expected obj count */ 
+                                                                             mcas::Protocol::OP_OPEN,
+                                                                             name);
 
     iobs->set_length(msg->msg_len);
 
@@ -146,15 +147,12 @@ Connection_handler::pool_t Connection_handler::create_pool(const std::string nam
                                                            uint64_t          expected_obj_count)
 {
   API_LOCK();
-  PMAJOR("create pool: %s (expected objs=%lu)", name.c_str(), expected_obj_count);
 
   /* send pool request message */
   const auto iobs = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   const auto iobr = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   assert(iobs);
   assert(iobr);
-
-  PLOG("Connection_handler::create_pool");
 
   Component::IKVStore::pool_t pool_id;
 
@@ -164,11 +162,11 @@ Connection_handler::pool_t Connection_handler::create_pool(const std::string nam
                                      auth_id(), /* auth id */
                                      ++_request_id,
                                      size,
+                                     expected_obj_count,
                                      mcas::Protocol::OP_CREATE,
                                      name);
     assert(msg->op);
     msg->flags = flags;
-    msg->expected_object_count = expected_obj_count;
 
     iobs->set_length(msg->msg_len);
 
@@ -196,9 +194,9 @@ status_t Connection_handler::close_pool(pool_t pool)
   const auto iobs = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   const auto iobr = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   const auto msg = new (iobs->base()) mcas::Protocol::Message_pool_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          mcas::Protocol::OP_CLOSE);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           mcas::Protocol::OP_CLOSE);
   msg->pool_id = pool;
 
   iobs->set_length(msg->msg_len);
@@ -217,17 +215,46 @@ status_t Connection_handler::close_pool(pool_t pool)
 status_t Connection_handler::delete_pool(const std::string& name)
 
 {
+  if(name.empty()) return E_INVAL;
+  
   API_LOCK();
 
   const auto iobs = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   const auto iobr = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
 
   const auto msg = new (iobs->base()) mcas::Protocol::Message_pool_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          0, // size
-                                                                          mcas::Protocol::OP_DELETE,
-                                                                          name);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           0, // size
+                                                                           0, // exp obj count
+                                                                           mcas::Protocol::OP_DELETE,
+                                                                           name);
+  iobs->set_length(msg->msg_len);
+
+  post_recv(&*iobr);
+  sync_inject_send(&*iobs);
+  wait_for_completion(&*iobr);
+
+  const auto response_msg =
+    response_ptr<const mcas::Protocol::Message_pool_response>(iobr->base());
+
+  return response_msg->get_status();
+}
+
+status_t Connection_handler::delete_pool(IKVStore::pool_t pool)
+{
+  if(!pool) return E_INVAL;
+
+  API_LOCK();
+  
+  const auto iobs = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
+  const auto iobr = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
+
+  const auto msg = new (iobs->base()) mcas::Protocol::Message_pool_request(iobs->length(),
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           mcas::Protocol::OP_DELETE);
+  msg->pool_id = pool;
   iobs->set_length(msg->msg_len);
 
   post_recv(&*iobr);
@@ -249,11 +276,11 @@ status_t Connection_handler::configure_pool(const Component::IKVStore::pool_t po
   const auto iobr = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
 
   const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                        auth_id(),
-                                                                        ++_request_id,
-                                                                        pool,
-                                                                        mcas::Protocol::OP_CONFIGURE,  // op
-                                                                        json);
+                                                                         auth_id(),
+                                                                         ++_request_id,
+                                                                         pool,
+                                                                         mcas::Protocol::OP_CONFIGURE,  // op
+                                                                         json);
   if ((json.length() + sizeof(mcas::Protocol::Message_IO_request)) >
       Buffer_manager<Component::IFabric_client>::BUFFER_LEN)
     return IKVStore::E_TOO_LARGE;
@@ -314,15 +341,15 @@ status_t Connection_handler::put(const pool_t pool,
 
   try {
     const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          pool,
-                                                                          mcas::Protocol::OP_PUT,  // op
-                                                                          key,
-                                                                          key_len,
-                                                                          value,
-                                                                          value_len,
-                                                                          flags);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           pool,
+                                                                           mcas::Protocol::OP_PUT,  // op
+                                                                           key,
+                                                                           key_len,
+                                                                           value,
+                                                                           value_len,
+                                                                           flags);
 
     if (_options.short_circuit_backend)
       msg->resvd |= mcas::Protocol::MSG_RESVD_SCBE;
@@ -403,7 +430,7 @@ status_t Connection_handler::two_stage_put_direct(const pool_t                  
 
   if (option_DEBUG)
     PLOG("value_buffer: (iov_len=%lu, region=%p, desc=%p)",
-         value_buffer->iov->iov_len, value_buffer->region, value_buffer->desc);
+         value_buffer->iov->iov_len, static_cast<const void *>(value_buffer->region), value_buffer->desc);
 
   sync_send(value_buffer);  // client owns buffer
 
@@ -449,7 +476,7 @@ status_t Connection_handler::put_direct(const pool_t                         poo
 
     const auto key_len = key.length();
     if ((key_len + value_len + sizeof(mcas::Protocol::Message_IO_request)) >
-      Buffer_manager<Component::IFabric_client>::BUFFER_LEN) {
+        Buffer_manager<Component::IFabric_client>::BUFFER_LEN) {
 
       /* check value is not too large for underlying transport */
       if(value_len > _max_message_size) {
@@ -473,21 +500,21 @@ status_t Connection_handler::put_direct(const pool_t                         poo
 
     if (option_DEBUG) {
       PLOG("put_direct: key=(%.*s) key_len=%lu value=(%.20s...) value_len=%lu",
-           (int) key_len, (const char*) key.c_str(), key_len, (const char*) value, value_len);
+           (int) key_len, (const char*) key.c_str(), key_len, static_cast<const char *>(value), value_len);
 
       PLOG("value_buffer: (iov_len=%lu, mr=%p, desc=%p)",
-           value_buffer->iov->iov_len, value_buffer->region, value_buffer->desc);
+           value_buffer->iov->iov_len, static_cast<const void *>(value_buffer->region), value_buffer->desc);
     }
 
     const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          pool,
-                                                                          mcas::Protocol::OP_PUT,  // op
-                                                                          key.c_str(),
-                                                                          key_len,
-                                                                          value_len,
-                                                                          flags);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           pool,
+                                                                           mcas::Protocol::OP_PUT,  // op
+                                                                           key.c_str(),
+                                                                           key_len,
+                                                                           value_len,
+                                                                           flags);
 
     if (_options.short_circuit_backend)
       msg->resvd |= mcas::Protocol::MSG_RESVD_SCBE;
@@ -531,13 +558,13 @@ status_t Connection_handler::get(const pool_t       pool,
   try {
 
     const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          pool,
-                                                                          mcas::Protocol::OP_GET,  // op
-                                                                          key,
-                                                                          "",
-                                                                          0);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           pool,
+                                                                           mcas::Protocol::OP_GET,  // op
+                                                                           key,
+                                                                           "",
+                                                                           0);
 
     if (_options.short_circuit_backend)
       msg->resvd |= mcas::Protocol::MSG_RESVD_SCBE;
@@ -584,13 +611,13 @@ status_t Connection_handler::get(const pool_t       pool,
   try {
 
     const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          pool,
-                                                                          mcas::Protocol::OP_GET,  // op
-                                                                          key.c_str(),
-                                                                          key.length(),
-                                                                          0);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           pool,
+                                                                           mcas::Protocol::OP_GET,  // op
+                                                                           key.c_str(),
+                                                                           key.length(),
+                                                                           0);
 
     /* indicate how much space has been allocated on this side. For
        get this is based on buffer size
@@ -640,7 +667,6 @@ status_t Connection_handler::get(const pool_t       pool,
       /* copy off value from IO buffer */
       value     = ::malloc(response_msg->data_len + 1);
       value_len = response_msg->data_len;
-
       memcpy(value, response_msg->data, response_msg->data_len);
       ((char*) value)[response_msg->data_len] = '\0';
     }
@@ -663,7 +689,7 @@ status_t Connection_handler::get_direct(const pool_t                         poo
   API_LOCK();
 
   if (!value || out_value_len == 0 || handle == 0) {
-    PWRN("bad parameter value=%p out_value_len=%lu handle=%p", value, out_value_len, handle);
+    PWRN("bad parameter value=%p out_value_len=%lu handle=%p", value, out_value_len, static_cast<const void *>(handle));
     return E_BAD_PARAM;
   }
 
@@ -685,13 +711,13 @@ status_t Connection_handler::get_direct(const pool_t                         poo
   status_t status;
   try {
     const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          pool,
-                                                                          mcas::Protocol::OP_GET,
-                                                                          key.c_str(),
-                                                                          key.length(),
-                                                                          0);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           pool,
+                                                                           mcas::Protocol::OP_GET,
+                                                                           key.c_str(),
+                                                                           key.length(),
+                                                                           0);
 
     /* indicate that this is a direct request and register
        how much space has been allocated on this side. For
@@ -760,13 +786,13 @@ status_t Connection_handler::erase(const pool_t pool,
 
   try {
     const auto msg = new (iobs->base()) mcas::Protocol::Message_IO_request(iobs->length(),
-                                                                          auth_id(),
-                                                                          ++_request_id,
-                                                                          pool,
-                                                                          mcas::Protocol::OP_ERASE,
-                                                                          key.c_str(),
-                                                                          key.length(),
-                                                                          0);
+                                                                           auth_id(),
+                                                                           ++_request_id,
+                                                                           pool,
+                                                                           mcas::Protocol::OP_ERASE,
+                                                                           key.c_str(),
+                                                                           key.length(),
+                                                                           0);
 
     iobs->set_length(msg->msg_len);
 
@@ -815,9 +841,9 @@ size_t Connection_handler::count(const pool_t pool)
     return response_msg->value;
   }
   catch ( ... )
-  {
-    return 0;
-  }
+    {
+      return 0;
+    }
 }
 
 status_t Connection_handler::get_attribute(const IKVStore::pool_t pool,
@@ -887,7 +913,12 @@ status_t Connection_handler::get_statistics(Component::IMCAS::Shard_stats& out_s
       response_ptr<const mcas::Protocol::Message_stats>(iobr->base());
 
     status = response_msg->get_status();
+#pragma GCC diagnostic push
+#if 9 <= __GNUC__
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
     out_stats = response_msg->stats;
+#pragma GCC diagnostic pop
   }
   catch(...) {
     status = E_FAIL;
@@ -937,7 +968,6 @@ status_t Connection_handler::find(const IKVStore::pool_t pool,
   catch(...) {
     status = E_FAIL;
   }
-
   return status;
 }
 
@@ -946,13 +976,11 @@ status_t Connection_handler::invoke_ado(const Component::IKVStore::pool_t pool,
                                         const std::string& key,
                                         const void * request,
                                         size_t request_len,
-                                        const uint32_t flags,                              
+                                        const uint32_t flags,
                                         std::string& out_response,
                                         const size_t value_size)
 {
   API_LOCK();
-
-  assert(request_len > 0);
 
   const auto iobs = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   assert(iobs);
@@ -961,15 +989,16 @@ status_t Connection_handler::invoke_ado(const Component::IKVStore::pool_t pool,
   status_t status;
 
   try {
-    const auto msg = new (iobs->base()) mcas::Protocol::Message_ado_request(iobs->length(),
-                                                                            auth_id(),
-                                                                            ++_request_id,
-                                                                            pool,
-                                                                            key,
-                                                                            request,
-                                                                            request_len,
-                                                                            flags,
-                                                                            value_size);
+    const auto msg = new (iobs->base())
+      mcas::Protocol::Message_ado_request(iobs->length(),
+                                          auth_id(),
+                                          ++_request_id,
+                                          pool,
+                                          key,
+                                          request,
+                                          request_len,
+                                          flags,
+                                          value_size);
     iobs->set_length(msg->message_size());
 
     if(flags & Component::IMCAS::ADO_FLAG_ASYNC) {
@@ -991,7 +1020,8 @@ status_t Connection_handler::invoke_ado(const Component::IKVStore::pool_t pool,
     status = response_msg->get_status();
 
     if(status == S_OK) {
-      out_response.assign(reinterpret_cast<const char*>(response_msg->response()), response_msg->response_len);
+      out_response.assign(reinterpret_cast<const char*>(response_msg->response()),
+                          response_msg->response_len);
     }
   }
   catch(...) {
@@ -1008,12 +1038,13 @@ status_t Connection_handler::invoke_put_ado(const IKVStore::pool_t pool,
                                             size_t request_len,
                                             const void * value,
                                             size_t value_len,
+                                            size_t root_len,
                                             const uint32_t flags,
                                             std::string& out_response)
 {
   API_LOCK();
 
-  assert(request_len > 0);
+  if(request_len == 0) return E_INVAL;
 
   const auto iobs = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
   assert(iobs);
@@ -1031,6 +1062,7 @@ status_t Connection_handler::invoke_put_ado(const IKVStore::pool_t pool,
                                                                                 request_len,
                                                                                 value,
                                                                                 value_len,
+                                                                                root_len,
                                                                                 flags);
 
     iobs->set_length(msg->message_size());
@@ -1076,10 +1108,9 @@ int Connection_handler::tick()
     break;
   }
   case HANDSHAKE_SEND: {
-    PMAJOR("client : HANDSHAKE_SEND");
     const auto iob = std::unique_ptr<buffer_t, iob_free>(allocate(), this);
-    auto msg = new (iob->base()) mcas::Protocol::Message_handshake(0, 1);
-
+    auto msg = new (iob->base()) mcas::Protocol::Message_handshake(auth_id(), 1);
+    msg->set_status(S_OK);
     iob->set_length(msg->msg_len);
     post_send(iob->iov, iob->iov + 1, &iob->desc, &*iob);
 
@@ -1094,12 +1125,7 @@ int Connection_handler::tick()
 
     wait_for_completion(&*iob);
 
-    // const auto response_msg =
-    //   response_ptr<const mcas::Protocol::Message_handshake_reply>(iob->base());
-
     set_state(READY);
-
-    PMAJOR("client : HANDSHAKE_GET_RESPONSE");
 
     _max_message_size = max_message_size(); /* from fabric component */
     break;
@@ -1119,7 +1145,7 @@ int Connection_handler::tick()
     wait_for_completion(&*iob);
 
     set_state(STOPPED);
-    PLOG("mcas_client: connection %p shutdown.", this);
+    PLOG("mcas_client: connection %p shutdown.", static_cast<const void *>(this));
     return 0;
   }
   case STOPPED: {

@@ -19,16 +19,12 @@
 #include <cxxabi.h>    // for __cxa_demangle
 #include <dlfcn.h>     // for dladdr
 #include <execinfo.h>  // for backtrace
-
+#include <cxxabi.h>
+#include <execinfo.h>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
 #include <string>
-
-#include <cxxabi.h>
-#include <execinfo.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 namespace Core
 {

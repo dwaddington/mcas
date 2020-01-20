@@ -22,10 +22,10 @@
 #ifndef __CORE_AVL_TREE_H__
 #define __CORE_AVL_TREE_H__
 
-#include <common/assert.h>
 #include <common/exceptions.h>
-#include <stdio.h>
-#include <thread>
+#include <cassert>
+#include <cstdio>
+#include <functional>
 #include <vector>
 
 namespace Core

@@ -28,7 +28,7 @@ float get_rdtsc_frequency_mhz() {
   sscanf(match, "@ %f", &clock_speed);
 
   if (clock_speed > 0)
-    clock_speed_in_MHz = clock_speed * 1000.0;
+    clock_speed_in_MHz = clock_speed * 1000.0f;
   else {
     /* some qemu guest and the aep1 host don't have freq in model name */
     match = strstr(buffer, "cpu MHz");
@@ -44,7 +44,7 @@ float get_rdtsc_frequency_mhz() {
 
 float cycles_to_usec(cpu_time_t time)
 {
-  return ((float) time) / get_rdtsc_frequency_mhz();
+  return float(time) / get_rdtsc_frequency_mhz();
 }
 
 }  // namespace Core

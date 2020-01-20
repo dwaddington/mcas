@@ -36,6 +36,8 @@
 #define __COMP_TYPES_H__
 
 #include <stdint.h>
+#include <cstddef>
+#include <sys/uio.h>
 
 typedef int status_t;
 
@@ -54,7 +56,10 @@ typedef uint32_t dword;
 typedef void *handle_t;
 typedef uint32_t core_id_t;
 typedef uint64_t atomic_t;
-typedef uint64_t cpu_time_t;
+typedef uint64_t cpu_time_t; /* timestamp counter time */
+typedef uint64_t epoch_time_t;
+typedef cpu_time_t tsc_time_t;
+
 typedef int numa_node_t;
 typedef uint64_t offset_t;
 

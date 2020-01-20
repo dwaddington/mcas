@@ -17,6 +17,7 @@
 #include <api/mcas_itf.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
+#include <boost/numeric/conversion/cast.hpp>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -109,6 +110,8 @@ class Connection_handler : public Connection_base {
   status_t close_pool(pool_t pool);
 
   status_t delete_pool(const std::string& name);
+  
+  status_t delete_pool(const Component::IKVStore::pool_t pool);
 
   status_t configure_pool(const Component::IKVStore::pool_t pool,
                           const std::string& json);
@@ -151,7 +154,20 @@ class Connection_handler : public Connection_base {
 
   uint64_t key_hash(const void* key, const size_t key_len);
 
-  uint64_t auth_id() const { return ((uint64_t) this); }
+  uint64_t auth_id() const {
+    /* temporary */
+    auto env = getenv("MCAS_AUTH_ID");
+    uint64_t auth_id;
+    if(env) {
+      auto id = std::strtoll(env, nullptr, 10);
+      auth_id = boost::numeric_cast<uint64_t>(id);
+    }
+    else {
+      auth_id = boost::numeric_cast<uint64_t>(getuid());
+    }
+           
+    return auth_id;
+  }
 
   size_t count(const pool_t pool);
 
@@ -182,6 +198,7 @@ class Connection_handler : public Connection_base {
                           size_t request_len,
                           const void * value,
                           size_t value_len,
+                          size_t root_len,
                           const uint32_t flags,
                           std::string& out_response);
 

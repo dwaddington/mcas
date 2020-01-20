@@ -19,6 +19,8 @@
  *
  */
 
+#include "nd_utils.h"
+
 #include <common/utils.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -26,9 +28,7 @@
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <fstream>
-#include <iostream>
-
-#include "nd_utils.h"
+#include <streambuf>
 
 #ifndef MAP_SYNC
 #define MAP_SYNC 0x80000

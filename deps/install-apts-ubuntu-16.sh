@@ -1,29 +1,43 @@
 #!/bin/bash
+#
+# Packages for Ubuntu 16.04 LTS
+#
 apt-get update
-apt-get install -y wget cmake build-essential git gcc make libcunit1-dev pkg-config libtool \
-        libaio-dev libssl-dev libibverbs-dev librdmacm-dev libudev-dev libuuid1 uuid uuid-dev\
-        libnuma-dev libaio-dev libcunit1 libcunit1-dev \
+apt-get install -y --no-install-recommends \
+        build-essential cmake
+
+./install-tzdata-noninteractive.sh
+./install-rust.sh
+
+# removed: asciidoc xmlto (needed only to build doc for ndctl)
+# removed: fabric (remote Python deployment)
+# removed: libcunit1 libcunit1-dev liblz4-dev libomp-dev libsnappy-dev uuid (unused)
+# removed: g++-multilib (cross-compiles)
+# removed: google-perftools (profiling)
+
+apt-get install -y --no-install-recommends \
+        autoconf automake ca-certificates cmake gcc g++ git make python python-numpy libtool-bin pkg-config \
+        libnuma-dev \
         libboost-system-dev libboost-iostreams-dev libboost-program-options-dev \
         libboost-filesystem-dev libboost-date-time-dev \
-        libssl-dev g++-multilib fabric libtool-bin autoconf automake \
-        libomp-dev libboost-python-dev libkmod-dev libjson-c-dev libbz2-dev \
-        libelf-dev libsnappy-dev liblz4-dev \
-        asciidoc xmlto \
-        google-perftools libgoogle-perftools-dev libgtest-dev \
-	      python-numpy libcurl4-openssl-dev linux-headers-generic
-
-find /usr/src/gtest
+        libaio-dev libssl-dev libibverbs-dev librdmacm-dev \
+        libudev-dev \
+        libboost-python-dev libkmod-dev libjson-c-dev libbz2-dev \
+        libelf-dev \
+        libgtest-dev \
+        libgoogle-perftools-dev libcurl4-openssl-dev \
+        linux-headers-generic \
+        uuid-dev golang
 
 # special handling of googletest
 #
 cd /usr/src/gtest
 mkdir build
-cd build
-cmake ..
-make
-make install
-cp libgtest* /usr/lib/
-cd ..
+( cd build
+  cmake ..
+  make
+  cp libgtest* /usr/lib/
+)
 rm -rf build
 mkdir /usr/local/lib/googletest
 ln -s /usr/lib/libgtest.a /usr/local/lib/googletest/libgtest.a

@@ -12,9 +12,10 @@
 */
 #include "store_map.h"
 
-const std::string store_map::impl_default = "hstore";
+const std::string store_map::impl_default = "hstore-cc";
 const store_map::impl_map_t store_map::impl_map = {
-  { impl_default, { "hstore", Component::hstore_factory } }
+  { "hstore-cc", { "hstore-cc", Component::hstore_factory } }
+  , { "hstore", { "hstore", Component::hstore_factory } }
 };
 
 namespace

@@ -41,11 +41,18 @@
 #include <cassert>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <memory>
+
+namespace impl
+{
+	class allocation_state_emplace;
+}
+
 #include <new> /* std::bad_alloc */
 
 class heap_rc_shared_ephemeral
 {
 	nupm::Rca_LB _heap;
+	std::vector<::iovec> _managed_regions;
 	std::size_t _allocated;
 	std::size_t _capacity;
 	/* The set of reconstituted addresses. Only needed during recovery.
@@ -63,6 +70,9 @@ class heap_rc_shared_ephemeral
 	static_assert(sizeof(void *) == 1U << log_min_alignment, "log_min_alignment does not match sizeof(void *)");
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
+
+	void add_managed_region(const ::iovec &r, unsigned numa_node);
+	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
 
 	template <bool B>
 		void write_hist(const ::iovec & pool_) const
@@ -89,7 +99,7 @@ class heap_rc_shared_ephemeral
 public:
 	friend class heap_rc_shared;
 
-	explicit heap_rc_shared_ephemeral(std::size_t capacity_);
+	explicit heap_rc_shared_ephemeral();
 };
 
 class heap_rc_shared
@@ -106,6 +116,11 @@ class heap_rc_shared
 public:
 	explicit heap_rc_shared(void *pool_, std::size_t sz_, unsigned numa_node_);
 	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager_);
+	/* allocation_state_emplace offered, but not used */
+	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_emplace *)
+		: heap_rc_shared(devdax_manager)
+	{
+	}
 
 	heap_rc_shared(const heap_rc_shared &) = delete;
 	heap_rc_shared &operator=(const heap_rc_shared &) = delete;
@@ -140,10 +155,7 @@ public:
 		return _numa_node;
 	}
 
-	::iovec region() const
-	{
-		return _pool0;
-	}
+	std::vector<::iovec> regions() const;
 };
 
 class heap_rc
@@ -163,6 +175,8 @@ public:
 	heap_rc(const heap_rc &) noexcept = default;
 
 	heap_rc & operator=(const heap_rc &) = default;
+
+    static constexpr std::uint64_t magic_value = 0xc74892d72eed493a;
 
 	heap_rc_shared *operator->() const
 	{

@@ -26,6 +26,7 @@
    in files containing the exception.
 */
 #include <common/memory.h>
+#include <boost/numeric/conversion/cast.hpp>
 
 namespace Common
 {
@@ -46,15 +47,17 @@ void *malloc_at(size_t size, addr_t addr) {
   }
 
   void *ptr =
-      ::mmap((void *) (addr), size + sizeof(uint32_t), PROT_READ | PROT_WRITE,
-             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0);
+    ::mmap(reinterpret_cast<void*>(addr),
+           size + sizeof(uint32_t),
+           PROT_READ | PROT_WRITE,
+           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0);
 
-  *((uint32_t *) ptr) = size;
-  return (void *) (((addr_t) ptr) + sizeof(uint32_t));
+  *(static_cast<uint32_t *>(ptr)) = boost::numeric_cast<uint32_t>(size);
+  return reinterpret_cast<void *>((reinterpret_cast<addr_t>(ptr)) + sizeof(uint32_t));
 }
 
 void free_at(void *ptr) {
-  void *base = (void *) (((addr_t) ptr) - sizeof(uint32_t));
-  ::munmap(base, *((uint32_t *) ptr));
+  void *base = reinterpret_cast<void *>(((reinterpret_cast<addr_t>(ptr)) - sizeof(uint32_t)));
+  ::munmap(base, *(reinterpret_cast<uint32_t *>(ptr)));
 }
 }  // namespace Common

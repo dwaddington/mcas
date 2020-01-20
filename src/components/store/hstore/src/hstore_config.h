@@ -12,24 +12,22 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_CONFIG_H_
-#define _COMANCHE_HSTORE_CONFIG_H_
+#ifndef _MCAS_HSTORE_CONFIG_H_
+#define _MCAS_HSTORE_CONFIG_H_
 
 /*
- * USE_PMEM 1
- *   USE_CC_HEAP 0: allocation from pmemobj pool
- *   USE_CC_HEAP 1: simple allocation using actual addresses from a large region obtained from pmemobj
- *   USE_CC_HEAP 2: simple allocation using offsets from a large region obtained from pmemobj
- *   USE_CC_HEAP 3: AVL-based allocation using actual addresses from a large region obtained from pmemobj
- * USE_PMEM 0
- *   USE_CC_HEAP 1: simple allocation using actual addresses from a large region obtained from dax_map
  *   USE_CC_HEAP 2: simple allocation using offsets from a large region obtained from dax_map (NOT TESTED)
  *   USE_CC_HEAP 3: AVL-based allocation using actual addresses from a large region obtained from dax_map
+ *   USE_CC_HEAP 4: bitmap-based allocation from a large region; crash-consistent
  *
  */
 
-#define USE_PMEM 0
+#if defined MCAS_HSTORE_USE_CC_HEAP
+#define USE_CC_HEAP MCAS_HSTORE_USE_CC_HEAP
+#else
 #define USE_CC_HEAP 3
+#endif
 #define THREAD_SAFE_HASH 0
+#define PREFIX "HSTORE : %s: "
 
 #endif

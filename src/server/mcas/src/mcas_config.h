@@ -13,15 +13,19 @@
 #ifndef __MCAS_CONFIG_H__
 #define __MCAS_CONFIG_H__
 
-/* NUM_SHARD_BUFFERS: number of 2MiB buffers each shard has available */
+/* NUM_SHARD_BUFFERS: number of 2MiB buffers per connection */
 static constexpr size_t NUM_SHARD_BUFFERS = 8;
 
 /* WORK_REQUEST_ALLOCATOR_COUNT: number of work request slots for ADO communications */
 static constexpr size_t WORK_REQUEST_ALLOCATOR_COUNT = 16;
 
+/* Maximum number of comparison to make on a index scan.  We limit the max so that
+   the shard thread does not get "jammed up" scanning the index. */
+static constexpr unsigned MAX_INDEX_COMPARISONS = 10000;
+
 #if defined(__powerpc64__)
-#define likely(X) X /* TODO: fix for Power */
-#define unlikely(X) X
+#define LIKELY(X) (X) /* TODO: fix for Power */
+#define UNLIKELY(X) (X)
 #endif
 
 namespace mcas

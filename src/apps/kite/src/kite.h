@@ -27,4 +27,44 @@ struct File_binary_kmer_t {
                    close_to_vector 64b uints */
 } __attribute__((packed));
 
+typedef struct {
+  unsigned high : 4;
+  unsigned low : 4;
+} __attribute__((packed)) base_4bit_t;
+
+inline unsigned char byte_to_symbol(unsigned b) {
+  /* must correspond to bitstring below */
+  switch (b) {
+    case 0b001:
+      return 'A';
+    case 0b010:
+      return 'C';
+    case 0b100:
+      return 'G';
+    case 0b111:
+      return 'T';
+    case 0b101:
+      return 'N';
+    case 0b011:
+      return 'N';
+    case 0b110:
+      return 'E'; /* error marker */
+    case 0b000:
+      return 0;
+    default:
+      throw General_exception("byte_to_symbol conversion failed (%x - >%c<)", b,
+                              b);
+  }
+}
+
+inline std::string str(base_4bit_t* data, unsigned k) {
+  std::stringstream ss;
+
+  for (unsigned i = 0; i < k / 2; i++) {
+    ss << byte_to_symbol(data[i].low) << byte_to_symbol(data[i].high);
+  }
+
+  return ss.str();
+}
+
 #endif

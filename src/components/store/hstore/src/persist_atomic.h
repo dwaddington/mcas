@@ -55,7 +55,9 @@ namespace impl
 		public:
 #endif
 			using allocator_type = typename Value::first_type::allocator_type;
-			using mod_ctl_ptr_t = typename allocator_type::template rebind<mod_control>::other::pointer;
+			using allocator_traits_type = std::allocator_traits<allocator_type>;
+			using mod_ctl_allocator_type = typename allocator_traits_type::template rebind_alloc<mod_control>;
+			using mod_ctl_ptr_t = typename std::allocator_traits<mod_ctl_allocator_type>::pointer;
 
 			/* key to destination of modification data */
 			using mod_key_t = typename Value::first_type::template rebind<char>;

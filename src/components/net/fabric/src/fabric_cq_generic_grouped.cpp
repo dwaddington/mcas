@@ -37,7 +37,6 @@ class event_producer;
  */
 
 /* Note: the info is owned by the caller, and must be copied if it is to be saved. */
-#include <iostream>
 Fabric_cq_generic_grouped::Fabric_cq_generic_grouped(
   Fabric_cq &cq_
 )
@@ -463,7 +462,6 @@ void Fabric_cq_generic_grouped::member_erase(Fabric_cq_grouped *cq_)
   _comm_cq_set.erase(cq_);
 }
 
-#include <iostream>
 void Fabric_cq_generic_grouped::queue_completion(Fabric_cq_grouped *cq_, ::status_t status_, const Fabric_cq::fi_cq_entry_t &cq_entry_)
 {
   std::lock_guard<std::mutex> k{_m_comm_cq_set};
@@ -482,18 +480,18 @@ void Fabric_cq_generic_grouped::queue_completion(Fabric_cq_grouped *cq_, ::statu
   (*it)->queue_completion(status_, cq_entry_);
 }
 
-ssize_t Fabric_cq_generic_grouped::cq_read(void *buf_, size_t count_) noexcept
+std::ptrdiff_t Fabric_cq_generic_grouped::cq_read(void *buf_, size_t count_) noexcept
 {
   std::lock_guard<std::mutex> k{_m_cq};
   return cq_read_locked(buf_, count_);
 }
 
-ssize_t Fabric_cq_generic_grouped::cq_read_locked(void *buf_, size_t count_) noexcept
+std::ptrdiff_t Fabric_cq_generic_grouped::cq_read_locked(void *buf_, size_t count_) noexcept
 {
   return _cq.cq_read(buf_, count_);
 }
 
-ssize_t Fabric_cq_generic_grouped::cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept
+std::ptrdiff_t Fabric_cq_generic_grouped::cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept
 {
   std::lock_guard<std::mutex> k{_m_cq};
   return _cq.cq_readerr(buf, flags);

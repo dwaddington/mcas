@@ -3,14 +3,8 @@
 
 #include <sys/mman.h>
 #include <common/str_utils.h>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
 #include <common/logging.h>
-#pragma GCC diagnostic pop
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
 #include <common/exceptions.h>
-#pragma GCC diagnostic pop
 
 class KV_pair 
 {

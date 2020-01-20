@@ -19,7 +19,6 @@
 
 #include "hstore_nupm_types.h"
 #include "hstore_open_pool.h"
-#include "hstore_common.h"
 #include "persister_nupm.h"
 #include "dax_map.h"
 
@@ -28,7 +27,7 @@
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib> /* getenv */
 
-template <typename PersistData, typename Heap>
+template <typename PersistData, typename Heap, typename HeapAllocator>
   class region;
 
 #pragma GCC diagnostic push

@@ -3,7 +3,6 @@
 #include <common/str_utils.h>
 #include <common/utils.h>
 #include <gtest/gtest.h>
-#include <iostream>
 
 using namespace Component;
 using namespace Common;

@@ -17,7 +17,6 @@
 #include <api/fabric_itf.h>
 #include <city.h>
 
-#include <iostream>
 #include <regex>
 
 #pragma GCC diagnostic ignored "-Wconversion"
@@ -61,7 +60,7 @@ MCAS_client::MCAS_client(unsigned           debug_level,
   const std::string provider =
       m[3].matched ? m[3].str() : "verbs"; /* default provider */
 
-  PMAJOR("mcas-client protocol session: %p (%s) (%d) (%s)", this,
+  PMAJOR("mcas-client protocol session: %p (%s) (%d) (%s)", static_cast<const void *>(this),
          ip_addr.c_str(), port, provider.c_str());
 
   open_transport(device, ip_addr, port, provider);
@@ -116,7 +115,7 @@ void MCAS_client::open_transport(const std::string& device,
 
 void MCAS_client::close_transport()
 {
-  PLOG("MCAS_client: closing fabric transport (%p)", this);
+  PLOG("MCAS_client: closing fabric transport (%p)", static_cast<const void *>(this));
 
   if (_connection) {
     _connection->shutdown();
@@ -170,6 +169,11 @@ status_t MCAS_client::delete_pool(const std::string& name)
   return _connection->delete_pool(name);
 }
 
+status_t MCAS_client::delete_pool(IKVStore::pool_t pool)
+{
+  return _connection->delete_pool(pool);
+}
+
 status_t MCAS_client::configure_pool(const IKVStore::pool_t pool,
                                      const std::string& json)
 {
@@ -183,7 +187,7 @@ status_t MCAS_client::put(const IKVStore::pool_t pool,
                           const size_t           value_len,
                           uint32_t               flags)
 {
-  assert(flags < FLAGS_MAX_VALUE);
+  assert(flags <= FLAGS_MAX_VALUE);
   return _connection->put(pool, key, value, value_len, flags);
 }
 
@@ -294,11 +298,12 @@ status_t MCAS_client::invoke_put_ado(const IKVStore::pool_t pool,
                                      size_t request_len,
                                      const void * value,
                                      size_t value_len,
+                                     size_t root_len,
                                      ado_flags_t flags,
                                      std::string& out_response)
 {
   return _connection->invoke_put_ado(pool, key, request, request_len,
-                                     value, value_len, flags, out_response);
+                                     value, value_len, root_len, flags, out_response);
 }
 
 

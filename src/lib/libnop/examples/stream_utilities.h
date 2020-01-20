@@ -22,7 +22,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
-#include <iostream>
+#include <ostream>
 #include <vector>
 #include <utility>
 

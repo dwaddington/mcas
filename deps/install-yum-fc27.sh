@@ -1,14 +1,28 @@
 #!/bin/bash
 
 # build-essentials for fedora
-yum -y install wget git make automake gcc-c++ openssl-devel kmod-libs \
-    kmod-devel libudev-devel json-c-devel libpcap-devel uuid-devel \
-    which libuuid libuuid-devel libaio-devel \
-    CUnit CUnit-devel librdmacm-devel librdmacm cmake3 numactl-devel python-devel \
-    rapidjson-devel gmp-devel mpfr-devel libmpc-devel \
-    elfutils-libelf-devel libpcap-devel libuuid-devel libaio-devel boost boost-devel \
-    boost-python3 boost-python3-devel gperftools gperftools-devel \
-    asciidoc xmlto libtool gtest gtest-devel pkg-config python3 \
-    python3-devel gtest-devel \
-    libcurl-devel
+
+# libuuid which gmp-devel mpfr-devel CUnit CUnit-devel
+dnf -y --nodocs --setopt=install_weak_deps=False install automake cmake3 git make gcc-c++ make libtool openssl-devel python3 python3-devel kmod-libs pkg-config bash-completion \
+    kmod-devel libudev-devel json-c-devel uuid-devel \
+    boost boost-devel boost-python3 boost-python3-devel \
+    elfutils-libelf-devel \
+    gperftools-devel \
+    gtest gtest-devel \
+    gtest-devel \
+    libaio-devel \
+    libcurl-devel \
+    librdmacm-devel librdmacm \
+    libuuid-devel \
+    numactl-devel \
+    python-devel \
+    rapidjson-devel \
+    openssl-devel golang
+
+dnf clean packages
+df -h /
+dnf -y --nodocs --setopt=install_weak_deps=False install kernel-devel
+
+# install Rust compiler and runtime
+./install-rust.sh
 

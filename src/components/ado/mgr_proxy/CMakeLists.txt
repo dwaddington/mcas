@@ -9,15 +9,17 @@ add_subdirectory(unit_test)
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 include_directories(../../../lib/common/include)
+include_directories(../../../lib/libadoproto/include)
 include_directories(../../../components/)
 include_directories(../../)
+include_directories(../../../lib/libthreadipc/include)
 
 file(GLOB SOURCES src/*.c*)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
-target_link_libraries(${PROJECT_NAME} common numa dl rt boost_system pthread)
+target_link_libraries(${PROJECT_NAME} common numa dl rt boost_system pthread threadipc)
 
 # set the linkage in the install/lib
 set_target_properties(${PROJECT_NAME} PROPERTIES

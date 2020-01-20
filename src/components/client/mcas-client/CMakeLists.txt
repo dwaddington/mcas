@@ -15,7 +15,7 @@ set(GCC_COVERAGE_COMPILE_FLAGS "-g -O2 -fPIC")
 file(GLOB SOURCES src/*.cpp)
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
-add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
+add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
 
 include_directories(../../../lib/common/include/)
 include_directories(../)

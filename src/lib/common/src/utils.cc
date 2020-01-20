@@ -63,8 +63,8 @@ void touch_huge_pages(void *addr, size_t size) {
   SUPPRESS_NOT_USED_WARN volatile byte b;
 
   // Touch memory to trigger page mapping.
-  for (volatile byte *p = (byte *) addr;
-       ((unsigned long) p) < (((unsigned long) addr) + size);
+  for (volatile byte *p = static_cast<byte *>(addr);
+       p < (static_cast<const byte *>(addr) + size);
        p += HUGE_PAGE_SIZE) {
     b = *p;  // R touch.
   }
@@ -80,8 +80,8 @@ void touch_pages(void *addr, size_t size) {
   SUPPRESS_NOT_USED_WARN volatile byte b;
 
   // Touch memory to trigger page mapping.
-  for (volatile byte *p = (byte *) addr;
-       ((unsigned long) p) < (((unsigned long) addr) + size); p += PAGE_SIZE) {
+  for (volatile byte *p = static_cast<byte *>(addr);
+       p < (static_cast<byte *>(addr) + size); p += PAGE_SIZE) {
     b = *p;  // R touch.
   }
 }
@@ -101,8 +101,8 @@ Cpu_bitset get_actual_affinities(const Cpu_bitset &logical_affinities,
   size_t bitcnt = 0;
   size_t bitmask_size =
       8 * numa_bitmask_nbytes(node_cpumask);  // numa_num_possible_cpus();
-  for (size_t b = 0; b < bitmask_size; b++) {
-    if (numa_bitmask_isbitset(node_cpumask, b)) {
+  for (unsigned b = 0; b < bitmask_size; b++) {
+    if (numa_bitmask_isbitset(node_cpumask, unsigned(b))) {
       bitcnt++;
     }
   }
@@ -130,7 +130,7 @@ Cpu_bitset get_actual_affinities(const Cpu_bitset &logical_affinities,
     }
 
     for (; a < bitmask_size; a++) {
-      if (numa_bitmask_isbitset(node_cpumask, a)) {
+      if (numa_bitmask_isbitset(node_cpumask, unsigned(a))) {
         if (l == c++) {
           cpu_bitset.set(a);
           cnt++;
@@ -156,7 +156,7 @@ bool check_ptr_valid(void *pointer, size_t len) {
   // int rc = write(nullfd, pointer, len);
   // close(nullfd);
   // return (rc >= 0);
-  char *p = (char *) pointer;
+  char *p = static_cast<char *>(pointer);
   int total = 0;
   while (len > 0) {
     char x = *p;

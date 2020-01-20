@@ -11,7 +11,7 @@
    limitations under the License.
 */
 
-#include "hstore_common.h"
+#include "hstore_config.h"
 #include "hstore_session.h"
 #include "persister_nupm.h"
 #include "dax_map.h"
@@ -102,7 +102,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     /* _devdax_manager will allocate 1GiB-aligned regions. But there is no mechanism for it to
      * tell us that. Round request up to 1 GiB to avoid wasting space.
      */
-	size = ((size_ - 1) / (1U<<30) + 1 ) * (1U<<30);
+     size = ((size_ - 1) / (1U<<30) + 1 ) * (1U<<30);
     /* Attempt to create a new pool. */
     try
     {

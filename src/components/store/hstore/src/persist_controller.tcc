@@ -24,7 +24,10 @@ template <typename Allocator>
 	impl::persist_controller<Allocator>::persist_controller(
 		const Allocator &av_
 		, persist_data_t *persist_
-		, construction_mode mode_
+		, construction_mode
+#if USE_CC_HEAP == 3
+			mode_
+#endif
 	)
 		: Allocator(av_)
 		, _persist(persist_)
@@ -38,10 +41,12 @@ template <typename Allocator>
 		{
 			_persist->do_initial_allocation(av_);
 		}
+#if USE_CC_HEAP == 3
 		if ( mode_ == construction_mode::reconstitute )
 		{
 			_persist->reconstitute(av_);
 		}
+#endif
 	}
 
 template <typename Allocator>
@@ -180,16 +185,17 @@ template <typename Allocator>
 	auto impl::persist_controller<Allocator>::resize_prolog(
 	) -> bucket_aligned_t *
 	{
-		using void_allocator_t =
-			typename bucket_allocator_t::template rebind<void>::other;
+		persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
 
-		auto ptr =
-			bucket_allocator_t(*this).allocate(
-				bucket_count()
-				, alignof(bucket_aligned_t)
-				, typename void_allocator_t::const_pointer()
-				, "resize"
-			);
+#if USE_CC_HEAP == 4
+		/* ERROR: allocation to a local can leak */
+#endif
+		bucket_allocator_t(*this).allocate(
+			ptr
+			, bucket_count()
+			, alignof(bucket_aligned_t)
+		);
+
 		new (&*ptr) typename persist_data_t::bucket_aligned_t[bucket_count()];
 		_persist->_sc[_persist->_segment_count._actual.value()].bp = ptr;
 		auto sc = &*_persist->_sc;

@@ -1,18 +1,19 @@
-#include "kite.h"
 #include <api/components.h>
 #include <api/mcas_itf.h>
 #include <assert.h>
-#include <boost/program_options.hpp>
-#include <chrono>
 #include <common/cycles.h>
 #include <common/logging.h>
 #include <common/str_utils.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <boost/program_options.hpp>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <stdint.h>
-#include <stdio.h>
 #include <string>
+#include <vector>
+#include "kite.h"
 
 using namespace std;
 
@@ -88,8 +89,7 @@ Component::IMCAS *init(const std::string &server_hostname, int port) {
                                           mcas_client_factory);
 
   auto fact = (IMCAS_factory *)comp->query_interface(IMCAS_factory::iid());
-  if (!fact)
-    throw Logic_exception("unable to create MCAS factory");
+  if (!fact) throw Logic_exception("unable to create MCAS factory");
 
   std::stringstream url;
   url << g_options.server << ":" << g_options.port;
@@ -97,8 +97,7 @@ Component::IMCAS *init(const std::string &server_hostname, int port) {
   IMCAS *mcas = fact->mcas_create(g_options.debug_level, "None", url.str(),
                                   g_options.device);
 
-  if (!mcas)
-    throw Logic_exception("unable to create MCAS client instance");
+  if (!mcas) throw Logic_exception("unable to create MCAS client instance");
 
   fact->release_ref();
 
@@ -113,23 +112,17 @@ void do_work(Component::IMCAS *mcas, string &filename) {
   fs.read(reinterpret_cast<char *>(&hdr), sizeof(File_binary_header_t));
   assert(hdr.magic == KSB_FILE_MAGIC);
 
-  PLOG("Loading from binary set format "
-       "(magic=%x,K=%u,genome_count=%lu,kmer_count=%lu,collecting_origins=%d,"
-       "single=%lx)",
-       hdr.magic, hdr.K, hdr.genome_count, hdr.kmer_count,
-       hdr.collecting_origins, hdr.single_genome_id);
+  string gnome_id = filename.substr(filename.find_last_of('/') + 1, 16);
 
-  const std::string poolname = "poolname";
+  PLOG(
+      "Loading from binary set format "
+      "(magic=%x,K=%u,genome_count=%lu,kmer_count=%lu,collecting_origins=%d,"
+      "single=%lx)",
+      hdr.magic, hdr.K, hdr.genome_count, hdr.kmer_count,
+      hdr.collecting_origins, hdr.single_genome_id);
+  vector<string> kmers;
 
-  auto pool = mcas->create_pool(poolname, GB(1), 0, /* flags */
-                                hdr.kmer_count);    /* obj count */
-  if (pool == IKVStore::POOL_ERROR)
-    throw General_exception("create_pool (%s) failed", poolname.c_str());
-
-  std::string request, response;
-
-  auto start_time = std::chrono::high_resolution_clock::now();
-  for (uint64_t k = 0; k < hdr.kmer_count; k++) {
+  for (uint64_t i = 0; i < hdr.kmer_count; i++) {
     File_binary_kmer_t kmer_record;
     fs.read(reinterpret_cast<char *>(&kmer_record), sizeof(File_binary_kmer_t));
 
@@ -137,17 +130,33 @@ void do_work(Component::IMCAS *mcas, string &filename) {
     /* read kmer data */
     assert(hdr.K % 2 == 0);
     size_t kmer_data_len = hdr.K / 2;
-    char kmer_data[kmer_data_len];
+    base_4bit_t kmer_data[kmer_data_len];
     fs.read(reinterpret_cast<char *>(kmer_data), kmer_data_len);
-    mcas->invoke_ado(pool, string(kmer_data), to_string(hdr.single_genome_id),
-                     IMCAS::ADO_FLAG_CREATE_ON_DEMAND, response, MB(1));
+    PLOG("single gnome id: %s", gnome_id.c_str());
+    PLOG("kmer: %s", str(kmer_data, hdr.K).c_str());
+    kmers.push_back(str(kmer_data, hdr.K));
+  }
+  PLOG("loaded .ksb file K=%u origins=%d record: %d/%d", hdr.K,
+       hdr.collecting_origins, kmers.size(), hdr.kmer_count);
+
+  const std::string poolname = "poolname";
+
+  auto pool = mcas->create_pool(poolname, GB(10), 0, /* flags */
+                                hdr.kmer_count);     /* obj count */
+  if (pool == IKVStore::POOL_ERROR)
+    throw General_exception("create_pool (%s) failed", poolname.c_str());
+
+  std::string request, response;
+
+  auto start_time = std::chrono::high_resolution_clock::now();
+  for (string kmer : kmers) {
+    mcas->invoke_put_ado(pool, kmer, gnome_id, "EMPTYPTR", 0,
+                         IMCAS::ADO_FLAG_NO_OVERWRITE, response);
   }
   __sync_synchronize();
   auto end_time = std::chrono::high_resolution_clock::now();
   mcas->close_pool(pool);
-  PLOG("loaded .ksb file K=%u origins=%d", hdr.K, hdr.collecting_origins);
-
-  auto secs = std::chrono::duration<double>( end_time - start_time).count();
+  auto secs = std::chrono::duration<double>(end_time - start_time).count();
 
   double per_sec = (((double)hdr.kmer_count) / secs);
   PINF("Time: %.2f sec", secs);

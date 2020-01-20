@@ -27,28 +27,14 @@ template <>
 	class deallocator_rc<void, persister>
 	{
 	public:
-		using pointer = void *;
-		using const_pointer = const void *;
 		using value_type = void;
-		template <typename U>
-			struct rebind
-			{
-				using other = deallocator_rc<U, persister>;
-			};
 	};
 
 template <typename Persister>
 	class deallocator_rc<void, Persister>
 	{
 	public:
-		using pointer = void *;
-		using const_pointer = const void *;
 		using value_type = void;
-		template <typename U>
-			struct rebind
-			{
-				using other = deallocator_rc<U, Persister>;
-			};
 	};
 
 template <typename T, typename Persister = persister>
@@ -57,25 +43,9 @@ template <typename T, typename Persister = persister>
 	{
 		heap_rc _pool;
 	public:
-		using size_type = std::size_t;
-		using difference_type = std::ptrdiff_t;
-		using pointer = T*;
-		using const_pointer = const T*;
-		using reference = T &;
-		using const_reference = const T &;
 		using value_type = T;
+		using size_type = std::size_t;
 
-	template <typename U>
-		struct rebind
-		{
-			using other = deallocator_rc<U, Persister>;
-		};
-#if 0
-		explicit deallocator_rc(void *area_, std::size_t size_, Persister p_ = Persister())
-			: Persister(p_)
-			, _pool(area_, size_)
-		{}
-#endif
 		explicit deallocator_rc(void *area_, Persister p_ = Persister())
 			: Persister(p_)
 			, _pool(area_)
@@ -95,27 +65,13 @@ template <typename T, typename Persister = persister>
 
 		deallocator_rc &operator=(const deallocator_rc &e_) = delete;
 
-		pointer address(reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-		const_pointer address(const_reference x) const noexcept
-		{
-			return pointer(&x);
-		}
-
 		void deallocate(
-			pointer p
+			T* p
 			, size_type sz_
-			, size_type alignment_
+			, size_type alignment_ = alignof(T)
 		)
 		{
 			_pool->free(p, sizeof(T) * sz_, alignment_);
-		}
-
-		auto max_size() const
-		{
-			return 8; /* reminder to provide a proper max size value */
 		}
 
 		void persist(const void *ptr, size_type len, const char * = nullptr) const

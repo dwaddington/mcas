@@ -22,11 +22,11 @@
 #ifndef __NUPM_ARENA_ALLOC_H__
 #define __NUPM_ARENA_ALLOC_H__
 
-#include <mutex>
-#include <set>
-
 #include "block_bitmap.h"
 #include "nd_utils.h"
+#include <mutex>
+#include <set>
+#include <vector>
 
 namespace nupm
 {
@@ -39,7 +39,7 @@ class Arena_allocator_volatile : private ND_control {
   static constexpr unsigned MAX_NUMA_SOCKETS = 4;
 
  public:
-  Arena_allocator_volatile(unsigned granularity = GB(1))
+  Arena_allocator_volatile(size_t granularity = GB(1))
       : _granularity(granularity)
   {
     if (granularity % 4096 > 0)

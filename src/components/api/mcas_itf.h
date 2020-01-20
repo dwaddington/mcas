@@ -36,6 +36,9 @@ public:
 
 public:
 
+  static constexpr Component::IKVStore::pool_t POOL_ERROR
+  = Component::IKVStore::POOL_ERROR; // same as IKVStore
+
   /* per-shard statistics */
   struct alignas(8) Shard_stats {
     uint64_t op_request_count;
@@ -48,6 +51,7 @@ public:
     uint64_t op_failed_request_count;
     uint64_t last_op_count_snapshot;
     uint16_t client_count;
+    
   public:
     Shard_stats() :
       op_request_count(0),
@@ -68,8 +72,15 @@ public:
   static constexpr ado_flags_t ADO_FLAG_ASYNC            = 0x1;
   /*< create KV pair if needed */
   static constexpr ado_flags_t ADO_FLAG_CREATE_ON_DEMAND = 0x2;
+  /*< create only - allocate key,value but don't call ADO */
+  static constexpr ado_flags_t ADO_FLAG_CREATE_ONLY      = 0x4;
+  /*< do not overwrite value if it already exists */
+  static constexpr ado_flags_t ADO_FLAG_NO_OVERWRITE     = 0x8;
+  /*< create value but do not attach to key, unless key does not exist */
+  static constexpr ado_flags_t ADO_FLAG_DETACHED         = 0x10;
   
 public:
+  using pool_t = Component::IKVStore::pool_t;
   
   /** 
    * Determine thread safety of the component
@@ -113,12 +124,24 @@ public:
   virtual status_t close_pool(IKVStore::pool_t pool) = 0;
 
   /** 
-   * Close and delete an existing pool
+   * Delete an existing pool. Pool must not be open
    * 
    * @param pool Pool name
+   *
+   * @return S_OK or E_ALREADY_OPEN
    */
   virtual status_t delete_pool(const std::string& pool_name) = 0;
 
+  /** 
+   * Close and delete an existing pool from a pool handle. Only one 
+   * reference count should exist. Any ADO plugin is notified before
+   * the pool is deleted.
+   * 
+   * @param pool Pool handle
+   *
+   * @return S_OK or E_BUSY if reference count > 1
+   */
+  virtual status_t delete_pool(IKVStore::pool_t pool) = 0;
 
   /** 
    * Configure a pool
@@ -149,7 +172,7 @@ public:
                        const void * value,
                        size_t value_len,
                        unsigned int flags = IKVStore::FLAGS_NONE) = 0;
-  
+
   virtual status_t put(IKVStore::pool_t pool,
                        const std::string& key,
                        const std::string& value,
@@ -157,7 +180,6 @@ public:
     /* this does not store any null terminator */
     return put(pool, key, value.data(), value.length(), flags);
   }
-
 
   /** 
    * Zero-copy put operation.  If there does not exist an object
@@ -194,16 +216,19 @@ public:
                        const std::string& key,
                        void*& out_value, /* release with free_memory() API */
                        size_t& out_value_len) = 0;
-  
+
   virtual status_t get(const IKVStore::pool_t pool,
                        const std::string& key,
                        std::string& out_value) {
-    void* val;
-    size_t val_size;
+    void* val = nullptr;
+    size_t val_size = 0;
     auto s = this->get(pool, key, val, val_size);
+
     /* copy result */
-    out_value.assign(static_cast<char*>(val), val_size);
-    this->free_memory(val);
+    if(s == S_OK) {
+      out_value.assign(static_cast<char*>(val), val_size);
+      this->free_memory(val);
+    }
     return s;
   }
 
@@ -351,8 +376,9 @@ public:
    * @param key Key
    * @param request Request data
    * @param request_len Length of request data in bytes
-   * @param request Value data
-   * @param request_len Length of value data in bytes
+   * @param value Value data
+   * @param value_len Length of value data in bytes
+   * @param root_len Length to allocate for root value (with ADO_FLAGS_DETACHED)
    * @param flags Flags for invocation (see ADO_FLAG_XXX)
    * @param out_response Response from invocation
    * 
@@ -364,6 +390,7 @@ public:
                                   size_t request_len,
                                   const void * value,
                                   size_t value_len,
+                                  size_t root_len,
                                   ado_flags_t flags,
                                   std::string& out_response) = 0;
   
@@ -371,10 +398,11 @@ public:
                                  const std::string& key,
                                  const std::string& request,
                                  const std::string& value,
+                                 size_t root_len,
                                  ado_flags_t flags,
                                  std::string& out_response) {
     return invoke_put_ado(pool, key, request.data(), request.length(),
-                          value.data(), value.length(), flags, out_response);
+                          value.data(), value.length(), root_len, flags, out_response);
   }
 
 

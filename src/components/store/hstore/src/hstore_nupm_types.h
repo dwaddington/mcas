@@ -17,12 +17,12 @@
 
 #include "hstore_config.h"
 
-#if USE_CC_HEAP == 1 || USE_CC_HEAP == 3
+#if USE_CC_HEAP == 3
+#elif USE_CC_HEAP == 4
 #else
 #error USE_CC_HEAP type incompatible with nupm
 #endif
 
-#include "hstore_common.h"
 #include "persister_nupm.h"
 
 #include <cstring> /* strerror */

@@ -150,9 +150,9 @@ public:
   std::size_t process_or_queue_completion(const fi_cq_entry_t &cq_entry, const Component::IFabric_op_completer::complete_param_tentative &cb, ::status_t status, void *callback_param);
   std::size_t process_or_queue_completion(const fi_cq_entry_t &cq_entry, Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb, ::status_t status, void *callback_param);
 
-  ssize_t cq_read(void *buf, std::size_t count) noexcept;
+  std::ptrdiff_t cq_read(void *buf, std::size_t count) noexcept;
 
-  ssize_t cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept;
+  std::ptrdiff_t cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept;
 
   std::size_t stalled_completion_count() { return 0U; }
   void incr_inflight(const char *) { ++_inflight; }

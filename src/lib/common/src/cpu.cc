@@ -60,7 +60,7 @@ status_t string_to_mask(std::string def, cpu_mask_t &mask) {
     try {
       mask.add_core(stoi(def));
       return S_OK;
-    } catch (std::invalid_argument e) {
+    } catch (const std::invalid_argument &) {
       return E_INVAL;
     }
   }
@@ -73,7 +73,7 @@ status_t string_to_mask(std::string def, cpu_mask_t &mask) {
     for_each(tok.begin(), tok.end(), [&](const string &s) {
       try {
         mask.add_core(stoi(s));
-      } catch (std::invalid_argument e) {
+      } catch (const std::invalid_argument &) {
         PWRN("invalid token in cpu mask string version.");
       }
     });

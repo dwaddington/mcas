@@ -8,6 +8,8 @@ include(../../../mk/clang-dev-tools.cmake)
 
 set(CMAKE_CXX_STANDARD 14)
 
+add_compile_options(-g -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
+
 configure_file(include/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/include/config.h)
 
 execute_process( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE )

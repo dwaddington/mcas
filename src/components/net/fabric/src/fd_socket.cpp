@@ -88,7 +88,7 @@ void Fd_socket::send(const void *buf, std::size_t size) const
 
 void Fd_socket::recv(void *buf, std::size_t size) const
 {
-  ssize_t r;
+  std::ptrdiff_t r;
   do
   {
      r = ::read(_fd, buf, size);

@@ -25,6 +25,7 @@
 
 #include <common/mpmc_bounded_queue.h>
 #include <common/spsc_bounded_queue.h>
+#include <memory>
 #include <string>
 
 struct uipc_channel
@@ -40,11 +41,15 @@ class Shared_memory;
 class Channel : public uipc_channel {
  private:
   static constexpr bool option_DEBUG = false;
-  
+
   /* we use the non-sleeping queue for the moment,
      with the ADO thread sleeping when the queue
      is empty */
-  using queue_t = Common::Spsc_bounded_lfq<void*>; 
+  using queue_t = Common::Spsc_bounded_lfq<void*>;
+  /* except that the _slab_ring is used by both
+   * shard and mcas, making it an mpmc queue
+   */
+  using mqueue_t = Common::Mpmc_bounded_lfq<void*>;
 
  public:
   Channel(const Channel &) = delete;
@@ -138,14 +143,16 @@ class Channel : public uipc_channel {
  private:
   bool _shutdown = false;
   bool _master;
-  Shared_memory* _shmem_fifo_m2s;
-  Shared_memory* _shmem_fifo_s2m;
-  Shared_memory* _shmem_slab_ring;
-  Shared_memory* _shmem_slab;
+  std::string _name;
+  long _slab_ring_net;
+  std::unique_ptr<Shared_memory> _shmem_fifo_m2s;
+  std::unique_ptr<Shared_memory> _shmem_fifo_s2m;
+  std::unique_ptr<Shared_memory> _shmem_slab_ring;
+  std::unique_ptr<Shared_memory> _shmem_slab;
 
-  queue_t* _in_queue = nullptr;
-  queue_t* _out_queue = nullptr;
-  queue_t* _slab_ring = nullptr;
+  queue_t* _in_queue;
+  queue_t* _out_queue;
+  mqueue_t* _slab_ring;
 };
 
 }  // namespace UIPC

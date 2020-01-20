@@ -25,22 +25,14 @@
 #include "dummy_shared_mutex.h"
 #endif
 
-#if USE_CC_HEAP == 1
-#include "allocator_cc.h"
-#elif USE_CC_HEAP == 2 /* offset allocator */
 #include "allocator_co.h"
-#elif USE_CC_HEAP == 3 /* reconstituting allocator */
 #include "allocator_rc.h"
-#endif
+#include "allocator_cc.h"
 
 #include "hop_hash.h"
 
-#if USE_PMEM
-#include "hstore_pmem.h"
-#else
 #include "hstore_nupm.h"
 #include "region.h"
-#endif
 
 #include "hstore_open_pool.h"
 #include "persist_fixed_string.h"
@@ -60,19 +52,22 @@ template <typename Handle, typename Allocator, typename Table, typename Lock>
 
 class hstore : public Component::IKVStore
 {
-  #if USE_CC_HEAP == 1
-  using alloc_t = allocator_cc<char, Persister>;
-  #elif USE_CC_HEAP == 2
+  #if USE_CC_HEAP == 2
   using alloc_t = allocator_co<char, Persister>;
+  using heap_alloc_t = heap_co;
   #elif USE_CC_HEAP == 3
   using alloc_t = allocator_rc<char, Persister>;
-  #else /* USE_CC_HEAP */
-  using alloc_t = allocator_pobj_cache_aligned<char>;
+  using heap_alloc_shared_t = heap_rc_shared;
+  using heap_alloc_t = heap_rc;
+  #elif USE_CC_HEAP == 4
+  using alloc_t = allocator_cc<char, Persister>;
+  using heap_alloc_shared_t = heap_cc_shared;
+  using heap_alloc_t = heap_cc;
   #endif /* USE_CC_HEAP */
   using dealloc_t = typename alloc_t::deallocator_type;
   using key_t = persist_fixed_string<char, 23, dealloc_t>;
   using mapped_t = persist_fixed_string<char, 23, dealloc_t>;
-  using allocator_segment_t = alloc_t::rebind<std::pair<const key_t, mapped_t>>::other;
+  using allocator_segment_t = std::allocator_traits<alloc_t>::rebind_alloc<std::pair<const key_t, mapped_t>>;
 #if THREAD_SAFE_HASH == 1
   /* thread-safe hash */
   using hstore_shared_mutex = std::shared_timed_mutex;
@@ -95,12 +90,8 @@ class hstore : public Component::IKVStore
     , hstore_shared_mutex
     >;
 public:
-#if USE_PMEM
-  using pm = hstore_pmem;
-#else
   using persist_data_t = typename impl::persist_data<allocator_segment_t, table_t::value_type>;
-  using pm = hstore_nupm<region<persist_data_t, heap_rc_shared>, table_t, table_t::allocator_type, lock_type_t>;
-#endif
+  using pm = hstore_nupm<region<persist_data_t, heap_alloc_shared_t, heap_alloc_t>, table_t, table_t::allocator_type, lock_type_t>;
   using open_pool_t = pm::open_pool_handle;
 private:
   using session_t = session<open_pool_t, alloc_t, table_t, lock_type_t>;
@@ -238,9 +229,10 @@ public:
   std::size_t count(pool_t pool) override;
 
   status_t map(pool_t pool,
-               std::function<int(const std::string& key,
-               const void * value,
-               std::size_t value_len)> function) override;
+               std::function<int(const void * key,
+                                 std::size_t key_len,
+                                 const void * value,
+                                 std::size_t value_len)> function) override;
 
   status_t map_keys(pool_t pool,
                std::function<int(const std::string& key)> function) override;

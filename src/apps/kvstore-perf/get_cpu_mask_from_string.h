@@ -3,10 +3,7 @@
 
 #include "get_vector_from_string.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
 #include <common/logging.h> /* PERR */
-#pragma GCC diagnostic pop
 #include <common/cpu.h> /* cpu_mask_t */
 
 #include <sstream>

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 include(../../../mk/clang-dev-tools.cmake)
 
-find_library(LIB_JEMALLOC libjemalloc.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
+# find_library(LIB_JEMALLOC libjemalloc.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 find_library(LIB_NDCTL libndctl.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 
 include_directories(./include/nupm)
@@ -37,6 +37,7 @@ add_subdirectory(unit_test)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(DIRECTORY "src/" DESTINATION "include/nupm" FILES_MATCHING PATTERN "./include/nupm/*")
+#install(DIRECTORY "include/nupm" DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 
 # # force early install because others depend on this.  this seems a hack. is there

@@ -19,9 +19,11 @@ template <typename Table>
 			: allocator_type(map_.get_allocator())
 			, _persist(&persist_)
 			, _map(&map_)
+			, _tick_expired(false)
 		{
 			if ( mode_ == construction_mode::reconstitute )
 			{
+#if USE_HEAP_CC == 3
 				/* reconstitute allocated memory */
 				_persist->mod_key.reconstitute(allocator_type(*this));
 				_persist->mod_mapped.reconstitute(allocator_type(*this));
@@ -32,6 +34,7 @@ template <typename Table>
 				else
 				{
 				}
+#endif
 			}
 			try
 			{
@@ -86,30 +89,43 @@ template <typename Table>
 template <typename Table>
 	impl::atomic_controller<Table>::update_finisher::~update_finisher()
 	{
-		_ctlr.update_finish();
+		try
+		{
+			_ctlr.update_finish();
+		}
+		catch (const perishable_expiry &)
+		{
+			_ctlr.tick_expired();
+		}
 	}
 
 template <typename Table>
 	auto impl::atomic_controller<Table>::redo_update() -> void
 	{
-		update_finisher uf(*this);
-		char *src = _persist->mod_mapped.data();
-		char *dst = _map->at(_persist->mod_key).data();
-		auto mod_ctl = &*(_persist->mod_ctl);
-		for ( auto i = mod_ctl; i != &mod_ctl[_persist->mod_size]; ++i )
 		{
-			std::size_t o_s = i->offset_src;
-			auto src_first = &src[o_s];
-			std::size_t sz = i->size;
-			auto src_last = src_first + sz;
-			std::size_t o_d = i->offset_dst;
-			auto dst_first = &dst[o_d];
-			/* NOTE: could be replaced with a pmem persistent memcpy */
-			persist_range(
-				dst_first
-				, std::copy(src_first, src_last, dst_first)
-				, "atomic ctl"
-			);
+			update_finisher uf(*this);
+			char *src = _persist->mod_mapped.data();
+			char *dst = _map->at(_persist->mod_key).data();
+			auto mod_ctl = &*(_persist->mod_ctl);
+			for ( auto i = mod_ctl; i != &mod_ctl[_persist->mod_size]; ++i )
+			{
+				std::size_t o_s = i->offset_src;
+				auto src_first = &src[o_s];
+				std::size_t sz = i->size;
+				auto src_last = src_first + sz;
+				std::size_t o_d = i->offset_dst;
+				auto dst_first = &dst[o_d];
+				/* NOTE: could be replaced with a pmem persistent memcpy */
+				persist_range(
+					dst_first
+					, std::copy(src_first, src_last, dst_first)
+					, "atomic ctl"
+				);
+			}
+		}
+		if ( is_tick_expired() )
+		{
+			throw perishable_expiry();
 		}
 	}
 
@@ -118,7 +134,7 @@ template <typename Table>
 	{
 		std::size_t ct = _persist->mod_size;
 		redo_finish();
-		allocator_type(*this).deallocate(_persist->mod_ctl, ct, sizeof(mod_control));
+		allocator_type(*this).deallocate(_persist->mod_ctl, ct);
 	}
 
 template <typename Table>
@@ -190,17 +206,14 @@ template <typename Table>
 				, al_
 			);
 
-		using void_allocator_t =
-			typename allocator_type::template rebind<void>::other;
-
 		{
-			auto ptr =
-				allocator_type(*this).allocate(
-					mods.size()
-					, alignof(mod_control)
-					, typename void_allocator_t::const_pointer()
-					, "mod_ctl"
-				);
+			/* ERROR: local pointer can leak */
+			persistent_t<typename std::allocator_traits<allocator_type>::pointer> ptr = nullptr;
+			allocator_type(*this).allocate(
+				ptr
+				, mods.size()
+				, alignof(mod_control)
+			);
 			new (&*ptr) mod_control[mods.size()];
 			_persist->mod_ctl = ptr;
 		}

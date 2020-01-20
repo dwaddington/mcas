@@ -113,11 +113,7 @@ namespace
   }
   catch ( const fabric_runtime_error &e_ )
   {
-    if ( hints_ )
-    {
-      throw e_.add(tostr(*hints_));
-    }
-    throw;
+    throw e_.add(std::string(node_ ? node_ : "(no node)") + " " + std::string(service_ ? service_  : "(no service)") + " " + std::string(hints_ ? tostr(*hints_) : "(no hints)"));
   }
 
   std::shared_ptr<::fi_info> make_fi_info(const ::fi_info &hints)

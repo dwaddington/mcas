@@ -9,5 +9,6 @@ add_subdirectory(components)
 add_subdirectory(server)
 add_subdirectory(python)
 add_subdirectory(apps)
-add_subdirectory(ado/EASTL)
+# EASTL test build is normally OFF. To build EASTL tests, cmake with -DEASTL_BUILD_TESTS=1
+add_subdirectory(ado)
 endif(BOOTSTRAP_DEPS)

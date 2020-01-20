@@ -91,14 +91,14 @@ unsigned long long genrand64_int64() {
 
     for (i = 0; i < NN - MM; i++) {
       x = (mt[i] & UM) | (mt[i + 1] & LM);
-      mt[i] = mt[i + MM] ^ (x >> 1) ^ mag01[(int) (x & 1ULL)];
+      mt[i] = mt[i + MM] ^ (x >> 1) ^ mag01[int(x & 1ULL)];
     }
     for (; i < NN - 1; i++) {
       x = (mt[i] & UM) | (mt[i + 1] & LM);
-      mt[i] = mt[i + (MM - NN)] ^ (x >> 1) ^ mag01[(int) (x & 1ULL)];
+      mt[i] = mt[i + (MM - NN)] ^ (x >> 1) ^ mag01[int(x & 1ULL)];
     }
     x = (mt[NN - 1] & UM) | (mt[0] & LM);
-    mt[NN - 1] = mt[MM - 1] ^ (x >> 1) ^ mag01[(int) (x & 1ULL)];
+    mt[NN - 1] = mt[MM - 1] ^ (x >> 1) ^ mag01[int(x & 1ULL)];
 
     mti = 0;
   }
@@ -114,19 +114,19 @@ unsigned long long genrand64_int64() {
 }
 
 /* generates a random number on [0, 2^63-1]-interval */
-long long genrand64_int63(void) { return (long long) (genrand64_int64() >> 1); }
+long long genrand64_int63(void) { return static_cast<long long>(genrand64_int64() >> 1); }
 
 /* generates a random number on [0,1]-real-interval */
 double genrand64_real1(void) {
-  return (genrand64_int64() >> 11) * (1.0 / 9007199254740991.0);
+  return double(genrand64_int64() >> 11) * (1.0 / 9007199254740991.0);
 }
 
 /* generates a random number on [0,1)-real-interval */
 double genrand64_real2(void) {
-  return (genrand64_int64() >> 11) * (1.0 / 9007199254740992.0);
+  return double(genrand64_int64() >> 11) * (1.0 / 9007199254740992.0);
 }
 
 /* generates a random number on (0,1)-real-interval */
 double genrand64_real3(void) {
-  return ((genrand64_int64() >> 12) + 0.5) * (1.0 / 4503599627370496.0);
+  return (double(genrand64_int64() >> 12) + 0.5) * (1.0 / 4503599627370496.0);
 }

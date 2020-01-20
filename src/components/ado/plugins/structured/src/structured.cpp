@@ -15,28 +15,113 @@
 #include <libpmem.h>
 #include <api/interfaces.h>
 #include <common/logging.h>
-#include <iostream>
-#include <string.h>
+#include <common/dump_utils.h>
+#include <common/type_name.h>
+#include <sstream>
+#include <string>
+#include <ccpm/immutable_list.h>
+
 
 status_t ADO_structured_plugin::register_mapped_memory(void *shard_vaddr,
-                                                     void *local_vaddr,
-                                                     size_t len) {
+                                                       void *local_vaddr,
+                                                       size_t len) {
   PLOG("ADO_structured_plugin: register_mapped_memory (%p, %p, %lu)", shard_vaddr,
        local_vaddr, len);
+
   /* we would need a mapping if we are not using the same virtual
      addresses as the Shard process */
   return S_OK;
 }
 
-status_t ADO_structured_plugin::do_work(uint64_t work_key,
-                                      const std::string &key,
-                                      void *shard_value_vaddr,
-                                      size_t value_len,
-                                      const void *in_work_request, /* don't use iovec because of non-const */
-                                      const size_t in_work_request_len,
-                                      void *&out_work_response,
-                                      size_t &out_work_response_len) {
+using namespace Structured_ADO_protocol;
+using namespace ccpm;
+
+
+status_t
+ADO_structured_plugin::process_putvar_command(const Structured_ADO_protocol::PutVariable * command,
+                                              const ccpm::region_vector_t& regions)
+{
+  /* just check the integrity? */
+  PNOTICE("putvar: (%s)", command->container_type()->c_str());
+  ccpm::Immutable_list<uint64_t> target(regions); /* checks integrity */
+
+  target.sort();
+  
+  for(auto i: target)
+    PLOG("list existing members: %lu", i);
+                       
   return S_OK;
+}
+
+status_t ADO_structured_plugin::process_invoke_command(const Structured_ADO_protocol::Invoke * command,
+                                                       const ccpm::region_vector_t& regions,
+                                                       void*& out_work_response,
+                                                       size_t& out_work_response_len)
+{
+  PLOG("invoke command");
+
+  ccpm::Immutable_list<uint64_t> target(regions); /* checks integrity */
+
+  if(command->method()->str() == "push_front") {
+    using Reader = nop::StreamReader<std::stringstream>;
+    nop::Deserializer<Reader> deserializer(command->serialized_params()->str());
+    uint64_t val;
+    if(!deserializer.Read(&val))
+      throw General_exception("bad deserialization");
+    PLOG("val = %lu", val);
+    target.push_front(val);
+  }
+  else if(command->method()->str() == "sort") {
+    PLOG("sorting list");
+    target.sort();
+  }
+  else {
+    PWRN("unknown invoke method");
+  }
+
+  for(auto i: target)
+    PLOG("list existing members: %lu", i);
+
+  return S_OK;
+}
+
+
+status_t ADO_structured_plugin::do_work(const uint64_t work_request_id,
+                                        const std::string &key,
+                                        void *value,
+                                        size_t value_len,
+                                        void * detached_value,
+                                        size_t detached_value_len,
+                                        const void *in_work_request, /* don't use iovec because of non-const */
+                                        const size_t in_work_request_len,
+                                        bool new_root,
+                                        response_buffer_vector_t& response_buffers)
+{
+  using namespace flatbuffers;
+  using namespace Structured_ADO_protocol;
+
+  PLOG("invoke: value=%p value_len=%lu", value, value_len);
+  
+  Verifier verifier(static_cast<const uint8_t*>(in_work_request), in_work_request_len);
+  if(!VerifyMessageBuffer(verifier)) {
+    PMAJOR("unknown command");
+  }
+
+  auto msg = GetMessage(in_work_request);
+
+  auto putvar_command = msg->command_as_PutVariable();
+  if(putvar_command)
+    return process_putvar_command(putvar_command, ccpm::region_vector_t{value, value_len});
+
+  auto invoke_command = msg->command_as_Invoke();
+  if(invoke_command)
+    return process_invoke_command(invoke_command,
+                                  ccpm::region_vector_t{value, value_len},
+                                  value,
+                                  value_len);
+
+  PERR("unhandled command");
+  return E_FAIL;
 }
 
 status_t ADO_structured_plugin::shutdown() {
@@ -57,3 +142,5 @@ extern "C" void *factory_createInstance(Component::uuid_t &interface_iid) {
 }
 
 #undef RESET_STATE
+
+

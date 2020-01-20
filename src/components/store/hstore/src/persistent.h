@@ -24,6 +24,7 @@ template <typename T>
 	{
 		T _v;
 	public:
+		using value_type = T;
 		persistent()
 			: _v((perishable::tick(), T()))
 		{
@@ -32,6 +33,7 @@ template <typename T>
 			: _v((perishable::tick(), other._v))
 		{
 		}
+
 		persistent(const T &t)
 			: _v((perishable::tick(), t))
 		{
@@ -92,6 +94,18 @@ template <typename T>
 		{
 			return bool(_v);
 		};
+	};
+
+template <typename T>
+	struct persistent_traits
+	{
+		using value_type = T;
+	};
+
+template <typename T>
+	struct persistent_traits<persistent<T>>
+	{
+		using value_type = typename persistent<T>::value_type;
 	};
 
 template <typename T>

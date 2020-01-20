@@ -15,6 +15,7 @@
 #ifndef _COMANCHE_HSTORE_PERSIST_MAP_H
 #define _COMANCHE_HSTORE_PERSIST_MAP_H
 
+#include "as_emplace.h"
 #include "bucket_aligned.h"
 #include "hash_bucket.h"
 #include "persist_fixed_string.h"
@@ -43,9 +44,10 @@ namespace impl
 	public:
 			using bucket_aligned_t = bucket_aligned<hash_bucket<value_type>>;
 	private:
+			using allocator_traits_type = std::allocator_traits<Allocator>;
 			using bucket_allocator_t =
-				typename Allocator::template rebind<bucket_aligned_t>::other;
-			using bucket_ptr = typename bucket_allocator_t::pointer;
+				typename allocator_traits_type::template rebind_alloc<bucket_aligned_t>;
+			using bucket_ptr = typename std::allocator_traits<bucket_allocator_t>::pointer;
 
 			/* bucket indexes */
 			using bix_t = segment_layout::bix_t;
@@ -85,16 +87,18 @@ namespace impl
 
 			segment_control _sc[_segment_capacity];
 
+			allocation_state_emplace _ase;	
 		public:
 			persist_map(std::size_t n, Allocator av);
 			persist_map(persist_map &&) = default;
 			void do_initial_allocation(Allocator av);
+#if USE_CC_HEAP == 3
 			void reconstitute(Allocator av);
+#endif
+			allocation_state_emplace &ase() { return _ase; }
 			friend class persist_controller<Allocator>;
 		};
 }
-
-// template<> struct type_number<typename persist_map<Allocator>::bucket_aligned_t> { static constexpr uint64_t value = 5; };
 
 #include "persist_map.tcc"
 

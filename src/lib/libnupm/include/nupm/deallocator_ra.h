@@ -11,111 +11,101 @@
    limitations under the License.
 */
 
-
 #ifndef COMANCHE_NUPM_DEALLOCATOR_RA_H
 #define COMANCHE_NUPM_DEALLOCATOR_RA_H
 
 #include "avl_malloc.h"
 
+#include "mr_traits.h"
 #include <cstddef> /* size_t, ptrdiff_t */
 
 namespace nupm
 {
-	template <typename T, typename MR>
-		class deallocator_adaptor;
+template <typename T, typename MR>
+class deallocator_adaptor;
 
-	template <typename MR>
-		class deallocator_adaptor<void, MR>
-		{
-		public:
-			using pointer = void *;
-			using const_pointer = const void *;
-			using value_type = void;
-			template <typename U>
-				struct rebind
-				{
-					using other = deallocator_adaptor<U, MR>;
-				};
-		};
+template <typename MR>
+class deallocator_adaptor<void, MR>
+{
+public:
+	using pointer = void *;
+	using const_pointer = const void *;
+	using value_type = void;
+	template <typename U>
+	struct rebind
+	{
+		using other = deallocator_adaptor<U, MR>;
+	};
+};
 
-	template <typename T, typename MR>
-		class deallocator_adaptor
-		{
-			/* Note: to distinguish copyable allocators from memory providers like
+template <typename T, typename MR>
+class deallocator_adaptor
+{
+	/* Note: to distinguish copyable allocators from memory providers like
 			 * AVL_range_allocator, C++17 pmr library refers to the latter as a
 			 * "memory resources," not as a "allocators."
 			 */
-			MR *_pmr;
-		protected:
-			auto pmr() const
-			{
-				return _pmr;
-			}
-		public:
-			using size_type = std::size_t;
-			using difference_type = std::ptrdiff_t;
-			using pointer = T*;
-			using const_pointer = const T*;
-			using reference = T &;
-			using const_reference = const T &;
-			using value_type = T;
+	MR *_pmr;
 
-			template <typename U>
-				struct rebind
-				{
-					using other = deallocator_adaptor<U, MR>;
-				};
+public:
+	auto pmr() const
+	{
+		return _pmr;
+	}
 
-			explicit deallocator_adaptor(MR &pmr_) noexcept
-				: _pmr(&pmr_)
-			{}
+public:
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
+	using pointer = T *;
+	using const_pointer = const T *;
+	using reference = T &;
+	using const_reference = const T &;
+	using value_type = T;
 
-			explicit deallocator_adaptor(const deallocator_adaptor &) noexcept = default;
+	template <typename U>
+	struct rebind
+	{
+		using other = deallocator_adaptor<U, MR>;
+	};
 
-			template <typename U>
-				explicit deallocator_adaptor(const deallocator_adaptor<U, MR> &d_) noexcept
-					: deallocator_adaptor(d_.pmr())
-				{}
+	explicit deallocator_adaptor(MR &pmr_) noexcept
+		: _pmr(&pmr_)
+	{
+	}
 
-			deallocator_adaptor &operator=(const deallocator_adaptor &e_) = delete;
+	explicit deallocator_adaptor(const deallocator_adaptor &) noexcept = default;
 
-			pointer address(reference x) const noexcept
-			{
-				return pointer(&x);
-			}
-			const_pointer address(const_reference x) const noexcept
-			{
-				return pointer(&x);
-			}
+	template <typename U>
+	explicit deallocator_adaptor(const deallocator_adaptor<U, MR> &d_) noexcept
+		: deallocator_adaptor(d_.pmr())
+	{
+	}
 
-			void deallocate(
-				pointer p
-				, size_type
-			)
-			{
-				_pmr->free(reinterpret_cast<addr_t>(p)
-					/* size is offered by deallocate but not accepted by free */
-#if 0
-					, sizeof(T) * sz_
-#endif
-				);
-			}
+	deallocator_adaptor &operator=(const deallocator_adaptor &e_) = delete;
 
-			void deallocate(
-				pointer p
-				, size_type sz
-				, size_type // alignment
-			)
-			{
-				int numa_node = 0;
-				_pmr->free(p, numa_node, sz);
-			}
+	pointer address(reference x) const noexcept
+	{
+		return pointer(&x);
+	}
+	const_pointer address(const_reference x) const noexcept
+	{
+		return pointer(&x);
+	}
 
-			auto max_size() const
-			{
-				return 8; /* reminder to provide a proper max size value */
-			}
-		};
-}
+	void deallocate(
+		pointer p_, size_type sz_)
+	{
+		deallocate(p_,sz_, alignof(T));
+	}
+
+	void deallocate(
+		pointer p_, size_type sz_, size_type alignment_ // alignment
+	)
+	{
+		unsigned numa_node = 0;
+		mr_traits<MR>::deallocate(this->pmr(), numa_node, p_, sz_ * sizeof(T), alignment_);
+	}
+};
+} // namespace nupm
 
 #endif

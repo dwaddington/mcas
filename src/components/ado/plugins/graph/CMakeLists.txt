@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-adoplugin-graph CXX)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin")
 
@@ -18,7 +18,10 @@ include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/flatbuffers/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/libccpm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
+include_directories(${CMAKE_SOURCE_DIR}/src/ado/EASTL/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/ado/EASTL/test/packages/EABase/include/Common/)
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # flatbuffers
 
@@ -30,7 +33,7 @@ add_custom_command(
   COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_SOURCE_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/src/graph_proto.fbs )
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
-add_compile_options(-g -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings)
+add_compile_options(-g -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings -Wformat=2)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 

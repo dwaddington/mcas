@@ -38,12 +38,14 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 
 #include "cpu.h"
 #include "cpu_bitset.h"
 #include "exceptions.h"
 #include "types.h"
 
+#include <boost/numeric/conversion/cast.hpp>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <sys/stat.h>
@@ -119,18 +121,18 @@ extern "C"
 
 #define KB(X) (X << 10)
 #define MB(X) (X << 20)
-#define GB(X) (((unsigned long) X) << 30)
-#define TB(X) (((unsigned long) X) << 40)
+#define GB(X) ((boost::numeric_cast<uint64_t>(X)) << 30)
+#define TB(X) ((boost::numeric_cast<uint64_t>(X)) << 40)
 
 #define REDUCE_KiB(X) (X >> 10)
 #define REDUCE_MiB(X) (X >> 20)
 #define REDUCE_GiB(X) (X >> 30)
 #define REDUCE_TiB(X) (X >> 40)
 
-#define KiB(X) (X << 10)
-#define MiB(X) (X << 20)
-#define GiB(X) (((unsigned long) X) << 30)
-#define TiB(X) (((unsigned long) X) << 40)
+#define KiB(X) KB(X)
+#define MiB(X) MB(X)
+#define GiB(X) GB(X)
+#define TiB(X) TB(X)
 
 #define PAGE_SHIFT_512 9
 #define PAGE_SHIFT_4K 12
@@ -398,12 +400,12 @@ INLINE void clflush_area(void *p, size_t size) {
   }
 }
 
-#ifndef likely
-#define likely(x) __builtin_expect(!!(x), 1)
+#ifndef LIKELY
+#define LIKELY(x) __builtin_expect(!!(x), 1)
 #endif
 
-#ifndef unlikely
-#define unlikely(x) __builtin_expect(!!(x), 0)
+#ifndef UNLIKELY
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 
 #else
@@ -446,8 +448,13 @@ template<typename DstT, typename SrcT> DstT safe_downsize(SrcT src) {
 }
 #endif
 
+#include <time.h>
 
+INLINE static epoch_time_t epoch_now() {
+  time_t t;
+  return time(&t);
+}
 
 #pragma GCC diagnostic pop
 
-#endif  // __KIVATI_UTILS_H__
+#endif

@@ -1,0 +1,16 @@
+{
+    "shards" :
+    [
+        {
+            "core" : 0,
+            "port" : 11911,
+            "net"  : "mlx5_0",
+            "default_backend" : "mapstore"
+        }
+    ],
+    "net_providers" : "verbs",
+    "security":
+    {
+        "cert" : "${CMAKE_INSTALL_PREFIX}/certs/mcas-cert.pem"
+    }
+}

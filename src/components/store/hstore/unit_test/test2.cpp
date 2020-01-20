@@ -106,7 +106,8 @@ TEST_F(KVStore_test, Instantiate)
     << ", " << (pmem_effective ? "effective" : "not effective")
     << "\n";
   /* create object instance through factory */
-  auto link_library = "libcomponent-" + store_map::impl->name + ".so";
+  /* This test only: use hstore-pe. the version compiled with simulated injection */
+  auto link_library = "libcomponent-" + store_map::impl->name + "-pe.so";
   Component::IBase * comp = Component::load_component(link_library,
                                                       store_map::impl->factory_id);
 

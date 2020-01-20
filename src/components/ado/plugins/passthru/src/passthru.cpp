@@ -15,8 +15,7 @@
 #include <libpmem.h>
 #include <api/interfaces.h>
 #include <common/logging.h>
-#include <iostream>
-#include <string.h>
+#include <string>
 
 status_t ADO_passthru_plugin::register_mapped_memory(void *shard_vaddr,
                                                      void *local_vaddr,
@@ -30,12 +29,14 @@ status_t ADO_passthru_plugin::register_mapped_memory(void *shard_vaddr,
 
 status_t ADO_passthru_plugin::do_work(uint64_t work_key,
                                       const std::string &key,
-                                      void *shard_value_vaddr,
+                                      void *value,
                                       size_t value_len,
+                                      void * detached_value,
+                                      size_t detached_value_len,
                                       const void *in_work_request, /* don't use iovec because of non-const */
                                       const size_t in_work_request_len,
-                                      void *&out_work_response,
-                                      size_t &out_work_response_len) {
+                                      bool new_root,
+                                      response_buffer_vector_t& response_buffers) {
   return S_OK;
 }
 

@@ -32,8 +32,6 @@
 #include <rdma/fi_domain.h> /* fi_cq_attr, fi_cq_err_entry, fi_cq_data_entry */
 #pragma GCC diagnostic pop
 
-#include <unistd.h> /* ssize_t */
-
 #include <atomic>
 #include <cstdint> /* uint{64,64}_t */
 #include <memory> /* shared_ptr, unique_ptr */

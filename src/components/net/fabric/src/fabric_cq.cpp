@@ -87,7 +87,7 @@ namespace
   return err;
 }
 
-ssize_t Fabric_cq::cq_read(void *buf, size_t count) noexcept
+std::ptrdiff_t Fabric_cq::cq_read(void *buf, size_t count) noexcept
 {
   /* Note: It would seem resonable to skip the CQ read if there are
    * no outstanding (inflight) operations. But at one time, the
@@ -112,7 +112,7 @@ ssize_t Fabric_cq::cq_read(void *buf, size_t count) noexcept
   return r;
 }
 
-ssize_t Fabric_cq::cq_readerr(::fi_cq_err_entry *buf, uint64_t flags) noexcept
+std::ptrdiff_t Fabric_cq::cq_readerr(::fi_cq_err_entry *buf, uint64_t flags) noexcept
 {
   auto r = ::fi_cq_readerr(&*_cq, buf, flags);
 

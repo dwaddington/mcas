@@ -71,6 +71,7 @@
 #define ESC_ERR BRIGHT_RED
 #define ESC_END "\033[0m"
 
+void pr_info(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void pr_info(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -84,6 +85,7 @@ inline void pr_info(const char * format, ...)
 #endif
 }
 
+void pr_error(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void pr_error(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -97,6 +99,7 @@ inline void pr_error(const char * format, ...)
 #endif
 }
 
+void PLOG(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PLOG(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -110,6 +113,7 @@ inline void PLOG(const char * format, ...)
 #endif
 }
 
+void PDBG(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PDBG(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -123,6 +127,7 @@ inline void PDBG(const char * format, ...)
 #endif
 }
 
+void PINF(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PINF(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -136,6 +141,7 @@ inline void PINF(const char * format, ...)
 #endif
 }
 
+void PWRN(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PWRN(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -149,6 +155,7 @@ inline void PWRN(const char * format, ...)
 #endif
 }
 
+void PERR(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PERR(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -162,6 +169,7 @@ inline void PERR(const char * format, ...)
 #endif
 }
 
+void PEXCEP(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PEXCEP(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -175,6 +183,7 @@ inline void PEXCEP(const char * format, ...)
 #endif
 }
 
+void PNOTICE(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PNOTICE(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -188,6 +197,7 @@ inline void PNOTICE(const char * format, ...)
 #endif
 }
 
+void PMAJOR(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PMAJOR(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG

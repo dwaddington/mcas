@@ -42,12 +42,20 @@ public:
   // clang-format on
 
   typedef enum {
+    FIND_TYPE_NONE   = 0x0,
     FIND_TYPE_NEXT   = 0x1, /*< just get the next key in order */
     FIND_TYPE_EXACT  = 0x2, /*< perform exact match comparison on key */
     FIND_TYPE_REGEX  = 0x3, /*< apply as regular expression */
     FIND_TYPE_PREFIX = 0x4, /*< match prefix only */
   } find_t;
 
+  inline static find_t convert_find_type(int i) {
+    static const find_t array[] = { FIND_TYPE_NONE, FIND_TYPE_NEXT, FIND_TYPE_EXACT, FIND_TYPE_REGEX, FIND_TYPE_PREFIX };
+    assert(i > 0);
+    if(i > 4) throw API_exception("out of enum bounds");
+    return array[i];
+  }
+    
   using offset_t = uint64_t;
   
   /** 
@@ -58,7 +66,7 @@ public:
   virtual void insert(const std::string& key) = 0;
 
   /** 
-   * Remove a key into the index
+   * Remove a key from the index
    * 
    * @param key Key
    */
@@ -92,6 +100,7 @@ public:
    * 
    * @param key_expression Key expression to match on
    * @param begin_position Position from which to start from. Counting from 0.
+   * @param find_type FIND_TYPE_NEXT, ..EXACT, ..REGEX, ..PREFIX
    * @param out_matched_position [out] Position of the match
    * @param out_matched_key Matching key result
    * @param max_comparisons Maximum number of comparisons
