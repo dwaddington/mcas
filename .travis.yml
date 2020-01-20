@@ -1,9 +1,10 @@
-language: c++
+language: minimal
 
 # add branches you want to trigger CI
 branches:
   only:
     - master
+    - unstable
 
 sudo: required
 
@@ -24,37 +25,36 @@ env:
   global:
   matrix:
     - CONTAINER_NAME="mcas-build-fedora27"
-      DOCKERIMG="fedora:27" 
+      DOCKERIMG="fedora:27"
       BOOTSTRAP_FILE="./install-yum-fc27.sh"
-      HOSTMODULE="-v /lib/modules:/lib/modules:ro -v /usr/src:/usr/src:ro"
+#      HOSTMODULE="-v /lib/modules:/lib/modules:ro -v /usr/src:/usr/src:ro"
     - CONTAINER_NAME="mcas-build-ubuntu1604"
-      DOCKERIMG="ubuntu:16.04"  
+      DOCKERIMG="ubuntu:16.04"
       BOOTSTRAP_FILE="./install-apts-ubuntu-16.sh"
     - CONTAINER_NAME="mcas-build-ubuntu1804"
-      DOCKERIMG="ubuntu:18.04"  
+      DOCKERIMG="ubuntu:18.04"
       BOOTSTRAP_FILE="./install-apts-ubuntu-18.sh"
 
 # for local building testing, remember to run git submodule init/update
 # https://stackoverflow.com/questions/33013539/docker-loading-kernel-modules
 before_install:
   - sudo apt-get update
-  - docker run -d --name ${CONTAINER_NAME} --privileged --cap-add=ALL
+  - docker run --rm -d --name ${CONTAINER_NAME} --privileged --cap-add=ALL
     -v $(pwd):/travis ${HOSTMODULE}
     ${DOCKERIMG}
     tail -f /dev/null
   - docker ps
   - docker exec -t ${CONTAINER_NAME} bash  -c "
-    cd /travis/deps;
-    ./install-tzdata-noninteractive.sh ;
-    ${BOOTSTRAP_FILE};"
+    cd /travis/deps ;
+    ${BOOTSTRAP_FILE} ;
+    "
 
-# note: limit job number to 2 to avoid out-of-memory for rocksdb build
 script:
   - docker exec -t ${CONTAINER_NAME} bash -c "
     cd /travis ;
     mkdir build;
     cd build;
-    cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist .. -DTBB_CI_BUILD=ON  &&
+    cmake -DSKIP_KERNEL_MODULES=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist -DTBB_CI_BUILD=ON .. &&
     make bootstrap &&
     make &&
     make install"
