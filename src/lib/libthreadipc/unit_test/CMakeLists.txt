@@ -4,8 +4,6 @@ project(libnupm-test CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(GCC_COVERAGE_COMPILE_FLAGS "-std=c++14 -g -fPIC")
-
 find_library(GTEST_LIB NAMES GTEST PATHS /usr/local/lib,/usr/lib)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
@@ -21,8 +19,6 @@ link_directories(${CMAKE_SOURCE_DIR}/src/lib/libthreadipc/)
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # ndctl
 link_directories(${GTEST_LIB})
-
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 add_executable(libthreadipc-test4 test4.cpp)
 target_compile_options(libthreadipc-test4 PUBLIC "$<$<CONFIG:Debug>:-O0>")

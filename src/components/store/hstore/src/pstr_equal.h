@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,8 +11,8 @@
    limitations under the License.
 */
 
-#ifndef _COMANCHE_PSTR_EQUAL_H_
-#define _COMANCHE_PSTR_EQUAL_H_
+#ifndef _MCAS_PSTR_EQUAL_H_
+#define _MCAS_PSTR_EQUAL_H_
 
 #include <cstring>
 

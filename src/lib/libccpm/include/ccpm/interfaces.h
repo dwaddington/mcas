@@ -51,6 +51,7 @@ namespace ccpm
  */
 typedef std::function<bool(const void * ptr)> ownership_callback_t;
 
+inline bool accept_all(const void *) { return true; }
 /*
  * Allocators can expand to more than one coarse-grained region of
  * memory.
@@ -63,8 +64,16 @@ struct region_vector_t : public std::vector<::iovec>
   explicit region_vector_t(const ::iovec &v) {
     push_back(v);
   }
+  region_vector_t() {
+  }
 };
 
+enum class Type_id : int64_t
+  {
+    None        = 0,
+    Fixed_array = 0xF0,
+  };
+    
 
 /**
  * Heap allocator (variable sized allocations)
@@ -170,7 +179,43 @@ public:
    * @param regions Pointer/length regions of contiguous memory
    **/
   virtual void add_regions(const region_vector_t &regions) = 0;
+
+  /** Test whether an address is in any heap region
+   * @param addr the address to test
+   *
+   * @erturn true iff the address is in some heap region
+   */
+  virtual bool includes(const void *ptr) const = 0;
 };
 
+class ILog
+{
+public:
+  virtual ~ILog() = default;
+
+  /*
+   * Record old value of a region to the log.
+   */
+  virtual void add(void *begin, std::size_t size) = 0;
+  /*
+   * Record an allocation to the log.
+   */
+  virtual void allocated(void *&p, std::size_t size) = 0;
+  /*
+   * Record a free to the log.
+   */
+  virtual void freed(void *&p, std::size_t size) = 0;
+
+  /*
+   * commit all previous add/allocated/freed commands
+   */
+  virtual void commit() = 0;
+  /*
+   * Restore all data areas added after initialization (or the most recent clear)
+   * to the values present at their last add command.
+   */
+  virtual void rollback() = 0;
+
+};
 }
 #endif //  __CCPM_INTERFACES_H__

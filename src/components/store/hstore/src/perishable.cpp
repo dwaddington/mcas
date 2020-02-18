@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,25 +11,85 @@
    limitations under the License.
 */
 
-
+#include "hstore_config.h"
 #include "hop_hash_log.h"
+#include "logging.h"
 #include "perishable.h"
 #include "perishable_expiry.h"
+
+#include <execinfo.h>
+
+#include <cstddef> /* uint64_t */
+#include <exception> /* uncaught_excpetion */
+
 
 bool perishable::_enabled = false;
 std::uint64_t perishable::_initial = 0;
 std::uint64_t perishable::_time_to_live = 0;
 
-void perishable::tick()
+void perishable::check()
+{
+	if ( std::uncaught_exception() )
+	{
+		PWRN(PREFIX_STATIC "TTL 0 during exception", LOCATION_STATIC);
+	}
+	else
+	{
+		throw perishable_expiry{__LINE__};
+	}
+}
+
+auto perishable::make_syndrome() -> syndrome
+{
+	syndrome sy(100);
+	int sz = ::backtrace(&sy[0], int(sy.size()));
+	sy.resize(sz);
+	return sy;
+}
+
+bool perishable::less::operator()(const syndrome &a, const syndrome &b)
+{
+	if ( a.size() < b.size() ) return true;
+	if ( b.size() < a.size() ) return false;
+	auto m = std::mismatch(a.begin(), a.end(), b.begin());
+	if ( m.first == a.end() ) return false;
+	return *m.first < *m.second;
+}
+
+perishable::syndrome_map perishable::seen{};
+
+bool perishable::tick()
 {
 	if ( _enabled )
 	{
+		if ( _time_to_live == use_syndrome )
+		{
+			auto sy = make_syndrome();
+#if 0
+			return ! seen.insert(sy).second;
+#else
+            auto seen_count = ++seen[sy];
+            if ( seen_count < 3 )
+            {
+                PWRN(PREFIX_STATIC " new perishable syndrome", LOCATION_STATIC);
+				check();
+				return false;
+            }
+            return true;
+#endif
+		}
+
 		if ( _time_to_live == 0 )
 		{
-			throw perishable_expiry{};
+			return false;
 		}
-		--_time_to_live;
+		if ( --_time_to_live == 0 )
+		{
+			check();
+			return false;
+		}
 	}
+	return true;
 }
 
 void perishable::reset(std::uint64_t n)
@@ -45,12 +105,9 @@ void perishable::enable(bool e)
 
 void perishable::test()
 {
-	if ( _enabled )
+	if ( _enabled && _time_to_live == 0 )
 	{
-		if ( _time_to_live == 0 )
-		{
-			throw perishable_expiry{};
-		}
+		check();
 	}
 
 }
@@ -59,7 +116,7 @@ void perishable::report()
 {
 	if ( _initial != 0 )
 	{
-		hop_hash_log<true>::write(__func__, " perishable: ", _time_to_live
+		hop_hash_log<true>::write(LOG_LOCATION_STATIC, "perishable: ", _time_to_live
 			, " of ", _initial, " ticks left");
 	}
 }

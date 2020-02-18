@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2019] [IBM Corporation]
+  Copyright [2017-2020] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -56,6 +56,9 @@ public:
             float core_number,
             numa_node_t numa_zone);
 
+  ADO_proxy(const ADO_proxy &) = delete;
+  ADO_proxy& operator=(const ADO_proxy &) = delete;
+
   virtual ~ADO_proxy();
 
   DECLARE_VERSION(0.1f);
@@ -64,7 +67,7 @@ public:
 
   void *query_interface(Component::uuid_t &itf_uuid) override {
     if (itf_uuid == Component::IADO_proxy::iid()) {
-      return (void *)static_cast<Component::IADO_proxy *>(this);
+      return static_cast<Component::IADO_proxy *>(this);
     } else
       return NULL; // we don't support this interface
   }
@@ -82,20 +85,19 @@ public:
                            void *value_vaddr) override;
 
   status_t send_work_request(const uint64_t work_request_key,
-                             const std::string &work_key_str,
-                             const void *value_addr,
+                             const char * key,
+                             const size_t key_len,
+                             const void * value_addr,
                              const size_t value_len,
-                             const void *detached_value,
+                             const void * detached_value,
                              const size_t detached_value_len,
-                             const void *invocation_data,
+                             const void * invocation_data,
                              const size_t invocation_data_len,
                              const bool new_root) override;
 
 
   bool check_work_completions(uint64_t& request_key,
                               status_t& out_status,
-                              void *& response,
-                              size_t & response_len,
                               Component::IADO_plugin::response_buffer_vector_t& response_buffers) override;
 
   status_t recv_callback_buffer(Buffer_header *& out_buffer) override;
@@ -129,10 +131,17 @@ public:
 
   bool check_op_event_response(const void * buffer,
                                Component::ADO_op& op) override;
+
+  bool check_unlock_request(const void * buffer,
+                            uint64_t& work_id,
+                            Component::IKVStore::key_t& key_handle) override;
+
   
   void send_table_op_response(const status_t s,
-                              const void *value_addr,
-                              size_t value_len) override;
+                              const void * value_addr = nullptr,
+                              size_t value_len = 0,
+                              const char * key_ptr = nullptr,
+                              Component::IKVStore::key_t out_key_handle = nullptr) override;
 
   void send_find_index_response(const status_t status,
                                 const offset_t matched_position,
@@ -147,7 +156,8 @@ public:
 
   void send_pool_info_response(const status_t status,
                                const std::string& info) override;
-  
+
+  void send_unlock_response(const status_t status) override;
 
   bool has_exited() override;
 
@@ -162,6 +172,9 @@ public:
   void get_deferred_unlocks(const uint64_t work_key,
                             std::vector<Component::IKVStore::key_t> &keys) override;
 
+  bool check_for_implicit_unlock(const uint64_t work_key,
+                                 const Component::IKVStore::key_t key) override;
+
   void add_life_unlock(const Component::IKVStore::key_t key) override;
 
   status_t remove_life_unlock(const Component::IKVStore::key_t key) override;
@@ -169,7 +182,7 @@ public:
   void release_life_locks() override;
 
 
-  std::string ado_id() const override { return container_id; }
+  std::string ado_id() const override { return _container_id; }
 
   const std::string& pool_name() const override { return _pool_name; }
 
@@ -186,18 +199,18 @@ private:
   const size_t                          _pool_size;
   const unsigned int                    _pool_flags;
   const uint64_t                        _expected_obj_count;
-  std::unique_ptr<ADO_protocol_builder> _ipc;
   std::string                           _cores;
   float                                 _core_number;
   std::string                           _filename;
   std::vector<std::string>              _args;
   std::string                           _channel_name;
+  std::unique_ptr<ADO_protocol_builder> _ipc;
   int                                   _memory;
   numa_node_t                           _numa;
   std::map<uint64_t, std::set<Component::IKVStore::key_t>> _deferred_unlocks;
   std::set<Component::IKVStore::key_t>  _life_unlocks;
   unsigned                              _outstanding_wr = 0;
-  std::string                           container_id;
+  std::string                           _container_id;
   pid_t                                 _pid; // Non-docker only
   
   static void child_exit(int, siginfo_t *, void *);
@@ -218,7 +231,7 @@ public:
 
   void *query_interface(Component::uuid_t &itf_uuid) override {
     if (itf_uuid == Component::IADO_proxy_factory::iid()) {
-      return (void *)static_cast<Component::IADO_proxy_factory *>(this);
+      return static_cast<Component::IADO_proxy_factory *>(this);
     } else
       return NULL; // we don't support this interface
   }

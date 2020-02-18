@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_DEALLOCATOR_CO_H
-#define COMANCHE_HSTORE_DEALLOCATOR_CO_H
+#ifndef MCAS_HSTORE_DEALLOCATOR_CO_H
+#define MCAS_HSTORE_DEALLOCATOR_CO_H
 
 #include "heap_co.h"
 #include "hop_hash_log.h"
@@ -94,12 +94,12 @@ template <typename T, typename Persister>
 #pragma GCC diagnostic ignored "-Wpedantic"
 			auto heap = static_cast<heap_co *>(pmemobj_direct((D_RO(root)->heap_oid)));
 #pragma GCC diagnostic pop
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 			{
-				auto ptr = static_cast<char *>(pmemobj_direct(oid));
-				hop_hash_log::write(__func__
-					, " [", ptr
-					, "..", static_cast<void *>(ptr + s * sizeof(T))
+				auto p = static_cast<char *>(pmemobj_direct(ptr));
+				hop_hash_log<HSTORE_TRACE_PALLOC>::write(LOG_LOCATION
+					, "[", p
+					, "..", static_cast<void *>(p + sz_ * sizeof(T))
 					, ")"
 				);
 			}

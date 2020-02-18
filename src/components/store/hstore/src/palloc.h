@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_PALLOC_H_
-#define _COMANCHE_HSTORE_PALLOC_H_
+#ifndef MCAS_HSTORE_PALLOC_H_
+#define MCAS_HSTORE_PALLOC_H_
 
 #include "trace_flags.h"
 
@@ -38,7 +38,7 @@ std::tuple<PMEMoid, std::size_t> palloc_inner(
 	, pmemobj_constr ctor_
 	, void *ctor_arg_
 	, const char *
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 		use_
 #endif
 )
@@ -56,10 +56,10 @@ std::tuple<PMEMoid, std::size_t> palloc_inner(
 			throw pobj_bad_alloc(0, 1, size_max_, size_min_, errno);
 		}
 	}
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 	{
 		void *ptr = pmemobj_direct(oid);
-		hop_hash_log::write(__func__, " " << use_, " [", ptr, ".."
+		hop_hash_log::write(LOG_LOCATION, " " << use_, " [", ptr, ".."
 			, static_cast<void *>(static_cast<char *>(ptr)+size_max_), ")"i
 		);
 	}
@@ -135,15 +135,15 @@ static inline std::tuple<PMEMoid, std::size_t> palloc(
 void zfree(
 	PMEMoid oid
 	, const char *
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 		why
 #endif
 )
 {
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 	{
 		const auto ptr = pmemobj_direct(oid);
-		hop_hash_log::write(__func__, " ", why, " [" <<,r << "..)");
+		hop_hash_log::write(LOG_LOCATION, " ", why, " [" <<,r << "..)");
 	}
 #endif
 	pmemobj_free(&oid);

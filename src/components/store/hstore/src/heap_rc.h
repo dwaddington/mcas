@@ -12,9 +12,10 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_HEAP_RC_H
-#define COMANCHE_HSTORE_HEAP_RC_H
+#ifndef MCAS_HSTORE_HEAP_RC_H
+#define MCAS_HSTORE_HEAP_RC_H
 
+#include "hstore_config.h"
 #include "dax_map.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
@@ -44,7 +45,7 @@
 
 namespace impl
 {
-	class allocation_state_emplace;
+	class allocation_state_combined;
 }
 
 #include <new> /* std::bad_alloc */
@@ -71,6 +72,9 @@ class heap_rc_shared_ephemeral
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
+public:
+	explicit heap_rc_shared_ephemeral();
+
 	void add_managed_region(const ::iovec &r, unsigned numa_node);
 	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
 
@@ -80,14 +84,14 @@ class heap_rc_shared_ephemeral
 			static bool suppress = false;
 			if ( ! suppress )
 			{
-				hop_hash_log<B>::write(__func__, " pool ", pool_.iov_base);
+				hop_hash_log<B>::write(LOG_LOCATION, "pool ", pool_.iov_base);
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
 				for ( unsigned i = std::max(0U, log_min_alignment); i != limit; ++i )
 				{
 					const std::size_t upper_bound = 1ULL << i;
-					hop_hash_log<B>::write(__func__
-						, " [", lower_bound, "..", upper_bound, "): "
+					hop_hash_log<B>::write(LOG_LOCATION
+						, "[", lower_bound, "..", upper_bound, "): "
 						, _hist_alloc.data()[i], " ", _hist_inject.data()[i], " ", _hist_free.data()[i]
 						, " "
 					);
@@ -96,10 +100,13 @@ class heap_rc_shared_ephemeral
 				suppress = true;
 			}
 		}
-public:
-	friend class heap_rc_shared;
 
-	explicit heap_rc_shared_ephemeral();
+	std::size_t allocated() const { return _allocated; }
+	std::size_t capacity() const { return _capacity; };
+	void inject_allocation(void *p, std::size_t sz, unsigned numa_node);
+	void *allocate(std::size_t sz, unsigned numa_node, std::size_t alignment);
+	void free(void *p, std::size_t sz, unsigned numa_node);
+	bool is_reconstituted(const void *p) const;
 };
 
 class heap_rc_shared
@@ -116,8 +123,8 @@ class heap_rc_shared
 public:
 	explicit heap_rc_shared(void *pool_, std::size_t sz_, unsigned numa_node_);
 	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager_);
-	/* allocation_state_emplace offered, but not used */
-	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_emplace *)
+	/* allocation_state_combined offered, but not used */
+	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_combined *)
 		: heap_rc_shared(devdax_manager)
 	{
 	}
@@ -145,7 +152,7 @@ public:
 
 	void free(void *p_, std::size_t sz_, std::size_t alignment_);
 
-	unsigned percent_used() const { return unsigned(_eph->_allocated * 100U / _eph->_capacity); }
+	unsigned percent_used() const { return _eph->capacity() == 0 ? 0U : unsigned(_eph->allocated() * 100U / _eph->capacity()); }
 
 	bool is_reconstituted(const void * p_) const;
 

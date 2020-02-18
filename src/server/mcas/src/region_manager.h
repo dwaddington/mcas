@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,26 +15,29 @@
 
 #include <api/fabric_itf.h>
 #include <common/utils.h>
+
 #include <set>
+
 #include "connection_handler.h"
 #include "types.h"
 
 namespace mcas
 {
 class Region_manager {
-
  public:
-  Region_manager(Connection* conn) : _conn(conn) {
-    assert(conn);
-  }
+  Region_manager(Connection* conn) : _conn(conn), _reg{} { assert(conn); }
 
-  ~Region_manager() {
+  Region_manager(const Region_manager &) = delete;
+  Region_manager &operator=(const Region_manager &) = delete;
+
+  ~Region_manager()
+  {
     /* deregister memory regions */
-    for(auto& r : _reg) {
+    for (auto& r : _reg) {
       _conn->deregister_memory(r);
     }
   }
-  
+
   /**
    * Register memory with network transport for direct IO.  Cache in map.
    *

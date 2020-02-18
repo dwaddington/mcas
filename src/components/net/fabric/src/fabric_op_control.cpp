@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -32,11 +32,7 @@
 #include "system_fail.h"
 
 #include <rdma/fi_errno.h> /* fi_strerror */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-align"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <rdma/fi_rma.h> /* fi_{read,recv,send,write}v, fi_inject */
-#pragma GCC diagnostic pop
+#include <rdma/fi_rma.h> /* fi_{read,recv,send,write}v, fj_inject, fi_sendmsg */
 
 #include <sys/select.h> /* pselect */
 #include <sys/uio.h> /* iovec */
@@ -180,6 +176,7 @@ void Fabric_op_control::post_recv(
   );
   _rxcq.incr_inflight(__func__);
 }
+
 void Fabric_op_control::post_recv(
   const ::iovec *first_
   , const ::iovec *last_
@@ -282,6 +279,39 @@ void Fabric_op_control::post_write(
 {
   auto desc = populated_desc(first_, last_);
   post_write(first_, last_, &*desc.begin(), remote_addr_, key_, context_);
+}
+
+  /**
+   * Send message
+   *
+   * @param connection Connection to inject on
+   * @param buf_ start of data to send
+   * @param len_ length of data to send (must not exceed max_inject_size())
+   */
+void Fabric_op_control::sendmsg(
+	const ::iovec *first_
+	, const ::iovec *last_
+	, void **desc_
+	, ::fi_addr_t addr_
+	, void *context_
+	, std::uint64_t flags
+)
+{
+	const ::fi_msg m {
+		first_, desc_, std::size_t(last_ - first_), addr_, context_, flags
+	};
+	CHECK_FI_EQ(::fi_sendmsg(&ep(), &m, flags), 0);
+
+	/* Note: keeping track of the number of completions is dfficult due to the
+	 * possibility of send requests with "unsignalled completions."
+	 * Such send requests *may or may not* produce a completion, depending on
+	 * whether the operation fails (will generate a completion) or succeeds
+	 * (will not generate a completion).
+	 */
+	if ( flags & FI_COMPLETION )
+	{
+		_txcq.incr_inflight(__func__);
+	}
 }
 
   /**

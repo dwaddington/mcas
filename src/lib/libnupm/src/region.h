@@ -470,9 +470,12 @@ private:
     /* allocate region */
     auto region_object_size = _mapper.rounded_up_object_size(object_size);
 
+    /* If the object is to be allocated from a slab, the allocation alignment here must
+     * be for the whole slab, not just the object.
+     */
     auto region_object_alignment =
       _mapper.could_exist_in_region(object_size)
-      ? region_object_size
+      ? region_size
       : object_alignment
       ;
     auto region_base        = _arena_allocator.alloc(region_size, numa_node, region_object_alignment);

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -19,10 +19,7 @@
  * Authors:
  */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fabric.h>
-#pragma GCC diagnostic pop
+#include "rdma-fabric.h"
 
 #if 1
 #define FABRIC_TRACE_FID(f) static_cast<void>(0)

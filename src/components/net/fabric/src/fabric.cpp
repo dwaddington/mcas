@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -32,18 +32,8 @@
 #include "hints.h"
 #include "system_fail.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fabric.h> /* fi_info, FI_VERSION */
-#pragma GCC diagnostic pop
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wcast-align"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fi_endpoint.h> /* fi_ep_bind, fi_pep_bind */
-#pragma GCC diagnostic pop
+#include "rdma-fabric.h" /* fi_info, FI_VERSION */
+#include "rdma-fi_endpoint.h" /* fi_ep_bind, fi_pep_bind */
 
 #include <netdb.h> /* addrinfo */
 #include <netinet/in.h> /* sockaddr_in */

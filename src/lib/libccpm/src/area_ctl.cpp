@@ -15,7 +15,7 @@
 
 #include "area_top.h"
 #include "div.h"
-#include <common/logging.h>
+#include "logging.h"
 #include <libpmem.h>
 #include <algorithm>
 #include <cassert>
@@ -29,9 +29,6 @@
 
 /*
  * TODO:
- *  1. fix loss of (most of) the initial element when sizeof area_ctl is much les than element size
- *  2. support grow (not in IHeap interface)
- *  3. finish crash consistency support on map side.
  */
 template <typename P>
 	void persist(
@@ -43,14 +40,6 @@ template <typename P>
 
 #define PERSIST(x) do { persist(x); } while (0)
 #define PERSIST_N(p, ct) do { ::pmem_persist(p, (sizeof *p) * ct); } while (0)
-
-void ccpm::doubt::set(const char *fn, void *p_, std::size_t bytes_)
-{
-	PLOG("set %s: doubt @ %p area %p.%zu", fn, static_cast<void *>(this), p_, bytes_);
-	_bytes = bytes_;
-	_in_doubt = p_;
-	PERSIST(*this);
-}
 
 class verifier
 {
@@ -72,7 +61,7 @@ public:
 constexpr ccpm::area_ctl::index_t ccpm::area_ctl::ct_atomic_words;
 constexpr std::size_t ccpm::area_ctl::min_alloc_size;
 
-/* Constructr for just enough of an area_ctl to hold _full_height */
+/* Constructor for just enough of an area_ctl to hold _full_height */
 ccpm::area_ctl::area_ctl(level_ix_t full_height_)
 	: _magic0(magic)
 	, _full_height(full_height_)
@@ -80,7 +69,7 @@ ccpm::area_ctl::area_ctl(level_ix_t full_height_)
 	, _element_count()
 	, _sub_size()
 	, _dt()
-	, _alloc_bits()
+	, _alloc_bits{0}
 	, _element_state()
 	, _magic1(magic)
 {
@@ -99,7 +88,7 @@ ccpm::area_ctl::area_ctl(
 	, _element_count(element_count_)
 	, _sub_size(sub_size_)
 	, _dt()
-	, _alloc_bits()
+	, _alloc_bits{0}
 	, _element_state()
 	, _magic1(magic)
 {
@@ -107,7 +96,6 @@ ccpm::area_ctl::area_ctl(
 	/* *** element_bitmap *** */
 
 	/* These are available for allocation */
-	el_fill_alloc_range(0, element_count_, false);
 
 	/* These are permanently "allocated, reserved" because they are past end of
 	 * storage */
@@ -135,6 +123,7 @@ ccpm::area_ctl::area_ctl(
 		if ( _level != 0 )
 		{
 			new (element_void(0)) area_ctl(full_height_);
+			persist(*static_cast<area_ctl *>(element_void(0)));
 		}
 	}
 	else
@@ -148,6 +137,7 @@ ccpm::area_ctl::area_ctl(
 
 	_magic0 = magic;
 	_magic1 = magic;
+	persist(*this);
 }
 
 auto ccpm::area_ctl::commission(
@@ -177,6 +167,15 @@ auto ccpm::area_ctl::commission(
 				, 1
 				, h
 			)
+		;
+}
+
+bool ccpm::area_ctl::includes(const void *ptr) const
+{
+	return
+		this <= ptr
+		&&
+		static_cast<const char *>(ptr) < static_cast<const char *>(static_cast<const void *>(this)) + _element_count * _sub_size
 		;
 }
 
@@ -244,7 +243,7 @@ void ccpm::area_ctl::el_set_alloc(index_t ix, bool alloc_state)
 	verifier v(this);
 	const auto outer_offset = ix / alloc_states_per_word;
 	const auto inner_offset = ix % alloc_states_per_word;
-	auto &aw = element_alloc_map()[outer_offset];
+	auto &aw = _alloc_bits[outer_offset];
 	aw =
 		( aw & ~(atomic_word(1U) << inner_offset) )
 		| (atomic_word(alloc_state) << inner_offset)
@@ -257,11 +256,8 @@ auto ccpm::area_ctl::el_fill_state_range(
 ) -> index_t
 {
 	verifier v(this);
-	for ( auto ix = first_ ; ix != last_; ++ix )
-	{
-		element_state(ix) = s;
-	}
-	PERSIST_N(&element_state(first_), last_ - first_);
+	std::fill(&_element_state[first_], &_element_state[last_], s);
+	PERSIST_N(&_element_state[first_], last_ - first_);
 	return last_;
 }
 
@@ -281,7 +277,7 @@ auto ccpm::area_ctl::el_alloc_value(index_t ix) const -> bool
 	verifier v(this);
 	const auto outer_offset = ix / alloc_states_per_word;
 	const auto inner_offset = ix % alloc_states_per_word;
-	const atomic_word aw = element_alloc_map()[outer_offset];
+	const atomic_word aw = _alloc_bits[outer_offset];
 	return (aw >> inner_offset) & 1;
 }
 
@@ -290,7 +286,7 @@ auto ccpm::area_ctl::el_state_value(index_t ix) const -> sub_state
 	verifier v(this);
 	/* bad form to call this if not allocated, as the value is a dont care */
 	assert(el_alloc_value(ix));
-	return element_state(ix);
+	return _element_state[ix];
 }
 
 auto ccpm::area_ctl::el_find_n_free(index_t n) const -> index_t
@@ -298,7 +294,7 @@ auto ccpm::area_ctl::el_find_n_free(index_t n) const -> index_t
 	verifier v(this);
 	for ( index_t outer_offset = 0; outer_offset != _element_count; ++outer_offset )
 	{
-		const auto pos = aw_find_n_free(element_alloc_map()[outer_offset], n);
+		const auto pos = aw_find_n_free(_alloc_bits[outer_offset], n);
 		if ( pos + n <= alloc_states_per_word )
 		{
 			return outer_offset * alloc_states_per_word + pos;
@@ -351,23 +347,6 @@ auto ccpm::area_ctl::el_subdivision_run_at(const index_t ix) const -> index_t
  * of the element state array
  */
 
-/* in the atomic word aw, return the index of a start of a run of n free elements
-* (or alloc_states_per_word-n+1, if there is no such run)
-*/
-auto ccpm::aw_find_n_free(atomic_word aw, const unsigned n) -> unsigned
-{
-	/* mask if 1's marks area to check */
-	atomic_word mask = (atomic_word(1U) << n) - 1U;
-	atomic_word desired = atomic_word(0);
-	unsigned pos = 0;
-	while ( pos + n <= alloc_states_per_word && (aw & mask) != desired )
-	{
-		aw >>= 1;
-		++pos;
-	}
-	return pos;
-}
-
 /*
  * Precondition:
  *   (The process may crash
@@ -412,12 +391,12 @@ auto ccpm::area_ctl::el_allocate_n(
 	 * (4) remove the "in doubt" marker.
 	 */
 
-	element_state(ix) = s;
+	_element_state[ix] = s;
 	el_fill_state_range(ix+1, ix+n, sub_state::continued);
 	/* the bit mask to add */
 	atomic_word res = (atomic_word(1U) << n) - 1U;
 
-	auto &aw = element_alloc_map()[outer_offset];
+	auto &aw = _alloc_bits[outer_offset];
 	aw |= (res << inner_offset);
 	return aw;
 }
@@ -443,10 +422,10 @@ void ccpm::area_ctl::el_reserve_range(
 		/* the bit mask to add */
 		atomic_word res = (atomic_word(1U) << inner_offset);
 
-		auto &aw = element_alloc_map()[outer_offset];
+		auto &aw = _alloc_bits[outer_offset];
 		aw |= res;
-		PERSIST(aw);
 	}
+	PERSIST(_alloc_bits);
 }
 
 auto ccpm::area_ctl::el_deallocate_n(
@@ -459,7 +438,7 @@ auto ccpm::area_ctl::el_deallocate_n(
 	const auto outer_offset = ix / alloc_states_per_word;
 	const auto inner_offset = ix % alloc_states_per_word;
 	const auto mask = ((atomic_word(1U) << (n)) - 1U) << inner_offset;
-	auto &aw = element_alloc_map()[outer_offset];
+	auto &aw = _alloc_bits[outer_offset];
 	aw &= ~mask;
 	/* ERROR: aw must persist before the element states, if deallocate chooses
 	 * to change element stats.
@@ -558,6 +537,12 @@ auto ccpm::area_ctl::locate_element(
 		;
 	auto ix = index_t(offset / _sub_size);
 	const auto ix_offset = offset % _sub_size;
+	if ( el_is_free(ix) )
+	{
+		assert( ! el_is_free(ix) );
+		throw
+			std::runtime_error("locate_element: deallocating free area (double free?)");
+	}
 	if ( el_is_client_start(ix) )
 	{
 		const bool aligned = el_is_client_start_aligned(ix);
@@ -649,7 +634,7 @@ void ccpm::area_ctl::deallocate_local(
 	 */
 #if 0
 	fill_state(element_ix_, run_size, sub_state::free);
-	PERSIST_N(&element_state(element_ix_), run_size);
+	PERSIST_N(&_element_state[element_ix_], run_size);
 #endif
 	ptr_ = nullptr;
 	PERSIST(ptr_);
@@ -776,6 +761,7 @@ void ccpm::area_ctl::allocate(
 				: sub_state::client_unaligned
 			);
 	PERSIST(aw);
+	dt_.clear(__func__);
 }
 
 /* restore_at and restore_to did not work too well, too many calls.
@@ -849,7 +835,7 @@ void ccpm::area_ctl::print(std::ostream &o_, unsigned indent_) const
 		}
 		else
 		{
-			switch ( element_state(ix) )
+			switch ( _element_state[ix] )
 			{
 			case sub_state::subdivision:
 				o_ << sj << element_void(ix) << ": element " << ix << ":"
@@ -885,9 +871,9 @@ void ccpm::area_ctl::print(std::ostream &o_, unsigned indent_) const
 	o_ << si << "area_ctl end\n";
 }
 
-void ccpm::area_ctl::restore(ownership_callback_t resolver_)
+void ccpm::area_ctl::restore(const ownership_callback_t &resolver_)
 {
-	PLOG("restore %p", static_cast<void *>(this));
+	PLOG(PREFIX "restore %p", LOCATION, static_cast<void *>(this));
 	verifier v(this);
 	/* Address of the region transitioning to/from client allocated
 	 * during a crash, if any

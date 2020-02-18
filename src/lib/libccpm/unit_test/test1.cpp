@@ -126,6 +126,41 @@ TEST_F(Libccpm_test, ccpm_overlay)
   delete obj;
 }
 
+TEST_F(Libccpm_test, ccpm_immutable_allocator)
+{
+  using namespace ccpm;
+
+  size_t region_size = 0x400;
+  region_vector_t regions;
+  regions.push_back(::iovec{aligned_alloc(8,region_size), region_size});
+  regions.push_back(::iovec{aligned_alloc(8,region_size), region_size});
+  ASSERT_TRUE(regions.size() == 2);
+
+  Immutable_allocator_base allocator(regions, nullptr, true);
+  size_t inc = 0x100;
+  void * ptr;
+  for(unsigned i=0;i<6;i++) {
+    PLOG("allocate: %p,0x%lx", ptr = allocator.allocate(inc), inc);
+    //allocator.dump_info();
+  }
+
+  try {
+    allocator.allocate(inc);
+    ASSERT_TRUE(false); /* we should have thrown an exception by now */
+  }
+  catch(...) {
+    /* need to add more memory */
+    PLOG("ran out of memory - OK - time to add more memmory!");
+    allocator.expand(::iovec{aligned_alloc(8,region_size), region_size});
+  }
+  
+  PLOG("allocate: %p,0x%lx", ptr = allocator.allocate(inc), inc);
+  PLOG("allocate: %p,0x%lx", ptr = allocator.allocate(inc), inc);
+  
+  //PLOG("allocate: %p,0x%lx", ptr = allocator.allocate(inc), inc);
+  allocator.dump_info();
+}
+
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);

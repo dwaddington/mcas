@@ -1,10 +1,7 @@
 #ifndef __STOPWATCH_H__
 #define __STOPWATCH_H__
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <common/cycles.h>
-#pragma GCC diagnostic pop
 
 #include <cstddef>
 #include <iostream>

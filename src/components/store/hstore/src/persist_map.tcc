@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,92 +13,154 @@
 
 #include <type_traits> /* is_base_of */
 
+#include "hstore_config.h"
 #include "perishable.h"
 #include "segment_layout.h"
+#if 1
+#include "logging.h"
+#endif
+
+template <typename Allocator>
+	class monitor_extend
+	{
+		Allocator _a;
+	public:
+		monitor_extend(const Allocator &a_)
+			: _a(a_)
+		{
+#if HSTORE_TRACE_EXTEND
+			PLOG(PREFIX "ctor %d", LOCATION, USE_CC_HEAP);
+#endif
+			_a.arm_extend();
+		}
+		~monitor_extend()
+		{
+#if HSTORE_TRACE_EXTEND
+			PLOG(PREFIX "dtor", LOCATION);
+#endif
+			_a.disarm_extend();
+		}
+	};
 
 /*
  * ===== persist_map =====
  */
 
 template <typename Allocator>
-	impl::persist_map<Allocator>::persist_map(std::size_t n, Allocator av_)
+	impl::persist_map<Allocator>::persist_map(
+		std::size_t n, Allocator av_
+		, allocation_state_emplace *ase_
+		, allocation_state_pin *aspd_
+		, allocation_state_pin *aspk_
+		, allocation_state_extend *asx_
+	)
 		: _size_control()
 		, _segment_count(
 			/* The map tends to split when it is about 40% full.
-			 * Triple the excpected object count when creating a segment count.
+			 * Triple the expected object count when computing a segment count.
 			 */
 			((n*3U)/base_segment_size == 0 ? 1U : segment_layout::log2((3U * n)/base_segment_size))
 		)
 		, _sc{}
-		, _ase{}
+		, _ase{ase_}
+		, _aspd{aspd_}
+		, _aspk{aspk_}
+		, _asx{asx_}
 	{
-		do_initial_allocation(av_);
+		/* do_initial_allocation now requires a persist_controller, to interpret the
+		 * allocation_state_combined field. Construct a temporary one here.
+		 * The permanent persist_controller will be constructted later.
+		 * ERROR: See if we can use a single persist_controller, constructed at an
+		 * appripriate time.
+		 */
+		persist_controller<Allocator> pc(av_, this, construction_mode::create);
+		do_initial_allocation(&pc);
 	}
 
 template <typename Allocator>
-	void impl::persist_map<Allocator>::do_initial_allocation(Allocator av_)
+	void impl::persist_map<Allocator>::do_initial_allocation(persist_controller<Allocator> *pc_)
 	{
-		if ( _segment_count._actual.is_stable() )
+		auto &av = static_cast<Allocator &>(*pc_);
+		if ( _segment_count.actual().is_stable() )
 		{
-			if ( _segment_count._actual.value() == 0 )
+			if ( _segment_count.actual().value() == 0 )
 			{
 #if USE_CC_HEAP == 4
-				/* ERROR: local memory owner can leak */
+                /*
+				 * (1) save enough information to know when the allocated pointer is hardened. In this case, the address and new value of the length of the segment table
+				 *
+				 * inlcudes setting of doubt type to emplace
+				 */
+
+				/* ERROR: we can get at the pesistent state two ways: through the allocator (which
+				 * knows about the allocation_state_extend member of persistent_state) and
+				 * pc_, which is the persistent controller. This is one too many ways.
+				 */
+				monitor_extend<Allocator> m{bucket_allocator_t(av)};
 #endif
-				persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
-				bucket_allocator_t(av_).allocate(
-					ptr
+				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
+				/* Run the allocation */
+				bucket_allocator_t(av).allocate(
+					_sc[0].bp
 					, base_segment_size
 					, segment_align
 				);
-				new ( &*ptr ) bucket_aligned_t[base_segment_size];
-				_sc[0].bp = ptr;
-				_segment_count._actual.incr();
-				av_.persist(&_segment_count, sizeof _segment_count);
+
+				/* (2) Someone needs to persist the pointer at _sc[0].bp. We let the "tentative_allocator" (part of the "tentative_allocation_state") do that. */
+				new ( &*_sc[0].bp ) bucket_aligned_t[base_segment_size];
+				/* (3) atomic increment */
+				_segment_count.actual_incr();
+				/* (4) presist the change */
+				av.persist(&_segment_count, sizeof _segment_count);
+				/* (5) destructor of monitor_extend will set the allocation_state_extend
+				 *     state to idle, indicating that address at _sc[0].bp, which the
+				 *     allocator will remember for a while, is definitely allocated and
+				 *     not in doubt.
+				 */
 			}
 
 			/* while not enough allocated segments to hold n elements */
-			for ( auto ix = _segment_count._actual.value(); ix != _segment_count._specified; ++ix )
+			for ( auto ix = _segment_count.actual().value(); ix != _segment_count.specified(); ++ix )
 			{
 				auto segment_size = base_segment_size<<(ix-1U);
-
 #if USE_CC_HEAP == 4
-				/* ERROR: local memory owner can leak */
+// 				tas_type tas(bucket_allocator_t(av), &_asc.extend);
+				monitor_extend<Allocator> m{bucket_allocator_t(av)};
+				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
 #endif
-				persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
-				bucket_allocator_t(av_).allocate(
-					ptr
+				bucket_allocator_t(av).allocate(
+					_sc[ix].bp
 					, segment_size
 					, segment_align
 				);
-				new (&*ptr) bucket_aligned_t[base_segment_size << (ix-1U)];
-				_sc[ix].bp = ptr;
-				_segment_count._actual.incr();
-				av_.persist(&_segment_count, sizeof _segment_count);
+
+				new (&*_sc[ix].bp) bucket_aligned_t[base_segment_size << (ix-1U)];
+				_segment_count.actual_incr();
+				av.persist(&_segment_count, sizeof _segment_count);
 			}
 
-			av_.persist(&_size_control, sizeof _size_control);
+			av.persist(&_size_control, sizeof _size_control);
 		}
 	}
 
-#if USE_CC_HEAP == 3
 template <typename Allocator>
 	void impl::persist_map<Allocator>::reconstitute(Allocator av_)
 	{
+#if USE_CC_HEAP == 3
 		auto av = bucket_allocator_t(av_);
-		if ( ! _segment_count._actual.is_stable() || _segment_count._actual.value() != 0 )
+		if ( ! _segment_count.actual().is_stable() || _segment_count.actual().value() != 0 )
 		{
 			segment_layout::six_t ix = 0U;
 			av.reconstitute(base_segment_size, _sc[ix].bp);
 			++ix;
 
 			/* restore segments beyond the first */
-			for ( ; ix != _segment_count._actual.value_not_stable(); ++ix )
+			for ( ; ix != _segment_count.actual().value_not_stable(); ++ix )
 			{
 				auto segment_size = base_segment_size<<(ix-1U);
 				av.reconstitute(segment_size, _sc[ix].bp);
 			}
-			if ( ! _segment_count._actual.is_stable() )
+			if ( ! _segment_count.actual().is_stable() )
 			{
 				/* restore the last, "junior" segment */
 				auto segment_size = base_segment_size<<(ix-1U);
@@ -106,5 +168,23 @@ template <typename Allocator>
 			}
 
 		}
-	}
+#elif USE_CC_HEAP == 4
+		/* */
+		/* manifest constant 4 is number of possible emplace/erase deallocations (though 2 is the maximum expected) */
+		for ( auto i = 0; i != 4; ++i )
+		{
+			if ( auto p = ase().er_disused_ptr(i) )
+			{
+				PLOG(PREFIX "possibly incomplete deallocation at %p", LOCATION, p);
+				av_.deallocate(&p);
+			}
+		}
+		/* emplace can be disarmed now. */
+		av_.emplace_disarm();
+		/* extend has only allocations (no deallocations), so it could ahve been
+		 * disarmed when the allocator was reinstantiated. But it was not,
+		 * so disarm it here.
+		 */
+		av_.extend_disarm();
 #endif
+	}

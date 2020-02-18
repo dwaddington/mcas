@@ -10,7 +10,7 @@ apt-get install -y build-essential git libnuma-dev libelf-dev libpcap-dev uuid-d
         rapidjson-dev libfuse-dev libpcap-dev sqlite3 libsqlite3-dev libomp-dev \
         libboost-python-dev libkmod-dev libjson-c-dev libbz2-dev \
         linux-headers-`uname -r` libelf-dev libsnappy-dev liblz4-dev \
-        asciidoc xmlto libtool libgtest-dev google-perftools libgoogle-perftools-dev golang
+        asciidoc xmlto libtool libgtest-dev google-perftools libgoogle-perftools-dev golang gnutls-dev libgnutls30
 
 # not sure this works
 # install Rust compiler and runtime

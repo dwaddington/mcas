@@ -5,12 +5,12 @@ project(component-adoplugin-passthru CXX)
 set(CMAKE_CXX_STANDARD 11)
 
 enable_language(CXX C ASM)
-set(GCC_COVERAGE_COMPILE_FLAGS "-g -O2 -fPIC")
 
 file(GLOB SOURCES src/*.cpp)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
-add_compile_options(-g -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings -Wformat=2)
+add_definitions(-DCONFIG_DEBUG)
+add_compile_options(${FLAG_DUMP_CLASS})
+add_compile_options(-O2 -fPIC)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 

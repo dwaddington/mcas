@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -21,21 +21,12 @@
 
 #include "fabric_util.h" /* make_fi_info */
 
+#include "rdma-fi_endpoint.h" /* fi_tx_attr, fi_rx_attr */
+#include "rdma-fabric.h" /* fi_info */
+
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fabric.h> /* fi_info */
-#pragma GCC diagnostic pop
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wcast-align"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fi_endpoint.h> /* fi_tx_attr, fi_rx_attr */
-#pragma GCC diagnostic pop
 
 #include <cstdint> /* uint32_t, uint64_t */
 #include <cstring> /* strdup */

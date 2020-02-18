@@ -12,28 +12,65 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_TRACE_FLAGS_H
-#define _COMANCHE_HSTORE_TRACE_FLAGS_H
+#ifndef _MCAS_HSTORE_TRACE_FLAGS_H
+#define _MCAS_HSTORE_TRACE_FLAGS_H
+
+#ifndef HSTORE_TRACE_ALL
+#define HSTORE_TRACE_ALL 0
+#endif
 
 /* things to report */
-#define TRACE_MANY 0
-#define TRACE_PALLOC 0
-#define TRACE_PERSIST 0
-#define TRACE_LOCK 0
-#define TRACE_HEAP 0
-#define TRACE_HEAP_SUMMARY 0
-#define TRACE_PERISHABLE_EXPIRY 0
-#define TRACE_RESIZE 0
-#define TRACE_OWNER 0
-#define TRACE_BUCKET_IX 0
+#ifndef HSTORE_TRACE_MANY
+#define HSTORE_TRACE_MANY HSTORE_TRACE_ALL
+#endif
 
-/* derive traces */
-#define TRACED_TABLE (TRACE_MANY || TRACE_PERISHABLE_EXPIRY)
+#ifndef HSTORE_TRACE_PALLOC
+#define HSTORE_TRACE_PALLOC HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_PERSIST
+#define HSTORE_TRACE_PERSIST HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_LOCK
+#define HSTORE_TRACE_LOCK HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_RESIZE
+#define HSTORE_TRACE_RESIZE HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_OWNER
+#define HSTORE_TRACE_OWNER HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_BUCKET_IX
+#define HSTORE_TRACE_BUCKET_IX HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_EXTEND
+#define HSTORE_TRACE_EXTEND HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_PERISHABLE_EXPIRY
+#define HSTORE_TRACE_PERISHABLE_EXPIRY HSTORE_TRACE_ALL
+#endif
+
+#ifndef HSTORE_TRACE_HEAP
+#define HSTORE_TRACE_HEAP HSTORE_TRACE_ALL
+#endif
+
+static constexpr bool trace_heap = bool(HSTORE_TRACE_HEAP);
+static constexpr bool trace_heap_summary = bool(HSTORE_TRACE_HEAP);
+static constexpr bool trace_perishable_expiry = bool(HSTORE_TRACE_PERISHABLE_EXPIRY);
+
+/* derived traces */
+#define TRACED_TABLE (HSTORE_TRACE_MANY || HSTORE_TRACE_PERISHABLE_EXPIRY || HSTORE_TRACE_RESIZE)
 #define TRACED_BUCKET TRACED_TABLE
 #define TRACED_CONTENT TRACED_TABLE
-#define TRACED_OWNER (TRACED_TABLE || TRACE_OWNER)
+#define TRACED_OWNER (HSTORE_TRACE_OWNER || TRACED_TABLE)
 
-/* Data to track which is not normally needed but us required by some TRACE */
+/* Data to track which is not normally needed but is required by some TRACE */
 #define TRACK_OWNER (TRACED_OWNER || TRACED_CONTENT)
 #define TRACK_POS TRACED_OWNER
 

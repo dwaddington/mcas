@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -54,7 +54,7 @@ public:
   
   void * query_interface(Component::uuid_t& itf_uuid) override {
     if(itf_uuid == Component::IADO_plugin::iid()) {
-      return (void *) static_cast<Component::IADO_plugin*>(this);
+      return static_cast<Component::IADO_plugin*>(this);
     }
     else return NULL; // we don't support this interface
   }
@@ -72,11 +72,9 @@ public:
 
 
   status_t do_work(const uint64_t work_key,
-                   const std::string& key,
-                   void * value,
-                   size_t value_len,
-                   void * detached_value,
-                   size_t detached_value_len,
+                   const char * key,
+                   size_t key_len,
+                   IADO_plugin::value_space_t& values,
                    const void * in_work_request, /* don't use iovec because of non-const */
                    const size_t in_work_request_len,
                    bool new_root,

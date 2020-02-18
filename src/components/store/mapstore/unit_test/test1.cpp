@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -10,16 +10,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wformat"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #include <gtest/gtest.h>
 #include <common/utils.h>
 #include <common/str_utils.h>
 #include <api/components.h>
 #include <api/kvstore_itf.h>
+
+#define ASSERT_OK(X) ASSERT_TRUE(S_OK == X)
 
 using namespace Component;
 
@@ -34,7 +32,7 @@ class KVStore_test : public ::testing::Test {
 
   // If the constructor and destructor are not enough for setting up
   // and cleaning up each test, you can define the following methods:
-  
+
   virtual void SetUp() {
     // Code here will be called immediately after the constructor (right
     // before each test).
@@ -44,10 +42,10 @@ class KVStore_test : public ::testing::Test {
                                                           Component::mapstore_factory);
 
       ASSERT_TRUE(comp);
-      IKVStore_factory * fact = (IKVStore_factory *) comp->query_interface(IKVStore_factory::iid());
+      auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
 
       _kvstore = fact->create("owner","name");
-  
+
       fact->release_ref();
     }
   }
@@ -56,7 +54,7 @@ class KVStore_test : public ::testing::Test {
     // Code here will be called immediately after each test (right
     // before the destructor).
   }
-  
+
   // Objects declared here can be used by all tests in the test case
   static Component::IKVStore * _kvstore;
 };
@@ -86,7 +84,7 @@ TEST_F(KVStore_test, BasicPut)
   std::string value = "Hello world!";
   //  value.resize(value.length()+1); /* append /0 */
   value.resize(KB(8));
-    
+
   _kvstore->put(pool, key, value.c_str(), value.length());
   _kvstore->put(pool, key2, value.c_str(), value.length());
 }
@@ -98,7 +96,7 @@ TEST_F(KVStore_test, BasicGet)
   void * value = nullptr;
   size_t value_len = 0;
   _kvstore->get(pool, key, value, value_len);
-  PINF("Value=(%.50s) %lu", ((char*)value), value_len);
+  PINF("Value=(%.50s) %lu", static_cast<const char *>(value), value_len);
 
   ASSERT_TRUE(value);
   ASSERT_TRUE(value_len == KB(8));
@@ -106,7 +104,7 @@ TEST_F(KVStore_test, BasicGet)
   value = nullptr;
   value_len = 0;
   _kvstore->get(pool, key, value, value_len);
-  PINF("Repeat Value=(%.50s) %lu", ((char*)value), value_len);
+  PINF("Repeat Value=(%.50s) %lu", static_cast<const char *>(value), value_len);
   auto count = _kvstore->count(pool);
   PINF("Count = %ld", count);
   ASSERT_TRUE(count == 2);
@@ -122,7 +120,7 @@ TEST_F(KVStore_test, BasicMap)
                    const void * value,
                    const size_t value_len) -> int
                 {
-                  PINF("key:(%s) value(%s)", key, static_cast<const char *>(value));
+                  PINF("key:(%.*s) value(%.*s)", int(key_len), static_cast<const char *>(key), int(value_len), static_cast<const char *>(value));
                   return 0;
                 }
                 );
@@ -137,8 +135,8 @@ TEST_F(KVStore_test, ValueResize)
                    const void * value,
                    const size_t value_len) -> int
                 {
-                  PINF("key:(%s) value(%s-%lu)", key,
-                       static_cast<const char *>(value),
+                  PINF("key:(%.*s) value(%.*s-%lu)", int(key_len), static_cast<const char *>(key),
+                       int(value_len), static_cast<const char *>(value),
                        value_len);
                   return 0;
                 }
@@ -155,15 +153,15 @@ TEST_F(KVStore_test, ValueResize)
                    const void * value,
                    const size_t value_len) -> int
                 {
-                  PINF("key:(%s) value(%s-%lu)", key,
-                       static_cast<const char *>(value),
+                  PINF("key:(%.*s) value(%.*s-%lu)", int(key_len), static_cast<const char *>(key),
+                       int(value_len), static_cast<const char *>(value),
                        value_len);
                   return 0;
                 }
                 );
 
 }
-  
+
 
 TEST_F(KVStore_test, BasicRemove)
 {
@@ -179,17 +177,17 @@ TEST_F(KVStore_test, ReopenPool)
 {
   pool = _kvstore->open_pool("test1.pool");
   ASSERT_TRUE(pool != Component::IKVStore::POOL_ERROR);
-  PLOG("re-opened pool: %p", (void*) pool);
+  PLOG("re-opened pool: %p", reinterpret_cast<const void *>(pool));
 }
 
 TEST_F(KVStore_test, ReClosePool)
 {
   _kvstore->close_pool(pool);
 }
-  
+
 TEST_F(KVStore_test, DeletePool)
 {
-  PLOG("deleting pool: %p", (void*) pool);
+  PLOG("deleting pool: %p", reinterpret_cast<const void *>(pool));
   _kvstore->delete_pool("test1.pool");
 }
 
@@ -206,18 +204,20 @@ TEST_F(KVStore_test, Timestamps)
     for(unsigned i=0;i<10;i++) {
       auto value = Common::random_string(16);
       auto key = Common::random_string(8);
-      PLOG("adding key-value pair (%s)", key.c_str()); 
+      PLOG("adding key-value pair (%s)", key.c_str());
       _kvstore->put(pool, key, value.c_str(), value.size());
       sleep(2);
     }
 
-    
+
     _kvstore->map(pool, [](const void* key,
                            const size_t key_len,
                            const void* value,
                            const size_t value_len,
                            const tsc_time_t timestamp) -> bool {
-                    PLOG("Timestamped record: %.*s @ %lu", (int)key_len, key, timestamp);
+                    (void)value; // unused
+                    (void)value_len; // unused
+                    PLOG("Timestamped record: %.*s @ %lu", int(key_len), static_cast<const char *>(key), timestamp);
                     return true;
                   }, 0, 0);
 
@@ -227,8 +227,10 @@ TEST_F(KVStore_test, Timestamps)
                            const void* value,
                            const size_t value_len,
                            const tsc_time_t timestamp) -> bool {
+                    (void)value; // unused
+                    (void)value_len; // unused
                     PLOG("After 5 Timestamped record: %.*s @ %lu",
-                         (int)key_len, key, timestamp);
+                         int(key_len), static_cast<const char *>(key), timestamp);
                     return true;
                   }, now + 5, 0);
   }
@@ -244,14 +246,14 @@ TEST_F(KVStore_test, Iterator)
   pool = _kvstore->create_pool("iterator-test.pool", MB(32));
 
   epoch_time_t now = 0;
-  
+
   for(unsigned i=0;i<10;i++) {
     auto value = Common::random_string(16);
     auto key = Common::random_string(8);
 
     if(i==5) { sleep(2); now = epoch_now(); }
-    
-    PLOG("(%u) adding key-value pair key(%s) value(%s)", i, key.c_str(),value.c_str()); 
+
+    PLOG("(%u) adding key-value pair key(%s) value(%s)", i, key.c_str(),value.c_str());
     _kvstore->put(pool, key, value.c_str(), value.size());
   }
 
@@ -261,8 +263,8 @@ TEST_F(KVStore_test, Iterator)
                    const void * value,
                    const size_t value_len) -> int
                 {
-                  PINF("key:(%p %.*s) value(%.*s)", key, (int) key_len, key, (int) value_len,
-                       value);
+                  PINF("key:(%p %.*s) value(%.*s)", static_cast<const char *>(key), int(key_len), static_cast<const char *>(key), int(value_len),
+                       static_cast<const char *>(value));
                   return 0;
                 }
                 );
@@ -271,13 +273,13 @@ TEST_F(KVStore_test, Iterator)
   status_t rc;
   IKVStore::pool_reference_t ref;
   bool time_match;
-  
 
-  auto iter = _kvstore->open_pool_iterator(pool);  
+
+  auto iter = _kvstore->open_pool_iterator(pool);
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, 0, ref, time_match, true)) == S_OK) {
     PLOG("iterator: key(%.*s) value(%.*s) %lu",
-         (int) ref.key_len, ref.key,
-         (int) ref.value_len, ref.value,
+         int(ref.key_len), static_cast<const char *>(ref.key),
+         int(ref.value_len), static_cast<const char *>(ref.value),
          ref.timestamp);
   }
   _kvstore->close_pool_iterator(pool, iter);
@@ -287,8 +289,8 @@ TEST_F(KVStore_test, Iterator)
   ASSERT_TRUE(now > 0);
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, now, ref, time_match, true)) == S_OK) {
     PLOG("(time-constrained) iterator: key(%.*s) value(%.*s) %lu (match=%s)",
-         (int) ref.key_len, ref.key,
-         (int) ref.value_len, ref.value,
+         int(ref.key_len), static_cast<const char *>(ref.key),
+         int(ref.value_len), static_cast<const char *>(ref.value),
          ref.timestamp,
          time_match ? "y":"n");
   }
@@ -296,39 +298,66 @@ TEST_F(KVStore_test, Iterator)
   ASSERT_TRUE(rc == E_OUT_OF_BOUNDS);
 
 
-  
+
   PLOG("Disturbed iteration...");
   unsigned i=0;
   iter = _kvstore->open_pool_iterator(pool);
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, 0, ref, time_match, true)) == S_OK) {
     PLOG("iterator: key(%.*s) value(%.*s) %lu",
-         (int) ref.key_len, ref.key,
-         (int) ref.value_len, ref.value,
+         int(ref.key_len), static_cast<const char *>(ref.key),
+         int(ref.value_len), static_cast<const char *>(ref.value),
          ref.timestamp);
     i++;
     if(i == 5) {
       /* disturb iteration */
       auto value = Common::random_string(16);
       auto key = Common::random_string(8);
-      PLOG("adding key-value pair key(%s) value(%s)", key.c_str(),value.c_str()); 
+      PLOG("adding key-value pair key(%s) value(%s)", key.c_str(),value.c_str());
       _kvstore->put(pool, key, value.c_str(), value.size());
     }
   }
   ASSERT_TRUE(rc == E_ITERATOR_DISTURBED);
-  
+
   PLOG("Closing pool.");
   ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
   ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
 }
 
+
+TEST_F(KVStore_test, KeySwap)
+{
+  ASSERT_TRUE(_kvstore);
+  pool = _kvstore->create_pool("keyswap", MB(32));
+
+  std::string left_key = "LeftKey";
+  std::string right_key = "RightKey";
+  std::string left_value = "This is left";
+  std::string right_value = "This is right";
+
+  ASSERT_OK(_kvstore->put(pool, left_key, left_value.c_str(), left_value.length()));
+  ASSERT_OK(_kvstore->put(pool, right_key, right_value.c_str(), right_value.length()));
+
+  ASSERT_OK(_kvstore->swap_keys(pool, left_key, right_key));
+
+  iovec new_left, new_right;
+  _kvstore->get(pool, left_key, new_left.iov_base, new_left.iov_len);
+  _kvstore->get(pool, right_key, new_right.iov_base, new_right.iov_len);
+
+  PLOG("left: %.*s", int(new_left.iov_len), static_cast<const char *>(new_left.iov_base));
+  PLOG("right: %.*s", int(new_right.iov_len), static_cast<const char *>(new_right.iov_base));
+  ASSERT_TRUE(strncmp(static_cast<const char *>(new_left.iov_base), right_value.c_str(), new_left.iov_len) == 0);
+  ASSERT_TRUE(strncmp(static_cast<const char *>(new_right.iov_base), left_value.c_str(), new_right.iov_len) == 0);
+  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
+  ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
+}
+
+
 } // namespace
 
 int main(int argc, char **argv) {
-  
+
   ::testing::InitGoogleTest(&argc, argv);
   auto r = RUN_ALL_TESTS();
 
   return r;
 }
-
-#pragma GCC diagnostic pop

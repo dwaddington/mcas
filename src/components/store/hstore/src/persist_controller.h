@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_PERSIST_CONTROLLER_H
-#define _COMANCHE_HSTORE_PERSIST_CONTROLLER_H
+#ifndef MCAS_HSTORE_PERSIST_CONTROLLER_H
+#define MCAS_HSTORE_PERSIST_CONTROLLER_H
 
 #include "construction_mode.h"
 #include "hop_hash_log.h"
@@ -31,8 +31,6 @@
  * Modification of persistent data (except for writes to persist_data::_sc)
  * goes through this class. Ideally this should also get writes to persist_data::_sc.
  */
-
-#include "hop_hash_log.h"
 
 class perishable_expiry;
 
@@ -52,17 +50,13 @@ namespace impl
 			}
 			persist_size_change(const persist_size_change &) = delete;
 			persist_size_change& operator=(const persist_size_change &) = delete;
-			~persist_size_change()
+			~persist_size_change() noexcept(! TEST_HSTORE_PERISHABLE)
 			{
-				try
+				if ( ! perishable_expiry::is_current() )
 				{
 					/* Note: change and size_stabilize are separate calls which could be combined. */
 					this->SizeChange::change();
 					_pc->size_stabilize();
-				}
-				catch ( const perishable_expiry & )
-				{
-					hop_hash_log<TEST_HSTORE_PERISHABLE>::write(__func__, " perishable_expiry");
 				}
 			}
 		};
@@ -128,26 +122,58 @@ namespace impl
 			void persist_size();
 			void persist_existing_segments(const char *what = "old segments");
 			void persist_new_segment(const char *what = "new segments");
-			auto record_owner_addr_and_bitmask(
+			void em_record_owner_addr_and_bitmask(
 				persistent_atomic_t<owner::value_type> *pmask_
 				, owner::value_type mask_
 			)
 			{
-				return
-					_persist->ase().record_owner_addr_and_bitmask(
+				auto pe = static_cast<allocator_type *>(this);
+				_persist->ase()
+					.em_record_owner_addr_and_bitmask(
 						pmask_
 						, mask_
-						, *static_cast<allocator_type *>(this)
+						, *pe
 					);
+			}
+			void er_record_owner_addr_and_bitmask(
+				persistent_atomic_t<owner::value_type> *pmask_
+				, owner::value_type mask_
+			)
+			{
+				auto pe = static_cast<allocator_type *>(this);
+				_persist->ase()
+					.er_record_owner_addr_and_bitmask(
+						pmask_
+						, mask_
+						, *pe
+					);
+			}
+			void record_segment_count_addr_and_target_value(
+				segment_count *psegment_count_
+				, segment_layout::six_t segment_count_expected_
+			)
+			{
+				auto pe = static_cast<allocator_type *>(this);
+				_persist->asx()
+					.record_segment_count_addr_and_target_value(
+						psegment_count_
+						, segment_count_expected_
+						, *pe
+					);
+			}
+			void clear_allocation_doubt()
+			{
+				_persist->ase().clear_allocation_doubt(static_cast<allocator_type *>(this));
+				_persist->asx().clear_allocation_doubt(static_cast<allocator_type *>(this));
 			}
 
 			auto segment_count_actual() const
 			{
-				return _persist->_segment_count._actual;
+				return _persist->_segment_count.actual();
 			}
 			std::size_t segment_count_specified() const
 			{
-				return _persist->_segment_count._specified;
+				return _persist->_segment_count.specified();
 			}
 
 			auto size_unstable() const /* debugging only */

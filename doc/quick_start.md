@@ -2,6 +2,14 @@
 
 The easiest way to get going is to use the DRAM based key-value engine, *mapstore*.  Mapstore is volatile and therefore data is lost after the MCAS process has been shutdown.
 
+### System Configuration
+
+Make sure you load the ```xpmem.ko``` kernel module.  This is built as part of the distribution (e.g., dist/lib/modules/4.18.19-100.fc27.x86_64/xpmem.ko)
+
+```bash
+insmod ./dist/lib/modules/4.18.19-100.fc27.x86_64/xpmem.ko
+```
+
 ### Launch MCAS server
 
 The MCAS server can be launched from the build directory.  Using one of the pre-supplied (testing) configuration files:

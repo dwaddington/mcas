@@ -33,7 +33,7 @@ public:
    */
   Slab(void * buffer, size_t size) : _root(static_cast<Slab_struct*>(buffer))
   {
-    if(!check_aligned(buffer, 64))
+    if(!check_aligned(buffer, 8))
       throw std::invalid_argument("object instance is not 64bit aligned");
 
     if(size <= sizeof(Slab_struct))

@@ -5,7 +5,7 @@ project(mcas-client-test CXX)
 
 enable_language(CXX C ASM)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG)
 
 include_directories(../../../../lib/common/include/)
 include_directories(../../../)

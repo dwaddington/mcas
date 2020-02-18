@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_DEALLOCATOR_POBJ_CACHE_ALIGNED_H
-#define _COMANCHE_HSTORE_DEALLOCATOR_POBJ_CACHE_ALIGNED_H
+#ifndef MCAS_HSTORE_DEALLOCATOR_POBJ_CACHE_ALIGNED_H
+#define MCAS_HSTORE_DEALLOCATOR_POBJ_CACHE_ALIGNED_H
 
 #include "deallocator_pobj.h"
 
@@ -104,16 +104,16 @@ template <typename T, typename Deallocator>
 		void deallocate(
 			pointer oid
 			, size_type
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 			s
 #endif
 		)
 		{
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 			{
 				auto ptr = static_cast<char *>(pmemobj_direct(oid)) - cache_align;
-				hop_hash_log::write(__func__
-					, " [", static_cast<void *>(ptr)
+				hop_hash_log::write(LOG_LOCATION
+					, "[", static_cast<void *>(ptr)
 					, "..", static_cast<void *>(ptr + s * sizeof(value_type))
 					, ") OID ", std::hex, oid.pool_uuid_lo, ".", oid.off, std::dec
 				);

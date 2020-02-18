@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_SEGMENT_AND_BUCKET_H
-#define _COMANCHE_HSTORE_SEGMENT_AND_BUCKET_H
+#ifndef _MCAS_HSTORE_SEGMENT_AND_BUCKET_H
+#define _MCAS_HSTORE_SEGMENT_AND_BUCKET_H
 
 #include "bucket_control_unlocked.h"
 #include "segment_layout.h"
@@ -54,9 +54,8 @@ namespace impl
 				}
 				return *this;
 			}
-			/* one or the other is necessary, not both */
+
 			bool at_end() const { return _bi == segment_size() && _seg->_next->index() == 0; }
-			bool can_incr_without_wrap() const { return _bi != segment_size() || _seg->_next->index() != 0; }
 
 			auto incr_without_wrap() -> segment_and_bucket &
 			{
@@ -74,11 +73,8 @@ namespace impl
 				}
 				return *this;
 			}
-			auto add_small(
-				const segment_layout &
-				, unsigned fwd
-			) -> segment_and_bucket &
-				{
+			auto add_small(unsigned fwd) -> segment_and_bucket &
+			{
 				/* To develop (six_t, bix_t) pair:
 				 *  1. Add to the (low) part.
 				 *  2. In case there was carry (next address is in following segment)
@@ -93,10 +89,7 @@ namespace impl
 				}
 				return *this;
 			}
-			auto subtract_small(
-				const segment_layout &
-				, unsigned bkwd
-			) -> segment_and_bucket &
+			auto subtract_small(unsigned bkwd) -> segment_and_bucket &
 			{
 				/* To develop (six_t, bix_t) pair:
 				 *  1. decrement the part.

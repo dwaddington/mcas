@@ -72,6 +72,7 @@
 #define ESC_END "\033[0m"
 
 void pr_info(const char * format, ...) __attribute__((format(printf, 1, 2)));
+
 inline void pr_info(const char * format, ...)
 {
 #ifdef CONFIG_DEBUG
@@ -82,6 +83,8 @@ inline void pr_info(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s[LOG]:%s %s\n", ESC_LOG, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -96,6 +99,8 @@ inline void pr_error(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s[LOG]:%s %s\n", ESC_ERR, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -110,6 +115,8 @@ inline void PLOG(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s[LOG]:%s %s\n", ESC_LOG, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -124,6 +131,8 @@ inline void PDBG(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s[DBG]:%s %s\n", ESC_DBG, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -138,6 +147,8 @@ inline void PINF(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s %s %s\n", ESC_INF, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -152,6 +163,8 @@ inline void PWRN(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s[WRN]: %s %s\n", ESC_WRN, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -166,6 +179,8 @@ inline void PERR(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%sError: %s %s\n", ESC_ERR, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -180,6 +195,8 @@ inline void PEXCEP(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%sException: %s %s\n", ESC_ERR, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -194,6 +211,8 @@ inline void PNOTICE(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%sNOTICE: %s %s\n", BRIGHT_RED, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 
@@ -208,6 +227,8 @@ inline void PMAJOR(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
   fprintf(stderr, "%s[+] %s %s\n", NORMAL_BLUE, buffer, ESC_END);
+#else
+  (void)format;
 #endif
 }
 

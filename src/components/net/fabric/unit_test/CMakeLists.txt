@@ -7,8 +7,6 @@ include_directories(../../../../components)
 include_directories(../../../../lib/common/include/)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # libfabric
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
-
 add_executable(fabric-test1 test1.cpp
   eyecatcher.cpp
   mr_lock.cpp

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -27,7 +27,21 @@
 #else
 #define USE_CC_HEAP 3
 #endif
+
 #define THREAD_SAFE_HASH 0
-#define PREFIX "HSTORE : %s: "
+#define PREFIX_STATIC "HSTORE %s %s:%d "
+#define LOCATION_STATIC __func__, __FILE__, __LINE__
+#define PREFIX PREFIX_STATIC "%p "
+#define LOCATION LOCATION_STATIC, static_cast<const void *>(this)
+
+/* JIRA DAWN-292 requested a compile-configured grain size, default 32MiB 1<<25 */
+#if ! defined HSTORE_GRAIN_SIZE
+#define HSTORE_GRAIN_SIZE (std::size_t(1)<<25)
+#endif
+
+/* timestamps are enabled to match mapstore. To disable, compile with -DENABLE_TIMESTAMPS=0 */
+#if ! defined ENABLE_TIMESTAMPS
+#define ENABLE_TIMESTAMPS 1
+#endif
 
 #endif

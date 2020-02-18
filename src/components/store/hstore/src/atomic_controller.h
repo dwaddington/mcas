@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,18 +12,25 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_ATOMIC_CTL_H_
-#define _COMANCHE_HSTORE_ATOMIC_CTL_H_
+#ifndef MCAS_HSTORE_ATOMIC_CTL_H_
+#define MCAS_HSTORE_ATOMIC_CTL_H_
 
 #include "construction_mode.h"
-#include "persist_atomic.h"
+#include "mod_control.h"
+#if 0
 #include "persist_fixed_string.h"
+#endif
+#include <api/kvstore_itf.h> /* Component */
 
+#include <tuple> /* tuple_element */
 #include <type_traits> /* is_base_of */
 #include <vector>
 
 namespace impl
 {
+	template <typename Value>
+		class persist_atomic;
+
 	template <typename Table>
 		class atomic_controller
 			: private std::allocator_traits<typename Table::allocator_type>::template rebind_alloc<mod_control>
@@ -32,28 +39,47 @@ namespace impl
 			using allocator_type =
 				typename std::allocator_traits<typename table_t::allocator_type>::template rebind_alloc<mod_control>;
 
-			using persist_t = persist_atomic<typename Table::value_type>;
-			using mod_key_t = typename persist_t::mod_key_t;
+			using persist_t = persist_atomic<typename table_t::value_type>;
 			persist_t *_persist; /* persist_atomic is a bad name. Should be a noun. */
 			table_t *_map;
+#if 0
 			bool _tick_expired;
+#endif
 			class update_finisher
 			{
-				impl::atomic_controller<Table> &_ctlr;
+				impl::atomic_controller<table_t> &_ctlr;
 			public:
-				update_finisher(impl::atomic_controller<Table> &ctlr_);
-				~update_finisher();
+				update_finisher(impl::atomic_controller<table_t> &ctlr_);
+				~update_finisher() noexcept(! TEST_HSTORE_PERISHABLE);
 			};
 			void redo_update();
 			void update_finish();
 			void redo_replace();
+			void redo_swap();
 			void redo_finish();
+#if 0
 			/* Helpers for the perishable test, to avoid an exception in the finish_update destructor */
 			void tick_expired() { _tick_expired = true; }
 			bool is_tick_expired() { auto r = _tick_expired; _tick_expired = false; return r; }
+#endif
+			void persist_range(const void *first_, const void *last_, const char *what_);
+
+			void emm_record_owner_addr_and_bitmask(
+				persistent_atomic_t<std::uint64_t> *pmask_
+				, std::uint64_t mask_
+			)
+			{
+				auto pe = static_cast<allocator_type *>(this);
+				_persist->ase()
+					.em_record_owner_addr_and_bitmask(
+						pmask_
+						, mask_
+						, *pe
+					);
+			}
 		public:
 			atomic_controller(
-				persist_atomic<typename Table::value_type> &persist_
+				persist_atomic<typename table_t::value_type> &persist_
 				, table_t &map_
 				, construction_mode mode_
 			);
@@ -62,23 +88,26 @@ namespace impl
 
 			void redo();
 
-			void persist_range(const void *first_, const void *last_, const char *what_);
-
 			void enter_update(
-				typename Table::allocator_type al_
-				, const typename Table::key_type &key
+				typename table_t::allocator_type al_
+				, const std::string &key
 				, std::vector<Component::IKVStore::Operation *>::const_iterator first
 				, std::vector<Component::IKVStore::Operation *>::const_iterator last
 			);
 			void enter_replace(
-				typename Table::allocator_type al
-				, const typename Table::key_type &key
+				typename table_t::allocator_type al
+				, const std::string &key
 				, const char *data
 				, std::size_t data_len
 				, std::size_t zeros_extend
 				, std::size_t alignment
 			);
-			friend class atomic_controller<Table>::update_finisher;
+			using mt = typename table_t::mapped_type;
+			void enter_swap(
+				mt &d0
+				, mt &d1
+			);
+			friend class atomic_controller<table_t>::update_finisher;
 	};
 }
 

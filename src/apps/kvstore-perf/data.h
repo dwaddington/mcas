@@ -6,7 +6,7 @@
 #include <common/logging.h>
 #include <common/exceptions.h>
 
-class KV_pair 
+class KV_pair
 {
 public:
   std::string key;
@@ -16,23 +16,26 @@ public:
     : key(), value(nullptr), value_len(0)
   {}
 
+  KV_pair(const KV_pair &) = delete;
+  KV_pair &operator=(const KV_pair &) = delete;
+
   size_t size() { return key.length() + value_len; }
 };
 
 class Data
 {
   size_t _num_elements;
-  size_t _key_len;  
-  size_t _val_len; 
+  size_t _key_len;
+  size_t _val_len;
 
 public:
   KV_pair * _data;
-  
-  Data() 
+
+  Data()
     : Data(0)
   {
   }
- 
+
   Data(size_t num_elements)
     : Data(num_elements, 0, 0, true)
   {
@@ -53,7 +56,7 @@ public:
   Data(const Data &) = delete;
   Data& operator=(const Data &) = delete;
 
-  ~Data() 
+  ~Data()
   {
     delete [] _data;
   }
@@ -82,10 +85,10 @@ public:
   {
     PLOG("Initializing data: %d key length, %d value length, %d elements....",
          int(_key_len), int(_val_len), int(_num_elements));
-        
+
     _data = data;
-    
-    for( size_t i=0; i<_num_elements; ++i) 
+
+    for( size_t i=0; i<_num_elements; ++i)
     {
       auto key = Common::random_string(_key_len);
 
@@ -98,29 +101,29 @@ public:
 
     PLOG("%d elements initialized, size %d.", int(_num_elements), int(_val_len));
   }
-  
-  const char * key(size_t i) const 
+
+  const char * key(size_t i) const
   {
     if(i >= _num_elements) throw General_exception("index out of bounds");
     return _data[i].key.c_str();
   }
-  
+
   const std::string & key_as_string(size_t i) const
   {
     if(i >= _num_elements) throw General_exception("index out of bounds");
     return _data[i].key;
   }
 
-  const char * value(size_t i) const 
+  const char * value(size_t i) const
   {
     if(i >= _num_elements) throw General_exception("index out of bounds");
     return static_cast<const char *>(_data[i].value);
   }
-  
+
   size_t key_len() const { return _key_len; }
-  
+
   size_t value_len() const { return _val_len; }
-  
+
   size_t num_elements() const { return _num_elements; }
 
   size_t memory_size() const { return _num_elements * _key_len * _val_len; }

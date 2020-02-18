@@ -30,20 +30,19 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG)
 
-file(GLOB SOURCES src/*.c*)
-
-add_library(ccpm SHARED ${SOURCES})
+set(CCPM_SOURCES src/area_ctl.cpp src/area_top.cpp src/atomic_word.cpp src/cca.cpp src/ccpm.cpp src/doubt.cpp src/log.cpp)
+add_library(ccpm SHARED ${CCPM_SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem)
+target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem gcov)
 
 add_subdirectory(unit_test)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(DIRECTORY "src/" DESTINATION "include/ccpm" FILES_MATCHING PATTERN "./include/ccpm/*")
-
+#install(DIRECTORY "include/ccpm" DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 # # force early install because others depend on this.  this seems a hack. is there
 # # a better way?

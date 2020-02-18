@@ -19,6 +19,7 @@ unsigned ccpm::aw_count_max_free_run(atomic_word aw)
 	 */
 
 	/* Algorithm of Hacker's Delight 6-3; modified to count runs of 0s, not 1s */
+	if ( aw == 0 ) { return 64; }
 	aw = ~aw;
 
 	unsigned k = 0;
@@ -27,4 +28,41 @@ unsigned ccpm::aw_count_max_free_run(atomic_word aw)
 		aw = aw & (aw << 1);
 	}
 	return k;
+}
+
+namespace
+{
+	/* find n free bits. The loop is O(n). Good for small n */
+	inline auto find_n_free_order_n(ccpm::atomic_word aw, const unsigned n) -> unsigned
+	{
+		aw = ~aw;
+		for ( unsigned i = 0; i != n - 1 && aw != 0; ++i )
+		{
+			aw &= aw >> 1;
+		}
+		return aw == 0 ? ccpm::alloc_states_per_word-n+1 : __builtin_ctzll(aw);
+	}
+
+	/* find n free bits. The loop is O(bit_count(aw) - n). Good for large n */
+	inline auto find_n_free_order_w(ccpm::atomic_word aw, const unsigned n) -> unsigned
+	{
+		/* mask if 1's marks area to check */
+		ccpm::atomic_word mask = (ccpm::atomic_word(1U) << n) - 1U;
+		ccpm::atomic_word desired = ccpm::atomic_word(0);
+		unsigned pos = 0;
+		while ( pos + n <= ccpm::alloc_states_per_word && (aw & mask) != desired )
+		{
+			aw >>= 1;
+			++pos;
+		}
+		return pos;
+	}
+}
+
+/* in the atomic word aw, return the index of a start of a run of n free elements
+* (or alloc_states_per_word-n+1, if there is no such run)
+*/
+auto ccpm::aw_find_n_free(atomic_word aw, const unsigned n) -> unsigned
+{
+	return find_n_free_order_n(aw, n);
 }

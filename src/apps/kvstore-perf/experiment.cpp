@@ -30,8 +30,6 @@
 #include <thread>
 #include <vector>
 
-#define FILESTORE_PATH "libcomponent-storefile.so"
-#define DUMMYSTORE_PATH "libcomponent-dummystore.so"
 #define MCAS_PATH "libcomponent-mcasclient.so"
 
 #define HT_SIZE_FACTOR 1 /* already factor 3 in hstore */
@@ -230,13 +228,7 @@ int Experiment::initialize_store(unsigned core)
 
   try
   {
-    if( component_is( "filestore" ) ) {
-      comp = load_component(FILESTORE_PATH, filestore_factory);
-    }
-    else if( component_is( "dummystore" ) ) {
-      comp = load_component(DUMMYSTORE_PATH, dummystore_factory);
-    }
-    else if( component_is( "mcas" ) ) {
+    if( component_is( "mcas" ) ) {
 
       DECLARE_STATIC_COMPONENT_UUID(mcas_factory, 0xfac66078,0xcb8a,0x4724,0xa454,0xd1,0xd8,0x8d,0xe2,0xdb,0x87);  // TODO: find a better way to register arbitrary components to promote modular use
       comp = load_component(MCAS_PATH, mcas_factory);
@@ -245,7 +237,7 @@ int Experiment::initialize_store(unsigned core)
       comp = load_component("libcomponent-hstore.so", hstore_factory);
     }
     else if ( component_is( "mapstore" ) ) {
-      comp = load_component("libcomponent-storemap.so", mapstore_factory);
+      comp = load_component("libcomponent-mapstore.so", mapstore_factory);
     }
     else throw General_exception("unknown --component option (%s)", _component.c_str());
   }
@@ -278,7 +270,7 @@ int Experiment::initialize_store(unsigned core)
 
   try
   {
-    IKVStore_factory * fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+    auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
 
     if ( component_is( "mcas" ) ) {
       auto port = _port;

@@ -4,27 +4,27 @@ project(component-mapstore CXX)
 
 set (CMAKE_CXX_STANDARD 14)
 
-add_compile_options(-g -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wredundant-decls -Wunused-value -Wunused-parameter -Wwrite-strings -Wformat=2)
+# -O2 probably unnecessary
+add_compile_options("-O2")
+# for serious debugging
+add_compile_options("$<$<CONFIG:Debug>:-O0>")
+add_definitions(-DCONFIG_DEBUG)
 
 add_subdirectory(./unit_test)
-
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
-include_directories(${CMAKE_INSTALL_PREFIX}/include) # city.h
-
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/tbb/include)
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
 
-# for serious debugging
-add_compile_options("$<$<CONFIG:Debug>:-O0>")
-
 file(GLOB SOURCES src/*.c*)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 target_link_libraries(${PROJECT_NAME} common numa dl rt boost_system pthread tbb tbbmalloc tbbmalloc_proxy nupm cityhash)

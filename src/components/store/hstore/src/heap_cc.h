@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,9 +12,11 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_HEAP_CC_H
-#define COMANCHE_HSTORE_HEAP_CC_H
+#ifndef MCAS_HSTORE_HEAP_CC_H
+#define MCAS_HSTORE_HEAP_CC_H
 
+#include "as_emplace.h"
+#include "cptr.h"
 #include "dax_map.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
@@ -39,14 +41,14 @@
 #include <sys/uio.h> /* iovec */
 
 #include <algorithm>
-#include <cassert>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <memory>
 #include <new> /* std::bad_alloc */
 
 namespace impl
 {
-	class allocation_state_emplace;
+	class allocation_state_pin;
+	class allocation_state_extend;
 }
 
 namespace ccpm
@@ -55,12 +57,22 @@ namespace ccpm
 	struct region_vector_t;
 }
 
+template <typename Foo, typename Persister>
+	class deallocator_cc;
+
+template <typename T, std::size_t SmallLimit, typename Allocator>
+	union persist_fixed_string;
+
 class heap_cc_shared_ephemeral
 {
 	std::unique_ptr<ccpm::IHeapGrowable> _heap;
 	std::vector<::iovec> _managed_regions;
 	std::size_t _capacity;
 	std::size_t _allocated;
+	impl::allocation_state_emplace *_ase;
+	impl::allocation_state_pin *_aspd;
+	impl::allocation_state_pin *_aspk;
+	impl::allocation_state_extend *_asx;
 
 	using hist_type = util::histogram_log2<std::size_t>;
 	hist_type _hist_alloc;
@@ -73,7 +85,14 @@ class heap_cc_shared_ephemeral
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
 	void add_managed_region(const ::iovec &r);
-	explicit heap_cc_shared_ephemeral(std::unique_ptr<ccpm::IHeapGrowable> p, const ccpm::region_vector_t &rv);
+	explicit heap_cc_shared_ephemeral(
+		impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
+		, std::unique_ptr<ccpm::IHeapGrowable> p
+		, const ccpm::region_vector_t &rv
+	);
 	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
 
 	template <bool B>
@@ -82,14 +101,14 @@ class heap_cc_shared_ephemeral
 			static bool suppress = false;
 			if ( ! suppress )
 			{
-				hop_hash_log<B>::write(__func__, " pool ", pool_.iov_base);
+				hop_hash_log<B>::write(LOG_LOCATION, "pool ", pool_.iov_base);
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
 				for ( unsigned i = std::max(0U, log_min_alignment); i != limit; ++i )
 				{
 					const std::size_t upper_bound = 1ULL << i;
-					hop_hash_log<B>::write(__func__
-						, " [", lower_bound, "..", upper_bound, "): "
+					hop_hash_log<B>::write(LOG_LOCATION
+						, "[", lower_bound, "..", upper_bound, "): "
 						, _hist_alloc.data()[i], " ", _hist_inject.data()[i], " ", _hist_free.data()[i]
 						, " "
 					);
@@ -104,8 +123,23 @@ public:
 #if 0
 	explicit heap_cc_shared_ephemeral();
 #endif
-	explicit heap_cc_shared_ephemeral(const ccpm::region_vector_t &rv_);
-	explicit heap_cc_shared_ephemeral(const ccpm::region_vector_t &rv_, ccpm::ownership_callback_t f);
+	explicit heap_cc_shared_ephemeral(
+		impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
+		, const ccpm::region_vector_t &rv_
+	);
+	explicit heap_cc_shared_ephemeral(
+		impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
+		, const ccpm::region_vector_t &rv_
+		, ccpm::ownership_callback_t f
+	);
+	heap_cc_shared_ephemeral(const heap_cc_shared_ephemeral &) = delete;
+	heap_cc_shared_ephemeral& operator=(const heap_cc_shared_ephemeral &) = delete;
 };
 
 class heap_cc_shared
@@ -118,8 +152,22 @@ class heap_cc_shared
 
 public:
 	explicit heap_cc_shared(uint64_t pool0_uuid, const std::unique_ptr<Devdax_manager> &devdax_manager_);
-	explicit heap_cc_shared(void *p, std::size_t sz, unsigned numa_node);
-	explicit heap_cc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_emplace *eas);
+	explicit heap_cc_shared(
+		impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
+		, void *p
+		, std::size_t sz
+		, unsigned numa_node
+	);
+	explicit heap_cc_shared(
+		const std::unique_ptr<Devdax_manager> &devdax_manager
+		, impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
+	);
 #if 0
 	explicit heap_cc_shared(const ccpm::region_vector_t &rv_);
 #endif
@@ -140,6 +188,21 @@ public:
 
 	void alloc(persistent_t<void *> *p, std::size_t sz, std::size_t alignment);
 	void free(persistent_t<void *> *p, std::size_t sz);
+
+	void emplace_arm() const { _eph->_ase->arm(persister_nupm()); }
+	void emplace_disarm() const { _eph->_ase->disarm(persister_nupm()); }
+
+	auto &aspd() const { return *_eph->_aspd; }
+	auto &aspk() const { return *_eph->_aspk; }
+	void pin_data_arm(cptr &cptr) const;
+	void pin_key_arm(cptr &cptr) const;
+
+	char *pin_data_get_cptr() const;
+	char *pin_key_get_cptr() const;
+	void pin_data_disarm() const;
+	void pin_key_disarm() const;
+	void extend_arm() const;
+	void extend_disarm() const;
 
 	unsigned percent_used() const
 	{

@@ -8,9 +8,14 @@
 using namespace Component;
 using namespace std;
 
-RamRBTree::RamRBTree(const std::string& owner, const std::string& name) {}
+RamRBTree::RamRBTree(const std::string& owner, const std::string& name)
+	: RamRBTree{}
+{
+	(void)owner; // unused
+	(void)name; // unused;
+}
 
-RamRBTree::RamRBTree() {}
+RamRBTree::RamRBTree() : _index{} {}
 
 RamRBTree::~RamRBTree() {}
 
@@ -52,6 +57,8 @@ status_t RamRBTree::find(const std::string& key_expression,
 
   offset_t end_position = _index.size();
   unsigned attempts =0;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch" // enumeration value ‘FIND_TYPE_NONE’ not handled in switch
   switch (find_type) {
     case FIND_TYPE_REGEX:
       {
@@ -59,8 +66,8 @@ status_t RamRBTree::find(const std::string& key_expression,
         for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
           string key = RamRBTree::get(out_matched_pos);
           if (regex_match(key, r)) {
-          out_matched_key = key;
-          return S_OK;
+            out_matched_key = key;
+            return S_OK;
           }
           else {
             if(++attempts > max_comparisons)
@@ -97,8 +104,9 @@ status_t RamRBTree::find(const std::string& key_expression,
       out_matched_key = get(begin_position);
       out_matched_pos = begin_position;
       return S_OK;
-      break;      
+      break;
   }
+#pragma GCC diagnostic pop
 
   return E_FAIL;
 }
@@ -107,7 +115,7 @@ status_t RamRBTree::find(const std::string& key_expression,
  * Factory entry point
  *
  */
-extern "C" void* factory_createInstance(Component::uuid_t& component_id)
+extern "C" void* factory_createInstance(Component::uuid_t component_id)
 {
   if (component_id == RamRBTree_factory::component_id()) {
     return static_cast<void*>(new RamRBTree_factory());

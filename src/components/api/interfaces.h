@@ -14,19 +14,17 @@
 #define __COMANCHE_INTERFACES_H__
 
 #include <component/base.h>
-/* Note: these uuid decls are so we don't have to have access to the component source code */
+/* Note: these uuid decls are so we don't have to have access to the component
+ * source code */
 
 #include "itf_ref.h"
 #include "types.h"
 
 namespace Interface
 {
-
 /* static interfaces, used for factory-less instantiation */
-DECLARE_STATIC_INTERFACE_UUID(ado_plugin, 0x59564581,0x9e1b,0x4811,0xbdb2,0x19,0x57,0xa0,0xa6,0x84,0x57);
+DECLARE_STATIC_INTERFACE_UUID(ado_plugin, 0x59564581, 0x9e1b, 0x4811, 0xbdb2, 0x19, 0x57, 0xa0, 0xa6, 0x84, 0x57);
 
-}
+}  // namespace Interface
 
-
-#endif // __COMPONENTS_H__
-
+#endif  // __COMPONENTS_H__

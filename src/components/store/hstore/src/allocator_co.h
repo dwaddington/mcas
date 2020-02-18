@@ -77,10 +77,7 @@ template <typename T, typename Persister = persister>
 
 		auto allocate(
 			size_type s
-			, size_type
-#if 0
-				alignment
-#endif
+			, size_type // alignment
 					= alignof(T)
 
 		) -> pointer

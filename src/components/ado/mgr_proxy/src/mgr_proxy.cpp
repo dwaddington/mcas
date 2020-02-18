@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -30,21 +30,20 @@ using namespace std;
 using namespace Common;
 using namespace Threadipc;
 
-ADO_manager_proxy::ADO_manager_proxy(unsigned    debug_level,
-                                     int         shard,
-                                     std::string cores,
-                                     float       cpu_num)
-    : debug_level(debug_level), shard(shard), cores(cores), cpu_num(cpu_num)
+ADO_manager_proxy::ADO_manager_proxy(unsigned    debug_level_,
+                                     int         shard_,
+                                     std::string cores_,
+                                     float       cpu_num_)
+    : shard(shard_), debug_level(debug_level_), cores(cores_), cpu_num(cpu_num_)
 {
 }
 
 ADO_manager_proxy::ADO_manager_proxy()
-{
-  debug_level = 0;
-  shard       = 0;
-  cores       = "";
-  cpu_num     = 1;
-}
+  : shard(0),
+    debug_level(0),
+    cores(""),
+    cpu_num(1)
+{}
 
 ADO_manager_proxy::~ADO_manager_proxy() {}
 
@@ -60,18 +59,22 @@ IADO_proxy *ADO_manager_proxy::create(const uint64_t auth_id,
                                       numa_node_t value_memory_numa_zone,
                                       SLA * sla)
 {
+  (void)sla; // unused
   if (!Thread_ipc::instance()->schedule_to_mgr(shard, cores, cpu_num,
                                                value_memory_numa_zone)) {
-    PERR("schedule_to_mgr thread ipc enqueue fail!");
+    throw General_exception("schedule_to_mgr thread ipc enqueue fail!");
   };
 
   struct message *msg = NULL;
   Thread_ipc::instance()->get_next_ado(msg);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare" // msg->shard_core is unsigned, this->shard is signed. Intentional?
   while (!msg || msg->shard_core != shard || msg->op != Operation::schedule) {
     if (msg) Thread_ipc::instance()->add_to_ado(msg);
     Thread_ipc::instance()->get_next_ado(msg);
   }
+#pragma GCC diagnostic pop
 
   // TODO:ask manager what memory;
   int memory = MB(1);
@@ -79,8 +82,8 @@ IADO_proxy *ADO_manager_proxy::create(const uint64_t auth_id,
   Component::IBase *comp = Component::load_component("libcomponent-adoproxy.so",
                                                      Component::ado_proxy_factory);
 
-  IADO_proxy_factory *fact = static_cast<IADO_proxy_factory *>(
-      comp->query_interface(IADO_proxy_factory::iid()));
+  auto fact = static_cast<IADO_proxy_factory *>
+    (comp->query_interface(IADO_proxy_factory::iid()));
 
   assert(fact);
 
@@ -93,7 +96,7 @@ IADO_proxy *ADO_manager_proxy::create(const uint64_t auth_id,
 
   if (!Thread_ipc::instance()->register_to_mgr(shard, msg->cores,
                                                ado->ado_id())) {
-    PERR("register_to_mgr enqueue failed!");
+    throw General_exception("register_to_mgr enqueue failed!");
   };
 
   return ado;
@@ -113,7 +116,7 @@ status_t ADO_manager_proxy::shutdown(IADO_proxy *ado)
  * Factory entry point
  *
  */
-extern "C" void *factory_createInstance(Component::uuid_t &component_id)
+extern "C" void *factory_createInstance(Component::uuid_t component_id)
 {
   if (component_id == ADO_manager_proxy_factory::component_id()) {
     return static_cast<void *>(new ADO_manager_proxy_factory());

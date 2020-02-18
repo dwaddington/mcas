@@ -13,7 +13,7 @@ SERVER_PID=$!
 sleep 3
 
 #launch client
-./dist/bin/kvstore-perf --port 11911 --cores 14 --server $NODE_IP --test put --component mcas --elements 2000000 --size 500000 --skip_json_reporting --device_name mlx5_0 --key_length 8 --value_length 8 --debug_level 0 &> test$TESTID-client.log &
+./dist/bin/kvstore-perf --port 11911 --cores 14 --server $NODE_IP --test put --component mcas --elements 2000000 --size 400000000 --skip_json_reporting --device_name mlx5_0 --key_length 8 --value_length 8 --debug_level 0 &> test$TESTID-client.log &
 CLIENT_PID=$!
 
 # arm cleanup

@@ -330,8 +330,8 @@ namespace eastl
 		OutputIterator mIterator;
 
 	public:
-		explicit raw_storage_iterator(OutputIterator iterator)
-		  : mIterator(iterator) 
+		explicit raw_storage_iterator(OutputIterator iterator_)
+		  : mIterator(iterator_) 
 		{
 		}
 

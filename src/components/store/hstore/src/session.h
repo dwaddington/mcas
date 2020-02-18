@@ -1,0 +1,969 @@
+/*
+   Copyright [2017-2020] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+#ifndef MCAS_HSTORE_SESSION_H
+#define MCAS_HSTORE_SESSION_H
+
+#include "hstore_config.h"
+#include "atomic_controller.h"
+#include "as_emplace.h"
+#include "construction_mode.h"
+#include "key_not_found.h"
+#include "logging.h"
+#include "hstore_alloc_type.h"
+#include "hstore_nupm_types.h"
+#include "is_locked.h"
+#include "monitor_emplace.h"
+#include "monitor_pin.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#include <tbb/scalable_allocator.h>
+#pragma GCC diagnostic pop
+#include <limits>
+#include <map>
+#include <memory>
+#include <utility> /* move */
+#include <vector>
+
+template <typename Handle, typename Allocator, typename Table, typename LockType>
+	class session;
+
+class Devdax_manager;
+
+struct lock_result
+{
+	enum class e_state
+	{
+		extant, created, not_created, creation_failed
+	} state;
+	Component::IKVStore::key_t key;
+	void *value;
+	std::size_t value_len;
+	const char *key_ptr;
+};
+
+/* open_pool_handle, alloc_t, table_t */
+template <typename Handle, typename Allocator, typename Table, typename LockType>
+	class session
+		: public Handle
+	{
+		class pool_iterator;
+		using table_t = Table;
+		using lock_type_t = LockType;
+		using key_t = typename table_t::key_type;
+		using mapped_t = typename table_t::mapped_type;
+		using data_t = typename std::tuple_element<0, mapped_t>::type;
+		using allocator_type = Allocator;
+		allocator_type _heap;
+		bool _pin_seq; /* used only for force undo_redo call */
+		table_t _map;
+		impl::atomic_controller<table_t> _atomic_state;
+		std::uint64_t _writes;
+		bool _debug;
+		std::map<pool_iterator *, std::shared_ptr<pool_iterator>> _iterators;
+
+		class pool_iterator
+			: public Component::IKVStore::Opaque_pool_iterator
+		{
+			using table_t = Table;
+			std::uint64_t _mark;
+			typename table_t::const_iterator _end;
+		public:
+			typename table_t::const_iterator _iter;
+		public:
+			explicit pool_iterator(
+				const session<Handle, Allocator, Table, LockType> * session_
+			)
+				: _mark(session_->writes())
+				, _end(session_->map().end())
+				, _iter(session_->map().begin())
+			{}
+
+			bool is_end() const { return _iter == _end; }
+			bool check_mark(std::uint64_t writes) const { return _mark == writes; }
+		};
+
+		class lock_impl
+			: public Component::IKVStore::Opaque_key
+		{
+			std::string _s;
+		public:
+			lock_impl(const std::string &s_)
+				: Component::IKVStore::Opaque_key{}
+				, _s(s_)
+			{
+#if 0
+				PINF(PREFIX "%s:%d lock: %s", LOCATION, _s.c_str());
+#endif
+			}
+			const std::string &key() const { return _s; }
+			~lock_impl()
+			{
+#if 0
+				PINF(PREFIX "%s:%d unlock: %s", LOCATION, _s.c_str());
+#endif
+			}
+		};
+
+		static bool try_lock(typename std::tuple_element<0, mapped_t>::type &d, lock_type_t type)
+		{
+			return
+				type == Component::IKVStore::STORE_LOCK_READ
+				? d.try_lock_shared()
+				: d.try_lock_exclusive()
+				;
+		}
+
+		class definite_lock
+		{
+			typename table_t::iterator _it;
+		public:
+			template <typename K>
+				definite_lock(table_t &map_, const K &key_, allocator_type al_)
+					: _it(map_.find(key_))
+				{
+					if ( _it == map_.end() )
+					{
+						throw impl::key_not_found{};
+					}
+
+					auto &d = data();
+
+					if ( ! d.lockable() )
+					{
+						/* Allocating space for a lockable value is tricky.
+						 *
+						 * allocator_cc (crash-consistent allocator):
+						 *   see notes in as_pin.h
+						 *
+						 * allocatpr_rc (reconstituting allocator):
+						 *   TBD
+						 */
+
+						/* convert value to lockable */
+#if 0
+						using monitor = monitor_pin<session::allocator_type>;
+						using monitor = monitor_pin<hstore_alloc_type<Persister>::heap_alloc_t>;
+#endif
+						monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_t> mp(d, al_.pool());
+						/* convert d to immovable data */
+						d.pin(mp.get_cptr(), al_);
+					}
+
+					if ( ! d.try_lock_exclusive() )
+					{
+						throw impl::is_locked{};
+					}
+				}
+
+			auto &mapped() const
+			{
+				return _it->second;
+			}
+
+			auto &data() const
+			{
+				auto &m = mapped();
+				return std::get<0>(m);
+			}
+
+			~definite_lock()
+			try
+			{
+				if ( ! perishable_expiry::is_current() )
+				{
+					/* release lock */
+					const auto &d = data();
+					d.unlock();
+				}
+			}
+			catch ( ... )
+			{}
+		};
+
+		auto allocator() const { return _heap; }
+		table_t &map() noexcept { return _map; }
+		const table_t &map() const noexcept { return _map; }
+
+	public:
+		using handle_t = Handle;
+		/* PMEMoid, persist_data_t */
+		template <typename OID, typename Persist>
+			explicit session(
+				OID
+#if USE_CC_HEAP == 2
+					heap_oid_
+#endif
+				, const pool_path &path_
+				, Handle &&pop_
+				, Persist *persist_data_
+				, bool debug_ = false
+			)
+			: Handle(std::move(pop_))
+			, _heap(
+				Allocator(
+#if USE_CC_HEAP == 2
+					*new
+						(pmemobj_direct(heap_oid_))
+						heap_co(heap_oid_)
+#elif USE_CC_HEAP == 3 || USE_CC_HEAP == 4
+					this->pool() /* not used */
+#endif /* USE_CC_HEAP */
+				)
+			)
+			, _pin_seq(undo_redo_pin_data(_heap) || undo_redo_pin_key(_heap))
+			, _map(persist_data_, _heap)
+			, _atomic_state(*persist_data_, _map)
+			, _writes(0)
+			, _debug(debug_)
+			, _iterators()
+		{}
+
+		auto writes() const { return _writes; }
+
+		explicit session(
+			const pool_path &
+			, Handle &&pop_
+			, construction_mode mode_
+			, bool debug_ = false
+		)
+			: Handle(std::move(pop_))
+			, _heap(
+				Allocator(
+					this->pool()->locate_heap()
+				)
+			)
+			, _pin_seq(undo_redo_pin_data(_heap) || undo_redo_pin_key(_heap))
+			, _map(&this->pool()->persist_data()._persist_map, mode_, _heap)
+			, _atomic_state(this->pool()->persist_data()._persist_atomic, _map, mode_)
+			, _writes(0)
+			, _debug(debug_)
+			, _iterators()
+		{}
+
+		~session()
+		{
+#if USE_CC_HEAP == 3 || USE_CC_HEAP == 4
+			this->pool()->quiesce();
+#endif
+		}
+
+		bool undo_redo_pin_data(allocator_type heap_)
+		{
+#if USE_CC_HEAP == 3
+			(void) heap_;
+			return true;
+#elif USE_CC_HEAP == 4
+			auto &aspd = heap_.pool()->aspd();
+			auto armed = aspd.is_armed();
+			if ( armed )
+			{
+				/* _arm_ptr points to a new cptr, within a "large", within a persist_fixed_string */
+				auto *pfs = data_t::pfs_from_cptr_ref(*aspd.arm_ptr());
+
+				if ( aspd.was_callback_tested() )
+				{
+					/* S_uncommitted or S_committed: allocator had an allocation in "in_doubt" state,
+					 * meaning that cptr, if not null contains an allocation address and not inline data
+					 */
+					if ( pfs->get_cptr().P )
+					{
+						/* S_committed: roll forward */
+						pfs->pin(aspd.get_cptr(), this->allocator());
+					}
+					else
+					{
+						/* S_uncommitted: roll back */
+						pfs->set_cptr(aspd.get_cptr(), this->allocator());
+					}
+				}
+				else
+				{
+					/* S_calling: allocator did not reach "in doubt" state, meaning that
+					 * cptr contains null or old inline data.
+					 */
+					/* roll back */
+					pfs->set_cptr(aspd.get_cptr(), this->allocator());
+				}
+				aspd.disarm(this->allocator());
+			}
+			else
+			{
+				/* S_unarmed: do nothing */
+			}
+			return armed;
+#endif
+		}
+
+		bool undo_redo_pin_key(allocator_type heap_)
+		{
+#if USE_CC_HEAP == 3
+			(void) heap_;
+			return true;
+#elif USE_CC_HEAP == 4
+			auto &aspk = heap_.pool()->aspk();
+			auto armed = aspk.is_armed();
+			if ( armed )
+			{
+				/* _arm_ptr points to a new cptr, within a "large", within a persist_fixed_string */
+				auto *pfs = key_t::pfs_from_cptr_ref(*aspk.arm_ptr());
+
+				if ( aspk.was_callback_tested() )
+				{
+					/* S_uncommitted or S_committed: allocator had an allocation in "in_doubt" state,
+					 * meaning that cptr, if not null contains an allocation address and not inline data
+					 */
+					if ( pfs->get_cptr().P )
+					{
+						/* S_committed: roll forward */
+						pfs->pin(aspk.get_cptr(), this->allocator());
+					}
+					else
+					{
+						/* S_uncommitted: roll back */
+						pfs->set_cptr(aspk.get_cptr(), this->allocator());
+					}
+				}
+				else
+				{
+					/* S_calling: allocator did not reach "in doubt" state, meaning that
+					 * cptr contains null or old inline data.
+					 */
+					/* roll back */
+					pfs->set_cptr(aspk.get_cptr(), this->allocator());
+				}
+				aspk.disarm(this->allocator());
+			}
+			else
+			{
+				/* S_unarmed: do nothing */
+			}
+			return armed;
+#endif
+		}
+
+		session(const session &) = delete;
+		session& operator=(const session &) = delete;
+		/* session constructor and get_pool_regions only */
+		const Handle &handle() const { return *this; }
+		auto *pool() const { return handle().get(); }
+
+		auto insert(
+			const std::string &key,
+			const void * value,
+			const std::size_t value_len
+		)
+		{
+			auto cvalue = static_cast<const char *>(value);
+
+#if USE_CC_HEAP == 4
+			/* Start of an emplace. Storage allocated by this->allocator()
+			 * is to be disclaimed upon a restart unless
+			 *  (1) verified in-use by the map (i.e., owner bit bit set to 1), or later
+			 *  (2) forgotten by the tentative_allocation_state_emplace going out of scope, in which case the map bit has long since been set to 1.
+			 */
+			monitor_emplace<Allocator> m(this->allocator());
+#endif
+			++_writes;
+			return
+				map().emplace(
+					std::piecewise_construct
+					, std::forward_as_tuple(key.begin(), key.end(), this->allocator())
+					, std::forward_as_tuple(
+/* we wish that std::tuple had piecewise_construct, but it does not. */
+#if 0
+						std::piecewise_construct,
+#endif
+						std::forward_as_tuple(cvalue, cvalue + value_len, this->allocator())
+#if ENABLE_TIMESTAMPS
+						, impl::tsc_now()
+#endif
+					)
+				);
+		}
+
+		void update_by_issue_41(
+			const std::string &key,
+			const void * value,
+			const std::size_t value_len,
+			void * /* old_value */,
+			const std::size_t old_value_len
+		)
+		{
+			definite_lock dl(this->map(), key, _heap);
+
+			/* hstore issue 41: "a put should replace any existing k,v pairs that match.
+			 * If the new put is a different size, then the object should be reallocated.
+			 * If the new put is the same size, then it should be updated in place."
+			 */
+			if ( value_len != old_value_len )
+			{
+				_atomic_state.enter_replace(
+					this->allocator()
+					, key
+					, static_cast<const char *>(value)
+					, value_len
+					, 0
+					, std::tuple_element<0, mapped_t>::type::default_alignment /* requested default mapped_type alignment */
+				);
+			}
+			else
+			{
+				std::vector<std::unique_ptr<Component::IKVStore::Operation>> v;
+				v.emplace_back(std::make_unique<Component::IKVStore::Operation_write>(0, value_len, value));
+				std::vector<Component::IKVStore::Operation *> v2;
+				std::transform(v.begin(), v.end(), std::back_inserter(v2), [] (const auto &i) { return i.get(); });
+				this->atomic_update(key, v2);
+			}
+		}
+
+		auto get(
+			const std::string &key,
+			void* buffer,
+			std::size_t buffer_size
+		) const -> std::size_t
+		{
+			auto &v = map().at(key);
+			auto value_len = std::get<0>(v).size();
+
+			if ( value_len <= buffer_size )
+			{
+				std::memcpy(buffer, std::get<0>(v).data(), value_len);
+			}
+			return value_len;
+		}
+
+		auto get_alloc(
+			const std::string &key
+		) const -> std::tuple<void *, std::size_t>
+		{
+			auto &v = map().at(key);
+			auto value_len = std::get<0>(v).size();
+
+			auto value = ::scalable_malloc(value_len);
+			if ( ! value )
+			{
+				throw std::bad_alloc();
+			}
+
+			std::memcpy(value, std::get<0>(v).data(), value_len);
+			return std::pair<void *, std::size_t>(value, value_len);
+		}
+
+		auto get_value_len(
+			const std::string & key
+		) const -> std::size_t
+		{
+			auto &v = this->map().at(key);
+			return std::get<0>(v).size();
+		}
+
+#if ENABLE_TIMESTAMPS
+		auto get_write_epoch_time(
+			const std::string & key
+		) const -> std::size_t
+		{
+			auto &v = this->map().at(key);
+			return impl::tsc_to_epoch(std::get<1>(v));
+		}
+#endif
+
+		auto pool_grow(
+			const std::unique_ptr<Devdax_manager> &dax_mgr_
+			, const std::size_t increment_
+		) const -> std::size_t
+		{
+			return this->pool()->grow(dax_mgr_, increment_);
+		}
+
+		void resize_mapped(
+			const std::string &key
+			, std::size_t new_mapped_len
+			, std::size_t alignment
+		)
+		{
+			definite_lock dl(this->map(), key, _heap);
+
+			auto &v = this->map().at(key);
+			auto &d = std::get<0>(v);
+			/* Replace the data if the size changes or if the data should be realigned */
+			if ( d.size() != new_mapped_len || reinterpret_cast<std::size_t>(d.data()) % alignment != 0 )
+			{
+				this->_atomic_state.enter_replace(
+					this->allocator()
+					, key
+					, d.data()
+					, std::min(d.size(), new_mapped_len)
+					, d.size() < new_mapped_len ? new_mapped_len - d.size() : std::size_t(0)
+					, alignment
+				);
+			}
+		}
+
+		auto lock(
+			const std::string &key
+			, lock_type_t type
+			, void *const value
+			, const std::size_t value_len
+		) -> lock_result
+		{
+#if USE_CC_HEAP == 4
+			monitor_emplace<Allocator> me(this->allocator());
+#endif
+			auto it = this->map().find(key);
+			if ( it == this->map().end() )
+			{
+				/* if the key is not found
+				 * we create it and allocate value space equal in size to
+				 * value_len (but, as a special case, the creation is suppressed
+				 * if value_len is 0).
+				 */
+				if ( value_len != 0 )
+				{
+					if ( _debug )
+					{
+						PLOG(PREFIX "allocating object %zu bytes", LOCATION, value_len);
+					}
+
+					++_writes;
+					auto r =
+						this->map().emplace(
+							std::piecewise_construct
+							, std::forward_as_tuple(fixed_data_location, key.begin(), key.end(), this->allocator())
+							, std::forward_as_tuple(
+/* we wish that std::tuple had piecewise_construct, but it does not. */
+#if 0
+								std::piecewise_construct,
+#endif
+								std::forward_as_tuple(fixed_data_location, value_len, this->allocator())
+#if ENABLE_TIMESTAMPS
+								, impl::tsc_now()
+#endif
+							)
+						);
+
+					if ( ! r.second )
+					{
+						/* Should not happen. If we could not find it, should be able to create it */
+						return { lock_result::e_state::creation_failed, Component::IKVStore::KEY_NONE, value, value_len, nullptr };
+					}
+
+					auto &v = *r.first;
+					auto &k = v.first;
+					auto &m = v.second;
+					auto &d = std::get<0>(m);
+#if 0
+					PLOG(PREFIX "data exposed (newly created): %p", LOCATION, d.data_fixed());
+					PLOG(PREFIX "key exposed (newly created): %p", LOCATION, k.data_fixed());
+#endif
+					return {
+						lock_result::e_state::created
+						, try_lock(d, type)
+							? new lock_impl(key)
+							: Component::IKVStore::KEY_NONE
+						, d.data_fixed()
+						, d.size()
+						, k.data_fixed()
+					};
+				}
+				else
+				{
+					return { lock_result::e_state::not_created, Component::IKVStore::KEY_NONE, value, value_len, nullptr };
+				}
+			}
+			else
+			{
+				auto &v = *it;
+				const key_t &k = v.first;
+				if ( ! k.is_fixed() )
+				{
+					auto &km = const_cast<typename std::remove_const<key_t>::type &>(k);
+					monitor_pin_key<hstore_alloc_type<Persister>::heap_alloc_t> mp(km, _heap.pool());
+					/* convert k to a immovable data */
+					km.pin(mp.get_cptr(), this->allocator());
+				}
+				mapped_t &m = v.second;
+				auto &d = std::get<0>(m);
+				if( ! d.is_fixed() )
+				{
+					monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_t> mp(d, _heap.pool());
+					/* convert d to a immovable data */
+					d.pin(mp.get_cptr(), this->allocator());
+				}
+#if 0
+				PLOG(PREFIX "data exposed (extant): %p", LOCATION, d.data_fixed());
+				PLOG(PREFIX "key exposed (extant): %p", LOCATION, k.data_fixed());
+#endif
+				/* Note: now returning E_LOCKED on lock failure as per a private request */
+				lock_result r {
+					lock_result::e_state::extant
+					, try_lock(d, type)
+						? new lock_impl(key)
+						: Component::IKVStore::KEY_NONE
+					, d.data_fixed()
+					, d.size()
+					, k.data_fixed()
+				};
+
+#if ENABLE_TIMESTAMPS
+				if ( type == Component::IKVStore::STORE_LOCK_WRITE && r.key != Component::IKVStore::KEY_NONE )
+				{
+					std::get<1>(m) = impl::tsc_now();
+				}
+#endif
+				return r;
+			}
+		}
+
+		auto unlock(Component::IKVStore::key_t key_) -> status_t
+		{
+			if ( key_ )
+			{
+#if 0
+				PINF(PREFIX "attempt unlock ...", LOCATION);
+#endif
+				if ( auto lk = dynamic_cast<lock_impl *>(key_) )
+				{
+#if 0
+					PINF(PREFIX "attempt unlock %s", LOCATION, lk->key().c_str());
+#endif
+					try {
+						auto &m = *this->map().find(lk->key());
+						auto &v = std::get<1>(m);
+						auto &d = std::get<0>(v);
+						d.unlock();
+					}
+					catch ( const std::out_of_range &e )
+					{
+#if 0
+						PINF(PREFIX "attempt unlock : key not found", LOCATION);
+#endif
+						return Component::IKVStore::E_KEY_NOT_FOUND;
+					}
+					catch( ... ) {
+						PLOG(PREFIX "attempt unlock : failed unexpected", LOCATION);
+						throw General_exception(PREFIX "failed unexpectedly", __func__);
+					}
+					delete lk;
+				}
+				else
+				{
+					return S_OK; /* not really OK - was not one of our locks */
+				}
+			}
+			return S_OK;
+		}
+
+		bool get_auto_resize() const
+		{
+			return this->map().get_auto_resize();
+		}
+
+		void set_auto_resize(bool auto_resize)
+		{
+			this->map().set_auto_resize(auto_resize);
+		}
+
+		auto erase(
+			const std::string &key
+		) -> status_t
+		{
+			auto it = this->map().find(key);
+			if ( it != this->map().end() )
+			{
+				auto &v = *it;
+				auto &m = v.second;
+				auto &d = std::get<0>(m);
+				if ( ! d.is_locked() )
+				{
+					++_writes;
+					map().erase(it);
+					return S_OK;
+				}
+				else
+				{
+					return E_LOCKED;
+				}
+			}
+			else
+			{
+				return Component::IKVStore::E_KEY_NOT_FOUND;
+			}
+		}
+
+		auto count() const -> std::size_t
+		{
+			return map().size();
+		}
+
+		auto bucket_count() const -> std::size_t
+		{
+			typename table_t::size_type count = 0;
+			/* bucket counter */
+			for (
+				auto n = this->map().bucket_count()
+				; n != 0
+				; --n
+			)
+			{
+				auto last = this->map().end(n-1);
+				for ( auto first = this->map().begin(n-1); first != last; ++first )
+				{
+					++count;
+				}
+			}
+			return count;
+		}
+
+		auto map(
+			std::function
+			<
+				int(const void * key, std::size_t key_len,
+				const void * val, std::size_t val_len)
+			> function_
+		) -> void
+		{
+			for ( auto &mt : this->map() )
+			{
+				const auto &pstring = mt.first;
+				const auto &m = mt.second;
+				const auto &d = std::get<0>(m);
+				function_(
+					reinterpret_cast<const void*>(pstring.data())
+					, pstring.size()
+					, d.data()
+					, d.size()
+				);
+			}
+		}
+
+		auto map(
+			std::function
+			<
+				int(const void * key
+				, std::size_t key_len
+				, const void * val
+				, std::size_t val_len
+				, epoch_time_t timestamp
+				)
+			> function_
+			, epoch_time_t t_begin
+			, epoch_time_t t_end
+		) -> bool
+		{
+#if ENABLE_TIMESTAMPS
+			auto begin_tsc = (t_begin == 0) ? 0 : impl::epoch_to_tsc(t_begin);
+			auto end_tsc = (t_end == 0) ? std::numeric_limits<tsc_time_t>::max() : impl::epoch_to_tsc(t_end);
+
+			for ( auto &mt : this->map() )
+			{
+				const auto &pstring = mt.first;
+				const auto &m = mt.second;
+				const auto t = std::get<1>(m);
+				if ( begin_tsc <= t && t <= end_tsc )
+				{
+					function_(
+						reinterpret_cast<const void*>(pstring.data())
+						, pstring.size()
+						, std::get<0>(m).data()
+						, std::get<0>(m).size()
+						, impl::tsc_to_epoch(std::get<1>(m))
+					);
+				}
+			}
+			return true;
+#else
+			(void) function_;
+			(void) t_begin;
+			(void) t_end;
+			return false;
+#endif
+		}
+
+		void atomic_update_inner(
+			const std::string &key
+			, const std::vector<Component::IKVStore::Operation *> &op_vector
+		)
+		{
+			_atomic_state.enter_update(this->allocator(), key, op_vector.begin(), op_vector.end());
+		}
+
+		void atomic_update(
+			const std::string& key
+			, const std::vector<Component::IKVStore::Operation *> &op_vector
+		)
+		{
+			this->atomic_update_inner(key, op_vector);
+		}
+
+		void lock_and_atomic_update(
+			const std::string& key
+			, const std::vector<Component::IKVStore::Operation *> &op_vector
+		)
+		{
+			definite_lock m(this->map(), key, _heap.pool());
+			this->atomic_update_inner(key, op_vector);
+		}
+
+		void *allocate_memory(
+			std::size_t size
+			, std::size_t alignment
+		)
+		{
+			if ( alignment != 0 && alignment < sizeof(void*) )
+			{
+				throw std::invalid_argument("alignment < sizeof(void*)");
+			}
+			if ( (alignment & (alignment - 1)) != 0 )
+			{
+				throw std::invalid_argument("alignment is not a power of 2");
+			}
+
+			persistent_t<char *> p = nullptr;
+#if USE_CC_HEAP == 4
+			/* ERROR: leaks memory on a crash */
+#endif
+			allocator().allocate(p, size, alignment);
+			return p;
+		}
+
+		void free_memory(
+			const void* addr
+			, size_t size
+		)
+		{
+			persistent_t<char *> p = static_cast<char *>(const_cast<void *>(addr));
+#if USE_CC_HEAP == 4
+			/* ERROR: leaks memory on a crash */
+#endif
+			allocator().deallocate(p, size);
+		}
+
+		unsigned percent_used() const
+		{
+			return this->pool()->percent_used();
+		}
+
+		auto swap_keys(
+			const std::string &key0
+			, const std::string &key1
+		) -> status_t
+		try
+		{
+			definite_lock d0(this->map(), key0, _heap.pool());
+			definite_lock d1(this->map(), key1, _heap.pool());
+
+			_atomic_state.enter_swap(
+				d0.mapped()
+				, d1.mapped()
+			);
+
+			return S_OK;
+		}
+		catch ( const std::domain_error & )
+		{
+			return Component::IKVStore::E_KEY_NOT_FOUND;
+		}
+		catch ( const std::range_error & )
+		{
+			return E_LOCKED;
+		}
+
+
+		auto open_iterator() -> Component::IKVStore::pool_iterator_t
+		{
+			auto i = std::make_shared<pool_iterator>(this);
+			_iterators.insert({i.get(), i});
+			return i.get();
+		}
+
+		status_t deref_iterator(
+			Component::IKVStore::pool_iterator_t iter
+			, const epoch_time_t t_begin
+			, const epoch_time_t t_end
+			, Component::IKVStore::pool_reference_t & ref
+			, bool& time_match
+			, bool increment
+		)
+		{
+			auto i = static_cast<pool_iterator *>(iter);
+			if ( _iterators.count(i) != 1 )
+			{
+				return E_INVAL;
+			}
+
+			if ( i->is_end() )
+			{
+				return E_OUT_OF_BOUNDS;
+			}
+
+			if ( ! i->check_mark(_writes) )
+			{
+				return E_ITERATOR_DISTURBED;
+			}
+
+#if ENABLE_TIMESTAMPS
+			auto begin_tsc = (t_begin == 0) ? 0 : impl::epoch_to_tsc(t_begin);
+			auto end_tsc = (t_end == 0) ? std::numeric_limits<tsc_time_t>::max() : impl::epoch_to_tsc(t_end);
+#else
+			(void)t_begin;
+			(void)t_end;
+#endif
+
+			auto &r = i->_iter;
+			{
+				const auto &k = r->first;
+				ref.key = k.data();
+				ref.key_len = k.size();
+			}
+			{
+				const auto &m = r->second;
+				const auto &d = std::get<0>(m);
+				ref.value = d.data();
+				ref.value_len = d.size();
+#if ENABLE_TIMESTAMPS
+				const auto t = std::get<1>(m);
+				ref.timestamp = impl::tsc_to_epoch(t);
+PLOG(
+	"(t_begin %" PRIu64 " ref.timestamp %" PRIu64 " t_end %" PRIu64 ") (begin_tsc %" PRIu64 " t %" PRIu64 "end_tsc %" PRIu64 ")"
+	, t_begin, ref.timestamp, t_end, begin_tsc, t, end_tsc
+);
+				time_match = ( begin_tsc <= t && t <= end_tsc );
+#endif
+			}
+
+			if ( increment )
+			{
+				++r;
+			}
+
+			return S_OK;
+		}
+
+		status_t close_iterator(Component::IKVStore::pool_iterator_t iter)
+		{
+			if ( iter == nullptr )
+			{
+				return E_INVAL;
+			}
+			auto i = static_cast<pool_iterator *>(iter);
+			if ( _iterators.erase(i) != 1 )
+			{
+				return E_INVAL;
+			}
+			return S_OK;
+		}
+	};
+
+#endif

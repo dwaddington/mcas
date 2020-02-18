@@ -4,8 +4,7 @@ include(../../../mk/common.cmake)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_compile_options(-g -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wredundant-decls -Wunused-value -Wunused-parameter -Wwrite-strings -Wformat=2)
-#add_compile_options(-pedantic -Weffc++)
+add_compile_options(-g)
 
 # use this to disable optimizations, e.g. for debugging or profiling
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
@@ -29,8 +28,7 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include) # rapidjson
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb (via nupm)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb (via nupm)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
-#add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DNDEBUG)
+add_definitions(-DCONFIG_DEBUG)
 add_compile_options("$<$<CONFIG:Release>:-DNDEBUG>")
 
 configure_file(example-ado.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/example-ado.conf)

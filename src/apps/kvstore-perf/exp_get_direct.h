@@ -52,7 +52,7 @@ public:
           size_t data_size = g_data->memory_size(); //sizeof(KV_pair) * g_data->num_elements();
            Data * data = static_cast<Data*>(aligned_alloc(64, data_size));
            madvise(data, data_size, MADV_HUGEPAGE | MADV_DONTFORK);
-           PMAJOR("Registering %p %lu with RDMA", (void*) data, data_size);
+           PMAJOR("Registering %p %lu with RDMA", static_cast<const void*>(data), data_size);
            _direct_memory_handle = store()->register_direct_memory(data, data_size);
            assert(_direct_memory_handle);
         }

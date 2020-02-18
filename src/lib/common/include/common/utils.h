@@ -1,7 +1,7 @@
 /*
    eXokernel Development Kit (XDK)
 
-   Samsung Research America Copyright (C) 2013
+   Samsung Research America Copyright (C) 2013,2020
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -36,9 +36,8 @@
 #define __COMMON_UTILS_H__
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
+// #pragma GCC diagnostic ignored "-Wunused-parameter"
+// #pragma GCC diagnostic ignored "-Wunused-function"
 
 #include "cpu.h"
 #include "cpu_bitset.h"
@@ -52,6 +51,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <stdexcept>
 
 #if defined(__unix__)
 #include <numa.h>
@@ -209,6 +209,7 @@ INLINE static void *forward_align_pointer(void *p, unsigned long alignment) {
  * @return
  */
 INLINE static bool check_aligned(const void *p, unsigned long alignment) {
+  if(alignment == 0) throw std::invalid_argument("invalid parameter");
   return (reinterpret_cast<unsigned long>(p) % alignment == 0);
 }
 
@@ -452,7 +453,8 @@ template<typename DstT, typename SrcT> DstT safe_downsize(SrcT src) {
 
 INLINE static epoch_time_t epoch_now() {
   time_t t;
-  return time(&t);
+  time(&t);
+  return t;
 }
 
 #pragma GCC diagnostic pop

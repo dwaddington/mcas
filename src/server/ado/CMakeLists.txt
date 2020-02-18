@@ -4,9 +4,7 @@ project (ado)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
-add_compile_options(-g -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings -Wno-variadic-macros -Wformat=2)
-#add_compile_options( -pedantic -Werror -Weffc++ -Wold-style-cast -Wunused-parameter)
+add_definitions(-DCONFIG_DEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)

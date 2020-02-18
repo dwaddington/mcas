@@ -27,7 +27,7 @@ apt-get install -y --no-install-recommends \
         libgtest-dev \
         libgoogle-perftools-dev libcurl4-openssl-dev \
         linux-headers-generic \
-        uuid-dev golang
+        uuid-dev golang libgnutls-dev libgnutls30
 
 # special handling of googletest
 #

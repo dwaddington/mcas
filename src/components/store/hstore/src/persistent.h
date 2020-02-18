@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_PERISTENT_H
-#define _COMANCHE_HSTORE_PERISTENT_H
+#ifndef MCAS_HSTORE_PERISTENT_H
+#define MCAS_HSTORE_PERISTENT_H
 
 #include "perishable.h"
 #include "test_flags.h" /* TEST_HSTORE_PERISHABLE */
@@ -30,36 +30,44 @@ template <typename T>
 		{
 		}
 		persistent(const persistent &other)
-			: _v((perishable::tick(), other._v))
+			: _v(perishable::tick() ? other._v : T())
 		{
 		}
 
 		persistent(const T &t)
-			: _v((perishable::tick(), t))
+			: _v(perishable::tick() ? t : T())
 		{
 		}
 		persistent<T> &operator=(const persistent &other)
 		{
-			perishable::tick();
-			_v = other._v;
+			if ( perishable::tick() )
+			{
+				_v = other._v;
+			}
 			return *this;
 		};
 		persistent<T> &operator=(const T &t)
 		{
-			perishable::tick();
-			_v = t;
+			if ( perishable::tick() )
+			{
+				_v = t;
+			}
 			return *this;
 		};
 		persistent<T> &operator&=(const T &t)
 		{
-			perishable::tick();
-			_v &= t;
+			if ( perishable::tick() )
+			{
+				_v &= t;
+			}
 			return *this;
 		};
 		persistent<T> &operator|=(const T &t)
 		{
-			perishable::tick();
-			_v |= t;
+			if ( perishable::tick() )
+			{
+				_v |= t;
+			}
 			return *this;
 		};
 		operator T() const
@@ -72,28 +80,33 @@ template <typename T>
 		}
 		persistent<T> &operator++()
 		{
-			perishable::tick();
-			++_v;
+			if ( perishable::tick() )
+			{
+				++_v;
+			}
 			return *this;
-		};
+		}
 		persistent<T> &operator--()
 		{
-			perishable::tick();
-			--_v;
+			if ( perishable::tick() )
+			{
+				--_v;
+			}
 			return *this;
-		};
+		}
 		auto &operator*() const
 		{
 			return *_v;
-		};
+		}
 		T operator->() const
 		{
 			return _v;
-		};
-		operator bool() const
+		}
+
+		const T &ref() const
 		{
-			return bool(_v);
-		};
+			return _v;
+		}
 	};
 
 template <typename T>
@@ -119,47 +132,59 @@ template <typename T>
 		{
 		}
 		persistent_atomic(const persistent_atomic &other)
-			: _v((perishable::tick(), other._v.load()))
+			: _v(perishable::tick() ? other._v.load() : T())
 		{
 		}
 		persistent_atomic(const T &t)
-			: _v((perishable::tick(), t))
+			: _v(perishable::tick() ? t : T())
 		{
 		}
 		persistent_atomic<T> &operator=(const persistent_atomic &other)
 		{
-			perishable::tick();
-			_v = other._v.load();
+			if ( perishable::tick() )
+			{
+				_v = other._v.load();
+			}
 			return *this;
 		};
 		persistent_atomic<T> &operator=(const T &t)
 		{
-			perishable::tick();
-			_v = t;
+			if ( perishable::tick() )
+			{
+				_v = t;
+			}
 			return *this;
 		};
 		persistent_atomic<T> &operator+=(const T &t)
 		{
-			perishable::tick();
-			_v += t;
+			if ( perishable::tick() )
+			{
+				_v += t;
+			}
 			return *this;
 		};
 		persistent_atomic<T> &operator-=(const T &t)
 		{
-			perishable::tick();
-			_v -= t;
+			if ( perishable::tick() )
+			{
+				_v -= t;
+			}
 			return *this;
 		};
 		persistent_atomic<T> &operator&=(const T &t)
 		{
-			perishable::tick();
-			_v &= t;
+			if ( perishable::tick() )
+			{
+				_v &= t;
+			}
 			return *this;
 		};
 		persistent_atomic<T> &operator|=(const T &t)
 		{
-			perishable::tick();
-			_v |= t;
+			if ( perishable::tick() )
+			{
+				_v |= t;
+			}
 			return *this;
 		};
 		operator T() const
@@ -168,14 +193,18 @@ template <typename T>
 		}
 		persistent_atomic<T> &operator++()
 		{
-			perishable::tick();
-			++_v;
+			if ( perishable::tick() )
+			{
+				++_v;
+			}
 			return *this;
 		};
 		persistent_atomic<T> &operator--()
 		{
-			perishable::tick();
-			--_v;
+			if ( perishable::tick() )
+			{
+				--_v;
+			}
 			return *this;
 		};
 		auto &operator*() const
@@ -188,16 +217,42 @@ template <typename T>
 		};
 	};
 
+
 #if TEST_HSTORE_PERISHABLE
 template <typename T>
 	using persistent_t = persistent<T>;
 template <typename T>
 	using persistent_atomic_t = persistent_atomic<T>;
+/* Return a reference to the true object underlying a persistent<T>.
+ * Dangerous in that the caller can use the reference in such a
+ * way as to defeat the persistence testing. Make it a bit less dangerous
+ * by returning a *const* ref.
+ */
+template <typename T>
+	const T & persistent_ref(const persistent<T> &p_)
+	{
+		return  p_.ref();
+	}
+template <typename T>
+	T persistent_load(const persistent<T> &p_)
+	{
+		return  p_.load();
+	}
 #else
 template <typename T>
 	using persistent_t = T;
 template <typename T>
 	using persistent_atomic_t = T;
+template <typename T>
+	const T & persistent_ref(T &p_)
+	{
+		return p_;
+	}
+template <typename T>
+	T persistent_load(T &p_)
+	{
+		return p_;
+	}
 #endif
 
 #endif

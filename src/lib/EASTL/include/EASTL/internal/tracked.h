@@ -475,7 +475,7 @@ namespace eastl
 		};
 
 	template <typename Type, typename Tracker, char ID>
-	        inline void swap(tracked<Type, Tracker, ID> &a, tracked<Type, Tracker, ID> &b) noexcept
+		inline void swap(tracked<Type, Tracker, ID> &a, tracked<Type, Tracker, ID> &b) noexcept
 		{
 			a.swap(b);
 		}

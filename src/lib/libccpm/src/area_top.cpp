@@ -18,7 +18,13 @@
 #include <cassert>
 #include <stdexcept>
 #include <ostream>
+#include <sys/uio.h> /* iovec */
 
+/* scan the chains of free pointers, starting with the least acceptable length
+ * (min_run_length_) and ending at the greatest possible length (alloc_states_per_word)
+ * to find the first non-empty list. This would be quicker If the enn-empty tiers
+ * were chained, or a bitmask of non-empty tiers were kept.
+ */
 auto ccpm::level_hints::find_free_ctl_ix(
 	unsigned min_run_length_
 ) const -> free_ctls_t::size_type
@@ -47,6 +53,11 @@ auto ccpm::area_top::is_in_chain(
 	assert(level_ix < _level.size());
 	const auto &level = _level[level_ix];
 	return run_length != 0 && level.tier_from_run_length(run_length)->contains(a);
+}
+
+bool ccpm::area_top::includes(const void *addr) const
+{
+	return _ctl && _ctl->includes(addr);
 }
 
 ccpm::area_top::area_top(area_ctl *ctl_)
@@ -88,7 +99,7 @@ auto ccpm::area_top::create(const ::iovec &iov_) -> area_top *
 
 auto ccpm::area_top::restore(
 	const ::iovec &iov_
-	, ownership_callback_t resolver_
+	, const ownership_callback_t &resolver_
 ) -> area_top *
 {
 	/* The base if the region contains an array of area_ctls.

@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_NUPM_TYPES_H
-#define COMANCHE_HSTORE_NUPM_TYPES_H
+#ifndef MCAS_HSTORE_NUPM_TYPES_H
+#define MCAS_HSTORE_NUPM_TYPES_H
 
 #include "hstore_config.h"
 

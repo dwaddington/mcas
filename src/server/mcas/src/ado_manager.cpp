@@ -1,10 +1,12 @@
+#include "ado_manager.h"
+
 #include <common/cpu.h>
 #include <common/logging.h>
 #include <numa.h>
 #include <unistd.h>
+
 #include <boost/tokenizer.hpp>
 #include <string>
-#include "ado_manager.h"
 
 using namespace std;
 using namespace Common;
@@ -64,10 +66,8 @@ void ADO_manager::init()
   // setup ado cpu pool
   auto ado_cores = get_ado_cores();
   if (ado_cores.empty()) {
-    for (unsigned i = 0; i < thread::hardware_concurrency(); i++)
-      _ado_cpu_pool.insert(i);
-    for (unsigned i = 0; i < shard_count(); i++)
-      _ado_cpu_pool.erase(get_shard_core(i));
+    for (unsigned i = 0; i < thread::hardware_concurrency(); i++) _ado_cpu_pool.insert(i);
+    for (unsigned i = 0; i < shard_count(); i++) _ado_cpu_pool.erase(get_shard_core(i));
   }
   else {
     auto     pos   = ado_cores.find("-");
@@ -106,7 +106,7 @@ void ADO_manager::main_loop()
     struct message *msg = NULL;
     Thread_ipc::instance()->get_next_mgr(msg);
     // PERR("get_next_mgr dequeue failed!");
-    if(_exit) continue;
+    if (_exit) continue;
     switch (msg->op) {
       case Operation::schedule:
         schedule(msg->shard_core, msg->cores, msg->core_number, msg->numa_zone);
@@ -126,7 +126,7 @@ void ADO_manager::main_loop()
 
 void ADO_manager::register_ado(unsigned int shard, string &cpus, string &id)
 {
-  struct ado ado;
+  struct ado ado{};
   ado.shard_id = shard;
   ado.cpus     = cpus;
   ado.id       = id;
@@ -140,10 +140,7 @@ void ADO_manager::kill_ado(const struct ado &ado)
   }
 }
 
-void ADO_manager::schedule(unsigned int shard,
-                           string       cpus,
-                           float        cpu_num,
-                           numa_node_t  numa_zone)
+void ADO_manager::schedule(unsigned int shard, string cpus, float cpu_num, numa_node_t numa_zone)
 {
   string            ret;
   set<unsigned int> cores;
@@ -182,8 +179,7 @@ void ADO_manager::schedule(unsigned int shard,
       }
     }*/
     }
-    if (!Thread_ipc::instance()->schedule_to_ado(
-            shard, ret.substr(0, ret.size() - 1), cpu_num, numa_zone)) {
+    if (!Thread_ipc::instance()->schedule_to_ado(shard, ret.substr(0, ret.size() - 1), cpu_num, numa_zone)) {
       PERR("schedule_to_ado enqueue failed!");
     }
   }

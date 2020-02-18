@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -55,8 +55,6 @@ using namespace rapidjson;
 using namespace Component;
 using namespace std;
 
-static int proj_id = 1;
-
 sig_atomic_t ADO_proxy::_exited;
 
 void std::default_delete<DOCKER>::operator()(DOCKER *d)
@@ -64,6 +62,19 @@ void std::default_delete<DOCKER>::operator()(DOCKER *d)
   docker_destroy(d);
 }
 
+namespace
+{
+  /* create unique channel id prefix */
+  auto make_channel_name(void *t)
+  {
+    std::stringstream ss;
+    ss << "channel-" << std::hex << reinterpret_cast<unsigned long>(t);
+    return ss.str();
+  }
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // uninitalized or default initialized: _ipc, _channel_name, _deferred_unlocks, _life_unlocks, container_id, _pid, docker
 ADO_proxy::ADO_proxy(const uint64_t auth_id,
                      Component::IKVStore * kvs,
                      Component::IKVStore::pool_t pool_id,
@@ -84,26 +95,20 @@ ADO_proxy::ADO_proxy(const uint64_t auth_id,
   _pool_size(pool_size),
   _pool_flags(pool_flags),
   _expected_obj_count(expected_obj_count),
+  _cores(cores),
+  _core_number(cpu_num),
   _filename(filename),
   _args(args),
-  _cores(cores),
+  _channel_name(make_channel_name(this)),
+  _ipc(std::make_unique<ADO_protocol_builder>(_channel_name, ADO_protocol_builder::Role::CONNECT)),
   _memory(memory),
-  _core_number(cpu_num),
   _numa(numa_zone)
 {
   assert(pool_id);
-
-  /* create unique channel id prefix */
-  std::stringstream ss;
-  ss << "channel-" << std::hex << (unsigned long)this;
-  _channel_name = ss.str();
-
-  _ipc = std::make_unique<ADO_protocol_builder>(
-      _channel_name, ADO_protocol_builder::Role::CONNECT);
-
   // launch ado process
   this->launch();
 }
+#pragma GCC diagnostic pop
 
 ADO_proxy::~ADO_proxy() {
 }
@@ -140,28 +145,36 @@ status_t ADO_proxy::send_memory_map(uint64_t token,
 }
 
 status_t ADO_proxy::send_work_request(const uint64_t work_request_key,
-                                      const std::string &work_key_str,
-                                      const void *value_addr,
+                                      const char * key,
+                                      const size_t key_len,
+                                      const void * value,
                                       const size_t value_len,
-                                      const void *detached_value_addr,
+                                      const void * detached_value,
                                       const size_t detached_value_len,
-                                      const void *invocation_data,
+                                      const void * invocation_data,
                                       const size_t invocation_data_len,
                                       const bool new_root) {
   _outstanding_wr++;
 
-  _ipc->send_work_request(work_request_key, work_key_str,
-                          value_addr, value_len,
-                          detached_value_addr, detached_value_len,
-                          invocation_data, invocation_data_len,
+  _ipc->send_work_request(work_request_key,
+                          key,
+                          key_len,
+                          value,
+                          value_len, 
+                          detached_value,
+                          detached_value_len,
+                          invocation_data,
+                          invocation_data_len,
                           new_root);
   return S_OK;
 }
 
 void ADO_proxy::send_table_op_response(const status_t s,
                                        const void *value_addr,
-                                       size_t value_len) {
-  _ipc->send_table_op_response(s, value_addr, value_len);
+                                       size_t value_len,
+                                       const char * key_ptr,
+                                       Component::IKVStore::key_t key_handle) {
+  _ipc->send_table_op_response(s, value_addr, value_len, key_ptr, key_handle);
 }
 
 void ADO_proxy::send_find_index_response(const status_t status,
@@ -191,19 +204,19 @@ void ADO_proxy::send_pool_info_response(const status_t status,
   _ipc->send_pool_info_response(status, info);
 }
 
+void ADO_proxy::send_unlock_response(const status_t status)
+{
+  _ipc->send_unlock_response(status);
+}
 
 bool ADO_proxy::check_work_completions(uint64_t& request_key,
                                        status_t& out_status,
-                                       void *& response,
-                                       size_t & response_len,
                                        Component::IADO_plugin::response_buffer_vector_t& response_buffers)
 {
   if(_outstanding_wr == 0) return false;
 
   auto result = _ipc->recv_from_ado_work_completion(request_key,
                                                     out_status,
-                                                    response,
-                                                    response_len,
                                                     response_buffers);
   if(result)
     _outstanding_wr--;
@@ -233,6 +246,7 @@ bool ADO_proxy::check_index_ops(const void * buffer,
                                 int& find_type,
                                 uint32_t max_comp)
 {
+  (void)max_comp; // unused
   return _ipc->recv_index_op_request(static_cast<const Buffer_header *>(buffer),
                                      key_expression,
                                      begin_pos,
@@ -268,6 +282,14 @@ bool ADO_proxy::check_op_event_response(const void * buffer, Component::ADO_op& 
 {
   return  _ipc->recv_op_event_response(static_cast<const Buffer_header *>(buffer), op);
 }
+
+bool ADO_proxy::check_unlock_request(const void * buffer,
+                                     uint64_t& work_id,
+                                     Component::IKVStore::key_t& key_handle)
+{
+  return _ipc->recv_unlock_request(static_cast<const Buffer_header *>(buffer), work_id, key_handle);
+}
+
 status_t ADO_proxy::recv_callback_buffer(Buffer_header *& out_buffer)
 {
   return _ipc->recv_callback(out_buffer);
@@ -344,11 +366,11 @@ void ADO_proxy::launch() {
   }
   req.SetObject();
   req.Parse(docker_buffer(docker.get()));
-  container_id = req["Id"].GetString();
+  _container_id = req["Id"].GetString();
 
   // launch container
   {
-    std::string url("http://v1.39/containers/" + container_id + "/start");
+    std::string url("http://v1.39/containers/" + _container_id + "/start");
     CURLcode response = docker_post(docker.get(), &url[0], NULL);
     assert(response == CURLE_OK);
   }
@@ -440,7 +462,7 @@ status_t ADO_proxy::kill() {
 
 #ifdef USE_DOCKER
   {
-    string url("http://v1.39/containers/" + container_id + "/wait");
+    string url("http://v1.39/containers/" + _container_id + "/wait");
     CURLcode response = docker_post(docker.get(), &url[0], NULL);
     assert(response == CURLE_OK);
     std::cout << docker_buffer(docker.get()) << std::endl;
@@ -449,7 +471,7 @@ status_t ADO_proxy::kill() {
   //  msgctl(_msqid, IPC_RMID, 0);
   // remove container
   {
-    string url("http://v1.39/containers/" + container_id);
+    string url("http://v1.39/containers/" + _container_id);
     CURLcode response = docker_delete(docker.get(), &url[0], NULL);
     assert(response == CURLE_OK);
   }
@@ -511,6 +533,21 @@ void ADO_proxy::get_deferred_unlocks(const uint64_t work_key, std::vector<Compon
   v.clear();
 }
 
+bool ADO_proxy::check_for_implicit_unlock(const uint64_t work_request_id,
+                                          const Component::IKVStore::key_t key)
+{
+  if(_deferred_unlocks.find(work_request_id) != _deferred_unlocks.end()) {
+    auto& key_v = _deferred_unlocks[work_request_id];
+    if(key_v.find(key) != key_v.end()) return true;
+  }
+  if(_life_unlocks.find(key) != _life_unlocks.end()) {
+    return true;
+  }
+  
+  return false;    
+}
+
+
 void ADO_proxy::add_life_unlock(const Component::IKVStore::key_t key)
 {
   //  PNOTICE("Adding life unlock (%p, %p)", this, key);
@@ -528,21 +565,21 @@ status_t ADO_proxy::remove_life_unlock(const Component::IKVStore::key_t key)
 void ADO_proxy::release_life_locks()
 {
   assert(_kvs);
-  unsigned lock_count = _life_unlocks.size();
+  auto lock_count = _life_unlocks.size();
   for(auto &lock : _life_unlocks) {
-    PLOG("ADO_proxy: releasing lock pool_id=%lx lock=%p", _pool_id, lock);
+    PLOG("ADO_proxy: releasing lock pool_id=%lx lock=%p", _pool_id, static_cast<const void *>(lock));
     status_t rc = _kvs->unlock(_pool_id, lock);
     if(rc != S_OK)
       throw Logic_exception("release_life_locks: pool unlock failed (%d)", rc);
   }
-  PLOG("ADO_proxy: %d life locks released.", lock_count);
+  PLOG("ADO_proxy: %zu life locks released.", lock_count);
 }
 
 /**
  * Factory entry point
  *
  */
-extern "C" void *factory_createInstance(Component::uuid_t &component_id) {
+extern "C" void *factory_createInstance(Component::uuid_t component_id) {
   if (component_id == ADO_proxy_factory::component_id()) {
     return static_cast<void *>(new ADO_proxy_factory());
   } else

@@ -66,7 +66,7 @@ TEST(RunningStatisticsTest, TenValues)
 
     for (int i = 1; i < 11; i++)
     {
-        bin.add_value((double)i);
+        bin.add_value(double(i));
     }
     
     int count = bin.getCount();
@@ -75,11 +75,12 @@ TEST(RunningStatisticsTest, TenValues)
     double mean = bin.getMean();
     double std = bin.getStd();
     double variance = bin.getVariance();
+    (void)variance; // unused
 
     ASSERT_EQ(count, 10);
     ASSERT_EQ(min, 1.0);
     ASSERT_EQ(max, 10.0);
-    ASSERT_FLOAT_EQ(mean, 5.5);
+    ASSERT_DOUBLE_EQ(mean, 5.5);
     ASSERT_NEAR(std, 3.02765, 0.0001);
 }
 

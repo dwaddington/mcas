@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -16,40 +16,39 @@
 #ifdef __cplusplus
 
 #include <api/components.h>
+#include <api/fabric_itf.h>
 #include <api/kvstore_itf.h>
 #include <common/cpu.h>
+#include <common/cycles.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
-#include <common/cycles.h>
 #include <sys/mman.h>
+
 #include <map>
 #include <queue>
 #include <set>
 #include <thread>
 
 #include "buffer_manager.h"
+#include "fabric_connection_base.h"  // default to fabric transport
 #include "mcas_config.h"
 #include "pool_manager.h"
 #include "protocol.h"
 #include "region_manager.h"
 
-#include <api/fabric_itf.h>
-#include "fabric_connection_base.h"  // default to fabric transport
-
 namespace mcas
 {
 using Connection_base = Fabric_connection_base;
 
-/** 
+/**
  * Connection handler is instantiated for each "connected" client
  */
 class Connection_handler
     : public Connection_base
     , public Region_manager {
  private:
-
   unsigned option_DEBUG = mcas::Global::debug_level;
-  
+
   /* Adaptor point for different transports */
   using Connection = Component::IFabric_server;
   using Factory    = Component::IFabric_server_factory;
@@ -82,13 +81,18 @@ class Connection_handler
   State _state = State::INITIALIZE;
 
  public:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // many uninitialized/default initialized elements
   Connection_handler(Factory* factory, Connection* connection)
-      : Connection_base(factory, connection), Region_manager(connection)
+      : Connection_base(factory, connection), Region_manager(connection),
+        _pending_msgs{},
+        _pending_actions{},
+        _freq_mhz(Common::get_rdtsc_frequency_mhz())
   {
     _pending_actions.reserve(Buffer_manager<Connection>::DEFAULT_BUFFER_COUNT);
     _pending_msgs.reserve(Buffer_manager<Connection>::DEFAULT_BUFFER_COUNT);
-    _freq_mhz = Common::get_rdtsc_frequency_mhz();
   }
+#pragma GCC diagnostic pop
 
   ~Connection_handler()
   {
@@ -109,11 +113,7 @@ class Connection_handler
    *
    * @param s
    */
-  inline void set_state(State s)
-  {
-    _state = s; /* we could add transition checking later */
-  }
-
+  inline void set_state(State s) { _state = s; /* we could add transition checking later */ }
 
   /**
    * Check for network completions
@@ -122,12 +122,10 @@ class Connection_handler
   Fabric_connection_base::Completion_state check_network_completions()
   {
     auto state = poll_completions();
-    if ( state == Fabric_connection_base::Completion_state::ADDED_DEFERRED_LOCK ) {
+    if (state == Fabric_connection_base::Completion_state::ADDED_DEFERRED_LOCK) {
       /* deferred unlocks */
       if (_deferred_unlock) {
-        if (option_DEBUG > 2)
-          PLOG("adding action for deferred unlocking value @ %p",
-               _deferred_unlock);
+        if (option_DEBUG > 2) PLOG("adding action for deferred unlocking value @ %p", _deferred_unlock);
         add_pending_action(action_t{ACTION_RELEASE_VALUE_LOCK, _deferred_unlock});
         _deferred_unlock = nullptr;
       }
@@ -176,9 +174,9 @@ class Connection_handler
    *
    * @return Pointer to buffer holding the message or null if there are none
    */
-  inline buffer_t *pop_pending_msg()
+  inline buffer_t* pop_pending_msg()
   {
-    assert( ! _pending_msgs.empty() );
+    assert(!_pending_msgs.empty());
     auto iob = _pending_msgs.back();
     _pending_msgs.pop_back();
     return iob;
@@ -197,8 +195,7 @@ class Connection_handler
 
     action = _pending_actions.back();
 
-    if(option_DEBUG > 2)
-      PLOG("Connection_handler: popped pending action (%u, %p)", action.op, action.parm);
+    if (option_DEBUG > 2) PLOG("Connection_handler: popped pending action (%u, %p)", action.op, action.parm);
 
     _pending_actions.pop_back();
     return true;
@@ -209,10 +206,7 @@ class Connection_handler
    *
    * @param action Action to add
    */
-  inline void add_pending_action(const action_t action)
-  {
-    _pending_actions.push_back(action);
-  }
+  inline void add_pending_action(const action_t action) { _pending_actions.push_back(action); }
 
   /**
    * Post a response
@@ -233,7 +227,7 @@ class Connection_handler
     set_state(POST_MSG_RECV); /* don't wait for this, let it be picked up in
                                  the check_completions cycle */
   }
-  
+
   /**
    * Set up for pending value send/recv
    *
@@ -241,35 +235,26 @@ class Connection_handler
    * @param target_len
    * @param region
    */
-  void set_pending_value(void*  target,
-                         size_t target_len,
-                         Component::IFabric_connection::memory_region_t region);
+  void set_pending_value(void* target, size_t target_len, Component::IFabric_connection::memory_region_t region);
 
-  inline void set_state_wait_send_value()
+  inline void set_state_wait_send_value() { set_state(State::WAIT_SEND_VALUE); }
+
+  void add_memory_handle(Component::IKVStore::memory_handle_t handle) { _mr_vector.push_back(handle); }
+
+  Component::IKVStore::memory_handle_t pop_memory_handle()
   {
-    set_state(State::WAIT_SEND_VALUE);
-  }
-
-
-  void add_memory_handle(Component::IKVStore::memory_handle_t handle) {
-    _mr_vector.push_back(handle);
-  }
-
-  Component::IKVStore::memory_handle_t pop_memory_handle() {
-    if(_mr_vector.empty()) return nullptr;
+    if (_mr_vector.empty()) return nullptr;
     auto mr = _mr_vector.back();
     _mr_vector.pop_back();
     return mr;
-  }  
+  }
 
   inline uint64_t auth_id() const { return _auth_id; }
-  inline void set_auth_id(uint64_t id) { _auth_id = id; }
+  inline void     set_auth_id(uint64_t id) { _auth_id = id; }
 
   inline size_t max_message_size() const { return _max_message_size; }
 
-  inline Pool_manager& pool_manager() {
-    return _pool_manager;
-  }
+  inline Pool_manager& pool_manager() { return _pool_manager; }
 
  private:
   struct {
@@ -300,17 +285,15 @@ class Connection_handler
   }
 
  private:
-
   /* list of pre-registered memory regions; normally one region */
   std::vector<Component::IKVStore::memory_handle_t> _mr_vector;
 
   uint64_t               _tick_count alignas(8) = 0;
-  uint64_t               _auth_id = 0;
+  uint64_t               _auth_id               = 0;
   std::vector<buffer_t*> _pending_msgs;
   std::vector<action_t>  _pending_actions;
   float                  _freq_mhz;
   Pool_manager           _pool_manager; /* instance shared across connections */
-
 };
 
 }  // namespace mcas

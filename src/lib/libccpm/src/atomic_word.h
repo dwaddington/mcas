@@ -14,7 +14,6 @@
 #ifndef CCPM_ATOMIC_WORD_H__
 #define CCPM_ATOMIC_WORD_H__
 
-#include <cstddef>
 #include <cstdint>
 #include <limits>
 

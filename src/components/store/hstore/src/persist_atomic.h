@@ -12,12 +12,15 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_PERSIST_ATOMIC_H
-#define _COMANCHE_HSTORE_PERSIST_ATOMIC_H
+#ifndef _MCAS_HSTORE_PERSIST_ATOMIC_H
+#define _MCAS_HSTORE_PERSIST_ATOMIC_H
 
+#include "as_emplace.h"
+#include "mod_control.h"
 #include "persist_fixed_string.h"
 #include "persistent.h"
 
+#include <array>
 #include <cstddef> /* size_t */
 
 /* Persistent data for hstore.
@@ -25,64 +28,70 @@
 
 namespace impl
 {
-#if 0
 	/* Until we get friendship sorted out.
 	 * The atomic_controller needs a class specialized by allocator only
 	 * to be friends with persist_atomic
 	 */
-	template <typename Allocator>
+	template <typename Table>
 		class atomic_controller;
-#endif
-
-	struct mod_control
-	{
-		persistent_t<std::size_t> offset_src;
-		persistent_t<std::size_t> offset_dst;
-		persistent_t<std::size_t> size;
-		explicit mod_control(std::size_t s, std::size_t d, std::size_t z)
-			: offset_src(s)
-			, offset_dst(d)
-			, size(z)
-		{}
-		explicit mod_control() : mod_control(0, 0, 0) {}
-	};
 
 	template <typename Value>
 		class persist_atomic
 		{
-#if 0
-#else
-		public:
-#endif
 			using allocator_type = typename Value::first_type::allocator_type;
 			using allocator_traits_type = std::allocator_traits<allocator_type>;
 			using mod_ctl_allocator_type = typename allocator_traits_type::template rebind_alloc<mod_control>;
 			using mod_ctl_ptr_t = typename std::allocator_traits<mod_ctl_allocator_type>::pointer;
 
+			/* "owner" of the mod_key and mod_mapped. 1 when in use, 0 when not in use */
+			persistent_atomic_t<std::uint64_t> mod_owner;
 			/* key to destination of modification data */
 			using mod_key_t = typename Value::first_type::template rebind<char>;
 			mod_key_t mod_key;
 			/* source of modification data */
-			using mod_mapped_t = typename Value::first_type::template rebind<char>;
+			using mod_mapped_t = typename std::tuple_element<0, typename Value::second_type>::type::template rebind<char>;
 			mod_mapped_t mod_mapped;
 			/* control of modification data */
 			persistent_t<mod_ctl_ptr_t> mod_ctl;
 			/* size of control located by mod_ctl (0 if no outstanding modification, negative if the modfication is a replace by erase/emplace */
 			persistent_atomic_t<std::ptrdiff_t> mod_size;
+			/* One type of allocation state at the moment. */
+			allocation_state_emplace *_ase;
+			/* persist data for "swap keys" function */
+			struct swap
+			{
+				using mapped_type = typename Value::second_type;
+				std::array<char, sizeof(mapped_type)> temp;
+				mapped_type *pd0;
+				mapped_type *pd1;
+				swap()
+					: temp{}
+					, pd0()
+					, pd1()
+				{}
+				swap(const swap &) = delete;
+				swap(swap &&) = default;
+				swap& operator=(const swap &) = delete;
+				swap& operator=(swap &&) = default;
+			} _swap;
+
 		public:
-			persist_atomic()
-				: mod_key()
+			persist_atomic(allocation_state_emplace *ase_)
+				: mod_owner()
+				, mod_key()
 				, mod_mapped()
 				, mod_ctl()
 				, mod_size(0U)
+				, _ase(ase_)
+				, _swap{}
 			{
 			}
 			persist_atomic(const persist_atomic &) = delete;
 			persist_atomic(persist_atomic &&) = default;
 			persist_atomic& operator=(const persist_atomic &) = delete;
-#if 0
-			friend class atomic_controller<Allocator>;
-#endif
+			allocation_state_emplace &ase() { return *_ase; }
+			template <typename Table>
+				friend class impl::atomic_controller;
 		};
 }
 

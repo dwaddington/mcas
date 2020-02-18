@@ -21,7 +21,7 @@ link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
 
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG)
 
 #set(SOURCES libpmem.c memops_generic.c  pmem.c  pmem.h  pmem_posix.c)
 file(GLOB_RECURSE SOURCES ./*.c)
@@ -31,6 +31,6 @@ add_library(pmem SHARED ${SOURCES})
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx512f")
 
 #target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc)
+target_link_libraries(${PROJECT_NAME} stdc++fs common numa pthread ${LIB_NDCTL} dl gcov)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)

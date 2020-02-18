@@ -11,7 +11,6 @@
    limitations under the License.
 */
 
-
 #ifndef __API_FABRIC_ITF__
 #define __API_FABRIC_ITF__
 
@@ -25,42 +24,42 @@
 #include <vector>
 
 #ifndef FABRIC_H
-#define FI_READ                 (1ULL << 8)
-#define FI_WRITE                (1ULL << 9)
-#define FI_RECV                 (1ULL << 10)
-#define FI_SEND                 (1ULL << 11)
-#define FI_TRANSMIT             FI_SEND
-#define FI_REMOTE_READ          (1ULL << 12)
-#define FI_REMOTE_WRITE         (1ULL << 13)
+#define FI_READ (1ULL << 8)
+#define FI_WRITE (1ULL << 9)
+#define FI_RECV (1ULL << 10)
+#define FI_SEND (1ULL << 11)
+#define FI_TRANSMIT FI_SEND
+#define FI_REMOTE_READ (1ULL << 12)
+#define FI_REMOTE_WRITE (1ULL << 13)
 
-#define FI_MULTI_RECV           (1ULL << 16)
-#define FI_REMOTE_CQ_DATA       (1ULL << 17)
-#define FI_MORE                 (1ULL << 18)
-#define FI_PEEK                 (1ULL << 19)
-#define FI_TRIGGER              (1ULL << 20)
-#define FI_FENCE                (1ULL << 21)
+#define FI_MULTI_RECV (1ULL << 16)
+#define FI_REMOTE_CQ_DATA (1ULL << 17)
+#define FI_MORE (1ULL << 18)
+#define FI_PEEK (1ULL << 19)
+#define FI_TRIGGER (1ULL << 20)
+#define FI_FENCE (1ULL << 21)
 
-#define FI_COMPLETION           (1ULL << 24)
-#define FI_EVENT                FI_COMPLETION
-#define FI_INJECT               (1ULL << 25)
-#define FI_INJECT_COMPLETE      (1ULL << 26)
-#define FI_TRANSMIT_COMPLETE    (1ULL << 27)
-#define FI_DELIVERY_COMPLETE    (1ULL << 28)
-#define FI_AFFINITY             (1ULL << 29)
-#define FI_COMMIT_COMPLETE      (1ULL << 30)
+#define FI_COMPLETION (1ULL << 24)
+#define FI_EVENT FI_COMPLETION
+#define FI_INJECT (1ULL << 25)
+#define FI_INJECT_COMPLETE (1ULL << 26)
+#define FI_TRANSMIT_COMPLETE (1ULL << 27)
+#define FI_DELIVERY_COMPLETE (1ULL << 28)
+#define FI_AFFINITY (1ULL << 29)
+#define FI_COMMIT_COMPLETE (1ULL << 30)
 
-#define FI_VARIABLE_MSG         (1ULL << 48)
-#define FI_RMA_PMEM             (1ULL << 49)
-#define FI_SOURCE_ERR           (1ULL << 50)
-#define FI_LOCAL_COMM           (1ULL << 51)
-#define FI_REMOTE_COMM          (1ULL << 52)
-#define FI_SHARED_AV            (1ULL << 53)
-#define FI_PROV_ATTR_ONLY       (1ULL << 54)
-#define FI_NUMERICHOST          (1ULL << 55)
-#define FI_RMA_EVENT            (1ULL << 56)
-#define FI_SOURCE               (1ULL << 57)
-#define FI_NAMED_RX_CTX         (1ULL << 58)
-#define FI_DIRECTED_RECV        (1ULL << 59)
+#define FI_VARIABLE_MSG (1ULL << 48)
+#define FI_RMA_PMEM (1ULL << 49)
+#define FI_SOURCE_ERR (1ULL << 50)
+#define FI_LOCAL_COMM (1ULL << 51)
+#define FI_REMOTE_COMM (1ULL << 52)
+#define FI_SHARED_AV (1ULL << 53)
+#define FI_PROV_ATTR_ONLY (1ULL << 54)
+#define FI_NUMERICHOST (1ULL << 55)
+#define FI_RMA_EVENT (1ULL << 56)
+#define FI_SOURCE (1ULL << 57)
+#define FI_NAMED_RX_CTX (1ULL << 58)
+#define FI_DIRECTED_RECV (1ULL << 59)
 #endif
 
 struct iovec; /* definition in <sys/uio.h> */
@@ -70,10 +69,8 @@ namespace Component
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-class IFabric_runtime_error
-  : public std::runtime_error
-{
-public:
+class IFabric_runtime_error : public std::runtime_error {
+ public:
   explicit IFabric_runtime_error(const std::string &what_arg);
   /**
    * @return The libfabric error code (enumeration in <rdma/fi_errno.h>)
@@ -86,13 +83,12 @@ public:
  *
  */
 #pragma GCC diagnostic push
-#if defined __GNUC__ && 6 < __GNUC__
+#if defined            __GNUC__ && 6 < __GNUC__
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
 
-class IFabric_op_completer
-{
-public:
+class IFabric_op_completer {
+ public:
   virtual ~IFabric_op_completer() {}
 
   /*
@@ -100,11 +96,7 @@ public:
    * here. Callbacks which return DEFER are enqueued, to be retried after
    * later callbacks are given a first chance to run.
    */
-  enum class cb_acceptance
-  {
-    ACCEPT
-    , DEFER
-  };
+  enum class cb_acceptance { ACCEPT, DEFER };
 
   /**
    * Poll completion events; service completion queues and store
@@ -112,20 +104,41 @@ public:
    * BOTH service the completion queues and service those events
    * stalled previously
    *
-   *  completion_flags, FI_{SEND,RECV,RMA,ATOMIC,MSG,TAGGED,MULTICAST,(REMOTE_)?READ,(REMOTE_)?WRITE,REMOTE_CQ_DATA,MULTI_RECV},
-   *  are described in "man fi_cq" and defined in libfabric/include/rdma/fabric.h
+   *  completion_flags,
+   * FI_{SEND,RECV,RMA,ATOMIC,MSG,TAGGED,MULTICAST,(REMOTE_)?READ,(REMOTE_)?WRITE,REMOTE_CQ_DATA,MULTI_RECV},
+   *  are described in "man fi_cq" and defined in
+   * libfabric/include/rdma/fabric.h
    *
-   * @param completion_callback (context_t, completion_flags, std::size_t len, status_t status, void* error_data)
+   * @param completion_callback (context_t, completion_flags, std::size_t len,
+   * status_t status, void* error_data)
    *
    * @return Number of completions processed
    */
   using complete_old = std::function<void(void *context, ::status_t)>;
-  using complete_definite = std::function<void(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data)>;
-  using complete_tentative = std::function<cb_acceptance(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data)>;
-  using complete_param_definite = std::function<void(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data, void *param)>;
-  using complete_param_tentative = std::function<cb_acceptance(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data, void *param)>;
-  using complete_param_definite_ptr_noexcept = void(*)(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data, void *param) noexcept;
-  using complete_param_tentative_ptr_noexcept = cb_acceptance(*)(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data, void *param) noexcept;
+  using complete_definite =
+      std::function<void(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data)>;
+  using complete_tentative = std::function<
+      cb_acceptance(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data)>;
+  using complete_param_definite = std::function<
+      void(void *context, ::status_t, std::uint64_t completion_flags, std::size_t len, void *error_data, void *param)>;
+  using complete_param_tentative              = std::function<cb_acceptance(void *context,
+                                                               ::status_t,
+                                                               std::uint64_t completion_flags,
+                                                               std::size_t   len,
+                                                               void *        error_data,
+                                                               void *        param)>;
+  using complete_param_definite_ptr_noexcept  = void (*)(void *context,
+                                                        ::status_t,
+                                                        std::uint64_t completion_flags,
+                                                        std::size_t   len,
+                                                        void *        error_data,
+                                                        void *        param) noexcept;
+  using complete_param_tentative_ptr_noexcept = cb_acceptance (*)(void *context,
+                                                                  ::status_t,
+                                                                  std::uint64_t completion_flags,
+                                                                  std::size_t   len,
+                                                                  void *        error_data,
+                                                                  void *        param) noexcept;
 
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
@@ -151,17 +164,20 @@ public:
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  virtual std::size_t poll_completions_tentative(const complete_param_tentative &completion_callback, void *callback_param) = 0;
+  virtual std::size_t poll_completions_tentative(const complete_param_tentative &completion_callback,
+                                                 void *                          callback_param) = 0;
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  virtual std::size_t poll_completions(complete_param_definite_ptr_noexcept completion_callback, void *callback_param) = 0;
+  virtual std::size_t poll_completions(complete_param_definite_ptr_noexcept completion_callback,
+                                       void *                               callback_param) = 0;
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  virtual std::size_t poll_completions_tentative(complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) = 0;
+  virtual std::size_t poll_completions_tentative(complete_param_tentative_ptr_noexcept completion_callback,
+                                                 void *                                callback_param) = 0;
 
   /**
    * Get count of stalled completions.
@@ -175,7 +191,8 @@ public:
    *
    * @param polls_limit Maximum number of polls
    *
-   * @return (was next completion context. But poll_completions can retrieve that)
+   * @return (was next completion context. But poll_completions can retrieve
+   * that)
    *
    * @throw IFabric_runtime_error - ::fi_control fail
    * @throw std::system_error - pselect fail
@@ -186,7 +203,8 @@ public:
    *
    * @param polls_limit Maximum time to wait
    *
-   * @return (was next completion context. But poll_completions can retrieve that)
+   * @return (was next completion context. But poll_completions can retrieve
+   * that)
    *
    * @throw IFabric_runtime_error - ::fi_control fail
    * @throw std::system_error - pselect fail
@@ -195,7 +213,7 @@ public:
 
   /**
    * Unblock any threads waiting on completions
-   * 
+   *
    * @throw std::system_error, e.g. for locking
    */
   virtual void unblock_completions() = 0;
@@ -211,11 +229,8 @@ public:
  * Fabric/RDMA-based network component
  *
  */
-class IFabric_communicator
-  : public IFabric_op_completer
-{
-public:
-
+class IFabric_communicator : public IFabric_op_completer {
+ public:
   /**
    * Asynchronously post a buffer to the connection
    *
@@ -226,7 +241,7 @@ public:
    * @throw IFabric_runtime_error std::runtime_error - ::fi_sendv fail
    */
   virtual void post_send(const ::iovec *first, const ::iovec *last, void **descriptors, void *context) = 0;
-  virtual void post_send(const std::vector<::iovec>& buffers, void *context) = 0;
+  virtual void post_send(const std::vector<::iovec> &buffers, void *context)                           = 0;
 
   /**
    * Asynchronously post a buffer to receive data
@@ -238,7 +253,7 @@ public:
    * @throw IFabric_runtime_error - ::fi_recvv fail
    */
   virtual void post_recv(const ::iovec *first, const ::iovec *last, void **descriptors, void *context) = 0;
-  virtual void post_recv(const std::vector<::iovec>& buffers, void *context) = 0;
+  virtual void post_recv(const std::vector<::iovec> &buffers, void *context)                           = 0;
 
   /**
    * Post RDMA read operation
@@ -253,14 +268,14 @@ public:
    */
   virtual void post_read(const ::iovec *first,
                          const ::iovec *last,
-                         void **descriptors,
-                         std::uint64_t remote_addr,
-                         std::uint64_t key,
-                         void *context) = 0;
-  virtual void post_read(const std::vector<::iovec>& buffers,
-                         std::uint64_t remote_addr,
-                         std::uint64_t key,
-                         void *context) = 0;
+                         void **        descriptors,
+                         std::uint64_t  remote_addr,
+                         std::uint64_t  key,
+                         void *         context) = 0;
+  virtual void post_read(const std::vector<::iovec> &buffers,
+                         std::uint64_t               remote_addr,
+                         std::uint64_t               key,
+                         void *                      context) = 0;
 
   /**
    * Post RDMA write operation
@@ -275,21 +290,22 @@ public:
    */
   virtual void post_write(const ::iovec *first,
                           const ::iovec *last,
-                          void **descriptors,
-                          std::uint64_t remote_addr,
-                          std::uint64_t key,
-                          void *context) = 0;
-  virtual void post_write(const std::vector<::iovec>& buffers,
-                          std::uint64_t remote_addr,
-                          std::uint64_t key,
-                          void *context) = 0;
+                          void **        descriptors,
+                          std::uint64_t  remote_addr,
+                          std::uint64_t  key,
+                          void *         context) = 0;
+  virtual void post_write(const std::vector<::iovec> &buffers,
+                          std::uint64_t               remote_addr,
+                          std::uint64_t               key,
+                          void *                      context) = 0;
 
   /**
    * Send message without completion
    *
    * @param connection Connection to inject on
    * @param buf Data to send
-   * @param buf Length of data to send (must not exceed IFabric_connection::max_inject_size())
+   * @param buf Length of data to send (must not exceed
+   * IFabric_connection::max_inject_size())
    *
    * @throw IFabric_runtime_error - ::fi_inject fail
    */
@@ -303,10 +319,8 @@ public:
 
 struct IFabric_memory_region;
 
-class IFabric_connection
-{
-public:
-
+class IFabric_connection {
+ public:
   virtual ~IFabric_connection() {}
 
   using memory_region_t = IFabric_memory_region *;
@@ -316,27 +330,28 @@ public:
    *
    * @param contig_addr Pointer to contiguous region
    * @param size Size of buffer in bytes
-   * @param key Requested key for the remote memory. Note: if the fabric provider
-   *            uses the key (i.e., the fabric provider memory region attributes
+   * @param key Requested key for the remote memory. Note: if the fabric
+   * provider uses the key (i.e., the fabric provider memory region attributes
    *            do not include the FI_MR_PROV_KEY bit), then the key must be
    *            unique among registered memory regions. As this API does not
-   *            expose these attributes, the only safe strategy is to assume that
-   *            the key must be unique among registered memory regsions.
-   * @param flags Flags e.g., FI_REMOTE_READ|FI_REMOTE_WRITE. Flag definitions are in <rdma/fabric.h>
-   * 
+   *            expose these attributes, the only safe strategy is to assume
+   * that the key must be unique among registered memory regsions.
+   * @param flags Flags e.g., FI_REMOTE_READ|FI_REMOTE_WRITE. Flag definitions
+   * are in <rdma/fabric.h>
+   *
    * @return Memory region handle
    *
    * @throw std::range_error - address already registered
    * @throw std::logic_error - inconsistent memory registry
    */
-  virtual memory_region_t register_memory(const void * contig_addr,
-                                          std::size_t size,
+  virtual memory_region_t register_memory(const void *  contig_addr,
+                                          std::size_t   size,
                                           std::uint64_t key,
                                           std::uint64_t flags) = 0;
 
   /**
    * De-register memory region
-   * 
+   *
    * @param memory_region Memory region to de-register
    *
    * @throw std::range_error - address not registered
@@ -345,13 +360,13 @@ public:
   virtual void deregister_memory(memory_region_t memory_region) = 0;
 
   virtual std::uint64_t get_memory_remote_key(memory_region_t) const noexcept = 0;
-  virtual void *get_memory_descriptor(memory_region_t) const noexcept = 0;
+  virtual void *        get_memory_descriptor(memory_region_t) const noexcept = 0;
 
   /**
    * Get address of connected peer (taken from fi_getpeer during
    * connection instantiation).
-   * 
-   * 
+   *
+   *
    * @return Peer endpoint address
    * @throw std::bad_alloc, e.g.
    */
@@ -360,8 +375,8 @@ public:
   /**
    * Get local address of connection (taken from fi_getname during
    * connection instantiation).
-   * 
-   * 
+   *
+   *
    * @return Local endpoint address
    * @throw std::bad_alloc, e.g.
    */
@@ -369,14 +384,14 @@ public:
 
   /**
    * Get the maximum message size for the provider
-   * 
+   *
    * @return Max message size in bytes
    */
   virtual std::size_t max_message_size() const noexcept = 0;
 
   /**
    * Get the maximum inject message size for the provider
-   * 
+   *
    * @return Max inject message size in bytes
    */
   virtual std::size_t max_inject_size() const noexcept = 0;
@@ -388,7 +403,6 @@ public:
   */
 };
 
-
 /**
  * An endpoint with a communication channel. Distinguished from a connection
  * which can provide grouped communications channels, but does not of itself
@@ -396,31 +410,23 @@ public:
  *
  */
 class IFabric_active_endpoint_comm
-  : public IFabric_connection
-  , public IFabric_communicator
-{
+    : public IFabric_connection
+    , public IFabric_communicator {
 };
-
 
 /**
  * An endpoint established as a server.
  *
  */
-class IFabric_server
-  : public IFabric_active_endpoint_comm
-{
+class IFabric_server : public IFabric_active_endpoint_comm {
 };
-
 
 /**
  * An endpoint established as a client.
  *
  */
-class IFabric_client
-  : public IFabric_active_endpoint_comm
-{
+class IFabric_client : public IFabric_active_endpoint_comm {
 };
-
 
 /**
  * An endpoint "grouped", without a communication channel.
@@ -429,11 +435,9 @@ class IFabric_client
  *
  */
 class IFabric_active_endpoint_grouped
-  : public IFabric_connection
-  , public IFabric_op_completer
-{
-public:
-
+    : public IFabric_connection
+    , public IFabric_op_completer {
+ public:
   /**
    * Allocate group (for partitioned completion handling)
    *
@@ -443,28 +447,21 @@ public:
   virtual IFabric_communicator *allocate_group() = 0;
 };
 
-
 /**
  * A client endpoint which cannot initiate commands but which
  * can allocate "commuicators" which can initiate commands.
  *
  */
-class IFabric_client_grouped
-  : public IFabric_active_endpoint_grouped
-{
+class IFabric_client_grouped : public IFabric_active_endpoint_grouped {
 };
-
 
 /**
  * A server endpoint which cannot initiate commands but which
  * can allocate "commuicators" which can initiate commands.
  *
  */
-class IFabric_server_grouped
-  : public IFabric_active_endpoint_grouped
-{
+class IFabric_server_grouped : public IFabric_active_endpoint_grouped {
 };
-
 
 /**
  * Fabric passive endpoint. Instantiation of this interface normally creates
@@ -472,22 +469,21 @@ class IFabric_server_grouped
  * connections (see man fi_cm).  On release of the interface, the endpoint
  * is destroyed.
  */
-class IFabric_passive_endpoint
-{
-public:
+class IFabric_passive_endpoint {
+ public:
   virtual ~IFabric_passive_endpoint() {}
 
   /**
    * Get the maximum message size for the provider
-   * 
+   *
    * @return Max message size in bytes
    */
   virtual std::size_t max_message_size() const noexcept = 0;
 
   /**
    * Get provider name
-   * 
-   * 
+   *
+   *
    * @return Provider name
    *
    * @throw std::bad_alloc, e.g.
@@ -495,43 +491,39 @@ public:
   virtual std::string get_provider_name() const = 0;
 };
 
-
 /**
  * Fabric passive endpoint providing servers with ordinary (not grouped)
  * communicators.
  */
-class IFabric_server_factory
-  : public IFabric_passive_endpoint
-{
-public:
-
+class IFabric_server_factory : public IFabric_passive_endpoint {
+ public:
   /**
    * Server/accept side handling of new connections (handled by the
    * active thread) are queued so that they can be taken by a polling
    * thread an integrated into the processing loop.  This method is
    * normally invoked until NULL is returned.
-   * 
+   *
    * @return New connection, or NULL if no new connection.
    *
    * @throw std::system_error, e.g. for locking
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : read error on event pipe
    */
-  virtual IFabric_server * get_new_connection() = 0;
+  virtual IFabric_server *get_new_connection() = 0;
 
   /**
    * Close connection and release any associated resources
-   * 
+   *
    * @param connection
    *
    * @throw std::system_error, e.g. for locking
    */
-  virtual void close_connection(IFabric_server * connection) = 0;
+  virtual void close_connection(IFabric_server *connection) = 0;
 
   /**
    * Used to get a vector of active connection belonging to this
    * end point.
-   * 
+   *
    * @return Vector of active connections
    *
    * @throw std::bad_alloc, e.g.
@@ -540,8 +532,8 @@ public:
 
   /**
    * Get provider name
-   * 
-   * 
+   *
+   *
    * @return Provider name
    *
    * @throw std::bad_alloc, e.g.
@@ -549,58 +541,54 @@ public:
   virtual std::string get_provider_name() const = 0;
 };
 
-
 /* Fabric passive endpoint providing servers with grouped communicators.
  */
-class IFabric_server_grouped_factory
-  : public IFabric_passive_endpoint
-{
-public:
+class IFabric_server_grouped_factory : public IFabric_passive_endpoint {
+ public:
   /**
    * Server/accept side handling of new connections (handled by the
    * active thread) are queued so that they can be taken by a polling
    * thread an integrated into the processing loop.  This method is
    * normally invoked until NULL is returned.
-   * 
-   * 
+   *
+   *
    * @return New connection, or NULL if no new connection.
    *
    * @throw std::logic_error : unexpected event
    * @throw std::system_error, e.g. for locking
    * @throw std::system_error : read error on event pipe
    */
-  virtual IFabric_server_grouped * get_new_connection() = 0;
+  virtual IFabric_server_grouped *get_new_connection() = 0;
 
   /**
    * Close connection and release any associated resources
-   * 
+   *
    * @param connection
    *
    * @throw std::system_error, e.g. for locking
    */
-  virtual void close_connection(IFabric_server_grouped * connection) = 0;
+  virtual void close_connection(IFabric_server_grouped *connection) = 0;
 
   /**
    * Used to get a vector of active connection belonging to this
    * end point.
-   * 
+   *
    * @return Vector of active connections
    * @throw std::bad_alloc, e.g.
    */
   virtual std::vector<IFabric_server_grouped *> connections() = 0;
 };
 
-
-class IFabric
-{
-public:
+class IFabric {
+ public:
   using memory_region_t = IFabric_memory_region *;
-  
-  DECLARE_INTERFACE_UUID(0xc373d083,0xe629,0x46c9,0x86fa,0x6f,0x96,0x40,0x61,0x10,0xdf);
+
+  DECLARE_INTERFACE_UUID(0xc373d083, 0xe629, 0x46c9, 0x86fa, 0x6f, 0x96, 0x40, 0x61, 0x10, 0xdf);
   virtual ~IFabric() {}
   /**
-   * Open a fabric server factory. Endpoints usually correspond with hardware resources,
-   * e.g. verbs queue pair. Options may not conflict with those specified for the fabric.
+   * Open a fabric server factory. Endpoints usually correspond with hardware
+   * resources, e.g. verbs queue pair. Options may not conflict with those
+   * specified for the fabric.
    *
    * @param json_configuration Configuration string in JSON
    *
@@ -611,12 +599,13 @@ public:
    * @throw IFabric_runtime_error - ::fi_pep_bind fail
    * @throw IFabric_runtime_error - ::fi_listen fail
    */
-  virtual IFabric_server_factory * open_server_factory(const std::string& json_configuration, std::uint16_t port) = 0;
+  virtual IFabric_server_factory *open_server_factory(const std::string &json_configuration, std::uint16_t port) = 0;
   /**
-   * Open a fabric "server grouped" factory. Endpoints usually correspond with hardware resources,
-   * e.g. verbs queue pair. Options may not conflict with those specified for the fabric.
-   * "Server groups" are servers in which each operation is assigned to a "communication group."
-   * Each "completion group" may be separately polled for completions.
+   * Open a fabric "server grouped" factory. Endpoints usually correspond with
+   * hardware resources, e.g. verbs queue pair. Options may not conflict with
+   * those specified for the fabric. "Server groups" are servers in which each
+   * operation is assigned to a "communication group." Each "completion group"
+   * may be separately polled for completions.
    *
    * @param json_configuration Configuration string in JSON
    *
@@ -627,11 +616,12 @@ public:
    * @throw IFabric_runtime_error - ::fi_pep_bind fail
    * @throw IFabric_runtime_error - ::fi_listen fail
    */
-  virtual IFabric_server_grouped_factory * open_server_grouped_factory(const std::string& json_configuration, std::uint16_t port) = 0;
+  virtual IFabric_server_grouped_factory *open_server_grouped_factory(const std::string &json_configuration,
+                                                                      std::uint16_t      port) = 0;
   /**
-   * Open a fabric client (active endpoint) connection to a server. Active endpoints
-   * usually correspond with hardware resources, e.g. verbs queue pair. Options may
-   * not conflict with those specified for the fabric.
+   * Open a fabric client (active endpoint) connection to a server. Active
+   * endpoints usually correspond with hardware resources, e.g. verbs queue
+   * pair. Options may not conflict with those specified for the fabric.
    *
    * @param json_configuration Configuration string in JSON
    * @param remote_endpoint The IP address (URL) of the server
@@ -644,7 +634,8 @@ public:
    * @throw std::bad_alloc - libfabric out of memory (creating a new server)
    * @throw std::bad_alloc - out of memory
    * @throw std::domain_error : json file parse-detected error
-   * @throw std::logic_error : socket initialized with a negative value (from ::socket) in Fd_control
+   * @throw std::logic_error : socket initialized with a negative value (from
+   * ::socket) in Fd_control
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : error receiving fabric server name
    * @throw std::system_error : pselect fail (expecting event)
@@ -661,10 +652,13 @@ public:
    * @throw IFabric_runtime_error - ::fi_ep_bind fail (event registration)
    *
    */
-  virtual IFabric_client * open_client(const std::string& json_configuration, const std::string& remote_endpoint, std::uint16_t port) = 0;
+  virtual IFabric_client *open_client(const std::string &json_configuration,
+                                      const std::string &remote_endpoint,
+                                      std::uint16_t      port) = 0;
   /**
-   * Open a fabric endpoint for which communications are divided into smaller entities (groups).
-   * Options may not conflict with those specified for the fabric.
+   * Open a fabric endpoint for which communications are divided into smaller
+   * entities (groups). Options may not conflict with those specified for the
+   * fabric.
    *
    * @param json_configuration Configuration string in JSON
    * @param remote_endpoint The IP address (URL) of the server
@@ -677,7 +671,8 @@ public:
    * @throw std::bad_alloc - libfabric out of memory (creating a new server)
    * @throw std::bad_alloc - out of memory
    * @throw std::domain_error : json file parse-detected error
-   * @throw std::logic_error : socket initialized with a negative value (from ::socket) in Fd_control
+   * @throw std::logic_error : socket initialized with a negative value (from
+   * ::socket) in Fd_control
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : error receiving fabric server name
    * @throw std::system_error : pselect fail (expecting event)
@@ -694,24 +689,23 @@ public:
    * @throw IFabric_runtime_error - ::fi_ep_bind fail (event registration)
    *
    */
-  virtual IFabric_client_grouped * open_client_grouped(const std::string& json_configuration,
-                                                       const std::string& remote_endpoint,
-                                                       std::uint16_t port) = 0;
-  
+  virtual IFabric_client_grouped *open_client_grouped(const std::string &json_configuration,
+                                                      const std::string &remote_endpoint,
+                                                      std::uint16_t      port) = 0;
 };
 
-class IFabric_factory : public Component::IBase
-{
-public:
-  DECLARE_INTERFACE_UUID(0xfac3d083,0xe629,0x46c9,0x86fa,0x6f,0x96,0x40,0x61,0x10,0xdf);
+class IFabric_factory : public Component::IBase {
+ public:
+  DECLARE_INTERFACE_UUID(0xfac3d083, 0xe629, 0x46c9, 0x86fa, 0x6f, 0x96, 0x40, 0x61, 0x10, 0xdf);
 
   /**
-   * Open a fabric endpoint.  Endpoints usually correspond with hardware resources, e.g. verbs queue pair
-   * Options should include provider, capabilities, active thread core.
+   * Open a fabric endpoint.  Endpoints usually correspond with hardware
+   * resources, e.g. verbs queue pair Options should include provider,
+   * capabilities, active thread core.
    *
    * @param json_configuration Configuration string in JSON
    * form. e.g. { "caps":["FI_MSG","FI_RMA"], "preferred_provider" : "verbs"}
-   * @return 
+   * @return
    */
   virtual ~IFabric_factory() {}
   /**
@@ -719,11 +713,11 @@ public:
    * @throw std::domain_error : json file parse-detected error
    * @throw IFabric_runtime_error - ::fi_control fail
    */
-  virtual IFabric * make_fabric(const std::string& json_configuration) = 0;
+  virtual IFabric *make_fabric(const std::string &json_configuration) = 0;
 };
 
 #pragma GCC diagnostic pop
 
-} // Component
+}  // namespace Component
 
-#endif // __API_FABRIC_ITF__
+#endif  // __API_FABRIC_ITF__

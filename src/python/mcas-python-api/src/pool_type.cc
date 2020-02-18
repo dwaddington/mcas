@@ -404,13 +404,13 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   std::string request(command);
   assert(request.size() > 0);
 
-  std::string out_response;
-  
+  std::vector<Component::IMCAS::ADO_response> response;
+
   status_t hr = self->_mcas->invoke_ado(self->_pool,
                                         key,
                                         request,
                                         0, // flags
-                                        out_response,
+                                        response,
                                         ondemand_size);
 
   if(hr != S_OK) {
@@ -420,7 +420,7 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
     return NULL;
   }
 
-  return PyUnicode_DecodeUTF8((const char *) out_response.data(), out_response.size(), "strict");
+  return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
 }
 
 
@@ -607,7 +607,10 @@ static PyObject * pool_find_key(Pool* self, PyObject *args, PyObject *kwds)
     return tuple;
   }
   else if(hr == E_FAIL) {
-    return Py_None;
+    auto tuple = PyTuple_New(2);
+    PyTuple_SetItem(tuple, 0, Py_None);
+    PyTuple_SetItem(tuple, 1, Py_None);
+    return tuple;
   }
   else {
     std::stringstream ss;

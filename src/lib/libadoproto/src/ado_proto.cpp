@@ -265,7 +265,8 @@ void ADO_protocol_builder::recv_find_index_response(status_t& status,
 
 
 void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
-                                             const std::string& work_key_str,
+                                             const char * key,
+                                             const size_t key_len,
                                              const void * value,
                                              const size_t value_len,
                                              const void * detached_value,
@@ -281,7 +282,7 @@ void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
   if(option_DEBUG > 0) {
     PMAJOR("SENDING Work_request: key=(%s) value=%p value_len=%lu"
            " invocation_len=%lu detached_value=(%p,%lu) (%.*s) new=%d",
-           work_key_str.c_str(),
+           key,
            value,
            value_len,
            invocation_data_len,
@@ -294,7 +295,8 @@ void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
 
   new (buffer) Work_request(MAX_MESSAGE_SIZE,
                             work_request_key,
-                            work_key_str,
+                            key,
+                            key_len,
                             reinterpret_cast<uint64_t>(value),
                             value_len,
                             reinterpret_cast<uint64_t>(detached_value),
@@ -308,7 +310,7 @@ void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
 
 void ADO_protocol_builder::send_work_response(status_t status,
                                               uint64_t work_key,
-                                              IADO_plugin::response_buffer_vector_t& response_buffers)
+                                              const IADO_plugin::response_buffer_vector_t& response_buffers)
 {
   auto buffer = get_buffer().release();
   assert(buffer);
@@ -321,11 +323,10 @@ void ADO_protocol_builder::send_work_response(status_t status,
   send(buffer);
 }
 
-bool ADO_protocol_builder::recv_from_ado_work_completion(uint64_t& work_key,
-                                                         status_t& status,
-                                                         void *& response,
-                                                         size_t& response_len,
-                                                         Component::IADO_plugin::response_buffer_vector_t& response_buffers)
+bool ADO_protocol_builder::
+recv_from_ado_work_completion(uint64_t& work_key,
+                              status_t& status,
+                              Component::IADO_plugin::response_buffer_vector_t& response_buffers)
 {
   Buffer_header * buffer = nullptr;
   status_t s = recv(buffer);
@@ -339,19 +340,15 @@ bool ADO_protocol_builder::recv_from_ado_work_completion(uint64_t& work_key,
   /*---------------------------------------*/
   using namespace mcas::ipc;
   
-  if(mcas::ipc::Message::is_valid(buffer)) {
+  if(mcas::ipc::Message::is_valid(buffer) &&
+     mcas::ipc::Message::type(buffer) == MSG_TYPE_WORK_RESPONSE) {
+    
     auto * wr = reinterpret_cast<Work_response*>(buffer);
 
+    response_buffers.clear();
     work_key = wr->work_key;
     status = wr->status;
-    response_len = wr->response_len;
-    response = ::malloc(response_len);
-    /* we have to copy response because the IPC buffer is going away. I don't
-       like this because of the double copying going on.
-    */
-    memcpy(response, wr->get_response(), response_len);
-    
-    wr->get_pool_buffers(response_buffers);
+    wr->copy_responses(response_buffers);
   }
   else throw Logic_exception("invalid IPC message");
   
@@ -520,7 +517,9 @@ void ADO_protocol_builder::recv_pool_info_response(status_t& status, std::string
 
 void ADO_protocol_builder::send_table_op_response(const status_t status,
                                                   const void * value_addr,
-                                                  size_t value_len)
+                                                  size_t value_len,
+                                                  const char * key_addr,
+                                                  Component::IKVStore::key_t key_handle)
 {
   auto buffer = get_buffer().release(); //::uipc_alloc_message(_channel); 
   assert(buffer);
@@ -528,14 +527,17 @@ void ADO_protocol_builder::send_table_op_response(const status_t status,
   new (buffer) Table_response(MAX_MESSAGE_SIZE,
                               status,
                               reinterpret_cast<uint64_t>(value_addr),
-                              value_len);
+                              value_len,
+                              reinterpret_cast<uint64_t>(key_addr),
+                              reinterpret_cast<uint64_t>(key_handle));
   send_callback(buffer);
 }
 
 void ADO_protocol_builder::recv_table_op_response(status_t& status,
                                                   void *& value_addr,
-                                                  size_t * p_out_value_len
-                                                  )
+                                                  size_t * p_out_value_len,
+                                                  const char ** out_key_ptr,
+                                                  Component::IKVStore::key_t * out_key_handle)
 {
   Buffer_header * buffer;
   auto st = poll_recv_callback(buffer);
@@ -547,8 +549,16 @@ void ADO_protocol_builder::recv_table_op_response(status_t& status,
     auto * wr = reinterpret_cast<Table_response*>(buffer);
     status = wr->status;
     value_addr = reinterpret_cast<void*>(wr->value_addr);
+    
     if(p_out_value_len)
       *p_out_value_len = wr->value_len;
+    
+    if(out_key_ptr)
+      *out_key_ptr = reinterpret_cast<const char *>(wr->key_addr);
+
+    if(out_key_handle)
+      *out_key_handle = reinterpret_cast<Component::IKVStore::key_t>(wr->key_handle);
+    
     free_ipc_buffer(buffer);
   }
   else throw Logic_exception("recv_table_op_response got something else");
@@ -692,7 +702,7 @@ bool ADO_protocol_builder::recv_iterate_request(const Buffer_header * buffer,
   return false;
 }
 
-void ADO_protocol_builder::send_iterate_response(status_t rc,
+void ADO_protocol_builder::send_iterate_response(const status_t rc,
                                                  Component::IKVStore::pool_iterator_t iterator,
                                                  Component::IKVStore::pool_reference_t reference)
 {
@@ -702,5 +712,51 @@ void ADO_protocol_builder::send_iterate_response(status_t rc,
 }
 
   
+/// --unlock
+void ADO_protocol_builder::send_unlock_request(const uint64_t work_id,
+                                               const Component::IKVStore::key_t key_handle)
+{
+  auto buffer = get_buffer().release();
+  new (buffer) mcas::ipc::Unlock_request(work_id, key_handle);
+                              
+  send_callback(buffer);
+}
 
+bool ADO_protocol_builder::recv_unlock_response(status_t& status)
+{
+  Buffer_header * buffer;
+  auto st = poll_recv_callback(buffer);
+  if ( st != S_OK )
+    throw std::runtime_error("bad response from recv_unlock_response");
+  
+  if(mcas::ipc::Message::is_valid(buffer) &&
+     mcas::ipc::Message::type(buffer) == MSG_TYPE_CHIRP) {
+    auto * chirp = reinterpret_cast<const Chirp*>(buffer);
+    status = chirp->status;
+    return chirp->type == UNLOCK_RESPONSE;
+  }
+  return false;
+}
 
+bool ADO_protocol_builder::recv_unlock_request(const Buffer_header * buffer,
+                                               uint64_t& work_id,
+                                               Component::IKVStore::key_t& key_handle)
+{
+  if(mcas::ipc::Message::is_valid(buffer) &&
+     mcas::ipc::Message::type(buffer) == MSG_TYPE_UNLOCK_REQUEST) {
+    auto * req = reinterpret_cast<const Unlock_request*>(buffer);
+    work_id = req->work_id;
+    key_handle = req->key_handle;
+    assert(work_id);
+    assert(key_handle);    
+    return true;
+  }
+  return false;
+}
+
+void ADO_protocol_builder::send_unlock_response(const status_t status)
+{
+  auto buffer = get_buffer().release();
+  new (buffer) mcas::ipc::Chirp(chirp_t::UNLOCK_RESPONSE, status);
+  send_callback(buffer);  
+}

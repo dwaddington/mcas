@@ -14,21 +14,20 @@
 #ifndef __API_KVSTORE_ITF__
 #define __API_KVSTORE_ITF__
 
+#include <api/components.h>
+#include <assert.h>
+#include <common/exceptions.h>
+#include <common/types.h>
+#include <common/utils.h>
+#include <semaphore.h>
 #include <sys/uio.h> /* iovec */
 
-#include <assert.h>
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib>
 #include <functional>
 #include <map>
-#include <vector>
-
-#include <api/components.h>
-#include <common/types.h>
-#include <common/exceptions.h>
-#include <common/utils.h>
-#include <semaphore.h>
 #include <mutex>
+#include <vector>
 
 /* print format for the pool type */
 #define PRIxIKVSTORE_POOL_T PRIx64
@@ -38,34 +37,34 @@ namespace Component
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-#define DECLARE_OPAQUE_TYPE(NAME) struct Opaque_##NAME { virtual ~Opaque_##NAME() {} }
+#define DECLARE_OPAQUE_TYPE(NAME) \
+  struct Opaque_##NAME {          \
+    virtual ~Opaque_##NAME() {}   \
+  }
 /**
  * Key-value interface
  */
 class IKVStore : public Component::IBase {
-public:
+ public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0x62f4829f,0x0405,0x4c19,0x9898,0xa3,0xae,0x21,0x5a,0x3e,0xe8);
   // clang-format on
 
-private:
-  
+ private:
   DECLARE_OPAQUE_TYPE(memory_region);
   DECLARE_OPAQUE_TYPE(key);
   DECLARE_OPAQUE_TYPE(lock_handle);
 
-public:
-  
+ public:
   DECLARE_OPAQUE_TYPE(pool_iterator);
 
-public:
-  
+ public:
   using pool_t          = uint64_t;
   using memory_handle_t = Opaque_memory_region*;
   using key_t           = Opaque_key*;
   using pool_lock_t     = Opaque_lock_handle*;
   using pool_iterator_t = Opaque_pool_iterator*;
-  
+
   static constexpr memory_handle_t HANDLE_NONE = nullptr;
   static constexpr key_t           KEY_NONE    = nullptr;
 
@@ -78,20 +77,21 @@ public:
 
   enum {
     FLAGS_NONE        = 0x0,
-    FLAGS_READ_ONLY   = 0x1,
+    FLAGS_READ_ONLY   = 0x1, /* lock read-only */
     FLAGS_SET_SIZE    = 0x2,
-    FLAGS_CREATE_ONLY = 0x4,
-    FLAGS_DONT_STOMP  = 0x8,
-    FLAGS_MAX_VALUE   = 0x8,
+    FLAGS_CREATE_ONLY = 0x4,  /* only succeed if no existing k-v pair exist */
+    FLAGS_DONT_STOMP  = 0x8,  /* do not overwrite existing k-v pair */
+    FLAGS_NO_RESIZE   = 0x10, /* if size < existing size, do not resize */
+    FLAGS_MAX_VALUE   = 0x10,
   };
 
   static constexpr pool_t POOL_ERROR = 0;
-  
+
   enum class Capability {
     POOL_DELETE_CHECK, /*< checks if pool is open before allowing delete */
     RWLOCK_PER_POOL,   /*< pools are locked with RW-lock */
     POOL_THREAD_SAFE,  /*< pools can be shared across multiple client threads */
-    WRITE_TIMESTAMPS, /*< support for write timestamping */
+    WRITE_TIMESTAMPS,  /*< support for write timestamping */
   };
 
   enum class Op_type {
@@ -107,7 +107,8 @@ public:
     CRC32                    = 3, /* get CRC32 of a value */
     AUTO_HASHTABLE_EXPANSION = 4, /* set to true if the hash table should expand */
     PERCENT_USED             = 5, /* get percent used pool capacity at current size */
-    WRITE_EPOCH_TIME         = 6, /* epoch time at which the key-value pair was last written or locked with STORE_LOCK_WRITE */
+    WRITE_EPOCH_TIME         = 6, /* epoch time at which the key-value pair was last
+                                     written or locked with STORE_LOCK_WRITE */
   };
 
   enum lock_type_t {
@@ -124,16 +125,16 @@ public:
     E_BAD_ALIGNMENT  = E_ERROR_BASE - 4,
     E_TOO_LARGE      = E_ERROR_BASE - 5,
     E_ALREADY_OPEN   = E_ERROR_BASE - 6,
-  };  
+  };
 
   class Operation {
     Op_type _type;
     size_t  _offset;
 
-  protected:
+   protected:
     Operation(Op_type type, size_t offset) : _type(type), _offset(offset) {}
 
-  public:
+   public:
     Op_type type() const noexcept { return _type; }
     size_t  offset() const noexcept { return _offset; }
   };
@@ -141,22 +142,19 @@ public:
   class Operation_sized : public Operation {
     size_t _len;
 
-  protected:
-    Operation_sized(Op_type type, size_t offset_, size_t len)
-      : Operation(type, offset_), _len(len)
-    {
-    }
+   protected:
+    Operation_sized(Op_type type, size_t offset_, size_t len) : Operation(type, offset_), _len(len) {}
 
-  public:
+   public:
     size_t size() const noexcept { return _len; }
   };
 
   class Operation_write : public Operation_sized {
     const void* _data;
 
-  public:
+   public:
     Operation_write(size_t offset, size_t len, const void* data)
-      : Operation_sized(Op_type::WRITE, offset, len), _data(data)
+        : Operation_sized(Op_type::WRITE, offset, len), _data(data)
     {
     }
     const void* data() const noexcept { return _data; }
@@ -206,8 +204,7 @@ public:
                              const std::string& name,
                              const size_t       size,
                              uint32_t           flags              = 0,
-                             uint64_t           expected_obj_count = 0)
-    __attribute__((deprecated))
+                             uint64_t           expected_obj_count = 0) __attribute__((deprecated))
   {
     return create_pool(path + name, size, flags, expected_obj_count);
   }
@@ -221,14 +218,10 @@ public:
    * @return Pool handle or POOL_ERROR if pool cannot be opened, or flags
    * unsupported
    */
-  virtual pool_t open_pool(const std::string& name, uint32_t flags = 0)
-  {
-    return POOL_ERROR;
-  }
+  virtual pool_t open_pool(const std::string& name, uint32_t flags = 0) { return POOL_ERROR; }
 
-  virtual pool_t open_pool(const std::string& path,
-                           const std::string& name,
-                           uint32_t flags = 0) __attribute__((deprecated))
+  virtual pool_t open_pool(const std::string& path, const std::string& name, uint32_t flags = 0)
+      __attribute__((deprecated))
   {
     return open_pool(path + name, flags);
   }
@@ -253,10 +246,7 @@ public:
    */
   virtual status_t delete_pool(const std::string& name) = 0;
 
-  virtual status_t delete_pool(const std::string& path, const std::string& name)
-  {
-    return delete_pool(path + name);
-  }
+  virtual status_t delete_pool(const std::string& path, const std::string& name) { return delete_pool(path + name); }
 
   /**
    * Get mapped memory regions for pool.  This is used for pre-registration with
@@ -268,14 +258,14 @@ public:
    * @return S_OK on success or E_POOL_NOT_FOUND.  Components that do not
    * support this return E_NOT_SUPPORTED.
    */
-  virtual status_t get_pool_regions(const pool_t          pool,
-                                    std::vector<::iovec>& out_regions)
+  virtual status_t get_pool_regions(const pool_t pool, std::vector<::iovec>& out_regions)
   {
     return E_NOT_SUPPORTED; /* not supported in FileStore */
   }
 
   /**
-   * Dynamically expand a pool.  Typically, this will add to the regions belonging to a pool.
+   * Dynamically expand a pool.  Typically, this will add to the regions
+   * belonging to a pool.
    *
    * @param pool Pool handle
    * @param increment_size Size in bytes to expand by
@@ -284,9 +274,7 @@ public:
    * @return S_OK on success or E_POOL_NOT_FOUND. Components that do not support
    * this return E_NOT_SUPPORTED.
    */
-  virtual status_t grow_pool(const pool_t pool,
-                             const size_t increment_size,
-                             size_t&      reconfigured_size)
+  virtual status_t grow_pool(const pool_t pool, const size_t increment_size, size_t& reconfigured_size)
   {
     return E_NOT_SUPPORTED;
   }
@@ -335,23 +323,23 @@ public:
     return E_NOT_SUPPORTED;
   }
 
-  /** 
+  /**
    * Resize memory for a value
-   * 
+   *
    * @param pool Pool handle
    * @param key Object key
    * @param new_size New size of value in bytes (can be more or less)
-   * 
-   * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND, E_KEY_NOT_FOUND, E_TOO_LARGE, E_ALREADY
+   *
+   * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND,
+   * E_KEY_NOT_FOUND, E_TOO_LARGE, E_ALREADY
    */
-  virtual status_t resize_value(const pool_t pool,
+  virtual status_t resize_value(const pool_t       pool,
                                 const std::string& key,
-                                const size_t new_size,
-                                const size_t alignment)
+                                const size_t       new_size,
+                                const size_t       alignment)
   {
     return E_NOT_SUPPORTED;
   }
-
 
   /**
    * Read an object value
@@ -365,8 +353,8 @@ public:
    */
   virtual status_t get(const pool_t       pool,
                        const std::string& key,
-                       void*&  out_value, /* release with free_memory() API */
-                       size_t& out_value_len) = 0;
+                       void*&             out_value, /* release with free_memory() API */
+                       size_t&            out_value_len) = 0;
 
   /**
    * Read an object value directly into client-provided memory.
@@ -406,6 +394,22 @@ public:
                                  const std::string*     key = nullptr) = 0;
 
   /**
+   * Atomically (crash-consistent for pmem) swap keys (K,V)(K',V') -->
+   * (K,V')(K',V)
+   *
+   * @param pool Pool handle
+   * @param key First key
+   * @param key Second key
+   *
+   * @return S_OK on success, E_POOL_NOT_FOUND, E_KEY_NOT_FOUND, E_LOCKED
+   * (unable to take both locks)
+   */
+  virtual status_t swap_keys(const pool_t pool, const std::string key0, const std::string key1)
+  {
+    return E_NOT_SUPPORTED; /* to remove after 313 */
+  }
+
+  /**
    * Set attribute on a pool.
    *
    * @param pool Pool handle
@@ -431,12 +435,7 @@ public:
    * @param handle memory handle
    *
    */
-  virtual status_t allocate_direct_memory(void*&           vaddr,
-                                          size_t           len,
-                                          memory_handle_t& handle)
-  {
-    return E_NOT_SUPPORTED;
-  }
+  virtual status_t allocate_direct_memory(void*& vaddr, size_t len, memory_handle_t& handle) { return E_NOT_SUPPORTED; }
 
   /**
    * Free memory for zero copy DMA
@@ -446,10 +445,7 @@ public:
    * @return S_OK on success
    */
 
-  virtual status_t free_direct_memory(memory_handle_t handle)
-  {
-    return E_NOT_SUPPORTED;
-  }
+  virtual status_t free_direct_memory(memory_handle_t handle) { return E_NOT_SUPPORTED; }
 
   /**
    * Register memory for zero copy DMA
@@ -459,10 +455,7 @@ public:
    *
    * @return Memory handle or NULL on not supported.
    */
-  virtual memory_handle_t register_direct_memory(void* vaddr, size_t len)
-  {
-    return nullptr;
-  }
+  virtual memory_handle_t register_direct_memory(void* vaddr, size_t len) { return nullptr; }
 
   /**
    * Direct memory regions should be unregistered before the memory is released
@@ -472,10 +465,7 @@ public:
    *
    * @return S_OK on success
    */
-  virtual status_t unregister_direct_memory(memory_handle_t handle)
-  {
-    return E_NOT_SUPPORTED;
-  }
+  virtual status_t unregister_direct_memory(memory_handle_t handle) { return E_NOT_SUPPORTED; }
 
   /**
    * Take a lock on an object. If the object does not exist and inout_value_len
@@ -489,16 +479,19 @@ public:
    * @param out_value [out] Pointer to data
    * @param inout_value_len [in-out] Size of data in bytes
    * @param out_key [out]  Handle to key for unlock
+   * @param out_key_ptr [out]  Optional request for key-string pointer (set to
+   * nullptr if not required)
    *
    * @return S_OK, S_CREATED_OK (if created on demand), E_KEY_NOT_FOUND,
-   * or other error
+   * E_LOCKED if unable to take lock or other error
    */
   virtual status_t lock(const pool_t       pool,
                         const std::string& key,
                         const lock_type_t  type,
                         void*&             out_value,
                         size_t&            inout_value_len,
-                        key_t&             out_key)
+                        key_t&             out_key_handle,
+                        const char**       out_key_ptr = nullptr)
   {
     return E_NOT_SUPPORTED;
   }
@@ -507,15 +500,11 @@ public:
    * Unlock a key-value pair
    *
    * @param pool Pool handle
-   * @param key_handle Handle (opaque) for key
+   * @param key_handle Handle (opaque) for key used to unlock
    *
    * @return S_OK, S_MORE (for async), E_INVAL or other error
    */
-  virtual status_t unlock(const pool_t pool,
-                          const key_t  key_handle)
-  {
-    return E_NOT_SUPPORTED;
-  }
+  virtual status_t unlock(const pool_t pool, const key_t key_handle) { return E_NOT_SUPPORTED; }
 
   /**
    * Update an existing value by applying a series of operations.
@@ -534,7 +523,7 @@ public:
   virtual status_t atomic_update(const pool_t                   pool,
                                  const std::string&             key,
                                  const std::vector<Operation*>& op_vector,
-                                 bool take_lock = true)
+                                 bool                           take_lock = true)
   {
     return E_NOT_SUPPORTED;
   }
@@ -545,7 +534,7 @@ public:
    * @param pool Pool handle
    * @param key Object key
    *
-   * @return S_OK or error code
+   * @return S_OK or error code (e.g. E_LOCKED)
    */
   virtual status_t erase(const pool_t pool, const std::string& key) = 0;
 
@@ -566,39 +555,36 @@ public:
    *
    * @return S_OK, E_POOL_NOT_FOUND
    */
-  virtual status_t map(const pool_t pool,
-                       std::function<int(const void* key,
-                                         const size_t key_len,
-                                         const void* value,
-                                         const size_t value_len)> function)
+  virtual status_t map(
+      const pool_t                                                                                         pool,
+      std::function<int(const void* key, const size_t key_len, const void* value, const size_t value_len)> function)
   {
     return E_NOT_SUPPORTED;
   }
 
   /**
-   * Apply functor to all objects in the pool according 
+   * Apply functor to all objects in the pool according
    * to given time constraints
    *
    * @param pool Pool handle
-   * @param function Functor to apply (not in time order). If 
+   * @param function Functor to apply (not in time order). If
    *                 functor returns < 0, then map aborts
    * @param t_begin Time must be after or equal. If set to zero, no constraint.
    * @param t_end Time must be before or equal. If set to zero, no constraint.
    *
    * @return S_OK, E_POOL_NOT_FOUND
-   */  
-  virtual status_t map(const pool_t pool,
-                       std::function<int(const void* key,
-                                         const size_t key_len,
-                                         const void* value,
-                                         const size_t value_len,
+   */
+  virtual status_t map(const pool_t                                   pool,
+                       std::function<int(const void*      key,
+                                         const size_t     key_len,
+                                         const void*      value,
+                                         const size_t     value_len,
                                          const tsc_time_t timestamp)> function,
-                       const epoch_time_t t_begin,
-                       const epoch_time_t t_end)
+                       const epoch_time_t                             t_begin,
+                       const epoch_time_t                             t_end)
   {
     return E_NOT_SUPPORTED;
   }
-
 
   /**
    * Apply functor to all keys only. Useful for file_store
@@ -608,29 +594,27 @@ public:
    *
    * @return S_OK, E_POOL_NOT_FOUND
    */
-  virtual status_t map_keys(const pool_t                               pool,
-                            std::function<int(const std::string& key)> function)
+  virtual status_t map_keys(const pool_t pool, std::function<int(const std::string& key)> function)
   {
     return E_NOT_SUPPORTED;
   }
 
-  /* 
+  /*
      auto iter = open_pool_iterator(pool);
 
      while(deref_pool_iterator(iter, ref, true) == S_OK)
        process_record(ref);
 
      close_pool_iterator(iter);
-  */                                                
-  
-  struct pool_reference_t {
-    const void* key;
-    size_t key_len;
-    const void* value;
-    size_t value_len;
-    tsc_time_t timestamp; /* zero if not supported */
-  } __attribute__((packed));
+  */
 
+  struct pool_reference_t {
+    const void*  key;
+    size_t       key_len;
+    const void*  value;
+    size_t       value_len;
+    epoch_time_t timestamp; /* zero if not supported */
+  } __attribute__((packed));
 
   /**
    * Open pool iterator to iterate over objects in pool.
@@ -639,10 +623,7 @@ public:
    *
    * @return Pool iterator or nullptr
    */
-  virtual pool_iterator_t open_pool_iterator(const pool_t pool)
-  {
-    return nullptr;
-  }
+  virtual pool_iterator_t open_pool_iterator(const pool_t pool) { return nullptr; }
 
   /**
    * Deference pool iterator position and optionally increment
@@ -655,17 +636,17 @@ public:
    * @param ref [out] Set to true if within time bounds
    * @param increment Move iterator forward one position
    *
-   * @return S_OK on success and valid reference, E_INVAL (bad iterator), 
+   * @return S_OK on success and valid reference, E_INVAL (bad iterator),
    *   E_OUT_OF_BOUNDS (when attempting to dereference out of bounds
    *   E_ITERATOR_DISTURBED (when writes have been made since last iteration)
    */
-  virtual status_t deref_pool_iterator(const pool_t pool,
-                                       pool_iterator_t iter,
+  virtual status_t deref_pool_iterator(const pool_t       pool,
+                                       pool_iterator_t    iter,
                                        const epoch_time_t t_begin,
                                        const epoch_time_t t_end,
-                                       pool_reference_t& ref,
-                                       bool& time_match,
-                                       bool increment = true)
+                                       pool_reference_t&  ref,
+                                       bool&              time_match,
+                                       bool               increment = true)
   {
     return E_NOT_IMPL;
   }
@@ -678,12 +659,8 @@ public:
    *
    * @return S_OK on success, E_INVAL (bad iterator)
    */
-  virtual status_t close_pool_iterator(const pool_t pool,
-                                       pool_iterator_t iter)
-  {
-    return E_NOT_IMPL;
-  }
-  
+  virtual status_t close_pool_iterator(const pool_t pool, pool_iterator_t iter) { return E_NOT_IMPL; }
+
   /**
    * Free server-side allocated memory
    *
@@ -697,36 +674,35 @@ public:
     return S_OK;
   }
 
-  /** 
+  /**
    * Allocate memory from pool
-   * 
+   *
    * @param pool Pool handle
    * @param size Size in bytes
    * @param alignment Alignment hint in bytes, 0 if no alignment is needed
    * @param out_addr Pointer to allocated region
-   * 
+   *
    * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND
-   */  
+   */
   virtual status_t allocate_pool_memory(const pool_t pool,
                                         const size_t size,
                                         const size_t alignment_hint,
-                                        void*& out_addr)
+                                        void*&       out_addr)
   {
     return E_NOT_SUPPORTED;
   }
 
-  /** 
+  /**
    * Free memory from pool
-   * 
+   *
    * @param pool Pool handle
    * @param addr Address of memory to free
-   * @param size Size in bytes of allocation; if provided this accelerates release
-   * 
+   * @param size Size in bytes of allocation; if provided this accelerates
+   * release
+   *
    * @return S_OK on success, E_INVAL, E_POOL_NOT_FOUND
-   */  
-  virtual status_t free_pool_memory(const pool_t pool,
-                                    const void* addr,
-                                    const size_t size = 0)
+   */
+  virtual status_t free_pool_memory(const pool_t pool, const void* addr, const size_t size = 0)
   {
     return E_NOT_SUPPORTED;
   }
@@ -738,10 +714,7 @@ public:
    *
    * @return S_OK on success or error otherwise
    */
-  virtual status_t ioctl(const std::string& command)
-  {
-    return E_NOT_SUPPORTED;
-  }
+  virtual status_t ioctl(const std::string& command) { return E_NOT_SUPPORTED; }
 
   /**
    * Debug routine
@@ -754,7 +727,7 @@ public:
 };
 
 class IKVStore_factory : public Component::IBase {
-public:
+ public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xface829f,0x0405,0x4c19,0x9898,0xa3,0xae,0x21,0x5a,0x3e,0xe8);
   // clang-format on
@@ -764,9 +737,7 @@ public:
     throw API_exception("IKVstore_factory::create(owner,param) not implemented");
   };
 
-  virtual IKVStore* create(const std::string& owner,
-                           const std::string& param,
-                           const std::string& param2)
+  virtual IKVStore* create(const std::string& owner, const std::string& param, const std::string& param2)
   {
     throw API_exception("IKVstore_factory::create(owner,param,param2) "
                         "not implemented");
@@ -782,8 +753,7 @@ public:
   }
 
   /* this is the preferred create method - the others will be deprecated */
-  virtual IKVStore* create(unsigned                            debug_level,
-                           std::map<std::string, std::string>& params)
+  virtual IKVStore* create(unsigned debug_level, std::map<std::string, std::string>& params)
   {
     throw API_exception("IKVstore_factory::create(debug_level,param-map) "
                         "not implemented");

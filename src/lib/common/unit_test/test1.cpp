@@ -17,25 +17,8 @@
 #include <gperftools/profiler.h>
 #endif
 
-class Libcommon_test : public ::testing::Test {
- protected:
-  // If the constructor and destructor are not enough for setting up
-  // and cleaning up each test, you can define the following methods:
+class Libcommon_test : public ::testing::Test { };
 
-  virtual void SetUp()
-  {
-    // Code here will be called immediately after the constructor (right
-    // before each test).
-  }
-
-  virtual void TearDown()
-  {
-    // Code here will be called immediately after each test (right
-    // before the destructor).
-  }
-
-  // Objects declared here can be used by all tests in the test case
-};
 #define QUEUE_SIZE 8
 #define COUNT 100
 
@@ -53,10 +36,10 @@ void mpmc_receiver(Common::Mpmc_bounded_lfq<uint64_t>& queue)
 
 TEST_F(Libcommon_test, mpmc_queue_test)
 {
-  auto buffer = Common::Mpmc_bounded_lfq<uint64_t>::allocate_queue_memory(QUEUE_SIZE); 
+  auto buffer = Common::Mpmc_bounded_lfq<uint64_t>::allocate_queue_memory(QUEUE_SIZE);
 
   Common::Mpmc_bounded_lfq<uint64_t> queue(QUEUE_SIZE, buffer);
-  
+
   std::thread forked_thread([&](){ mpmc_receiver(queue); });
 
   sleep(1);
@@ -86,10 +69,10 @@ void spsc_receiver(Common::Spsc_bounded_lfq<uint64_t>& queue)
 
 TEST_F(Libcommon_test, spsc_queue_test)
 {
-  auto buffer = Common::Spsc_bounded_lfq<uint64_t>::allocate_queue_memory(QUEUE_SIZE); 
+  auto buffer = Common::Spsc_bounded_lfq<uint64_t>::allocate_queue_memory(QUEUE_SIZE);
 
   Common::Spsc_bounded_lfq<uint64_t> queue(QUEUE_SIZE, buffer);
-  
+
   std::thread forked_thread([&](){ spsc_receiver(queue); });
 
   sleep(1);
@@ -122,22 +105,22 @@ TEST_F(Libcommon_test, spsc_queue_test_fast)
   auto buffer = Common::Spsc_bounded_lfq<uint64_t>::allocate_queue_memory(256);
 
   Common::Spsc_bounded_lfq<uint64_t> queue(256, buffer);
-  
+
   std::thread forked_thread([&](){ spsc_receiver_fast(queue); });
 
   sleep(1);
 
   auto start_time = std::chrono::high_resolution_clock::now();
-  
+
   for(uint64_t i=0;i<FAST_COUNT;i++) {
     while(!queue.push(i)); // if queue is full, push will fail
   }
 
   forked_thread.join();
-  
+
   auto   end_time = std::chrono::high_resolution_clock::now();
 
-  double secs     = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() / 1000.0;
+  double secs = std::chrono::duration<double>(end_time - start_time).count();
 
   double per_sec = ((static_cast<double>(FAST_COUNT)) / secs);
   PINF("Time: %.2f sec", secs);

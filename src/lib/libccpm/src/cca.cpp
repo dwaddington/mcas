@@ -14,14 +14,34 @@
 #include <ccpm/cca.h>
 
 #include "area_top.h"
+#include "logging.h"
 #include <common/errors.h> // S_OK, E_FAIL
-#include <common/logging.h> // PLOG
+#include <cassert>
 #include <ostream>
 
 #define FINE_TRACE 0
 #if FINE_TRACE
 #include <iostream>
+static unsigned i = 0;
 #endif
+
+ccpm::cca::cca()
+	: _top()
+	, _last_top_allocate(0)
+	, _last_top_free(0)
+{}
+
+ccpm::cca::cca(const region_vector_t &regions, ownership_callback_t resolver)
+	: cca()
+{
+	reconstitute(regions, resolver, false);
+}
+
+ccpm::cca::cca(const region_vector_t &regions)
+	: cca()
+{
+	reconstitute(regions, nullptr, true);
+}
 
 bool ccpm::cca::reconstitute(
 	const region_vector_t &regions_
@@ -29,7 +49,7 @@ bool ccpm::cca::reconstitute(
 	, const bool force_init_
 )
 {
-PLOG("RECONSTITUTE (%s)", force_init_ ? "init" : "recover");
+	PLOG(PREFIX "reconsitiute (%s)", LOCATION, force_init_ ? "init" : "recover");
 	if ( ! _top.empty() ) { return false; }
 	for ( const auto & r : regions_ )
 	{
@@ -39,6 +59,9 @@ PLOG("RECONSTITUTE (%s)", force_init_ ? "init" : "recover");
 			: area_top::restore(r, resolver_)
 		);
 	}
+#if FINE_TRACE
+	this->print(std::cerr);
+#endif
 	return ! _top.empty() && force_init_;
 }
 
@@ -50,12 +73,25 @@ void ccpm::cca::add_regions(const region_vector_t &regions_)
 	}
 }
 
+bool ccpm::cca::includes(const void *addr) const
+{
+	for ( const auto &it : _top )
+	{
+		if ( it->includes(addr) )
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 auto ccpm::cca::allocate(
 	void * & ptr_
 	, std::size_t bytes_
 	, std::size_t alignment_
 ) -> status_t
 {
+	assert(ptr_ == nullptr);
 	/* Try all regions, round robin.
 	 * When ranges are available, theis can be done by a concactenation
 	 * of the ranges [i .. end) and [begin .. i)
@@ -63,6 +99,10 @@ auto ccpm::cca::allocate(
 	 */
 
 	auto split = _top.begin() + _last_top_allocate;
+#if FINE_TRACE
+	PLOG(PREFIX "AL %u", LOCATION, i++);
+	this->print(std::cerr);
+#endif
 	for ( auto it = split; it != _top.end(); ++it )
 	{
 		(*it)->allocate(ptr_, bytes_, alignment_);
@@ -70,7 +110,7 @@ auto ccpm::cca::allocate(
 		{
 			_last_top_allocate = it - _top.begin();
 #if FINE_TRACE
-			PLOG("allocate %p.%zx", ptr_, bytes_);
+			PLOG(PREFIX "allocate %p.%zx", LOCATION, ptr_, bytes_);
 			this->print(std::cerr);
 #endif
 			return S_OK;
@@ -84,7 +124,7 @@ auto ccpm::cca::allocate(
 		{
 			_last_top_allocate = it - _top.begin();
 #if FINE_TRACE
-			PLOG("allocate %p.%zx", ptr_, bytes_);
+			PLOG(PREFIX "allocate %p.%zx", LOCATION, ptr_, bytes_);
 			this->print(std::cerr);
 #endif
 			return S_OK;
@@ -99,7 +139,12 @@ auto ccpm::cca::free(
 	, std::size_t bytes_
 ) -> status_t
 {
-	/* Chnage when ranges appear (see note for allocate) */
+#if FINE_TRACE
+	PLOG(PREFIX "cca DE %u %p", LOCATION, i++, ptr_);
+	this->print(std::cerr);
+#endif
+
+	/* Change when ranges appear (see note for allocate) */
 	auto split = _top.begin() + _last_top_free;
 
 	for ( auto it = split; it != _top.end(); ++it )

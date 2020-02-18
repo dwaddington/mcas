@@ -36,16 +36,16 @@ namespace ccpm
 			: _bytes()
 			, _in_doubt()
 		{}
+
 		void set(const char *fn, void *p, std::size_t bytes);
+
 		void clear(const char *fn)
 		{
 			set(fn, nullptr, 0);
 		}
-		void *get() const
-		{
-			PLOG("get: doubt @ %p area %p.%zu", static_cast<const void *>(this), _in_doubt, _bytes);
-			return _in_doubt;
-		}
+
+		void *get() const;
+
 		std::size_t bytes() { return _bytes; }
 	};
 }

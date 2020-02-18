@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_ALLOCATOR_POBJ_CACHE_ALIGNED_H
-#define _COMANCHE_HSTORE_ALLOCATOR_POBJ_CACHE_ALIGNED_H
+#ifndef MCAS_HSTORE_ALLOCATOR_POBJ_CACHE_ALIGNED_H
+#define MCAS_HSTORE_ALLOCATOR_POBJ_CACHE_ALIGNED_H
 
 #include "deallocator_pobj_cache_aligned.h"
 #include "pool_pobj.h"
@@ -111,7 +111,7 @@ template <typename T, typename Deallocator>
 			, allocator_pobj_cache_aligned<void>::const_pointer /* hint */ =
 				allocator_pobj_cache_aligned<void>::const_pointer{}
 			, const char *
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 			why
 #endif
 				= nullptr
@@ -130,10 +130,10 @@ template <typename T, typename Deallocator>
 			{
 				throw pobj_bad_alloc(cache_align, s, sizeof(T), sizeof(T), errno);
 			}
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 			{
 				auto ptr = static_cast<char *>(pmemobj_direct(oid)) + cache_align;
-				hop_hash_lgo::write(__func__
+				hop_hash_log::write(__func__
 					, " ", (why ? why : "(cache aligned no reason)")
 					, " [", static_cast<void *>(ptr)
 					, "..", static_cast<void *>(ptr + s * sizeof(T))

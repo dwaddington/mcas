@@ -38,7 +38,12 @@ public:
     : Immutable_allocator_base(buffer, buffer_size) {
   }
 
-  void * add_string(const std::basic_string<CharT>& str)
+  Immutable_string_table(region_vector_t regions, bool force_init)
+    : Immutable_allocator_base(regions, ccpm::accept_all, force_init) {
+  }
+  
+
+  const char * add_string(const std::basic_string<CharT>& str)
   {
     size_t string_data_len = str.size() * sizeof(CharT);
     auto record_len = string_data_len + sizeof(CharT) + sizeof(String_record);
@@ -55,7 +60,7 @@ public:
     return dst;
   }
 
-  void * add_string(const char * c_str, size_t c_str_len) {
+  const char * add_string(const char * c_str, size_t c_str_len) {
     auto record_len = c_str_len + sizeof(CharT) + sizeof(String_record);
     auto record = static_cast<String_record*>(allocate(record_len));
     record->length = 0;
@@ -78,6 +83,10 @@ public:
     return result;
   }
 
+  inline void expand(::iovec region) {
+    Immutable_allocator_base::expand(region);
+  }
+   
   bool is_valid() const { return Immutable_allocator_base::is_valid(); }
 
   

@@ -1,0 +1,20 @@
+{
+    "shards" :
+    [
+        {
+            "core" : 0,
+            "port" : 16970,
+            "net"  : "mlx5_0",
+            "default_backend" : "mapstore",
+            "ado_plugins" : ["libcomponent-adoplugin-testing.so"],
+            "ado_core_number" : 1
+        }
+    ],
+    "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
+    "net_providers" : "verbs",
+    "resources":
+    {
+            "ado_cores":"6-8",
+            "ado_manager_core": 8
+    }
+}

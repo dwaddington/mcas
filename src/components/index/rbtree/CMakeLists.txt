@@ -4,11 +4,11 @@ project(component-indexrbtree CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
+add_definitions(-DCONFIG_DEBUG)
+
 include(../../../../mk/clang-dev-tools.cmake)
 
 add_subdirectory(./unit_test)
-
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 include_directories(../../../lib/common/include/)
 include_directories(../../)
@@ -17,6 +17,7 @@ enable_language(CXX C ASM)
 file(GLOB SOURCES src/*.c*)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 target_link_libraries(${PROJECT_NAME} common numa dl rt boost_system pthread)

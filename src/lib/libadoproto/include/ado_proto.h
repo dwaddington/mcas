@@ -131,9 +131,10 @@ public:
                        void * value_vaddr);
 
   /* shard-side, must not block */
-  void send_work_request(const uint64_t work_key,
-                         const std::string& work_key_str,
-                         const void * value_vaddr,
+  void send_work_request(const uint64_t work_request_key,
+                         const char * key,
+                         const size_t key_len,
+                         const void * value,
                          const size_t value_len,
                          const void * detached_value,
                          const size_t detached_value_len,
@@ -143,15 +144,13 @@ public:
 
   void send_work_response(status_t status,
                           uint64_t work_key,
-                          Component::IADO_plugin::response_buffer_vector_t& response_buffers);
+                          const Component::IADO_plugin::response_buffer_vector_t& response_buffers);
 
   ssize_t recv_from_proxy(void * target, const size_t target_len);
 
   /* shard-side, must not block */
   bool recv_from_ado_work_completion(uint64_t& work_key,
                                      status_t& status,
-                                     void *& response,
-                                     size_t& response_len,
                                      Component::IADO_plugin::response_buffer_vector_t& response_buffers);
 
   /* table operations */
@@ -223,11 +222,15 @@ public:
 
   void send_table_op_response(const status_t status,
                               const void * value_addr = nullptr,
-                              size_t value_len = 0);
+                              size_t value_len = 0,
+                              const char * key_addr = nullptr,
+                              Component::IKVStore::key_t key_handle = nullptr);
 
   void recv_table_op_response(status_t& status,
                               void *& out_value_addr,
-                              size_t * p_out_value_len = nullptr);
+                              size_t * p_out_value_len = nullptr,
+                              const char ** out_key_ptr = nullptr,
+                              Component::IKVStore::key_t * out_key_handle = nullptr);
 
   void recv_find_index_response(status_t& status,
                                 offset_t& out_matched_position,
@@ -250,11 +253,21 @@ public:
                             epoch_time_t& t_end,
                             Component::IKVStore::pool_iterator_t& iterator);
 
-  void send_iterate_response(status_t rc,
+  void send_iterate_response(const status_t rc,
                              Component::IKVStore::pool_iterator_t iterator,
                              Component::IKVStore::pool_reference_t reference);
-                            
 
+  void send_unlock_request(const uint64_t work_id,
+                           const Component::IKVStore::key_t key_handle);
+
+  bool recv_unlock_response(status_t& status);
+
+  bool recv_unlock_request(const Buffer_header * buffer,
+                           uint64_t& work_id,
+                           Component::IKVStore::key_t& key_handle);
+
+  void send_unlock_response(const status_t status);
+  
   /* free the singleton buffer */
   void free_ipc_buffer(void * p)
   {

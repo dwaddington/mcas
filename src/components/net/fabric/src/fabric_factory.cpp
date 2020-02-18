@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -43,7 +43,7 @@ void *Fabric_factory::query_interface(Component::uuid_t& itf_uuid) {
  * Factory entry point
  *
  */
-extern "C" void * factory_createInstance(Component::uuid_t& component_id)
+extern "C" void * factory_createInstance(Component::uuid_t component_id)
 {
   return component_id == Fabric_factory::component_id() ? new Fabric_factory() : nullptr;
 }

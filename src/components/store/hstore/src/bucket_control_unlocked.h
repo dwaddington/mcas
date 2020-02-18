@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,11 +12,13 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_BUCKET_CONTROL_UNLOCKED_
-#define _COMANCHE_HSTORE_BUCKET_CONTROL_UNLOCKED_
+#ifndef MCAS_HSTORE_BUCKET_CONTROL_UNLOCKED_
+#define MCAS_HSTORE_BUCKET_CONTROL_UNLOCKED_
 
+#include "hstore_config.h"
 #include "bucket_aligned.h"
 #include "hop_hash_log.h"
+#include "segment_layout.h"
 #include "trace_flags.h"
 #include <array>
 #include <cstddef> /* size_t */
@@ -47,7 +49,7 @@ namespace impl
 					typename bucket_type::owner_type &o = *it;
 					/* cheat: owner::value will take *any* reference as a Lock */
 					int lock = 0;
-					auto bit_count = bit_count_v(o.value(lock));
+					auto bit_count = bit_count_v(o.ownership_bits(lock));
 					++h[bit_count];
 				}
 				{
@@ -56,7 +58,7 @@ namespace impl
 					{
 						hs << " " << hn;
 					}
-					hop_hash_log<TRACE_MANY>::write(index(), ":", hs.str());
+					hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, index(), ":", hs.str());
 				}
 				/* Report the distribution of owned element counts in each ownership range.
 				 * We do now wrap, so the first owner::size element counts will wrongly counted. */
@@ -65,10 +67,10 @@ namespace impl
 				{
 					typename bucket_type::owner_type &o = *it;
 					int lock = 0;
-					/* cheat: owner::value will take *any* reference as a Lock */
+					/* cheat: owner::ownership_bit_mask will take *any* reference as a Lock */
 					all_owners_mask >>= 1U;
-					assert((all_owners_mask & o.value(lock)) == 0);
-					all_owners_mask |= o.value(lock);
+					assert((all_owners_mask & o.ownership_bits(lock)) == 0);
+					all_owners_mask |= o.ownership_bits(lock);
 					auto bit_count = bit_count_v(all_owners_mask);
 					++j[bit_count];
 				}
@@ -78,7 +80,7 @@ namespace impl
 					{
 						js << " " << jn;
 					}
-					hop_hash_log<TRACE_MANY>::write(index(), ":", js.str());
+					hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, index(), ":", js.str());
 				}
 			}
 
@@ -87,12 +89,16 @@ namespace impl
 #if USE_CC_HEAP == 3
 				for ( auto it = _buckets; it != _buckets_end; ++it )
 				{
-					typename bucket_type::content_type &c = *it;
+					typename bucket_type::owner_type &w = *it;
 					/* deconsititute key and value */
-					if ( c.state_get() != bucket_type::FREE )
+					if ( w.is_adjacent_content_in_use() )
 					{
+						typename bucket_type::content_type &c = *it;
 						c.value().first.deconstitute();
-						c.value().second.deconstitute();
+						/* ERROR: depends on the types of first and second,
+						 * so should be handled by the session level, not here
+						 */
+						std::get<0>(c.value().second).deconstitute();
 					}
 				}
 #endif
@@ -129,7 +135,7 @@ namespace impl
 
 			~bucket_control_unlocked()
 			{
-#if TRACE_MANY
+#if HSTORE_TRACE_MANY
 				/* report statistics for in-use segments */
 				if ( _buckets != _buckets_end )
 				{
@@ -147,24 +153,25 @@ namespace impl
 
 			template <typename Allocator>
 				void reconstitute(
-					Allocator
-#if USE_CC_HEAP == 3
-						av_
-#endif
+					Allocator av_
 				)
 				{
-#if USE_CC_HEAP == 3
 					for ( auto it = _buckets; it != _buckets_end; ++it )
 					{
+						typename bucket_type::owner_type &w = *it;
 						typename bucket_type::content_type &c = *it;
 						/* reconsititute key and value */
-						if ( c.state_get() != bucket_type::FREE )
+						if ( w.is_adjacent_content_in_use() )
 						{
-							c.value().first.reconstitute(av_);
-							c.value().second.reconstitute(av_);
+							/* ERROR: depends on the types of first and second,
+							 * so should be handled by the session level, not here
+							 */
+							const_cast<
+								typename std::remove_const<typename bucket_type::content_type::key_t>::type &
+							>(c.value().first).reconstitute(av_);
+							std::get<0>(c.value().second).reconstitute(av_);
 						}
 					}
-#endif
 				}
 		};
 }

@@ -103,10 +103,15 @@ public:
                                  std::vector<uint64_t> &out_attr,
                                  const std::string *key = nullptr) override;
 
+  virtual status_t swap_keys(const pool_t pool,
+                             const std::string key0,
+                             const std::string key1) override;
+
   virtual status_t lock(const pool_t pool, const std::string &key,
                         lock_type_t type, void *&out_value,
                         size_t &out_value_len,
-                        IKVStore::key_t &out_key) override;
+                        IKVStore::key_t &out_key,
+                        const char ** out_key_ptr) override;
 
   virtual status_t unlock(const pool_t pool, key_t key) override;
 

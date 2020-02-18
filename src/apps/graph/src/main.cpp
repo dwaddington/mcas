@@ -339,7 +339,7 @@ Component::IMCAS * init(const std::string& server_hostname,  int port)
   IBase *comp = Component::load_component("libcomponent-mcasclient.so",
                                           mcas_client_factory);
 
-  auto fact = (IMCAS_factory *) comp->query_interface(IMCAS_factory::iid());
+  auto fact = static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid()));
   if(!fact)
     throw Logic_exception("unable to create MCAS factory");
 

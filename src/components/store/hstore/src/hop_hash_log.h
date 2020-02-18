@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,12 +12,15 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_HOP_HASH_LOG_H
-#define COMANCHE_HSTORE_HOP_HASH_LOG_H
+#ifndef MCAS_HSTORE_HOP_HASH_LOG_H
+#define MCAS_HSTORE_HOP_HASH_LOG_H
 
 #include <iosfwd>
 #include <string>
 #include <sstream>
+
+#define LOG_LOCATION_STATIC __func__, ":", __LINE__, " "
+#define LOG_LOCATION LOG_LOCATION_STATIC, static_cast<const void *>(this), " "
 
 namespace hop_hash_log_impl
 {

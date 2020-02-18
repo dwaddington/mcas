@@ -105,7 +105,7 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
     return -1;
   }
   
-  auto fact = (IMCAS_factory *) comp->query_interface(IMCAS_factory::iid());
+  auto fact = static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid()));
   if(fact == nullptr) {
     PyErr_SetString(PyExc_RuntimeError, "mcas.Session failed to get IMCAS_factory");
     return -1;

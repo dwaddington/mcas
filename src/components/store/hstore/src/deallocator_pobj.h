@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_DEALLOCATOR_POBJ_H
-#define _COMANCHE_HSTORE_DEALLOCATOR_POBJ_H
+#ifndef MCAS_HSTORE_DEALLOCATOR_POBJ_H
+#define MCAS_HSTORE_DEALLOCATOR_POBJ_H
 
 #include "persister_pmem.h"
 #include "pointer_pobj.h"
@@ -93,16 +93,16 @@ template <typename T, typename Persister>
 		void deallocate(
 			pointer oid
 			, size_type
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 				s
 #endif
 		)
 		{
-#if TRACE_PALLOC
+#if HSTORE_TRACE_PALLOC
 			{
 				auto ptr = static_cast<char *>(pmemobj_direct(oid));
-				hop_hash_log::write(__func__
-					, " [", ptr
+				hop_hash_log::write(LOG_LOCATION
+					, "[", ptr
 					, "..", static_cast<void *>(ptr + s * sizeof(T))
 					, ")"
 				);
@@ -119,14 +119,14 @@ template <typename T, typename Persister>
 		}
 		void persist(const void *ptr, size_type len
 			, const char *
-#if TRACE_PERSIST
+#if HSTORE_TRACE_PERSIST
 			what
 #endif
 				= "unspecified"
 		) const
 		{
-#if TRACE_PERSIST
-			hop_hash_log::write(__func__, " ", what, " ["
+#if HSTORE_TRACE_PERSIST
+			hop_hash_log::write(LOG_LOCATION, what, " ["
 				, ptr, ".."
 				, static_cast<const void *>(static_cast<const char*>(ptr)+len)
 				, ")"

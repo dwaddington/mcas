@@ -4,6 +4,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 configure_file(mapstore-ado0.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/mapstore-ado0.conf)
 configure_file(mapstore-secure0.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/mapstore-secure0.conf)
 configure_file(hstore-ado0.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/hstore-ado0.conf)
+configure_file(hstore-cc-ado0.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/hstore-cc-ado0.conf)
 configure_file(testing-ado0.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/testing-ado0.conf)
 configure_file(testing-ado0-sock.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/testing-ado0-sock.conf)
 

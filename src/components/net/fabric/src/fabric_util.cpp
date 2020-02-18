@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -22,14 +22,7 @@
 #include "fabric_bad_alloc.h"
 #include "fabric_check.h" /* CHECK_FI_ERR */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wcast-align"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fi_cm.h> /* fi_getname */
-#pragma GCC diagnostic pop
+#include "rdma-fi_cm.h" /* fi_getname */
 
 #include <map>
 #include <memory> /* shared_ptr */

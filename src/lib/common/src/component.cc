@@ -42,8 +42,6 @@
 #include <component/base.h>
 #include <config.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
 
 namespace Component
 {
@@ -60,14 +58,8 @@ IBase *load_component(const char *dllname, Component::uuid_t component_id) {
  *
  */
 IBase *load_component(const char *dllname, Component::uuid_t component_id, bool quiet) {
-  /* Note: use of a reference parameter in ans extern "C" function is not portable */
-  void *(*factory_createInstance)(Component::uuid_t &);
-  char *error;
 
   void *dll = dlopen(dllname, RTLD_NOW);
-
-  if (!quiet && dll == nullptr)
-    PLOG("Unable to find component binary with path (%s).", dllname);
 
   if (!dll) {
     const auto dll_path = std::string(COMPONENT_DLL_INSTALL_DIR) + "/" + dllname;
@@ -81,14 +73,16 @@ IBase *load_component(const char *dllname, Component::uuid_t component_id, bool 
       return nullptr;
     }
   }
-  *(void **) (&factory_createInstance) = dlsym(dll, "factory_createInstance");
 
+  const auto factory_createInstance = reinterpret_cast<void *(*)(Component::uuid_t)>(dlsym(dll, "factory_createInstance"));
+
+  char *error;
   if ((error = dlerror()) != nullptr) {
     PLOG("Error: %s\n", error);
     return nullptr;
   }
 
-  IBase *comp = (IBase *) factory_createInstance(component_id);
+  IBase *comp = static_cast<IBase *>(factory_createInstance(component_id));
 
   if (comp == nullptr) {
     PERR("Factory create instance returned nullptr (%s). Possible component ID "
@@ -135,6 +129,3 @@ status_t bind(std::vector<IBase *> components) {
   return S_OK;
 }
 }  // namespace Component
-
-
-#pragma GCC diagnostic pop

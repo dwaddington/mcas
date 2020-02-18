@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 add_subdirectory(unit_test)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG)
 
 include_directories(../../../lib/common/include)
 include_directories(../../../lib/libadoproto/include)

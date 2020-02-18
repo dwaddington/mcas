@@ -1,0 +1,21 @@
+{
+    "shards" :
+    [
+        {
+            "core" : 1,
+            "port" : 16971,
+            "net"  : "mlx5_0",
+            "default_backend" : "hstore",
+            "ado_plugins" : ["libcomponent-adoplugin-testing.so"],
+            "dax_config" : [{ "region_id": 0, "path": "/dev/dax0.0", "addr": "0x9000000000" }],
+            "ado_core_number" : 1
+        }
+    ],
+    "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
+    "net_providers" : "verbs",
+    "resources":
+    {
+            "ado_cores":"6-8",
+            "ado_manager_core": 8
+    }
+}

@@ -930,7 +930,7 @@ namespace Internal
 		{
 			return *this;
 		}
-#pragma GCC diagnostic push
+#pragma GCC diagnostic pop
 	};
 }// namespace Internal
 

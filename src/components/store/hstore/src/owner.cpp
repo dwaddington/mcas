@@ -15,3 +15,4 @@
 
 constexpr unsigned impl::owner::size;
 constexpr std::size_t impl::owner::pos_undefined;
+constexpr char impl::owner::lock_id;

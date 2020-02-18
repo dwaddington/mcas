@@ -4,6 +4,7 @@ option(FORCE_OTT_BUILD "force out of tree build" ON)
 option(BOOTSTRAP_DEPS "bootstrap to build deps" ON)
 option(TEST_HSTORE_PERISHABLE "hstore perishable testing enabled" OFF)
 option(BUILD_RUST "enabled Rust-based dependencies" ON)
+option(CODE_COVERAGE "enable gcc code coverage" OFF)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR AND FORCE_OTT_BUILD)
     message(FATAL_ERROR "Cannot use in-source build ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}. You should delete any CMakeCache.txt and CMakeFiles and then try out-of-tree build")
@@ -19,7 +20,8 @@ else()
   set(BUILD_RUST OFF)
 endif()
 
-set(GCC_COVERAGE_COMPILE_FLAGS "-g -shared-libgcc -DTBB_USE_THREADING_TOOLS")
+add_compile_options(-g -shared-libgcc)
+add_definitions(-DTBB_USE_THREADING_TOOLS -DEASTL_STD_ITERATOR_CATEGORY_ENABLED)
 set(ENV{MCAS_HOME} ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(CheckIncludeFiles)

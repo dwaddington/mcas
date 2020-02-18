@@ -7,6 +7,9 @@ sleep 5
 $DIR/mcas-hstore-basic-0.sh
 echo "mcas-hstore-basic-0 complete."
 sleep 5
+$DIR/mcas-hstore-cc-basic-0.sh
+echo "mcas-hstore-cc-basic-0 complete."
+sleep 5
 $DIR/mcas-hstore-dram-0.sh
 echo "mcas-hstore-dram-0 complete."
 sleep 5

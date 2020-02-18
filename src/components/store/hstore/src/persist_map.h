@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,15 +12,15 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_PERSIST_MAP_H
-#define _COMANCHE_HSTORE_PERSIST_MAP_H
+#ifndef MCAS_HSTORE_PERSIST_MAP_H
+#define MCAS_HSTORE_PERSIST_MAP_H
 
-#include "as_emplace.h"
 #include "bucket_aligned.h"
 #include "hash_bucket.h"
 #include "persist_fixed_string.h"
 #include "persistent.h"
 #include "persist_atomic.h"
+#include "segment_count.h"
 #include "segment_layout.h"
 #include "size_control.h"
 
@@ -31,6 +31,9 @@
 
 namespace impl
 {
+	class allocation_state_emplace;
+	class allocation_state_pin;
+	class allocation_state_extend;
 	using segment_count_actual_t = value_unstable<segment_layout::six_t, 1>;
 
 	template <typename Allocator>
@@ -54,18 +57,6 @@ namespace impl
 			/* segment indexes */
 			using six_t = segment_layout::six_t;
 
-			struct segment_count
-			{
-				/* current segment count */
-				segment_count_actual_t _actual;
-				/* desired segment count */
-				persistent_atomic_t<six_t> _specified;
-				segment_count(six_t specified_)
-					: _actual(0)
-					, _specified(specified_)
-				{}
-			};
-
 			struct segment_control
 			{
 				persistent_t<bucket_ptr> bp;
@@ -87,15 +78,25 @@ namespace impl
 
 			segment_control _sc[_segment_capacity];
 
-			allocation_state_emplace _ase;	
+			/* Three types of allocation states at the moment. At most one at a time is "active" */
+			allocation_state_emplace *_ase;
+			allocation_state_pin *_aspd;
+			allocation_state_pin *_aspk;
+			allocation_state_extend *_asx;
 		public:
-			persist_map(std::size_t n, Allocator av);
+			persist_map(
+				std::size_t n
+				, Allocator av
+				, allocation_state_emplace *ase_
+				, allocation_state_pin *aspd_
+				, allocation_state_pin *aspk_
+				, allocation_state_extend *asx_
+			);
 			persist_map(persist_map &&) = default;
-			void do_initial_allocation(Allocator av);
-#if USE_CC_HEAP == 3
+			void do_initial_allocation(persist_controller<Allocator> *pc);
 			void reconstitute(Allocator av);
-#endif
-			allocation_state_emplace &ase() { return _ase; }
+			allocation_state_emplace &ase() { return *_ase; }
+			allocation_state_extend &asx() { return *_asx; }
 			friend class persist_controller<Allocator>;
 		};
 }

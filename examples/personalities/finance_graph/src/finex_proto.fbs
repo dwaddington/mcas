@@ -1,0 +1,81 @@
+// FlatBuffers IDL file
+
+namespace Graph_ADO_protocol;
+
+enum TypeId:byte {
+  STRING,
+  UINT64,
+  UINT32,
+  INT64,
+  INT32,
+  FLOAT,
+}
+
+table Field
+{
+  name : string;
+  type : TypeId;
+}
+
+table PropertyMapSchema
+{
+  name  : string;
+  fields: [Field];
+}
+
+table CompanyRecord
+{
+  type    : string;
+  name    : string;
+  country : string;
+}
+
+table AtmRecord
+{
+  latitude  : float;
+  longitude : float;
+}
+
+table ClientRecord
+{
+  first_name : string;
+  last_name : string;
+  age : int;
+  email : string;
+  occupation : string;
+  political_views : string;
+  nationality : string;
+  university : string;
+  academic_degree : string;
+  address : string;
+  postal_code : string;
+  country : string;
+  city : string;
+}
+
+table Transaction
+{
+  source : string;
+  target : string;
+  date : string;
+  time : string;
+  amount : float;
+  currency : string;
+}
+
+
+union Element
+{
+  PropertyMapSchema,
+  CompanyRecord,
+  AtmRecord,
+  ClientRecord,
+  Transaction,
+}
+
+table Message
+{
+  element : Element;
+}
+
+root_type Message;

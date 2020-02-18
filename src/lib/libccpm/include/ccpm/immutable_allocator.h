@@ -33,17 +33,27 @@ private:
   bool _rebuilt = false;
 public:
 
-// _root is not initialized
+  // _root is not initialized
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
   Immutable_allocator_base(region_vector_t regions,
                            ccpm::ownership_callback_t callback,
                            bool force_init)
-    {
+  {
     reconstitute(regions, callback, force_init);
     assert(_root);
   }
+
+  explicit Immutable_allocator_base(::iovec& region)
+  {
+    region_vector_t regions;
+    regions.push_back(region);
+    reconstitute(regions, nullptr, true /* this is new - force initialization */);
+    assert(_root);
+  }
 #pragma GCC diagnostic pop
+
+  
 
   Immutable_allocator_base(Immutable_allocator_base& src) : _root(src._root)
   {
@@ -60,6 +70,9 @@ public:
   virtual ~Immutable_allocator_base() {
   }
 
+  /**
+   * @brief      Force full slab persistence
+   */
   void persist() {
     pmem_persist(_root, reinterpret_cast<byte*>(_root) - _root->slab_end);
   }
@@ -74,19 +87,17 @@ public:
    * @return : True iff re-initialization took place
    **/
   bool reconstitute(const region_vector_t &regions,
-                    ccpm::ownership_callback_t ,
+                    ccpm::ownership_callback_t callback,
                     const bool force_init)
   {
-    if(regions.size() != 1)
-      throw General_exception("only supports one region currently");
+    if(regions.size() == 0)
+      throw std::invalid_argument("invalid regions parameter");
+    
+
     void * buffer = regions[0].iov_base;
     size_t size = regions[0].iov_len;
-
     assert(size > 0);
     assert(buffer);
-
-    if(debug_level > 0)
-      PLOG("reconstitute: %p force=%d size=%lu", buffer, force_init, size);
 
     _root = static_cast<Immutable_slab*>(buffer);
 
@@ -102,7 +113,15 @@ public:
       _root->magic = MAGIC;
       _root->slab_end = static_cast<byte*>(buffer) + size;
       _root->next_free = static_cast<byte*>(buffer) + sizeof(struct Immutable_slab);
-      _root->linked_slab = nullptr;
+      if(regions.size() > 1) {
+        auto copy_regions = regions;
+        copy_regions.erase(copy_regions.begin());
+        /* recurse through regions */
+        _root->linked_slab = new Immutable_allocator_base(copy_regions, callback, force_init);
+      }
+      else {
+        _root->linked_slab = nullptr; /* no more linked regions */
+      }
       _root->resvd = 0;
 
       pmem_persist(_root, sizeof(*_root));
@@ -110,8 +129,6 @@ public:
     }
     else {
       assert(is_valid());
-      if(debug_level > 0)
-        PLOG("Immutable_allocator_base: existing allocator OK");
     }
 
     if(_root->next_free.load() > _root->slab_end)
@@ -134,7 +151,6 @@ public:
   {
     if(alignment > 0) throw API_exception("alignment not supported");
     ptr = allocate(bytes);
-    pmem_persist(ptr, sizeof(ptr));
     return S_OK;
   }
 
@@ -153,15 +169,15 @@ public:
 
   bool rebuilt() const { return _rebuilt; }
 
-    /**
-     * @brief      Allocate memory
-     *
-     * @param[in]  size  Size to allocate in bytes
-     *
-     * @return     Pointer to newly allocated region
-     */
-    void * allocate(const size_t size)
-    {
+  /**
+   * @brief      Allocate memory
+   *
+   * @param[in]  size  Size to allocate in bytes
+   *
+   * @return     Pointer to newly allocated region
+   */
+  void * allocate(const size_t size)
+  {
     assert(_root);
     assert(is_valid());
 
@@ -178,8 +194,12 @@ public:
     assert(nptr <= _root->slab_end);
     updated_nptr = nptr + rsize;
 
-    if(updated_nptr > _root->slab_end) /*< bounds check */
+    if(updated_nptr > _root->slab_end) { /* out of memory condition */
+      if(_root->linked_slab) {
+        return _root->linked_slab->allocate(size);
+      }
       throw std::bad_alloc();
+    }
 
     while(!_root->next_free.compare_exchange_weak(nptr,
                                                   updated_nptr,
@@ -188,15 +208,30 @@ public:
 
     pmem_flush(&_root->next_free, sizeof(_root->next_free));
     assert(check_aligned(nptr, 8));
-        return nptr;
+    return nptr;
+  }
+
+  /**
+   * @brief      Expand the slab allocator (creates and links in new allocator)
+   *
+   * @param[in]  region  New memory region
+   */
+  void expand(::iovec region) {
+    if(_root->linked_slab) {
+      _root->linked_slab->expand(region);
+      return;
     }
+    
+    /* link in a new allocator */
+    _root->linked_slab = new Immutable_allocator_base(region); 
+    pmem_persist(_root->linked_slab, sizeof(_root->linked_slab));
+  }
 
-  size_t remaining_size() const { return (_root->slab_end - _root->next_free); }
+  inline size_t remaining_size() const { return (_root->slab_end - _root->next_free); }
 
-  virtual bool is_valid() const { return _root->magic == MAGIC; }
+  bool is_valid() const { return _root->magic == MAGIC; }
 
-
-  virtual void dump_info() const {
+  void dump_info() const {
     PINF("-- Immutable Allocator --");
     PINF("magic    : %X", _root->magic);
     PINF("range    : %p-%p (size %lu)", static_cast<const void *>(_root), _root->slab_end, _root->slab_end - reinterpret_cast<byte*>(_root));
@@ -204,7 +239,10 @@ public:
     PINF("free     : %lu/%lu",
          _root->slab_end - reinterpret_cast<byte*>(_root->next_free.load()),
          _root->slab_end - reinterpret_cast<byte*>(_root));
+    PINF("linked   : %p", reinterpret_cast<void*>(_root->linked_slab));
     PINF("-------------------------");
+    if(_root->linked_slab)
+      _root->linked_slab->dump_info();
   }
 
 
@@ -227,6 +265,9 @@ public:
     : Immutable_allocator_base(base, size, nullptr, force_init) {
     assert(base);
     assert(size);
+  };
+  explicit Immutable_allocator(region_vector_t& regions, const bool force_init) noexcept 
+    : Immutable_allocator_base(regions, nullptr, force_init) {
   };
 
   T* allocate(std::size_t n=1) {

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -10,7 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define LARGE_VALUE_SIZE KB(128); // MB(4);
+#define LARGE_VALUE_SIZE KB(128);  // MB(4);
 #define LARGE_ITERATIONS 10000
 #define EXPECTED_OBJECTS 10000
 
@@ -21,10 +21,10 @@
 #include <core/task.h>
 #include <gtest/gtest.h>
 #include <sys/mman.h>
-#include <boost/program_options.hpp>
-#include <iostream>
 
+#include <boost/program_options.hpp>
 #include <chrono> /* milliseconds */
+#include <iostream>
 #include <thread> /* this_thread::sleep_for */
 
 //#define TEST_PERF_SMALL_PUT
@@ -43,7 +43,7 @@ struct {
   unsigned    debug_level;
   unsigned    base_core;
   size_t      value_size;
-} Options;
+} Options {};
 
 Component::IKVStore_factory *fact;
 
@@ -75,17 +75,7 @@ class mcas_client_test : public ::testing::Test {
 
 Component::IKVStore *mcas_client_test::_mcas;
 
-DECLARE_STATIC_COMPONENT_UUID(mcas_client,
-                              0x2f666078,
-                              0xcb8a,
-                              0x4724,
-                              0xa454,
-                              0xd1,
-                              0xd8,
-                              0x8d,
-                              0xe2,
-                              0xdb,
-                              0x87);
+DECLARE_STATIC_COMPONENT_UUID(mcas_client, 0x2f666078, 0xcb8a, 0x4724, 0xa454, 0xd1, 0xd8, 0x8d, 0xe2, 0xdb, 0x87);
 DECLARE_STATIC_COMPONENT_UUID(mcas_client_factory,
                               0xfac66078,
                               0xcb8a,
@@ -100,11 +90,11 @@ DECLARE_STATIC_COMPONENT_UUID(mcas_client_factory,
 
 void basic_test(IKVStore *kv, unsigned shard)
 {
-  int  rc;
+  int               rc;
   std::stringstream ss;
   ss << Options.pool << shard;
   std::string pool_name = ss.str();
-  auto pool = kv->create_pool(pool_name, MB(8), 0, EXPECTED_OBJECTS);
+  auto        pool      = kv->create_pool(pool_name, MB(8), 0, EXPECTED_OBJECTS);
 
   std::string value = "Hello! Value";  // 12 chars
 
@@ -118,7 +108,7 @@ void basic_test(IKVStore *kv, unsigned shard)
     size_t pv_len = 0;
     rc            = kv->get(pool, key.c_str(), pv, pv_len);
     ASSERT_TRUE(rc == S_OK);
-    ASSERT_TRUE(strncmp((char *) pv, value.c_str(), value.length()) == 0);
+    ASSERT_TRUE(strncmp(static_cast<char *>(pv), value.c_str(), value.length()) == 0);
   }
 
   kv->close_pool(pool);
@@ -126,26 +116,21 @@ void basic_test(IKVStore *kv, unsigned shard)
   free(pv);
 }
 
-
 TEST_F(mcas_client_test, SessionControl)
 {
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component(
-      "libcomponent-mcasclient.so", mcas_client_factory);
+  Component::IBase *comp = Component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
 
   ASSERT_TRUE(comp);
-  fact = (IKVStore_factory *) comp->query_interface(IKVStore_factory::iid());
+  fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
 
-  auto mcas = fact->create(Options.debug_level, "dwaddington", Options.addr,
-                           Options.device);
+  auto mcas = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
   ASSERT_TRUE(mcas);
   mcas->release_ref();
 
-  auto mcas2 = fact->create(Options.debug_level, "dwaddington", Options.addr,
-                            Options.device);
+  auto mcas2 = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
   ASSERT_TRUE(mcas2);
-  auto mcas3 = fact->create(Options.debug_level, "dwaddington", Options.addr,
-                            Options.device);
+  auto mcas3 = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
   ASSERT_TRUE(mcas3);
 
   basic_test(mcas2, 0);
@@ -157,26 +142,21 @@ TEST_F(mcas_client_test, SessionControl)
   fact->release_ref();
 }
 
-
-
 TEST_F(mcas_client_test, Instantiate)
 {
   PMAJOR("Running Instantiate...");
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component(
-      "libcomponent-mcasclient.so", mcas_client_factory);
+  Component::IBase *comp = Component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
 
   ASSERT_TRUE(comp);
-  fact = (IKVStore_factory *) comp->query_interface(IKVStore_factory::iid());
+  fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
 
-  _mcas = fact->create(Options.debug_level, "dwaddington",
-                       Options.addr,
-                       Options.device);
+  _mcas = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
   ASSERT_TRUE(_mcas);
 
   fact->release_ref();
 }
-  
+
 TEST_F(mcas_client_test, OpenCloseDelete)
 {
   PMAJOR("Running OpenCloseDelete...");
@@ -185,7 +165,7 @@ TEST_F(mcas_client_test, OpenCloseDelete)
 
   const std::string poolname = Options.pool + "/OpenCloseDelete";
   ASSERT_TRUE((pool = _mcas->create_pool(poolname, GB(1))) != IKVStore::POOL_ERROR);
-  ASSERT_FALSE(pool  == IKVStore::POOL_ERROR);
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
   ASSERT_TRUE(_mcas->close_pool(pool) == S_OK);
 
   /* pool already exists */
@@ -243,15 +223,14 @@ TEST_F(mcas_client_test, GetNotExist)
   free(pv);
   PLOG("GetNotExist OK!");
 }
-#endif 
+#endif
 TEST_F(mcas_client_test, BasicPutAndGet)
 {
   PMAJOR("Running BasicPutGet...");
   ASSERT_TRUE(_mcas);
   int rc;
 
-  auto pool =
-    _mcas->create_pool(Options.pool, MB(8));
+  auto pool = _mcas->create_pool(Options.pool, MB(8));
 
   std::string value = "Hello! Value";  // 12 chars
   void *      pv;
@@ -264,16 +243,15 @@ TEST_F(mcas_client_test, BasicPutAndGet)
     size_t pv_len = 0;
     PINF("performing 'get' to retrieve what was put..");
     rc = _mcas->get(pool, "key0", pv, pv_len);
-    PINF("get response:%d (%s) len:%lu", rc, (char *) pv, pv_len);
+    PINF("get response:%d (%s) len:%lu", rc, static_cast<char *>(pv), pv_len);
     ASSERT_TRUE(rc == S_OK);
-    ASSERT_TRUE(strncmp((char *) pv, value.c_str(), value.length()) == 0);
+    ASSERT_TRUE(strncmp(static_cast<char *>(pv), value.c_str(), value.length()) == 0);
   }
 
   _mcas->delete_pool(Options.pool);
   free(pv);
   PLOG("BasicPutAndGet OK!");
 }
-
 
 #ifdef TEST_SCALE_IOPS
 
@@ -295,8 +273,7 @@ class IOPS_task : public Core::Tasklet {
 
   virtual void initialize(unsigned core) override
   {
-    _store = fact->create(Options.debug_level, "dwaddington", Options.addr,
-                          Options.device);
+    _store = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
 
     char poolname[64];
     sprintf(poolname, "/dev/dax0.%u", core);
@@ -324,8 +301,7 @@ class IOPS_task : public Core::Tasklet {
     if (_iterations == 0) PLOG("Starting worker: %u", core);
 
     _iterations++;
-    status_t rc = _store->put(_pool, _data[_iterations].key,
-                              _data[_iterations].value, VALUE_SIZE);
+    status_t rc = _store->put(_pool, _data[_iterations].key, _data[_iterations].value, VALUE_SIZE);
 
     if (rc != S_OK) throw General_exception("put operation failed:rc=%d", rc);
 
@@ -385,8 +361,7 @@ TEST_F(mcas_client_test, PerfSmallPut)
   int rc;
 
   const std::string poolname = Options.pool + "/PerfSmallPut";
-  auto pool =
-    _mcas->create_pool(poolname, GB(4));
+  auto              pool     = _mcas->create_pool(poolname, GB(4));
 
   static constexpr unsigned long ITERATIONS = 1000000;
   static constexpr unsigned long VALUE_SIZE = 32;
@@ -416,8 +391,7 @@ TEST_F(mcas_client_test, PerfSmallPut)
 
   auto end  = std::chrono::high_resolution_clock::now();
   auto secs = std::chrono::duration<double>(end - start).count();
-  PMAJOR("PerfSmallPut Ops/Sec: %lu",
-         static_cast<unsigned long>(ITERATIONS / secs));
+  PMAJOR("PerfSmallPut Ops/Sec: %lu", static_cast<unsigned long>(ITERATIONS / secs));
 
   ::free(data);
 
@@ -433,8 +407,7 @@ TEST_F(mcas_client_test, PerfSmallPutDirect)
   int rc;
 
   /* open or create pool */
-  Component::IKVStore::pool_t pool =
-    _mcas->open_pool(std::string("/mnt/pmem0/mcas") + Options.pool, 0);
+  Component::IKVStore::pool_t pool = _mcas->open_pool(std::string("/mnt/pmem0/mcas") + Options.pool, 0);
 
   if (pool == Component::IKVStore::POOL_ERROR) {
     /* ok, try to create pool instead */
@@ -474,9 +447,8 @@ TEST_F(mcas_client_test, PerfSmallPutDirect)
   }
 
   auto end  = std::chrono::high_resolution_clock::now();
-  auto secs = std::chrono::duration<double>(end - start) .count();
-  PMAJOR("PerfSmallPutDirect Ops/Sec: %lu",
-         static_cast<unsigned long>(ITERATIONS / secs));
+  auto secs = std::chrono::duration<double>(end - start).count();
+  PMAJOR("PerfSmallPutDirect Ops/Sec: %lu", static_cast<unsigned long>(ITERATIONS / secs));
 
   _mcas->unregister_direct_memory(handle);
 
@@ -492,14 +464,14 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
 
   int rc;
   ASSERT_TRUE(_mcas);
-  
+
   const std::string poolname = Options.pool + "/PerfLargePutDirect";
-  
+
   /* open or create pool */
   auto pool = _mcas->create_pool(poolname, GB(8), 0, EXPECTED_OBJECTS);
 
   PLOG("Test pool created OK.");
-  
+
   static constexpr unsigned long PER_ITERATION = 1;
   static constexpr unsigned long ITERATIONS    = LARGE_ITERATIONS;
   static constexpr unsigned long VALUE_SIZE    = LARGE_VALUE_SIZE;
@@ -512,8 +484,8 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
 
   PLOG("Allocating buffer with test data ...");
   size_t    data_size = sizeof(record_t) * PER_ITERATION;
-  record_t *data      = (record_t *) aligned_alloc(MiB(2), data_size);
-  madvise(data, data_size, MADV_HUGEPAGE|MADV_DONTFORK);
+  record_t *data      = static_cast<record_t *>(aligned_alloc(MiB(2), data_size));
+  madvise(data, data_size, MADV_HUGEPAGE | MADV_DONTFORK);
 
   ASSERT_FALSE(data == nullptr);
   auto handle = _mcas->register_direct_memory(data, data_size); /* register whole region */
@@ -531,10 +503,7 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
 
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     /* different value each iteration; tests memory region registration */
-    rc = _mcas->put_direct(pool,
-                           data[i % PER_ITERATION].key,
-                           data[i % PER_ITERATION].value,
-                           VALUE_SIZE,
+    rc = _mcas->put_direct(pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK);
   }
@@ -542,8 +511,7 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
   auto end  = std::chrono::high_resolution_clock::now();
   auto secs = std::chrono::duration<double>(end - start).count();
   PINF("PerfLargePutDirect Throughput: %.2f MiB/sec (%.2f IOPS)",
-       ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024),
-       (PER_ITERATION * ITERATIONS) / secs);
+       ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024), (PER_ITERATION * ITERATIONS) / secs);
 
   _mcas->close_pool(pool);
   _mcas->delete_pool(poolname);
@@ -559,19 +527,19 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
 
   PMAJOR("Running LargeGetDirect...");
   const std::string poolname = Options.pool + "/PerfLargeGetDirect";
-  auto pool = _mcas->create_pool(poolname, GB(8), 0, EXPECTED_OBJECTS);
+  auto              pool     = _mcas->create_pool(poolname, GB(8), 0, EXPECTED_OBJECTS);
   ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
 
   static constexpr unsigned long PER_ITERATION = 1;
   static constexpr unsigned long ITERATIONS    = LARGE_ITERATIONS;
   static constexpr unsigned long VALUE_SIZE    = LARGE_VALUE_SIZE;
   static constexpr unsigned long KEY_SIZE      = 8;
-  
-  std::vector<std::string*> keys;
-  
+
+  std::vector<std::string *> keys;
+
   PLOG("Allocating buffer with test data ...");
-  size_t    data_size = VALUE_SIZE * PER_ITERATION;
-  char     *data      = (char *) aligned_alloc(MiB(2), data_size);
+  size_t data_size = VALUE_SIZE * PER_ITERATION;
+  char * data      = static_cast<char *>(aligned_alloc(MiB(2), data_size));
   madvise(data, data_size, MADV_HUGEPAGE | MADV_DONTFORK);
   memset(data, 0, data_size);
 
@@ -586,7 +554,7 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
     // memcpy(p, val.c_str(), VALUE_SIZE);
     // p+=val.length();
     auto s = new std::string;
-    *s = Common::random_string(KEY_SIZE);
+    *s     = Common::random_string(KEY_SIZE);
     keys.push_back(s);
   }
   PLOG("Using put_direct to fill for get_direct operation...");
@@ -596,10 +564,7 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     //    PLOG("Putting key(%s)", keys[i % PER_ITERATION]->c_str());
     /* different value each iteration; tests memory region registration */
-    rc = _mcas->put_direct(pool,
-                           *keys[i % PER_ITERATION],
-                           &data[i % PER_ITERATION],
-                           VALUE_SIZE,
+    rc = _mcas->put_direct(pool, *keys[i % PER_ITERATION], &data[i % PER_ITERATION], VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK || rc == -6);
   }
@@ -607,33 +572,26 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
   auto end  = std::chrono::high_resolution_clock::now();
   auto secs = std::chrono::duration<double>(end - start).count();
   PINF("LargePutDirect Throughput: %.2f MiB/sec  (%.2f IOPS)",
-       ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024),
-       ((PER_ITERATION * ITERATIONS) / secs));
+       ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024), ((PER_ITERATION * ITERATIONS) / secs));
 
-
-  for(unsigned r=0;r<2;r++) {
+  for (unsigned r = 0; r < 2; r++) {
     PINF("LargeGetDirect: Starting .. get_direct phase (%u)", r);
 
     start = std::chrono::high_resolution_clock::now();
-    
+
     /* perform get phase */
     for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
       size_t value_len = VALUE_SIZE;
       //    PLOG("get_direct (key=%s)", keys[i % PER_ITERATION]->c_str());
-      rc               = _mcas->get_direct(pool,
-                                           *keys[i % PER_ITERATION],
-                                           &data[i % PER_ITERATION],
-                                           value_len,
-                                           handle);
+      rc = _mcas->get_direct(pool, *keys[i % PER_ITERATION], &data[i % PER_ITERATION], value_len, handle);
       ASSERT_TRUE(rc == S_OK);  // || rc == -6);
     }
-    
+
     end  = std::chrono::high_resolution_clock::now();
     secs = std::chrono::duration<double>(end - start).count();
     PINF("PerfLargeGetDirect Throughput: %.2f MiB/sec (%.2f IOPS)",
-         ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024),
-         ((PER_ITERATION * ITERATIONS) / secs));
-    
+         ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024), ((PER_ITERATION * ITERATIONS) / secs));
+
     PINF("LargeGetDirect: Starting phase (2) .. get_direct phase");
   }
 
@@ -650,7 +608,7 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
   int rc;
 
   const std::string poolname = Options.pool + "/PerfSmallGetDirect";
-  auto pool = _mcas->create_pool(poolname, GB(8));
+  auto              pool     = _mcas->create_pool(poolname, GB(8));
 
   static constexpr unsigned long PER_ITERATION = 8;
   static constexpr unsigned long ITERATIONS    = 100000;
@@ -668,8 +626,7 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
   madvise(data, data_size, MADV_HUGEPAGE);
 
   ASSERT_FALSE(data == nullptr);
-  auto handle = _mcas->register_direct_memory(
-      data, data_size); /* register whole region */
+  auto handle = _mcas->register_direct_memory(data, data_size); /* register whole region */
 
   PLOG("Filling data...");
   /* set up data */
@@ -684,14 +641,13 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
 
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     /* different value each iteration; tests memory region registration */
-    rc = _mcas->put_direct(pool, data[i % PER_ITERATION].key,
-                           data[i % PER_ITERATION].value, VALUE_SIZE,
+    rc = _mcas->put_direct(pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK || rc == -2);
   }
 
   auto end  = std::chrono::high_resolution_clock::now();
-  auto secs = std::chrono::duration<double>(end - start) .count();
+  auto secs = std::chrono::duration<double>(end - start).count();
   PINF("PerfSmallGet Prep-Throughput: %.2f MiB/sec",
        ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024));
 
@@ -702,22 +658,19 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
   /* perform get phase */
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     size_t value_len = VALUE_SIZE;
-    rc               = _mcas->get_direct(pool, data[i % PER_ITERATION].key,
-                           data[i % PER_ITERATION].value, value_len, handle);
+    rc = _mcas->get_direct(pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, value_len, handle);
     ASSERT_TRUE(rc == S_OK);  // || rc == -6);
   }
 
   end  = std::chrono::high_resolution_clock::now();
   secs = std::chrono::duration<double>(end - start).count();
-  PINF("PerfSmallGet Throughput: %.2f MiB/sec",
-       ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024));
+  PINF("PerfSmallGet Throughput: %.2f MiB/sec", ((PER_ITERATION * ITERATIONS * VALUE_SIZE) / secs) / (1024.0 * 1024));
 
   _mcas->close_pool(pool);
   _mcas->delete_pool(poolname);
   _mcas->unregister_direct_memory(handle);
 }
 #endif
-
 
 TEST_F(mcas_client_test, Release)
 {
@@ -736,13 +689,13 @@ int main(int argc, char **argv)
   try {
     namespace po = boost::program_options;
     po::options_description desc("Options");
-    desc.add_options()("help", "Show help")
-      ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")
-      ("server-addr", po::value<std::string>()->default_value("10.0.0.21:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
-      ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")
-      ("pool", po::value<std::string>()->default_value("myPool"), "Pool name")
-      ("value_size", po::value<std::size_t>()->default_value(0), "Value size")
-      ("base", po::value<unsigned>()->default_value(0), "Base core.");
+    desc.add_options()("help", "Show help")("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")(
+        "server-addr", po::value<std::string>()->default_value("10.0.0.21:11911:verbs"),
+        "Server address IP:PORT[:PROVIDER]")("device", po::value<std::string>()->default_value("mlx5_0"),
+                                             "Network device (e.g., mlx5_0)")(
+        "pool", po::value<std::string>()->default_value("myPool"), "Pool name")(
+        "value_size", po::value<std::size_t>()->default_value(0), "Value size")(
+        "base", po::value<unsigned>()->default_value(0), "Base core.");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_SIZE_CONTROL_H
-#define _COMANCHE_HSTORE_SIZE_CONTROL_H
+#ifndef MCAS_HSTORE_SIZE_CONTROL_H
+#define MCAS_HSTORE_SIZE_CONTROL_H
 
 #include "persist_atomic.h"
 #include "value_unstable.h"
@@ -39,7 +39,7 @@ namespace impl
 		size_change& operator=(const size_change &) = delete;
 	protected:
 		size_control & get_size_control() const { return *_size_control; }
-		virtual ~size_change() {}
+		virtual ~size_change() noexcept(! TEST_HSTORE_PERISHABLE) {}
 	public:
 		size_change(size_control &ctl)
 			: _size_control(&ctl)

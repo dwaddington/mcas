@@ -29,23 +29,11 @@ namespace ccpm
 		top_vec_t _top;
 		top_vec_t::size_type _last_top_allocate;
 		top_vec_t::size_type _last_top_free;
-		explicit cca()
-			: _top()
-			, _last_top_allocate(0)
-			, _last_top_free(0)
-		{}
+		explicit cca();
 	public:
-		explicit cca(const region_vector_t &regions, ownership_callback_t resolver)
-			: cca()
-		{
-			reconstitute(regions, resolver, false);
-		}
+		explicit cca(const region_vector_t &regions, ownership_callback_t resolver);
 
-		explicit cca(const region_vector_t &regions)
-			: cca()
-		{
-			reconstitute(regions, nullptr, true);
-		}
+		explicit cca(const region_vector_t &regions);
 
 		cca(const cca &) = delete;
 		const cca& operator=(const cca &) = delete;
@@ -70,6 +58,10 @@ namespace ccpm
 		void add_regions(
 			const region_vector_t &
 		) override;
+
+		bool includes(
+			const void *addr
+		) const override;
 
 		status_t remaining(
 			std::size_t & out_size_

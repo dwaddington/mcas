@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,11 +12,11 @@
 */
 
 #include "hstore_config.h"
-#include "hstore_session.h"
 #include "persister_nupm.h"
 #include "dax_map.h"
 #include "pool_path.h"
 #include "region.h"
+#include "session.h"
 
 #include <city.h> /* CityHash */
 
@@ -90,6 +90,9 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       throw pool_error("unsupported flags " + std::to_string(flags_), pool_ec::pool_unsupported_mode);
     }
     auto uuid = dax_uuid_hash(path_);
+    auto size = size_;
+
+#if USE_CC_HEAP == 3
     /* The first part of pool space is the header, which is described by a Region.
      * In order to give the heap a well-aligned space, the size actually allocated
      * to a heap may be as little as 3/4 of the area provided to the heap.
@@ -98,11 +101,15 @@ template <typename Region, typename Table, typename Allocator, typename LockType
      * Ask for enough space to contain the header and to compensate for inefficiency
      * due to heap alignment.
      */
-    auto size = sizeof(Region) + size_ * 4 / 3;
-    /* _devdax_manager will allocate 1GiB-aligned regions. But there is no mechanism for it to
-     * tell us that. Round request up to 1 GiB to avoid wasting space.
+    size = sizeof(Region) + size_ * 4 / 3;
+#endif
+
+#if defined HSTORE_GRAIN_SIZE
+    /* _devdax_manager will allocate a region of some granularity But there is no mechanism for it to
+     * tell us that. Round request up to a grain size, if specified, to avoid wasting space.
      */
-     size = ((size_ - 1) / (1U<<30) + 1 ) * (1U<<30);
+    size = round_up(size_, (HSTORE_GRAIN_SIZE));
+#endif
     /* Attempt to create a new pool. */
     try
     {
@@ -112,7 +119,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       {
         throw pool_error("create_region fail: " + path_.str(), pool_ec::region_fail);
       }
-      PLOG(PREFIX "in %s: created region ID %" PRIx64 " at %p:0x%zx", __func__, path_.str().c_str(), uuid, pop, size);
+      PLOG(PREFIX "in %s: created region ID %" PRIx64 " at %p:0x%zx", LOCATION, path_.str().c_str(), uuid, pop, size);
 
       open_pool_handle h(new (pop) Region(uuid, size, expected_obj_count_, _numa_node), region_closer_t(this->shared_from_this()));
       return std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(path_, std::move(h), construction_mode::create);
@@ -153,7 +160,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       throw std::invalid_argument("failed to re-open pool");
     }
 
-    PLOG(PREFIX "in %s: opened region ID %" PRIx64 " at %p", __func__, path_.str().c_str(), uuid, static_cast<const void *>(pop.get()));
+    PLOG(PREFIX "in %s: opened region ID %" PRIx64 " at %p", LOCATION, path_.str().c_str(), uuid, static_cast<const void *>(pop.get()));
     /* open_pool_handle is a managed region *, and pop is a region. */
     auto s = std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(path_, std::move(pop), construction_mode::reconstitute);
     return s;

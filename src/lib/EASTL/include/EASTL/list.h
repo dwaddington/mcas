@@ -97,8 +97,9 @@ namespace eastl
 	template <typename Tracker>
 	struct ListNodeBase
 	{
-		tracked<ListNodeBase<Tracker>*, Tracker, 'L'> mpNext;
-		tracked<ListNodeBase<Tracker>*, Tracker, 'L'> mpPrev;
+		using tracked_type = tracked<ListNodeBase<Tracker>*, Tracker, 'L'>;
+		tracked_type mpNext;
+		tracked_type mpPrev;
 
 		void        insert(ListNodeBase<Tracker>* pNext) EA_NOEXCEPT;                                // Inserts this standalone node before the node pNext in pNext's list.
 		void        remove() EA_NOEXCEPT;                                                   // Removes this node from the list it's in. Leaves this node's mpNext/mpPrev invalid.
@@ -108,6 +109,8 @@ namespace eastl
 
 		void        insert_range(ListNodeBase<Tracker>* pFirst, ListNodeBase<Tracker>* pFinal) EA_NOEXCEPT;   // Differs from splice in that first/final aren't in another list.
 		static void remove_range(ListNodeBase<Tracker>* pFirst, ListNodeBase<Tracker>* pFinal) EA_NOEXCEPT;   //
+
+		ListNodeBase(const Tracker &t) : mpNext(nullptr, t), mpPrev(nullptr, t) {}
 	} EASTL_LIST_PROXY_MAY_ALIAS;
 
 
@@ -149,6 +152,7 @@ namespace eastl
 		struct ListNode : public ListNodeBase<Tracker>
 		{
 			T mValue;
+			ListNode(const Tracker &t) : ListNodeBase<Tracker>(t) {}
 		};
 		EA_RESTORE_VC_WARNING()
 
@@ -751,7 +755,7 @@ namespace eastl
 
 	template <typename T, typename Allocator>
 	inline ListBase<T, Allocator>::ListBase(const allocator_type& allocator)
-		: mNode(),
+		: mNode(allocator),
 		  #if EASTL_LIST_SIZE_CACHE
 		  mSize(0, allocator),
 		  #endif
@@ -797,6 +801,7 @@ namespace eastl
 	ListBase<T, Allocator>::DoAllocateNode()
 	{
 		node_type* pNode = (node_type*)allocate_memory(mAllocator, sizeof(node_type), EASTL_ALIGN_OF(T), 0);
+		new (pNode) node_type(mAllocator);
 		EASTL_ASSERT(pNode != nullptr);
 		return pNode;
 	}

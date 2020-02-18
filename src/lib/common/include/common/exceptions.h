@@ -83,6 +83,7 @@ class Constructor_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }
@@ -98,12 +99,13 @@ class General_exception : public Exception {
   General_exception() : _err_code(E_FAIL) {}
 
   __attribute__((__format__(__printf__, 2, 0)))
-    General_exception(const char *fmt, ...) : Exception(""), _err_code(E_FAIL)  {
+  General_exception(const char *fmt, ...) : Exception(""), _err_code(E_FAIL)  {
     va_list args;
     va_start(args, fmt);
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
   status_t error_code() const { return _err_code; }
 
@@ -125,6 +127,7 @@ class API_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }
@@ -147,6 +150,7 @@ class Logic_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }
@@ -169,6 +173,7 @@ class IO_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }
@@ -191,6 +196,7 @@ class Program_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }
@@ -213,6 +219,7 @@ class Data_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }
@@ -235,6 +242,7 @@ class Protocol_exception : public Exception {
     char msg[255] = {0};
     vsnprintf(msg, 254, fmt, args);
     set_cause(msg);
+    va_end(args);
   }
 
   status_t error_code() const { return _err_code; }

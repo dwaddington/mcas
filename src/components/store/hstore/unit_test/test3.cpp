@@ -11,6 +11,8 @@
    limitations under the License.
 */
 #include "store_map.h"
+#include "profiler.h"
+#include "timer.h"
 
 #include <gtest/gtest.h>
 #include <common/utils.h>
@@ -18,16 +20,8 @@
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
 
-#if defined HAS_PROFILER
-#include <gperftools/profiler.h> /* Alas, no __has_include until C++17 */
-#else
-int ProfilerStart(const char *) {}
-void ProfilerStop() {}
-#endif
-
 #include <chrono>
 #include <cstdlib>
-#include <functional> /* function */
 #include <iostream>
 #include <string>
 #include <random>
@@ -35,27 +29,8 @@ void ProfilerStop() {}
 #include <tuple>
 #include <vector>
 
-class timer
-{
-public:
-	using clock_t = std::chrono::steady_clock;
-	using duration_t = typename clock_t::duration;
-private:
-	std::function<void(duration_t) noexcept> _f;
-	clock_t::time_point _start;
-public:
-	timer(std::function<void(duration_t) noexcept> f_)
-		: _f(f_)
-		, _start(clock_t::now())
-	{}
-	~timer()
-	{
-		_f(clock_t::now() - _start);
-	}
-};
-
 /*
- * Performancte test:
+ * Performance test:
  *
  * export PMEM_IS_PMEM_FORCE=1
  * LD_PRELOAD=/usr/lib/libprofiler.so CPUPROFILE=cpu.profile ./src/components/hstore/unit_test/hstore-test3
@@ -200,7 +175,7 @@ TEST_F(KVStore_test, CreatePool)
 void KVStore_test::populate_many(kvv_t &kvv, const char tag, std::size_t key_length, std::size_t value_length)
 {
   std::mt19937_64 r0{};
-  for ( auto i = 0; i != many_count_target; ++i )
+  for ( auto i = 0UL; i != many_count_target; ++i )
   {
     auto ukey = r0();
     std::ostringstream s;
@@ -231,12 +206,13 @@ TEST_F(KVStore_test, PopulateManyLargeLarge)
 long unsigned KVStore_test::put_many(const kvv_t &kvv, const std::string &descr)
 {
   long unsigned count = 0;
-  ProfilerStart(("test3-put-" + descr + "-cpu-" + store_map::impl->name + ".profile").c_str());
+  profiler pr("test3-put-" + descr + "-cpu-" + store_map::impl->name + ".profile");
   {
     timer t(
       [&count, &descr] (timer::duration_t d) {
         auto seconds = std::chrono::duration<double>(d).count();
-        std::cerr << descr << " " << count << " in " << seconds << " seconds -> " << count / seconds << " per second\n";
+        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+        std::cout << descr << " " << count << " in " << seconds << " seconds -> " << microseconds / count << " us -> " << double(count) / seconds << " per second\n";
       }
     );
     for ( auto &kv : kvv )
@@ -250,11 +226,10 @@ long unsigned KVStore_test::put_many(const kvv_t &kvv, const std::string &descr)
       }
       else
       {
-         std::cerr << __func__ << " FAIL " << key << "\n";
+         std::cout << __func__ << " FAIL " << key << "\n";
       }
     }
   }
-  ProfilerStop();
   return count;
 }
 
@@ -266,7 +241,7 @@ TEST_F(KVStore_test, PutManyShortShort)
   auto count_actual = put_many(kvv_short_short, "short_short");
 
   EXPECT_LE(count_actual, many_count_target);
-  EXPECT_LE(many_count_target * 0.99, double(count_actual));
+  EXPECT_LE(many_count_target * 99 / 100, count_actual);
 
   multi_count_actual += count_actual;
 }
@@ -279,7 +254,7 @@ TEST_F(KVStore_test, PutManyShortLong)
   auto count_actual = put_many(kvv_short_long, "short_long");
 
   EXPECT_LE(count_actual, many_count_target);
-  EXPECT_LE(many_count_target * 0.99, double(count_actual));
+  EXPECT_LE(many_count_target * 99 / 100, count_actual);
 
   multi_count_actual += count_actual;
 }
@@ -292,7 +267,7 @@ TEST_F(KVStore_test, PutManyLongLong)
   auto count_actual = put_many(kvv_long_long, "long_long");
 
   EXPECT_LE(count_actual, many_count_target);
-  EXPECT_LE(many_count_target * 0.99, double(count_actual));
+  EXPECT_LE(many_count_target * 99 / 100, count_actual);
 
   multi_count_actual += count_actual;
 }
@@ -309,16 +284,17 @@ TEST_F(KVStore_test, Size1)
 
 void KVStore_test::get_many(const kvv_t &kvv, const std::string &descr)
 {
-  ProfilerStart(("test3-get-" + descr + "-cpu-" + store_map::impl->name + ".profile").c_str());
+  profiler pr("test3-get-" + descr + "-cpu-" + store_map::impl->name + ".profile");
   /* get is quick; run 10 for better profiling */
   {
-	auto ct = get_expand * kvv.size();
+    auto count = get_expand * kvv.size();
     timer t(
-		[&descr,ct] (timer::duration_t d) {
-			auto seconds = std::chrono::duration<double>(d).count();
-			std::cerr << descr << " " << ct << " in " << seconds << " => " << ct / seconds << " per second\n";
-		}
-	);
+      [&descr,count] (timer::duration_t d) {
+        auto seconds = std::chrono::duration<double>(d).count();
+        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+        std::cout << descr << " " << count << " in " << seconds << " seconds -> " << microseconds / count << " us -> " << double(count) / seconds << " per second\n";
+      }
+    );
     for ( auto i = 0; i != get_expand; ++i )
     {
       for ( auto &kv : kvv )
@@ -336,7 +312,6 @@ void KVStore_test::get_many(const kvv_t &kvv, const std::string &descr)
       }
     }
   }
-  ProfilerStop();
 }
 
 TEST_F(KVStore_test, GetManyShortShort)

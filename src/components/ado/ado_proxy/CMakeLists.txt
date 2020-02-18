@@ -4,8 +4,7 @@ project(component-adoproxy CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
-
+add_definitions(-DCONFIG_DEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(../../../lib/common/include)
@@ -15,7 +14,6 @@ include_directories(../../)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # docker.h
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # libdocker
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # libdocker
-
 
 file(GLOB SOURCES src/*.c*)
 

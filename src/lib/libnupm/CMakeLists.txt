@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 project(nupm CXX C)
 
 set(CMAKE_CXX_STANDARD 14)
+add_compile_options(-Wall)
 
 include(../../../mk/clang-dev-tools.cmake)
 
@@ -21,17 +22,18 @@ link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmallo
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
 
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG)
 
 file(GLOB SOURCES src/*.c*)
 
 add_library(nupm SHARED ${SOURCES})
 
-target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem)
+target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
+#target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0> -fopenmp)
+target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem gcov)
 
 add_subdirectory(unit_test)
 

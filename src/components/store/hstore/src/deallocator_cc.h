@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_DEALLOCATOR_CC_H
-#define COMANCHE_HSTORE_DEALLOCATOR_CC_H
+#ifndef MCAS_HSTORE_DEALLOCATOR_CC_H
+#define MCAS_HSTORE_DEALLOCATOR_CC_H
 
 #include "heap_cc.h"
 #include "persistent.h"
@@ -66,19 +66,32 @@ template <typename T, typename Persister = persister>
 
 		deallocator_cc &operator=(const deallocator_cc &e_) = delete;
 
+		void emplace_arm()
+		{
+			_pool->emplace_arm();
+		}
+
+		void emplace_disarm()
+		{
+			_pool->emplace_disarm();
+		}
+
 		/* For crash consistency testing only.
 		 * Some deallocations are for pointers which are themselves
 		 * marked persistent, and which are passed as such to the
 		 * deallocator. */
+		/* ERROR: ensure that all calls from the kvstore come from an
+		 * allocator with crash-consistent logic
+		 */
 		void deallocate(
-			pointer_type & p
+			pointer_type & p_
 			, size_type sz_
 		)
 		{
 			/* What we might like to say, if persistent_t had the intelligence:
 			 * _pool->free(static_pointer_cast<void *>(&p), sizeof(T) * sz_);
 			 */
-			_pool->free(reinterpret_cast<persistent_t<void *> *>(&p), sizeof(T) * sz_);
+			_pool->free(reinterpret_cast<persistent_t<void *> *>(&p_), sizeof(T) * sz_);
 		}
 
 		void persist(const void *ptr, size_type len, const char * = nullptr) const

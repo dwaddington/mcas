@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,21 +11,11 @@
    limitations under the License.
 */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <api/components.h>
-#pragma GCC diagnostic pop
 
 #include <gtest/gtest.h>
 
-#pragma GCC diagnostic push
-#if __clang__
-#pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
-#endif
 #include <common/logging.h>
-#pragma GCC diagnostic pop
 
 #include <api/fabric_itf.h>
 

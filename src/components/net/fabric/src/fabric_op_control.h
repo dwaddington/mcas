@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -24,13 +24,7 @@
 #include "fabric_types.h" /* addr_ep_t */
 #include "fd_pair.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fi_domain.h> /* fi_cq_attr, fi_cq_err_entry, fi_cq_data_entry */
-#pragma GCC diagnostic pop
+#include "rdma-fi_domain.h" /* fi_cq_attr, fi_cq_err_entry, fi_cq_data_entry */
 
 #include <atomic>
 #include <cstdint> /* uint{64,64}_t */
@@ -119,6 +113,15 @@ class Fabric_op_control
    * @throw fabric_runtime_error : std::runtime_error : ::fi_cq_open fail (make_fid_cq)
    */
   fid_unique_ptr<::fid_cq> make_fid_cq(::fi_cq_attr &attr, void *context) const;
+
+	void sendmsg(
+		const ::iovec *first_
+		, const ::iovec *last_
+		, void **desc_
+		, ::fi_addr_t addr_
+		, void *context_
+		, std::uint64_t flags
+	);
 
 public:
   const ::fi_info &ep_info() const { return *_ep_info; }

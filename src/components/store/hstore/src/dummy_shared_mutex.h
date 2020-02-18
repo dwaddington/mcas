@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_DUMMY_SHARED_MUTEX_H_
-#define _COMANCHE_HSTORE_DUMMY_SHARED_MUTEX_H_
+#ifndef MCAS_HSTORE_DUMMY_SHARED_MUTEX_H_
+#define MCAS_HSTORE_DUMMY_SHARED_MUTEX_H_
 
 #include <cassert>
 #include <system_error>

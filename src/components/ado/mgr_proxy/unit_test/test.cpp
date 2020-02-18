@@ -42,7 +42,7 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
       "libcomponent-adomgrproxy.so", Component::ado_manager_proxy_factory);
 
   ASSERT_TRUE(comp);
-  IADO_manager_proxy_factory *fact =
+  auto fact =
     static_cast<IADO_manager_proxy_factory *>(comp->query_interface(IADO_manager_proxy_factory::iid()));
 
   _ado_manager = fact->create(1, 0, "", 1);

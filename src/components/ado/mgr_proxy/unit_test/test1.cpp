@@ -46,8 +46,8 @@ TEST_F(KVIndex_test, Instantiate)
       "libcomponent-indexrbtree.so", Component::rbtreeindex_factory);
 
   ASSERT_TRUE(comp);
-  IKVIndex_factory *fact =
-      (IKVIndex_factory *) comp->query_interface(IKVIndex_factory::iid());
+  auto fact =
+    static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid()));
 
   _kvindex = fact->create("owner", "name");
 

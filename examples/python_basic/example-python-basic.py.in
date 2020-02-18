@@ -1,0 +1,85 @@
+#!/usr/bin/python3
+
+import sys
+# extend PYTHONPATH equivalent
+sys.path.append('${CMAKE_INSTALL_PREFIX}/lib64/python');
+sys.path.append('${CMAKE_INSTALL_PREFIX}/lib/python');
+
+import mcas
+import numpy as np
+
+def get_keys(pool, expr):
+    result = []
+    offset=0
+    print(expr)
+    (k,offset) = pool.find_key(expr, offset)
+    while k != None:
+        result.append(k)
+        offset += 1
+        (k, offset) = pool.find_key(expr, offset)
+        if k != None:
+            print((k,offset))
+    return result
+
+def test_basic_operations(pool):
+    print('Testing basic operations...')
+    pool.put('local-tree','oak')
+    pool.put('dessert-tree','palm')
+    pool.put('snow-tree', 'fir')
+
+    print('local-tree => ' + pool.get('local-tree'))
+    print('dessert-tree => ' + pool.get('dessert-tree'))
+    print('snow-tree => ' + pool.get('snow-tree'))
+
+def test_index(pool):    
+    print('Testing index...')
+    (k,offset)=pool.find_key("prefix:snow", 0)
+    print((k,offset))
+    print(get_keys(pool, "prefix:snow"))
+    print('----')
+
+    print(get_keys(pool, "regex:.*"))
+    print('----')
+
+
+def test_direct_operations(pool):
+    arr = bytearray(int(1e2))
+    arr[0] = 3;
+    arr[1] = 2;
+    arr[2] = 1;
+    pool.put_direct('array0', arr)
+
+    y = pool.get_direct('array0')
+    print('First part...')
+    print(y[0:20])
+
+    print('Len: %d' % pool.get_attribute('array0','length'))
+    print('Crc: %x' % pool.get_attribute('array0','crc32'))
+    print('Size enquiry:%d' % pool.get_size('array0'))
+
+
+def main():
+    if len(sys.argv) == 1:
+        print(sys.argv[0] + ' <MCAS server ip addr>')
+        return
+    
+    pool_name = 'foo'
+
+    session = mcas.Session(ip=sys.argv[1])
+    pool = session.create_pool(pool_name,int(2e9),100)
+
+    # add secondary index
+    pool.configure("AddIndex::VolatileTree")
+
+    test_basic_operations(pool)
+    test_direct_operations(pool)
+    test_index(pool)
+
+    # we can explicitly remove the secondary index
+    pool.configure("RemoveIndex::"); 
+    pool.close()
+    session.delete_pool(pool_name)
+
+
+if __name__ == "__main__":
+    main()

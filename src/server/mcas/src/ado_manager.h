@@ -4,10 +4,12 @@
 
 #include <common/types.h>
 #include <threadipc/queue.h>
+
 #include <set>
 #include <thread>
 #include <utility>
 #include <vector>
+
 #include "config_file.h"
 #include "program_options.h"
 
@@ -32,12 +34,17 @@ struct compare {
 class ADO_manager : public mcas::Config_file {
  public:
   ADO_manager(Program_options &options)
-      : mcas::Config_file(options.config_file),
-        _thread(&ADO_manager::init, this)
+    : mcas::Config_file(options.config_file),
+      _ados{},
+      _ado_cpu_pool{},
+      _manager_cpu_pool{},
+      _thread(&ADO_manager::init, this)
   {
     while (!_running) usleep(1000);
     _sla = NULL;
   }
+  ADO_manager(const ADO_manager &) = delete;
+  ADO_manager &operator=(const ADO_manager &) = delete;
   ~ADO_manager() { exit(); }
   void setSLA();
 
@@ -71,10 +78,7 @@ class ADO_manager : public mcas::Config_file {
   }
   void        register_ado(unsigned int, std::string &, std::string &);
   void        kill_ado(const struct ado &ado);
-  void        schedule(unsigned int shard_core,
-                       std::string  cpus,
-                       float        cpu_num,
-                       numa_node_t  numa_zone);
+  void        schedule(unsigned int shard_core, std::string cpus, float cpu_num, numa_node_t numa_zone);
   std::string reschedule(const struct ado &ado)
   {
     // TODO

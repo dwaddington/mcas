@@ -64,6 +64,7 @@ class KVStore_test : public ::testing::Test {
 
   static constexpr unsigned many_key_length = 8;
   static constexpr unsigned many_value_length = 16;
+  static constexpr char long_value[24] = "........" "........" ".......";
   using kv_t = std::tuple<std::string, std::string>;
   static std::vector<kv_t> kvv;
   static const std::size_t many_count_target;
@@ -79,6 +80,7 @@ constexpr std::size_t KVStore_test::estimated_object_count_small;
 constexpr std::size_t KVStore_test::estimated_object_count_large;
 constexpr std::size_t KVStore_test::many_count_target_small;
 constexpr std::size_t KVStore_test::many_count_target_large;
+constexpr char KVStore_test::long_value[24];
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
 bool KVStore_test::pmem_effective = ! getenv("PMEM_IS_PMEM_FORCE") || getenv("PMEM_IS_PMEM_FORCE") == std::string("0");
@@ -148,6 +150,8 @@ public:
     : _kvstore(kvstore_)
     , _pool(_kvstore->create_pool(name_, size, flags, expected_obj_count))
   {}
+  pool_open(const pool_open &) = delete;
+  pool_open& operator=(const pool_open &) = delete;
 
   ~pool_open()
   {
@@ -181,7 +185,7 @@ TEST_F(KVStore_test, CreatePool)
 TEST_F(KVStore_test, PopulateMany)
 {
   std::mt19937_64 r0{};
-  for ( auto i = 0; i != many_count_target; ++i )
+  for ( auto i = 0UL; i != many_count_target; ++i )
   {
     auto ukey = r0();
     std::ostringstream s;
@@ -277,7 +281,7 @@ TEST_F(KVStore_test, GetMany)
     auto count = _kvstore->count(p.pool());
     {
       /* count should be close to PutMany many_count_actual; duplicate keys are the difference */
-      EXPECT_LE(many_count_actual * 0.99, double(count));
+      EXPECT_LE(many_count_actual * 99 / 100, count);
     }
     {
       std::size_t mismatch_count = 0;
@@ -296,12 +300,12 @@ TEST_F(KVStore_test, GetMany)
           _kvstore->free_memory(value);
         }
       }
-      /* We do not know exactly now many mismatches (caused by duplicates) to expcect,
+      /* We do not know exactly now many mismatches (caused by duplicates) to expect,
        * because "extant_count" counts both extant items due to duplicate keys in the
        * population arrays and extant items due to restarts.
        * But it should be a small fraction of the total number of keys
        */
-      EXPECT_GT(many_count_target * 0.01, double(mismatch_count));
+      EXPECT_GT(many_count_target / 100, mismatch_count);
     }
   }
 }
@@ -340,9 +344,10 @@ TEST_F(KVStore_test, UpdateMany)
 
       for ( auto &kv : kvv )
       {
+        /* Long enough to force a move to out-of-line storage */
         const auto &key = std::get<0>(kv);
         const auto &value = std::get<1>(kv);
-        const auto update_value = value + ((key[0] & 1) ? "X" : "");
+        const auto update_value = value + ((key[0] & 1) ? "X" : "") + ((key[0] & 2) ? long_value : "");
         {
           auto r = _kvstore->put(p.pool(), key, update_value.c_str(), update_value.length());
           EXPECT_EQ(S_OK, r);
@@ -382,7 +387,7 @@ TEST_F(KVStore_test, GetManyUpdates)
     auto count = _kvstore->count(p.pool());
     {
       /* count should be close to PutMany many_count_actual; duplicate keys are the difference */
-      EXPECT_LE(many_count_actual * 0.99, double(count));
+      EXPECT_LE(many_count_actual * 99 / 100, double(count));
     }
     {
       std::size_t mismatch_count = 0;
@@ -390,7 +395,7 @@ TEST_F(KVStore_test, GetManyUpdates)
       {
         const auto &key = std::get<0>(kv);
         const auto &ev = std::get<1>(kv);
-        const auto update_ev = ev + ((key[0] & 1) ? "X" : "");
+        const auto update_ev = ev + ((key[0] & 1) ? "X" : "") + ((key[0] & 2) ? long_value : "");
         void * value = nullptr;
         size_t value_len = 0;
         auto r = _kvstore->get(p.pool(), key, value, value_len);
@@ -411,7 +416,7 @@ TEST_F(KVStore_test, GetManyUpdates)
        * population arrays and extant items due to restarts.
        * But it should be a small fraction of the total number of keys
        */
-      EXPECT_GT(many_count_target * 0.01, double(mismatch_count));
+      EXPECT_GT(many_count_target / 100, mismatch_count);
     }
   }
 }

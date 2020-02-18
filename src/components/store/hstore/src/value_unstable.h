@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_VALUE_UNSTABLE_H
-#define _COMANCHE_HSTORE_VALUE_UNSTABLE_H
+#ifndef MCAS_HSTORE_VALUE_UNSTABLE_H
+#define MCAS_HSTORE_VALUE_UNSTABLE_H
 
 #include "persist_atomic.h"
 
@@ -24,6 +24,12 @@
 
 namespace impl
 {
+	template <typename T, unsigned N>
+		class value_unstable;
+
+	template <typename T, unsigned N>
+		bool operator==(const value_unstable<T, N> &a, const value_unstable<T, N> &b);
+
 	template <typename T, unsigned N>
 		class value_unstable
 		{
@@ -52,7 +58,15 @@ namespace impl
 			void decr() { _value_and_unstable -= count_1; }
 			void incr() { _value_and_unstable += count_1; }
 			bool is_stable() const { return destable_count() == 0; }
+
+			friend bool operator== <>(const value_unstable<T, N> &a, const value_unstable<T, N> &b);
 		};
+
+	template <typename T, unsigned N>
+		bool operator==(const value_unstable<T, N> &a, const value_unstable<T, N> &b)
+		{
+			return a._value_and_unstable == b._value_and_unstable;
+		}
 
 	template <typename T, unsigned N>
 		constexpr T value_unstable<T, N>::count_1;

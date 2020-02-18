@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,14 +14,18 @@
 #define __CLIENT_FABRIC_TRANSPORT_H__
 
 #include <api/fabric_itf.h>
+#include <common/cycles.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
+
 #include "mcas_client_config.h"
 
 namespace mcas
 {
 namespace Client
 {
+static constexpr size_t NUM_BUFFERS = 64; /* defines max outstanding */
+
 class Fabric_transport {
   friend class mcas_client;
 
@@ -32,29 +36,32 @@ class Fabric_transport {
   using buffer_t        = Buffer_manager<Transport>::buffer_t;
   using memory_region_t = Component::IFabric_memory_region *;
 
+  double cycles_per_second = Common::get_rdtsc_frequency_mhz() * 1000000.0;
+
   Fabric_transport(Component::IFabric_client *fabric_connection)
-      : _transport(fabric_connection), _bm(fabric_connection)
+      : _transport(fabric_connection),
+      _max_inject_size(_transport->max_inject_size()),
+      _bm(fabric_connection, NUM_BUFFERS)
   {
-    _max_inject_size = _transport->max_inject_size();
   }
+
+  Fabric_transport(const Fabric_transport &) = delete;
+  Fabric_transport &operator=(const Fabric_transport &) = delete;
 
   ~Fabric_transport() {}
 
-  static Component::IFabric_op_completer::cb_acceptance completion_callback(
-      void *        context,
-      status_t      st,
-      std::uint64_t completion_flags,
-      std::size_t   len,
-      void *        error_data,
-      void *        param)
+  static Component::IFabric_op_completer::cb_acceptance completion_callback(void *        context,
+                                                                            status_t      st,
+                                                                            std::uint64_t completion_flags,
+                                                                            std::size_t   len,
+                                                                            void *        error_data,
+                                                                            void *        param)
   {
     if (UNLIKELY(st != S_OK))
-      throw Program_exception(
-          "poll_completions failed unexpectedly (st=%d) (cf=%lx)", st,
-          completion_flags);
+      throw Program_exception("poll_completions failed unexpectedly (st=%d) (cf=%lx)", st, completion_flags);
 
-    if (*((void **) param) == context) {
-      *((void **) param) = nullptr;
+    if (*(static_cast<void **>(param)) == context) {
+      *static_cast<void **>(param) = nullptr; /* signals completion */
       return Component::IFabric_op_completer::cb_acceptance::ACCEPT;
     }
     else {
@@ -69,10 +76,32 @@ class Fabric_transport {
    */
   void wait_for_completion(void *wr)
   {
-    void *p = wr;
-    while (p) {
-      _transport->poll_completions_tentative(completion_callback, &p);
+    auto start_time = rdtsc();
+    // currently setting time out to 1 min...
+    while (wr && static_cast<double>(rdtsc() - start_time) / cycles_per_second <= 60) {
+      try {
+        _transport->poll_completions_tentative(completion_callback, &wr);
+      }
+      catch (...) {
+        break;
+      }
     }
+    if (wr) {
+      throw Program_exception("time out: waiting for completion");
+    }
+  }
+
+  /**
+   * Test completion of work request
+   *
+   * @param Work request
+   *
+   * @return True iff complete
+   */
+  inline bool test_completion(void *wr)
+  {
+    _transport->poll_completions_tentative(completion_callback, &wr);
+    return (wr == nullptr);
   }
 
   /**
@@ -84,35 +113,21 @@ class Fabric_transport {
     return _transport->register_memory(base, len, 0, 0);
   }
 
-  inline void *get_memory_descriptor(memory_region_t region)
-  {
-    return _transport->get_memory_descriptor(region);
-  }
+  inline void *get_memory_descriptor(memory_region_t region) { return _transport->get_memory_descriptor(region); }
 
-  inline void deregister_memory(memory_region_t region)
-  {
-    _transport->deregister_memory(region);
-  }
+  inline void deregister_memory(memory_region_t region) { _transport->deregister_memory(region); }
 
-  inline void post_send(const ::iovec *first,
-                        const ::iovec *last,
-                        void **        descriptors,
-                        void *         context)
+  inline void post_send(const ::iovec *first, const ::iovec *last, void **descriptors, void *context)
   {
     _transport->post_send(first, last, descriptors, context);
   }
 
-  inline void post_recv(const ::iovec *first,
-                        const ::iovec *last,
-                        void **        descriptors,
-                        void *         context)
+  inline void post_recv(const ::iovec *first, const ::iovec *last, void **descriptors, void *context)
   {
     _transport->post_recv(first, last, descriptors, context);
   }
 
-  inline size_t max_message_size() const {
-    return _transport->max_message_size();
-  }
+  inline size_t max_message_size() const { return _transport->max_message_size(); }
 
   /**
    * Post send (one or two buffers) and wait for completion.
@@ -133,7 +148,6 @@ class Fabric_transport {
     }
 
     wait_for_completion(iob);
-    iob->reset_length();
   }
 
   /**
@@ -153,8 +167,6 @@ class Fabric_transport {
       post_send(iob->iov, iob->iov + 1, &iob->desc, iob);
       wait_for_completion(iob);
     }
-
-    iob->reset_length();
   }
 
   /**
@@ -192,29 +204,23 @@ class Fabric_transport {
   void post_recv(buffer_t *iob)
   {
     if (option_DEBUG)
-      PLOG("%s: (%p, %p, base=%p, len=%lu)", __func__, static_cast<const void *>(iob), iob->desc,
-           iob->iov->iov_base, iob->iov->iov_len);
+      PLOG("%s: (%p, %p, base=%p, len=%lu)", __func__, static_cast<const void *>(iob), iob->desc, iob->iov->iov_base,
+           iob->iov->iov_len);
 
-    iob->reset_length();
     post_recv(iob->iov, iob->iov + 1, &iob->desc, iob);
   }
 
-  Component::IKVStore::memory_handle_t register_direct_memory(void * region,
-                                                              size_t region_len)
+  Component::IKVStore::memory_handle_t register_direct_memory(void *region, size_t region_len)
   {
     // if (!check_aligned(region, 64))
-    //   throw API_exception("register_direct_memory: region should be aligned");
+    //   throw API_exception("register_direct_memory: region should be
+    //   aligned");
 
     auto mr        = register_memory(region, region_len);
     auto desc      = get_memory_descriptor(mr);
-    auto buffer    = new buffer_t(region_len);
-    buffer->iov    = new iovec{(void *) region, region_len};
-    buffer->region = mr;
-    buffer->desc   = desc;
-
+    auto buffer    = new buffer_t(region, region_len, mr, desc);
     if (option_DEBUG)
-      PLOG("register_direct_memory (%p, %lu, mr=%p, desc=%p)", region,
-           region_len, static_cast<const void *>(mr), desc);
+      PLOG("register_direct_memory (%p, %lu, mr=%p, desc=%p)", region, region_len, static_cast<const void *>(mr), desc);
 
     return reinterpret_cast<Component::IKVStore::memory_handle_t>(buffer);
   }
@@ -235,7 +241,7 @@ class Fabric_transport {
   Transport *               _transport;
   size_t                    _max_inject_size;
   Buffer_manager<Transport> _bm; /*< IO buffer manager */
-};
+};                               // namespace Client
 
 }  // namespace Client
 }  // namespace mcas

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string>
+#include <queue>
 #include <sstream>
 #include <chrono>
 #include <iostream>
@@ -100,6 +101,30 @@ TEST_F(KV_test, BasicPoolOperations)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(KV_test, OpenCloseDeletePool)
+{
+  using namespace Component;
+
+  const std::string poolname = "pool2";
+  
+  auto pool = mcas->create_pool(poolname,
+                                MB(64),   /* size */
+                                0,    /* flags */
+                                100); /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);  
+
+  ASSERT_OK(mcas->close_pool(pool));
+
+  /* re-open pool */
+  pool = mcas->open_pool(poolname);
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+  
+  ASSERT_OK(mcas->delete_pool(pool));
+}
+
+/* test for dawn-311 */
 TEST_F(KV_test, DeletePoolOperations)
 {
   using namespace Component;
@@ -155,6 +180,99 @@ TEST_F(KV_test, BasicPutGetOperations)
   /* here inout_value_len is zero, therefore on-demand creation is disabled */
   ASSERT_TRUE(mcas->get(pool, key0, out_value) == IKVStore::E_KEY_NOT_FOUND);
 
+  ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
+
+TEST_F(KV_test, AsyncPutErase)
+{
+  using namespace Component;
+
+  const std::string poolname = "AsyncPutErase";
+  
+  auto pool = mcas->create_pool(poolname,
+                                MB(32),   /* size */
+                                0, /* flags */
+                                100); /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  std::string value0 = "this_is_value_0";
+
+  IMCAS::async_handle_t handle = IMCAS::ASYNC_HANDLE_INIT;
+  ASSERT_OK(mcas->async_put(pool,
+                            "testKey",
+                            value0.data(),
+                            value0.length(),
+                            handle));
+  ASSERT_TRUE(handle != nullptr);
+
+  ASSERT_OK(mcas->erase(pool,"testKey"));
+
+  int iterations = 0;
+  while(mcas->check_async_completion(handle) == E_BUSY) {
+    ASSERT_TRUE(iterations < 1000000);
+    iterations++;
+  }
+
+  constexpr int batch_size = 32; // see client_fabric_transport.h
+  std::vector<std::string> keys;
+  std::vector<std::string> values;
+  for(int i=0;i<batch_size;i++) {
+    keys.push_back(Common::random_string(8));
+    values.push_back(Common::random_string(48));
+  }
+
+  std::queue<IMCAS::async_handle_t> issued;
+
+  /* do multiple runs */
+  for(unsigned j=0;j<100;j++) {
+    /* issue batch */
+    for(int i=0;i<batch_size;i++) {
+      IMCAS::async_handle_t handle = IMCAS::ASYNC_HANDLE_INIT;
+      ASSERT_OK(mcas->async_put(pool,
+                                keys[i],
+                                values[i].data(),
+                                values[i].length(),
+                                handle));
+      ASSERT_TRUE(handle != nullptr);
+      issued.push(handle);
+    }
+
+    /* wait for completions */
+    while(!issued.empty()) {
+      status_t s = mcas->check_async_completion(issued.front());
+      ASSERT_TRUE(s == S_OK || s == E_BUSY);
+      if(s == S_OK)
+        issued.pop();
+    }
+
+    /* now erase them */
+    for(int i=0;i<batch_size;i++) {
+      IMCAS::async_handle_t handle = IMCAS::ASYNC_HANDLE_INIT;
+      ASSERT_OK(mcas->async_erase(pool,
+                                  keys[i],
+                                  handle));
+      ASSERT_TRUE(handle != nullptr);
+      issued.push(handle);
+    }
+
+    /* wait for completions */
+    while(!issued.empty()) {
+      status_t s = mcas->check_async_completion(issued.front());
+      ASSERT_TRUE(s == S_OK || s == E_BUSY);
+      if(s == S_OK)
+        issued.pop();
+    }    
+
+    std::vector<uint64_t> attr;
+    ASSERT_OK(mcas->get_attribute(pool,
+                                  IMCAS::Attribute::COUNT,
+                                  attr));
+    ASSERT_TRUE(attr[0] == 0);
+
+  }
+  
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }

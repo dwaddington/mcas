@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -18,13 +18,7 @@
 #include <api/fabric_itf.h> /* ::status_t */
 #include "delete_copy.h" /* delete_copy */
 #include "fabric_ptr.h" /* fid_unique_ptr */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wshadow"
-#include <rdma/fi_domain.h> /* fi_cq_attr, fi_cq_err_entry, fi_cq_data_entry, FI_CQ_FORMAT_DATA */
-#pragma GCC diagnostic pop
+#include "rdma-fi_domain.h" /* fi_cq_attr, fi_cq_err_entry, fi_cq_data_entry, FI_CQ_FORMAT_DATA */
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */
 #include <queue>

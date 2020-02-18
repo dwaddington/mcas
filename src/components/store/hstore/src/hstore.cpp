@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,25 +11,25 @@
    limitations under the License.
 */
 
-#include <stdexcept>
-#include <set>
-
-#include <city.h>
-#include <common/errors.h>
-#include <common/exceptions.h>
-#include <common/logging.h>
-#include <common/utils.h>
-
 #include "hstore.h"
 
 #include "atomic_controller.h"
 #include "hop_hash.h"
+#include "is_locked.h"
+#include "key_not_found.h"
+#include "logging.h"
 #include "perishable.h"
 #include "persist_fixed_string.h"
 #include "pool_path.h"
 
 #include "hstore_nupm_types.h"
 #include "persister_nupm.h"
+
+#include <common/errors.h>
+#include <common/exceptions.h>
+#include <common/utils.h>
+
+#include <city.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -44,9 +44,8 @@
 #include <new>
 #include <map> /* session set */
 #include <mutex> /* thread safe use of libpmempool/obj */
+#include <set>
 #include <stdexcept> /* domain_error */
-
-#define PREFIX "HSTORE : %s: "
 
 /*
  * To run hstore without PM, use variables USE_DRAM and NO_CLFLUSHOPT:
@@ -141,7 +140,7 @@ int hstore::get_capability(const Capability cap) const
   }
 }
 
-#include "hstore_session.h"
+#include "session.h"
 
 auto hstore::create_pool(const std::string & name_,
                          const std::size_t size_,
@@ -151,7 +150,7 @@ try
 {
   if ( option_DEBUG )
   {
-    PLOG(PREFIX "pool_name=%s size %zu", __func__, name_.c_str(), size_);
+    PLOG(PREFIX "pool_name=%s size %zu", LOCATION, name_.c_str(), size_);
   }
   try
   {
@@ -212,13 +211,13 @@ status_t hstore::close_pool(const pool_t pid)
     auto pool = move_pool(pid);
     if ( option_DEBUG )
     {
-      PLOG(PREFIX "closed pool (%" PRIxIKVSTORE_POOL_T ")", __func__, pid);
+      PLOG(PREFIX "closed pool (%" PRIxIKVSTORE_POOL_T ")", LOCATION, pid);
     }
     _pool_manager->pool_close_check(path);
   }
   catch ( const API_exception &e )
   {
-    PLOG(PREFIX " exception %s", __func__, e.cause());
+    PLOG(PREFIX "exception %s", LOCATION, e.cause());
     return e.error_code();
   }
   return S_OK;
@@ -231,7 +230,7 @@ status_t hstore::delete_pool(const std::string &name_)
   _pool_manager->pool_delete(path);
   if ( option_DEBUG )
   {
-    PLOG("pool deleted: %s", name_.c_str());
+    PLOG(PREFIX "pool deleted: %s", LOCATION, name_.c_str());
   }
   return S_OK;
 }
@@ -266,7 +265,7 @@ auto hstore::put(const pool_t pool,
   if ( option_DEBUG ) {
     PLOG(
          PREFIX "(key=%s) (value=%.*s)"
-         , __func__
+         , LOCATION
          , key.c_str()
          , int(value_len)
          , static_cast<const char*>(value)
@@ -294,7 +293,15 @@ auto hstore::put(const pool_t pool,
       return
         i.second                   ? S_OK
         : flags & FLAGS_DONT_STOMP ? int(Component::IKVStore::E_KEY_EXISTS)
-        : ( session->update_by_issue_41(key, value, value_len, i.first->second.data(), i.first->second.size()), S_OK )
+        : (
+            session->update_by_issue_41(
+              key
+              , value
+              , value_len
+              , std::get<0>(i.first->second).data()
+              , std::get<0>(i.first->second).size())
+            , S_OK
+          )
         ;
     }
     catch ( const std::bad_alloc & )
@@ -305,9 +312,9 @@ auto hstore::put(const pool_t pool,
     {
       return E_NOT_SUPPORTED;
     }
-    catch ( const std::range_error & )
+    catch ( const impl::is_locked & )
     {
-      return E_ALREADY; /* ... and is locked, so cannot be updated */
+      return E_LOCKED; /* ... and is locked, so cannot be updated */
     }
   }
   else
@@ -384,7 +391,7 @@ auto hstore::get(const pool_t pool,
     }
     return S_OK;
   }
-  catch ( const std::out_of_range & )
+  catch ( const impl::key_not_found & )
   {
     return Component::IKVStore::E_KEY_NOT_FOUND;
   }
@@ -412,7 +419,7 @@ auto hstore::get_direct(const pool_t pool,
     }
     return S_OK;
   }
-  catch ( const std::out_of_range & )
+  catch ( const impl::key_not_found & )
   {
     return Component::IKVStore::E_KEY_NOT_FOUND;
   }
@@ -445,7 +452,7 @@ auto hstore::get_attribute(
       out_attr.push_back(session->get_value_len(*key));
       return S_OK;
     }
-    catch ( const std::out_of_range & )
+    catch ( const impl::key_not_found & )
     {
       return Component::IKVStore::E_KEY_NOT_FOUND;
     }
@@ -453,6 +460,7 @@ auto hstore::get_attribute(
     {
       return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
     }
+    break;
   case AUTO_HASHTABLE_EXPANSION:
     try
     {
@@ -463,10 +471,28 @@ auto hstore::get_attribute(
     {
       return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
     }
+    break;
   case PERCENT_USED:
     out_attr.push_back(session->percent_used());
     return S_OK;
     break;
+#if ENABLE_TIMESTAMPS
+  case IKVStore::Attribute::WRITE_EPOCH_TIME:
+    if ( ! key )
+    {
+      return E_BAD_PARAM;
+    }
+    try
+    {
+      out_attr.push_back(session->get_write_epoch_time(*key));
+      return S_OK;
+    }
+    catch ( const impl::key_not_found & )
+    {
+      return Component::IKVStore::E_KEY_NOT_FOUND;
+    }
+    break;
+#endif
   default:
     return E_NOT_SUPPORTED;
   }
@@ -502,8 +528,8 @@ auto hstore::set_attribute(
 auto hstore::resize_value(
   const pool_t pool
   , const std::string &key
-  , const std::size_t alignment
   , const std::size_t new_value_len
+  , const std::size_t alignment
 ) -> status_t
 {
   const auto session = static_cast<session_t *>(locate_session(pool));
@@ -524,13 +550,13 @@ auto hstore::resize_value(
   {
     return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
   }
-  catch ( const std::domain_error & )
+  catch ( const impl::key_not_found & )
   {
     return E_KEY_NOT_FOUND; /* key not found */
   }
-  catch ( const std::range_error & )
+  catch ( const impl::is_locked & )
   {
-    return E_ALREADY; /* could not get unique lock (?) */
+    return E_LOCKED; /* could not get unique lock (?) */
   }
 }
 
@@ -541,6 +567,7 @@ auto hstore::lock(
   , void *& out_value
   , std::size_t & out_value_len
   , Component::IKVStore::key_t& out_key
+  , const char ** out_key_ptr
 ) -> status_t
 {
   const auto session = static_cast<session_t *>(locate_session(pool));
@@ -549,6 +576,10 @@ auto hstore::lock(
   auto r = session->lock(key, type, out_value, out_value_len);
 
   out_key = r.key;
+  if ( out_key_ptr )
+  {
+    *out_key_ptr = r.key_ptr;
+  }
   /* If lock valid, safe to provide access to the key */
   if ( r.key != Component::IKVStore::KEY_NONE )
   {
@@ -559,11 +590,16 @@ auto hstore::lock(
   switch ( r.state )
   {
   case lock_result::e_state::created:
-    return S_OK_CREATED;
+    /* Returns undocumented "E_LOCKED" if lock not held */
+    return r.key == Component::IKVStore::KEY_NONE ? E_LOCKED : S_OK_CREATED;
   case lock_result::e_state::not_created:
     return E_KEY_NOT_FOUND;
   case lock_result::e_state::extant:
-    return S_OK;
+    /* Returns undocumented "E_LOCKED" if lock not held */
+    return r.key == Component::IKVStore::KEY_NONE ? E_LOCKED : S_OK;
+  case lock_result::e_state::creation_failed:
+    /* should not happen. */
+    return E_KEY_EXISTS;
   }
   return E_KEY_NOT_FOUND;
 }
@@ -586,7 +622,7 @@ auto hstore::erase(const pool_t pool,
 {
   const auto session = static_cast<session_t *>(locate_session(pool));
   return session
-    ? ( session->erase(key) == 0 ? int(Component::IKVStore::E_KEY_NOT_FOUND) : S_OK )
+    ? session->erase(key)
     : Component::IKVStore::E_POOL_NOT_FOUND
     ;
 }
@@ -634,6 +670,29 @@ auto hstore::map(
 
   return session
     ? ( session->map(f_), S_OK )
+    : int(Component::IKVStore::E_POOL_NOT_FOUND)
+    ;
+}
+
+auto hstore::map(
+  pool_t pool_,
+  std::function<
+    int(
+      const void * key,
+      std::size_t key_len,
+      const void * value,
+      std::size_t value_len,
+      tsc_time_t timestamp
+    )
+  > f_,
+  epoch_time_t t_begin_,
+  epoch_time_t t_end_
+) -> status_t
+{
+  const auto session = static_cast<session_t *>(locate_session(pool_));
+
+  return session
+    ? ( session->map(f_, t_begin_, t_end_) ? S_OK : E_NOT_SUPPORTED )
     : int(Component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
@@ -688,17 +747,31 @@ catch ( const std::invalid_argument & )
 {
   return E_NOT_SUPPORTED;
 }
-catch ( const std::out_of_range & )
+catch ( const impl::key_not_found & )
 {
   return E_KEY_NOT_FOUND;
 }
-catch ( const std::range_error & )
+catch ( const impl::is_locked & )
 {
-  return E_ALREADY; /* ... and is locked, so cannot be updated */
+  return E_LOCKED; /* ... is locked, so cannot be updated */
 }
 catch ( const std::system_error & )
 {
   return E_FAIL;
+}
+
+auto hstore::swap_keys(
+  const pool_t pool
+  , const std::string key0
+  , const std::string key1
+) -> status_t
+{
+  const auto session = static_cast<session_t *>(locate_session(pool));
+  return
+    session
+    ? session->swap_keys(key0, key1)
+    : int(Component::IKVStore::E_POOL_NOT_FOUND)
+    ;
 }
 
 auto hstore::allocate_pool_memory(
@@ -746,5 +819,53 @@ catch ( const API_exception & ) /* bad pointer */
 catch ( const std::exception & )
 {
   return E_FAIL;
+}
+
+auto hstore::open_pool_iterator(pool_t pool) -> pool_iterator_t
+{
+  auto session = static_cast<session_t *>(locate_session(pool));
+  return
+    session
+    ? session->open_iterator()
+    : nullptr
+    ;
+}
+
+status_t hstore::deref_pool_iterator(
+  const pool_t pool
+  , pool_iterator_t iter
+  , const epoch_time_t t_begin
+  , const epoch_time_t t_end
+  , pool_reference_t & ref
+  , bool & time_match
+  , bool increment
+)
+{
+  const auto session = static_cast<session_t *>(locate_session(pool));
+  return
+    session
+    ? session->deref_iterator(
+        iter
+        , t_begin
+        , t_end
+        , ref
+        , time_match
+        , increment
+      )
+    : E_INVAL
+    ;
+}
+
+status_t  hstore::close_pool_iterator(
+  const pool_t pool
+  , pool_iterator_t iter
+)
+{
+  auto session = static_cast<session_t *>(locate_session(pool));
+  return
+    session
+    ? session->close_iterator(iter)
+    : E_INVAL
+    ;
 }
 

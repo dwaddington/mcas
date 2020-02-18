@@ -13,7 +13,7 @@
 
 /*
   Authors:
-  Copyright (C) 2019, Daniel G. Waddington <daniel.waddington@ibm.com>
+  Copyright (C) 2019-2020, Daniel G. Waddington <daniel.waddington@ibm.com>
 */
 
 #ifndef __ERRORS_H__
@@ -25,6 +25,8 @@
     S_OK = 0,                                                           \
     S_OK_CREATED = 1,                                                   \
     S_MORE = 2,                                                         \
+    S_USER0 = 3,                                                        \
+    S_USER1 = 4,                                                        \
     E_FAIL = -1,                                                        \
     E_INVALID_REQUEST = -2,                                             \
     E_INVAL = -2,                                                       \

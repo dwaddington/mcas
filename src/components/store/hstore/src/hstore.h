@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_H_
-#define _COMANCHE_HSTORE_H_
+#ifndef MCAS_HSTORE_H_
+#define MCAS_HSTORE_H_
 
 #include "hstore_config.h"
 
@@ -50,23 +50,15 @@ class Devdax_manager;
 template <typename Handle, typename Allocator, typename Table, typename Lock>
   class session;
 
-class hstore : public Component::IKVStore
+class hstore
+  : public Component::IKVStore
 {
-  #if USE_CC_HEAP == 2
-  using alloc_t = allocator_co<char, Persister>;
-  using heap_alloc_t = heap_co;
-  #elif USE_CC_HEAP == 3
-  using alloc_t = allocator_rc<char, Persister>;
-  using heap_alloc_shared_t = heap_rc_shared;
-  using heap_alloc_t = heap_rc;
-  #elif USE_CC_HEAP == 4
-  using alloc_t = allocator_cc<char, Persister>;
-  using heap_alloc_shared_t = heap_cc_shared;
-  using heap_alloc_t = heap_cc;
-  #endif /* USE_CC_HEAP */
+  using alloc_t = typename hstore_alloc_type<Persister>::alloc_t;
+  using heap_alloc_shared_t = typename hstore_alloc_type<Persister>::heap_alloc_shared_t;
+  using heap_alloc_t = typename hstore_alloc_type<Persister>::heap_alloc_t;
   using dealloc_t = typename alloc_t::deallocator_type;
-  using key_t = persist_fixed_string<char, 23, dealloc_t>;
-  using mapped_t = persist_fixed_string<char, 23, dealloc_t>;
+  using key_t = typename hstore_kv_types<dealloc_t>::key_t;
+  using mapped_t = typename hstore_kv_types<dealloc_t>::mapped_t;
   using allocator_segment_t = std::allocator_traits<alloc_t>::rebind_alloc<std::pair<const key_t, mapped_t>>;
 #if THREAD_SAFE_HASH == 1
   /* thread-safe hash */
@@ -82,12 +74,12 @@ class hstore : public Component::IKVStore
 
   using table_t =
     hop_hash<
-    key_t
-    , mapped_t
-    , pstr_hash<key_t>
-    , pstr_equal<key_t>
-    , allocator_segment_t
-    , hstore_shared_mutex
+      key_t
+      , mapped_t
+      , pstr_hash<key_t>
+      , pstr_equal<key_t>
+      , allocator_segment_t
+      , hstore_shared_mutex
     >;
 public:
   using persist_data_t = typename impl::persist_data<allocator_segment_t, table_t::value_type>;
@@ -203,16 +195,17 @@ public:
                                  const std::string* key) override;
 
   status_t lock(const pool_t pool,
-                        const std::string& key,
-                        lock_type_t type,
-                        void*& out_value,
-                        std::size_t& out_value_len,
-                        Component::IKVStore::key_t& out_key) override;
+                const std::string& key,
+                lock_type_t type,
+                void*& out_value,
+                std::size_t& out_value_len,
+                Component::IKVStore::key_t& out_key,
+                const char ** out_key_ptr) override;
 
   status_t resize_value(pool_t pool
                         , const std::string& key
-                        , std::size_t        alignment
-                        , std::size_t        new_value_len) override;
+                        , std::size_t        new_value_len
+                        , std::size_t        alignment) override;
 
   status_t unlock(pool_t pool,
                   Component::IKVStore::key_t key_handle) override;
@@ -234,6 +227,15 @@ public:
                                  const void * value,
                                  std::size_t value_len)> function) override;
 
+  status_t map(pool_t pool,
+               std::function<int(const void * key,
+                                 std::size_t key_len,
+                                 const void * value,
+                                 std::size_t value_len,
+                                 tsc_time_t timestamp)> function,
+               epoch_time_t t_begin,
+               epoch_time_t t_end) override;
+
   status_t map_keys(pool_t pool,
                std::function<int(const std::string& key)> function) override;
 
@@ -246,6 +248,17 @@ public:
     const std::string& key,
     const std::vector<Operation *> &op_vector,
     bool take_lock) override;
+
+  /* Unfortunately, swap_keys uses the notion of a "lock", which makes it
+   * significantly more complex than if it were simply swapping keys.
+   * Since small keys cannot be locked in place, they must first be moved,
+   * which will require one allocation per small key.
+   */
+  status_t swap_keys(
+    pool_t pool,
+    std::string key0,
+    std::string key1
+  ) override;
 
   status_t get_pool_regions(
     pool_t pool,
@@ -262,6 +275,22 @@ public:
     const void* addr,
     size_t size) override;
 
+  pool_iterator_t open_pool_iterator(pool_t pool) override;
+
+  status_t deref_pool_iterator(
+    pool_t pool
+    , pool_iterator_t iter
+    , epoch_time_t t_begin
+    , epoch_time_t t_end
+    , pool_reference_t & ref
+    , bool & time_match
+    , bool increment
+  ) override;
+
+  status_t close_pool_iterator(
+    pool_t pool
+    , pool_iterator_t iter
+  ) override;
 };
 
 class hstore_factory : public Component::IKVStore_factory

@@ -10,8 +10,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __mcas_CLIENT_CONFIG_H__
-#define __mcas_CLIENT_CONFIG_H__
+#ifndef __MCAS_CLIENT_CONFIG_H__
+#define __MCAS_CLIENT_CONFIG_H__
 
 #if defined(__powerpc64__)
 #define LIKELY(X) (X) /* TODO: fix for Power */

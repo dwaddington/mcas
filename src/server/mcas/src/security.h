@@ -19,24 +19,22 @@
 
 namespace mcas
 {
-
 class Shard_security_state;
 
-class Shard_security
-{
-private:
+class Shard_security {
+ private:
   const unsigned _debug_level = 3;
 
-public:
+ public:
   Shard_security(const std::string& certs_path);
 
   inline bool auth_enabled() const { return _auth_enabled; }
 
-private:
+ private:
   const std::string                     _certs_path;
   bool                                  _auth_enabled;
   std::shared_ptr<Shard_security_state> _state;
 };
-}
+}  // namespace mcas
 
-#endif // __MCAS_SECURITY_H__
+#endif  // __MCAS_SECURITY_H__

@@ -1,7 +1,15 @@
 /*
- * (C) Copyright IBM Corporation 2018, 2019. All rights reserved.
- * US Government Users Restricted Rights - Use, duplication or disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
- */
+   Copyright [2018-2019] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 /*
  * Hopscotch hash hop_hash debug
@@ -11,6 +19,8 @@
 
 #include "owner_debug.tcc"
 #include "content_debug.tcc"
+#include "bits_to_ints.h"
+#include <boost/io/ios_state.hpp>
 
 template <typename LockOwner, typename LockContent>
 	impl::bucket_print<LockOwner, LockContent>::bucket_print(
@@ -64,7 +74,6 @@ template <typename TableBase>
 			<< " )";
 	}
 
-
 #include "cond_print.h"
 
 #include <cstddef> /* size_t */
@@ -98,7 +107,30 @@ template <typename TableBase>
 	{
 		return o_;
 	}
+#if 0
+inline std::vector<int> bits_to_ints(std::uint64_t b, int offset)
+{
+	std::vector<int> v;
+	for ( int ix = 0; b != 0; b>>=1, ++ix)
+	{
+		if ( b & 1 )
+		{
+			v.push_back(ix + offset);
+		}
+	}
+	return v;
+}
 
+inline std::string ints_to_string(std::vector<int> v)
+{
+	std::string s = "(";
+	for ( auto i : v )
+	{
+		s += std::to_string(i) + " ";
+	}
+	return s + ")";
+}
+#endif
 template <typename TableBase>
 	auto impl::operator<<(
 		std::ostream &o_
@@ -120,14 +152,18 @@ template <typename TableBase>
 					, sb
 				);
 
-			auto v = owner_lk.ref().value(owner_lk);
+			auto v = owner_lk.ref().ownership_bits(owner_lk);
 			if (
 				v != 0
 				||
-				! content_lk.ref().is_clear()
+				owner_lk.ref().is_adjacent_content_in_use()
 			)
 			{
-				o_ << k;
+				{
+					boost::io::ios_flags_saver s(o_);
+					o_ << k << ": " << std::hex << v << "=" << ints_to_string(bits_to_ints(v, int(k)));
+				}
+
 				for ( auto m = k; v != 0; v >>= 1, m = (m + 1) % tbl_base.bucket_count() )
 				{
 					/* v claims ownership of m */
@@ -145,7 +181,7 @@ template <typename TableBase>
 				o_ << ": "
 					<< make_bucket_print(tbl_base.bucket_count(), owner_lk, content_lk)
 					<< "\n";
-				if ( content_lk.ref().state_get() == TableBase::bucket_t::IN_USE ) { contents.insert(k); }
+				if ( owner_lk.ref().is_adjacent_content_in_use() ) { contents.insert(k); }
 			}
 		}
 
@@ -176,14 +212,14 @@ template <typename TableBase>
 
 		if ( ! tbl_base.segment_count_actual().is_stable() )
 		{
-			auto &loc = tbl_base._bc[tbl_base.segment_count()];
+			auto &loc = tbl_base._bc[tbl_base.segment_count_not_stable()];
 			if ( loc._buckets )
 			{
 				o_ << "Pending buckets\n";
 				for ( std::size_t ks = 0; ks != tbl_base.bucket_count(); ++ks )
 				{
 					const auto kj = tbl_base.bucket_count() + ks;
-					const auto sbj = tbl_base.make_segment_and_bucket(kj);
+					const auto sbj = tbl_base.make_segment_and_bucket_unsafe(kj);
 					bypass_lock<typename TableBase::bucket_t, const owner> owner_lk(loc._buckets[ks], sbj);
 					bypass_lock<typename TableBase::bucket_t, const content<typename TableBase::value_type>>
 						content_lk(
@@ -191,9 +227,9 @@ template <typename TableBase>
 							, sbj
 						);
 					if (
-						owner_lk.ref().value(owner_lk) != 0
+						owner_lk.ref().ownership_bits(owner_lk) != 0
 						||
-						! content_lk.ref().is_clear()
+						owner_lk.ref().is_adjacent_content_in_use()
 					)
 					{
 						o_ << kj << ": "

@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_ALLOCATOR_CC_H
-#define COMANCHE_HSTORE_ALLOCATOR_CC_H
+#ifndef MCAS_HSTORE_ALLOCATOR_CC_H
+#define MCAS_HSTORE_ALLOCATOR_CC_H
 
 #include "deallocator_cc.h"
 
@@ -67,6 +67,15 @@ template <typename T, typename Persister = persister>
 			{}
 
 		allocator_cc &operator=(const allocator_cc &a_) = delete;
+
+		void arm_extend()
+		{
+			this->pool()->extend_arm();
+		}
+		void disarm_extend()
+		{
+			this->pool()->extend_disarm();
+		}
 
 		void allocate(
 			pointer_type & p_

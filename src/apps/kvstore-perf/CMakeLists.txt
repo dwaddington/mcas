@@ -15,8 +15,7 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include) # rapidjson
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbbmalloc
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbbmalloc
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
-add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
+add_definitions(-DCONFIG_DEBUG)
 
 add_executable(kvstore-perf kvstore_perf.cpp exp_erase.cpp exp_throughput.cpp experiment.cpp exp_update.cpp program_options.cpp statistics.cpp)
 

@@ -6,11 +6,13 @@
 #include <pthread.h>
 #include <stdexcept>
 
+//#define DEBUG_LOCKING
+
 namespace Common
 {
 class RWLock {
  public:
-  RWLock() {
+  RWLock() : _lock{} {
     if (pthread_rwlock_init(&_lock, NULL))
       throw General_exception("unable to initialize RW lock");
   }
@@ -21,9 +23,19 @@ class RWLock {
 
   int write_lock() { return pthread_rwlock_wrlock(&_lock); }
 
-  int write_trylock() { return pthread_rwlock_trywrlock(&_lock); }
+  int write_trylock() {
+#ifdef DEBUG_LOCKING
+    PLOG("write-trylock (%p)", this);
+#endif
+    return pthread_rwlock_trywrlock(&_lock);
+  }
 
-  int unlock() { return pthread_rwlock_unlock(&_lock); }
+  int unlock() {
+#ifdef DEBUG_LOCKING    
+    PLOG("unlock (%p)", this);
+#endif
+    return pthread_rwlock_unlock(&_lock);
+  }
 
   ~RWLock() { pthread_rwlock_destroy(&_lock); }
 

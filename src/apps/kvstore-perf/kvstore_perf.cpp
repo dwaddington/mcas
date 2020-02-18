@@ -12,20 +12,10 @@
 #include "get_vector_from_string.h"
 #include "program_options.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
 #include <common/utils.h>
-#pragma GCC diagnostic pop
 #include "task.h"
 #include <api/components.h>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <api/kvstore_itf.h>
-#pragma GCC diagnostic pop
 #include <boost/program_options.hpp>
 
 #undef PROFILE

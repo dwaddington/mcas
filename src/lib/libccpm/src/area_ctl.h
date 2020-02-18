@@ -253,17 +253,6 @@ namespace ccpm
 		auto el_deallocate_n(index_t ix , index_t n) -> atomic_word &;
 		void el_reserve_range(index_t first_, index_t last);
 
-		/* locate start of element_alloc_map */
-		atomic_word *element_alloc_map()
-		{
-			return &_alloc_bits[0];
-		}
-
-		const atomic_word *element_alloc_map() const
-		{
-			return &_alloc_bits[0];
-		}
-
 		sub_state &element_state(index_t ix_)
 		{
 			return _element_state[ix_];
@@ -354,6 +343,7 @@ namespace ccpm
 			void *start
 			, std::size_t size
 		) -> area_ctl *;
+		bool includes(const void *ptr) const;
 
 		std::size_t bytes_free() const;
 		std::size_t bytes_free_local() const;
@@ -391,15 +381,15 @@ namespace ccpm
 
 		void set_allocated(void *p, std::size_t bytes);
 		void set_deallocated(void *p, std::size_t bytes);
-		void restore(ownership_callback_t resolver_);
+		void restore(const ownership_callback_t &resolver_);
 		level_ix_t height() const;
 
 		index_t el_max_free_run() const
 		{
 			index_t m = 0;
-			for ( auto ix = 0; ix != ct_atomic_words; ++ix )
+			for ( auto ix = 0; ix != ct_atomic_words && m != 64; ++ix )
 			{
-				m = std::max(m, aw_count_max_free_run(element_alloc_map()[ix]));
+				m = std::max(m, aw_count_max_free_run(_alloc_bits[ix]));
 			}
 			return m;
 		}

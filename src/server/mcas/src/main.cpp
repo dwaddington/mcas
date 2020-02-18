@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -10,39 +10,42 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include <common/logging.h>
+
 #include <boost/program_options.hpp>
+#include <iostream>
 
 #include "ado_manager.h"
 #include "launcher.h"
 #include "mcas_config.h"
-#include <common/logging.h>
-#include <iostream>
 
-Program_options g_options;
+Program_options g_options {};
 
 namespace
 {
-  /* std::ostringstream initializes locale on first use. To avoid race conditions,
-   * force a first use which precedes thread creation.
-   */
-  void init_locale() {
-    std::ostringstream s;
-    s << 0;
-  }
+/* std::ostringstream initializes locale on first use. To avoid race conditions,
+ * force a first use which precedes thread creation.
+ */
+void init_locale()
+{
+  std::ostringstream s;
+  s << 0;
 }
+}  // namespace
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   namespace po = boost::program_options;
 
   try {
     init_locale();
     po::options_description desc("Options");
 
-    desc.add_options()("help", "Show help")                        //
-        ("config", po::value<std::string>(), "Configuration file") //
-        ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")            //
-        ("forced-exit", "Forced exit") //
-        ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)") //
+    desc.add_options()("help", "Show help")                                                             //
+        ("config", po::value<std::string>(), "Configuration file")                                      //
+        ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")                           //
+        ("forced-exit", "Forced exit")                                                                  //
+        ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")  //
         ;
 
     po::variables_map vm;
@@ -59,17 +62,17 @@ int main(int argc, char *argv[]) {
     }
 
     g_options.config_file = vm["config"].as<std::string>();
-    g_options.device = vm["device"].as<std::string>();
+    g_options.device      = vm["device"].as<std::string>();
     g_options.forced_exit = vm.count("forced-exit");
-    PLOG("forced-exit:%s",  g_options.forced_exit ? "yes" : "no");
+    PLOG("forced-exit:%s", g_options.forced_exit ? "yes" : "no");
 
     mcas::Global::debug_level = g_options.debug_level = vm["debug"].as<unsigned>();
 
-    ADO_manager * mgr;
+    ADO_manager *mgr;
     try {
       mgr = new ADO_manager(g_options);
     }
-    catch(Config_exception e) {
+    catch (Config_exception e) {
       return -1;
     }
 

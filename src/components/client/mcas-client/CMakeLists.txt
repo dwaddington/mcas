@@ -10,14 +10,17 @@ include (../../../../mk/clang-dev-tools.cmake)
 
 add_subdirectory(./unit_test)
 
-set(GCC_COVERAGE_COMPILE_FLAGS "-g -O2 -fPIC")
-
 file(GLOB SOURCES src/*.cpp)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
-add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
+add_definitions(-DCONFIG_DEBUG)
+add_compile_options(${FLAG_DUMP_CLASS})
+# -O2 probably not necessary
+add_compile_options("-O2")
 
-include_directories(../../../lib/common/include/)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/components)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
 include_directories(../)
 include_directories(../../)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # city.h
@@ -26,6 +29,7 @@ link_directories(/usr/lib/x86_64-linux-gnu)
 include_directories(../../../server/mcas/src/)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 

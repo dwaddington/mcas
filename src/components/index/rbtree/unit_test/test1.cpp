@@ -46,8 +46,8 @@ TEST_F(KVIndex_test, Instantiate)
       "libcomponent-indexrbtree.so", Component::rbtreeindex_factory);
 
   ASSERT_TRUE(comp);
-  IKVIndex_factory *fact =
-      (IKVIndex_factory *) comp->query_interface(IKVIndex_factory::iid());
+  auto fact =
+    static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid()));
 
   _kvindex = fact->create("owner", "name");
 
@@ -65,7 +65,7 @@ TEST_F(KVIndex_test, InsertPerf)
     _kvindex->insert(keys[i]);
   }
   delete[] keys;
-  double duration = (clock() - start) / (double) CLOCKS_PER_SEC;
+  double duration = double(clock() - start) / double(CLOCKS_PER_SEC);
   PINF("Time sec: %lf", duration);
   PINF("Size: %ld", _kvindex->count());
 }

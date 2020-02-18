@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -42,7 +42,7 @@ class ADO_manager_proxy : public Component::IADO_manager_proxy {
   void *query_interface(Component::uuid_t &itf_uuid) override
   {
     if (itf_uuid == Component::IADO_manager_proxy::iid())
-      return (void *) static_cast<Component::IADO_manager_proxy *>(this);
+      return static_cast<Component::IADO_manager_proxy *>(this);
     else
       return NULL;  // we don't support this interface
   }
@@ -70,7 +70,9 @@ class ADO_manager_proxy : public Component::IADO_manager_proxy {
  private:
   int                   shard;
   unsigned              debug_level;
+#if 0 /* unused */
   shared_memory_token_t token;
+#endif
   std::string           cores;
   float                 cpu_num;
 };
@@ -92,8 +94,7 @@ class ADO_manager_proxy_factory : public Component::IADO_manager_proxy_factory {
   void *query_interface(Component::uuid_t &itf_uuid) override
   {
     if (itf_uuid == Component::IADO_manager_proxy_factory::iid()) {
-      return (void *) static_cast<Component::IADO_manager_proxy_factory *>(
-          this);
+      return static_cast<Component::IADO_manager_proxy_factory *>(this);
     }
     else
       return NULL;  // we don't support this interface

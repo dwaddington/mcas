@@ -7,5 +7,5 @@ else()
   message("-- Private access clone: git clone ")
 endif()
 
-add_subdirectory(personalities)
+
 

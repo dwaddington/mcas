@@ -1,5 +1,5 @@
 /*
- * (C) Copyright IBM Corporation 2018. All rights reserved.
+ * (C) Copyright IBM Corporation 2018, 2020. All rights reserved.
  *
  */
 
@@ -22,13 +22,13 @@ class RamRBTree : public Component::IKVIndex {
   RamRBTree();
   virtual ~RamRBTree();
 
-  DECLARE_VERSION(0.1);
+  DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x8a120985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x29); //
   
   void* query_interface(Component::uuid_t& itf_uuid) override
   {
     if (itf_uuid == Component::IKVIndex::iid()) {
-      return (void*) static_cast<Component::IKVIndex*>(this);
+      return static_cast<Component::IKVIndex*>(this);
     }
     else
       return NULL;  // we don't support this interface
@@ -54,13 +54,13 @@ private:
 
 class RamRBTree_factory : public Component::IKVIndex_factory {
  public:
-  DECLARE_VERSION(0.1);
+  DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x29); //
 
   void* query_interface(Component::uuid_t& itf_uuid) override
   {
     if (itf_uuid == Component::IKVIndex_factory::iid()) {
-      return (void*) static_cast<Component::IKVIndex_factory*>(this);
+      return static_cast<Component::IKVIndex_factory*>(this);
     }
     else
       return NULL;  // we don't support this interface

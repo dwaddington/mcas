@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,10 +12,11 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_NUPM_REGION_H
-#define COMANCHE_HSTORE_NUPM_REGION_H
+#ifndef MCAS_HSTORE_NUPM_REGION_H
+#define MCAS_HSTORE_NUPM_REGION_H
 
 /* requires persist_data_t definition */
+#include "hstore_config.h"
 #include "persist_data.h"
 
 #include <sys/uio.h>
@@ -47,14 +48,28 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
     )
       : magic(0)
       , _uuid(uuid_)
-      , _heap(this+1, size_ - sizeof(*this), numa_node_)
-      , _persist_data(expected_obj_count, typename PersistData::allocator_type(locate_heap()))
+      , _heap(
+#if USE_CC_HEAP == 4
+		&_persist_data.ase()
+        , (&_persist_data.aspd())
+        , (&_persist_data.aspk())
+        , &_persist_data.asx()
+        ,
+#endif
+        this+1
+        , size_ - sizeof(*this)
+        , numa_node_
+      )
+      , _persist_data(
+		expected_obj_count
+		, typename PersistData::allocator_type(locate_heap())
+	)
     {
       magic = magic_value;
       persister_nupm::persist(this, sizeof *this);
     }
 
-    /* The "reanimate" constructor */
+    /* The "reanimate" (or "reconsitute") constructor */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
@@ -63,11 +78,28 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
     )
       : magic(0)
       , _uuid(this->_uuid)
-      , _heap(devdax_manager_, &this->_persist_data.ase())
+      , _heap(
+        devdax_manager_
+#if USE_CC_HEAP == 4
+        , &this->_persist_data.ase()
+        , &this->_persist_data.aspd()
+        , &this->_persist_data.aspk()
+        , &this->_persist_data.asx()
+#endif
+      )
       , _persist_data(std::move(this->_persist_data))
     {
       magic = magic_value;
       persister_nupm::persist(this, sizeof *this);
+#if USE_CC_HEAP == 4
+      /* any old values in the allocation states have been queried, as needed, by
+       * the crash-consistent allocator. Reset all allocation states.
+       */
+      this->_persist_data.ase().reset();
+      this->_persist_data.aspd().reset();
+      this->_persist_data.aspk().reset();
+      this->_persist_data.asx().reset();
+#endif
     }
 #pragma GCC diagnostic pop
 

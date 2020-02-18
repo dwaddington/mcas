@@ -1,7 +1,17 @@
 /*
- * (C) Copyright IBM Corporation 2018, 2019. All rights reserved.
- * US Government Users Restricted Rights - Use, duplication or disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
- */
+   Copyright [2018-2020] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+#include "hstore_config.h"
 
 /*
  * Hopscotch hash table - template Key, Value, and allocators
@@ -33,13 +43,13 @@ template <typename Allocator>
 		, _persist(persist_)
 		, _bucket_count_cached(bucket_count_uncached())
 	{
-		assert(_persist->_segment_count._specified <= _segment_capacity);
-		assert(1U <= _persist->_segment_count._specified);
+		assert(_persist->_segment_count.specified() <= _segment_capacity);
+		assert(1U <= _persist->_segment_count.specified());
 
 		/* Persisted data needs at least one segment. */
-		if ( _persist->_segment_count._actual.is_stable() && _persist->_segment_count._actual.value() == 0 )
+		if ( _persist->_segment_count.actual().is_stable() && _persist->_segment_count.actual().value() == 0 )
 		{
-			_persist->do_initial_allocation(av_);
+			_persist->do_initial_allocation(this);
 		}
 #if USE_CC_HEAP == 3
 		if ( mode_ == construction_mode::reconstitute )
@@ -91,10 +101,7 @@ template <typename Allocator>
 	void impl::persist_controller<Allocator>::persist_internal(
 		const void *first_
 		, const void *last_
-		, const char *
-#if 0
-			what_
-#endif
+		, const char * // what_
 	)
 	{
 		this->Allocator::persist(first_, static_cast<const char *>(last_) - static_cast<const char *>(first_));
@@ -187,17 +194,19 @@ template <typename Allocator>
 	{
 		persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
 
+		{
 #if USE_CC_HEAP == 4
-		/* ERROR: allocation to a local can leak */
+			monitor_extend<Allocator> m(bucket_allocator_t{*this});
 #endif
-		bucket_allocator_t(*this).allocate(
-			ptr
-			, bucket_count()
-			, alignof(bucket_aligned_t)
-		);
+			bucket_allocator_t(*this).allocate(
+				ptr
+				, bucket_count()
+				, alignof(bucket_aligned_t)
+			);
+		}
 
 		new (&*ptr) typename persist_data_t::bucket_aligned_t[bucket_count()];
-		_persist->_sc[_persist->_segment_count._actual.value()].bp = ptr;
+		_persist->_sc[_persist->_segment_count.actual().value()].bp = ptr;
 		auto sc = &*_persist->_sc;
 		return &*(sc[segment_count_actual().value()].bp);
 	}
@@ -214,14 +223,14 @@ template <typename Allocator>
 	void impl::persist_controller<Allocator>::resize_interlog()
 	{
 		persist_segment_table();
-		_persist->_segment_count._actual.destabilize();
+		_persist->_segment_count.actual_destabilize();
 		persist_segment_count();
 	}
 
 template <typename Allocator>
 	void impl::persist_controller<Allocator>::resize_epilog()
 	{
-		_persist->_segment_count._actual.value_set_stable(_persist->_segment_count._actual.value_not_stable() + 1U);
+		_persist->_segment_count.actual_value_set_stable(_persist->_segment_count.actual().value_not_stable() + 1U);
 		_bucket_count_cached = bucket_count_uncached();
 		persist_segment_count();
 	}

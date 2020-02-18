@@ -17,17 +17,17 @@
 #include <api/mcas_itf.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
-#include <boost/numeric/conversion/cast.hpp>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
+
+#include <boost/numeric/conversion/cast.hpp>
 #include <map>
 #include <set>
 
 #include "buffer_manager.h"
-#include "mcas_client_config.h"
-
 #include "client_fabric_transport.h"
+#include "mcas_client_config.h"
 
 /* Enable this to introduce locks to prevent re-entry by multiple
    threads.  The client is not re-entrant because of the state machine
@@ -65,10 +65,9 @@ class Connection_handler : public Connection_base {
    *
    * @return
    */
-  Connection_handler(Connection_base::Transport* connection);
+  Connection_handler(Connection_base::Transport *connection);
 
   ~Connection_handler();
-  
 
  private:
   enum State {
@@ -99,114 +98,121 @@ class Connection_handler : public Connection_base {
     while (tick() > 0) sleep(1);
   }
 
-  pool_t open_pool(const std::string name,
-                   uint32_t          flags);
+  pool_t open_pool(const std::string name, const unsigned int flags);
 
-  pool_t create_pool(const std::string name,
-                     const size_t      size,
-                     uint32_t          flags,
-                     uint64_t          expected_obj_count);
+  pool_t create_pool(const std::string  name,
+                     const size_t       size,
+                     const unsigned int flags,
+                     const uint64_t     expected_obj_count);
 
-  status_t close_pool(pool_t pool);
+  status_t close_pool(const pool_t pool);
 
-  status_t delete_pool(const std::string& name);
-  
-  status_t delete_pool(const Component::IKVStore::pool_t pool);
+  status_t delete_pool(const std::string &name);
 
-  status_t configure_pool(const Component::IKVStore::pool_t pool,
-                          const std::string& json);
+  status_t delete_pool(const pool_t pool);
 
-  status_t put(const pool_t      pool,
-               const std::string key,
-               const void*       value,
-               const size_t      value_len,
-               uint32_t          flags);
+  status_t configure_pool(const Component::IKVStore::pool_t pool, const std::string &json);
 
-  status_t put(const pool_t pool,
-               const void*  key,
-               const size_t key_len,
-               const void*  value,
-               const size_t value_len,
-               uint32_t flags);
+  status_t put(const pool_t       pool,
+               const std::string  key,
+               const void *       value,
+               const size_t       value_len,
+               const unsigned int flags);
 
-  status_t put_direct(const pool_t                         pool,
-                      const std::string&                   key,
-                      const void*                          value,
-                      const size_t                         value_len,
-                      Component::IKVStore::memory_handle_t handle,
-                      uint32_t                         flags);
+  status_t put(const pool_t       pool,
+               const void *       key,
+               const size_t       key_len,
+               const void *       value,
+               const size_t       value_len,
+               const unsigned int flags);
 
-  status_t get(const pool_t pool, const std::string& key, std::string& value);
+  status_t put_direct(const pool_t                               pool,
+                      const std::string &                        key,
+                      const void *                               value,
+                      const size_t                               value_len,
+                      const Component::IKVStore::memory_handle_t handle,
+                      const unsigned int                         flags);
 
-  status_t get(const pool_t       pool,
-               const std::string& key,
-               void*&             value,
-               size_t&            value_len);
+  status_t async_put(const pool_t                      pool,
+                     const void *                      key,
+                     const size_t                      key_len,
+                     const void *                      value,
+                     size_t                            value_len,
+                     Component::IMCAS::async_handle_t &out_handle,
+                     unsigned int                      flags);
+
+  status_t check_async_completion(Component::IMCAS::async_handle_t &handle);
+
+  status_t get(const pool_t pool, const std::string &key, std::string &value);
+
+  status_t get(const pool_t pool, const std::string &key, void *&value, size_t &value_len);
 
   status_t get_direct(const pool_t                         pool,
-                      const std::string&                   key,
-                      void*                                value,
-                      size_t&                              out_value_len,
+                      const std::string &                  key,
+                      void *                               value,
+                      size_t &                             out_value_len,
                       Component::IKVStore::memory_handle_t handle = Component::IKVStore::HANDLE_NONE);
 
-  status_t erase(const pool_t pool,
-                 const std::string& key);
+  status_t erase(const pool_t pool, const std::string &key);
 
-  uint64_t key_hash(const void* key, const size_t key_len);
+  status_t async_erase(const Component::IMCAS::pool_t    pool,
+                       const std::string &               key,
+                       Component::IMCAS::async_handle_t &out_handle);
 
-  uint64_t auth_id() const {
+  uint64_t key_hash(const void *key, const size_t key_len);
+
+  uint64_t auth_id() const
+  {
     /* temporary */
-    auto env = getenv("MCAS_AUTH_ID");
+    auto     env = getenv("MCAS_AUTH_ID");
     uint64_t auth_id;
-    if(env) {
+    if (env) {
       auto id = std::strtoll(env, nullptr, 10);
       auth_id = boost::numeric_cast<uint64_t>(id);
     }
     else {
       auth_id = boost::numeric_cast<uint64_t>(getuid());
     }
-           
+
     return auth_id;
   }
 
   size_t count(const pool_t pool);
 
-  status_t get_attribute(const Component::IKVStore::pool_t pool,
+  status_t get_attribute(const Component::IKVStore::pool_t    pool,
                          const Component::IKVStore::Attribute attr,
-                         std::vector<uint64_t>& out_attr,
-                         const std::string* key);
+                         std::vector<uint64_t> &              out_attr,
+                         const std::string *                  key);
 
-  status_t get_statistics(Component::IMCAS::Shard_stats& out_stats);
+  status_t get_statistics(Component::IMCAS::Shard_stats &out_stats);
 
   status_t find(const Component::IKVStore::pool_t pool,
-                const std::string& key_expression,
-                const offset_t offset,
-                offset_t& out_matched_offset,
-                std::string& out_matched_key);
+                const std::string &               key_expression,
+                const offset_t                    offset,
+                offset_t &                        out_matched_offset,
+                std::string &                     out_matched_key);
 
-  status_t invoke_ado(const Component::IKVStore::pool_t pool,
-                      const std::string& key,
-                      const void * request,
-                      size_t request_len,
-                      const uint32_t flags,                              
-                      std::string& out_response,
-                      const size_t value_size);
-  
-  status_t invoke_put_ado(const Component::IKVStore::pool_t pool,
-                          const std::string& key,
-                          const void * request,
-                          size_t request_len,
-                          const void * value,
-                          size_t value_len,
-                          size_t root_len,
-                          const uint32_t flags,
-                          std::string& out_response);
+  status_t invoke_ado(const Component::IKVStore::pool_t            pool,
+                      const std::string &                          key,
+                      const void *                                 request,
+                      size_t                                       request_len,
+                      const unsigned int                           flags,
+                      std::vector<Component::IMCAS::ADO_response> &out_response,
+                      const size_t                                 value_size);
+
+  status_t invoke_put_ado(const Component::IKVStore::pool_t            pool,
+                          const std::string &                          key,
+                          const void *                                 request,
+                          size_t                                       request_len,
+                          const void *                                 value,
+                          size_t                                       value_len,
+                          size_t                                       root_len,
+                          const unsigned int                           flags,
+                          std::vector<Component::IMCAS::ADO_response> &out_response);
 
   bool check_message_size(size_t size) const { return size > _max_message_size; }
 
  private:
-
-  
   /**
    * FSM tick call
    *
@@ -218,10 +224,7 @@ class Connection_handler : public Connection_base {
    *
    * @param s State to change to
    */
-  inline void set_state(State s)
-  {
-    _state = s;
-  } /* we could add transition checking later */
+  inline void set_state(State s) { _state = s; } /* we could add transition checking later */
 
   /**
    * Put used when the value exceeds the size of the basic
@@ -237,23 +240,22 @@ class Connection_handler : public Connection_base {
    * @return
    */
   status_t two_stage_put_direct(const pool_t                         pool,
-                                const void*                          key,
+                                const void *                         key,
                                 const size_t                         key_len,
-                                const void*                          value,
+                                const void *                         value,
                                 const size_t                         value_len,
                                 Component::IKVStore::memory_handle_t handle,
-                                uint32_t                             flags);
-
+                                unsigned int                         flags);
 
  private:
 #ifdef THREAD_SAFE_CLIENT
   std::mutex _api_lock;
 #endif
 
-  bool     _exit                = false;
-  uint64_t _request_id          = 0;
-  size_t   _max_message_size    = 0;
-  size_t   _max_inject_size     = 0;
+  bool     _exit             = false;
+  uint64_t _request_id       = 0;
+  size_t   _max_message_size = 0;
+  size_t   _max_inject_size  = 0;
 
   struct {
     bool short_circuit_backend = false;

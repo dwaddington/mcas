@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,23 +13,27 @@
 #ifndef __mcas_PROTOCOL_H__
 #define __mcas_PROTOCOL_H__
 
+#include <api/ado_itf.h>
+#include <api/mcas_itf.h>
 #include <assert.h>
-#include <boost/numeric/conversion/cast.hpp>
+#include <common/dump_utils.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/utils.h>
-#include <api/mcas_itf.h>
+
+#include <boost/numeric/conversion/cast.hpp>
 #include <cstring>
+#include <stdexcept>
 
 #pragma GCC diagnostic ignored "-Wshadow"
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-#define PROTOCOL_DEBUG
+//#define PROTOCOL_DEBUG
+//#define RESPONSE_DATA_DEBUG
 
 namespace mcas
 {
-
 namespace Protocol
 {
 static constexpr unsigned PROTOCOL_VERSION = 0xFB;
@@ -90,29 +94,28 @@ enum {
 };
 
 enum {
-  IO_READ      = 0x1,
-  IO_WRITE     = 0x2,
-  IO_ERASE     = 0x4,
-  IO_MAX       = 0xFF,
+  IO_READ  = 0x1,
+  IO_WRITE = 0x2,
+  IO_ERASE = 0x4,
+  IO_MAX   = 0xFF,
 };
 
 /* Base for all messages */
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
 struct Message {
   Message(uint64_t auth_id, uint8_t type_id, uint8_t op_param)
-    : auth_id(auth_id), version(PROTOCOL_VERSION), type_id(type_id)
+      : auth_id(auth_id), version(PROTOCOL_VERSION), type_id(type_id)
   {
     status_delta = 0;
     assert(op_param);
     op = op_param;
     assert(this->op);
   }
+#pragma GCC diagnostic pop
 
   /* responses generally have no good value in the "op" field */
-  Message(uint64_t auth_id, uint8_t type_id)
-      : Message(auth_id, type_id, OP_INVALID)
-  {
-  }
+  Message(uint64_t auth_id, uint8_t type_id) : Message(auth_id, type_id, OP_INVALID) {}
 
   void set_status(status_t rc_status)
   {
@@ -120,27 +123,23 @@ struct Message {
     status_delta = boost::numeric_cast<uint8_t>(i);
   }
 
-  status_t get_status() const
-  {
-    return -1 * status_delta;
-  }
-  
+  status_t get_status() const { return -1 * status_delta; }
+
   void print() const
   {
-    PLOG("Message:%p auth_id:%lu msg_len=%u type=%x", static_cast<const void *>(this), auth_id, msg_len, type_id);
+    PLOG("Message:%p auth_id:%lu msg_len=%u type=%x", static_cast<const void*>(this), auth_id, msg_len, type_id);
   }
 
   /* Convert the response to the expected type after verifying that the
      type_id field matches what is expected.
    */
   template <typename Type>
-  const Type *ptr_cast() const
+  const Type* ptr_cast() const
   {
     if (this->type_id != Type::id)
-      throw Protocol_exception("expected %s (0x%x) message - got 0x%x, len %lu",
-                               Type::description, Type::id,
+      throw Protocol_exception("expected %s (0x%x) message - got 0x%x, len %lu", Type::description, Type::id,
                                this->type_id, this->msg_len);
-    return static_cast<const Type *>(this);
+    return static_cast<const Type*>(this);
   }
 
   uint64_t auth_id;  // authorization token
@@ -148,33 +147,29 @@ struct Message {
   uint8_t  version;  // protocol version
   uint8_t  type_id;  // message type id
   union {
-    uint8_t op;      // operation code 
+    uint8_t op;            // operation code
     uint8_t status_delta;  // return -ve delta
   };
-  uint8_t resvd;     // reserved
+  uint8_t resvd;  // reserved
 } __attribute__((packed));
-
 
 namespace
 {
-  inline const Message *message_cast(const void *b)
-  {
-    auto pm = static_cast<const Message *>(b);
-    assert(pm->version == PROTOCOL_VERSION);
-    if (pm->version != PROTOCOL_VERSION)
-    {
-      Protocol_exception e("expected protocol version 0x%x, got got 0x%x",
-                           PROTOCOL_VERSION,
-                           pm->version);
+inline const Message* message_cast(const void* b)
+{
+  auto pm = static_cast<const Message*>(b);
+  assert(pm->version == PROTOCOL_VERSION);
+  if (pm->version != PROTOCOL_VERSION) {
+    Protocol_exception e("expected protocol version 0x%x, got got 0x%x", PROTOCOL_VERSION, pm->version);
 #if 0
       throw e;
 #else
-      PWRN("%s", e.cause());
+    PWRN("%s", e.cause());
 #endif
-    }
-    return pm;
   }
+  return pm;
 }
+}  // namespace
 
 static_assert(sizeof(Message) == 16, "Unexpected Message data structure size");
 
@@ -184,9 +179,8 @@ static_assert(sizeof(Message) == 16, "Unexpected Message data structure size");
 // POOL OPERATIONS - create, delete
 
 struct Message_pool_request : public Message {
-
-  static constexpr uint8_t id = MSG_TYPE_POOL_REQUEST;
-  static constexpr const char *description = "Message_pool_request";
+  static constexpr uint8_t     id          = MSG_TYPE_POOL_REQUEST;
+  static constexpr const char* description = "Message_pool_request";
 
   Message_pool_request(size_t             buffer_size,
                        uint64_t           auth_id,
@@ -195,17 +189,15 @@ struct Message_pool_request : public Message {
                        size_t             expected_object_count,
                        uint8_t            op,
                        const std::string& pool_name)
-      : Message(auth_id, id, op), pool_size(pool_size),
-        expected_object_count(expected_object_count)
+      : Message(auth_id, id, op), pool_size(pool_size), expected_object_count(expected_object_count)
   {
     assert(op);
     assert(this->op);
-    if(buffer_size < (sizeof *this)) throw std::length_error(description);
+    if (buffer_size < (sizeof *this)) throw std::length_error(description);
     auto max_data_len = buffer_size - (sizeof *this);
 
     size_t len = pool_name.length();
-    if (len >= max_data_len)
-      throw std::length_error(description);
+    if (len >= max_data_len) throw std::length_error(description);
 
     strncpy(data, pool_name.c_str(), len);
     data[len] = '\0';
@@ -213,11 +205,8 @@ struct Message_pool_request : public Message {
     msg_len = boost::numeric_cast<decltype(msg_len)>((sizeof *this) + len + 1);
   }
 
-  Message_pool_request(size_t   buffer_size,
-                       uint64_t auth_id,
-                       uint64_t request_id,
-                       uint8_t  op)
-    : Message_pool_request(buffer_size, auth_id, request_id, 0, 0, op, "")
+  Message_pool_request(size_t buffer_size, uint64_t auth_id, uint64_t request_id, uint8_t op)
+      : Message_pool_request(buffer_size, auth_id, request_id, 0, 0, op, "")
   {
     pool_id = 0;
   }
@@ -235,14 +224,13 @@ struct Message_pool_request : public Message {
 } __attribute__((packed));
 
 struct Message_pool_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_POOL_RESPONSE;
-  static constexpr const char *description = "Message_pool_response";
+  static constexpr uint8_t     id          = MSG_TYPE_POOL_RESPONSE;
+  static constexpr const char* description = "Message_pool_response";
 
-  Message_pool_response(uint64_t auth_id)
-      : Message(auth_id, id)
-  {
-    msg_len = (sizeof *this);
-  }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_pool_response(uint64_t auth_id) : Message(auth_id, id) { msg_len = (sizeof *this); }
+#pragma GCC diagnostic pop
 
   uint64_t pool_id;
   char     data[];
@@ -252,9 +240,11 @@ struct Message_pool_response : public Message {
 // IO OPERATIONS
 
 struct Message_IO_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_IO_REQUEST;
-  static constexpr const char *description = "Message_IO_request";
+  static constexpr uint8_t     id          = MSG_TYPE_IO_REQUEST;
+  static constexpr const char* description = "Message_IO_request";
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
   Message_IO_request(size_t      buffer_size,
                      uint64_t    auth_id,
                      uint64_t    request_id,
@@ -265,14 +255,12 @@ struct Message_IO_request : public Message {
                      const void* value,
                      size_t      value_len,
                      uint32_t    flags)
-      : Message(auth_id, MSG_TYPE_IO_REQUEST, op),        
-        pool_id(pool_id),
-        request_id(request_id),
-        flags(flags)
+      : Message(auth_id, MSG_TYPE_IO_REQUEST, op), pool_id(pool_id), request_id(request_id), flags(flags)
   {
     set_key_and_value(buffer_size, key, key_len, value, value_len);
     msg_len = boost::numeric_cast<decltype(msg_len)>(sizeof(Message_IO_request) + key_len + value_len + 1);
   }
+#pragma GCC diagnostic pop
 
   Message_IO_request(size_t             buffer_size,
                      uint64_t           auth_id,
@@ -282,10 +270,21 @@ struct Message_IO_request : public Message {
                      const std::string& key,
                      const std::string& value,
                      uint32_t           flags)
-      : Message_IO_request(buffer_size, auth_id, request_id, pool_id, op, key.data(), key.size(), value.data(), value.size(), flags)
+      : Message_IO_request(buffer_size,
+                           auth_id,
+                           request_id,
+                           pool_id,
+                           op,
+                           key.data(),
+                           key.size(),
+                           value.data(),
+                           value.size(),
+                           flags)
   {
   }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
   /* key, and data_length */
   Message_IO_request(size_t      buffer_size,
                      uint64_t    auth_id,
@@ -296,36 +295,34 @@ struct Message_IO_request : public Message {
                      size_t      key_len,
                      size_t      value_len,
                      uint32_t    flags)
-      : Message(auth_id, id, op), 
-        pool_id(pool_id),
-        request_id(request_id),
-        flags(flags)
+      : Message(auth_id, id, op), pool_id(pool_id), request_id(request_id), flags(flags)
   {
     set_key_value_len(buffer_size, key, key_len, value_len);
-    msg_len = boost::numeric_cast<decltype(msg_len)>((sizeof *this) + key_len + 1); /* we don't add value len, this will be in next buffer */
+    msg_len = boost::numeric_cast<decltype(msg_len)>((sizeof *this) + key_len +
+                                                     1); /* we don't add value len, this will be in next buffer */
   }
+#pragma GCC diagnostic pop
 
-  Message_IO_request(size_t       buffer_size,
-                     uint64_t     auth_id,
-                     uint64_t     request_id,
-                     uint64_t     pool_id,
-                     uint8_t      op,
+  Message_IO_request(size_t             buffer_size,
+                     uint64_t           auth_id,
+                     uint64_t           request_id,
+                     uint64_t           pool_id,
+                     uint8_t            op,
                      const std::string& key,
-                     size_t       value_len,
-                     uint32_t     flags)
+                     size_t             value_len,
+                     uint32_t           flags)
       : Message_IO_request(buffer_size, auth_id, request_id, pool_id, op, key.data(), key.size(), value_len, flags)
   {
   }
 
   /*< version used for configure_pool command */
-  Message_IO_request(size_t       buffer_size,
-                     uint64_t     auth_id,
-                     uint64_t     request_id,
-                     uint64_t     pool_id,
-                     uint8_t      op,
+  Message_IO_request(size_t             buffer_size,
+                     uint64_t           auth_id,
+                     uint64_t           request_id,
+                     uint64_t           pool_id,
+                     uint8_t            op,
                      const std::string& data)
-      : Message_IO_request(buffer_size, auth_id, request_id, pool_id, op, data.data(),
-                           data.size(), 0, 0)
+      : Message_IO_request(buffer_size, auth_id, request_id, pool_id, op, data.data(), data.size(), 0, 0)
   {
   }
 
@@ -336,16 +333,12 @@ struct Message_IO_request : public Message {
   inline size_t get_key_len() const { return key_len; }
   inline size_t get_value_len() const { return val_len; }
 
-  void set_key_value_len(size_t       buffer_size,
-                         const void*  key,
-                         const size_t key_len,
-                         const size_t value_len)
+  void set_key_value_len(size_t buffer_size, const void* key, const size_t key_len, const size_t value_len)
   {
     if (UNLIKELY((key_len + 1 + (sizeof *this)) > buffer_size))
-      throw API_exception(
-          "%s::%s - insufficient buffer for "
-          "key-value_len pair (key_len=%lu) (val_len=%lu)",
-          description, __func__, key_len, value_len);
+      throw API_exception("%s::%s - insufficient buffer for "
+                          "key-value_len pair (key_len=%lu) (val_len=%lu)",
+                          description, __func__, key_len, value_len);
 
     memcpy(data, key, key_len); /* only copy key and set value length */
     data[key_len] = '\0';
@@ -360,12 +353,10 @@ struct Message_IO_request : public Message {
                          const size_t p_value_len)
   {
     assert(buffer_size > 0);
-    if (UNLIKELY((p_key_len + p_value_len + 1 + (sizeof *this)) >
-                 buffer_size))
-      throw API_exception(
-          "%s::%s - insufficient buffer for "
-          "key-value pair (key_len=%lu) (val_len=%lu) (buffer_size=%lu)",
-          description, __func__, p_key_len, p_value_len, buffer_size);
+    if (UNLIKELY((p_key_len + p_value_len + 1 + (sizeof *this)) > buffer_size))
+      throw API_exception("%s::%s - insufficient buffer for "
+                          "key-value pair (key_len=%lu) (val_len=%lu) (buffer_size=%lu)",
+                          description, __func__, p_key_len, p_value_len, buffer_size);
 
     memcpy(data, p_key, p_key_len);
     data[p_key_len] = '\0';
@@ -386,16 +377,18 @@ struct Message_IO_request : public Message {
 } __attribute__((packed));
 
 struct Message_IO_response : public Message {
-  static constexpr uint64_t BIT_TWOSTAGE = 1ULL << 63;
-  static constexpr uint8_t id = MSG_TYPE_IO_RESPONSE;
-  static constexpr const char *description = "Message_IO_response";
+  static constexpr uint64_t    BIT_TWOSTAGE = 1ULL << 63;
+  static constexpr uint8_t     id           = MSG_TYPE_IO_RESPONSE;
+  static constexpr const char* description  = "Message_IO_response";
 
-  Message_IO_response(size_t buffer_size, uint64_t auth_id)
-      : Message(auth_id, id)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_IO_response(size_t buffer_size, uint64_t auth_id) : Message(auth_id, id)
   {
     data_len = 0;
     msg_len  = (sizeof *this);
   }
+#pragma GCC diagnostic pop
 
   void copy_in_data(const void* in_data, size_t len)
   {
@@ -403,7 +396,7 @@ struct Message_IO_response : public Message {
     memcpy(data, in_data, len);
     data_len = len;
 
-    msg_len  = boost::numeric_cast<decltype(msg_len)>((sizeof *this) + data_len);
+    msg_len = boost::numeric_cast<decltype(msg_len)>((sizeof *this) + data_len);
   }
 
   size_t base_message_size() const { return (sizeof *this); }
@@ -422,80 +415,83 @@ struct Message_IO_response : public Message {
 
 ////////////////////////////////////////////////////////////////////////
 // INFO REQUEST/RESPONSE
-struct Message_INFO_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_INFO_REQUEST;
-  static constexpr const char *description = "Message_INFO_request";
 
-  Message_INFO_request(uint64_t auth_id) : Message(auth_id, id),
-                                          key_len(0) {
-  }
+struct Message_INFO_request : public Message {
+  static constexpr uint8_t     id          = MSG_TYPE_INFO_REQUEST;
+  static constexpr const char* description = "Message_INFO_request";
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_INFO_request(uint64_t auth_id) : Message(auth_id, id), key_len(0) {}
+#pragma GCC diagnostic pop
 
   const char* key() const { return data; }
   const char* c_str() const { return data; }
-  size_t base_message_size() const { return (sizeof *this); }
-  size_t message_size() const { return (sizeof *this) + key_len + 1; }
+  size_t      base_message_size() const { return (sizeof *this); }
+  size_t      message_size() const { return (sizeof *this) + key_len + 1; }
 
-  void set_key(const size_t buffer_size,
-               const std::string& key) {
+  void set_key(const size_t buffer_size, const std::string& key)
+  {
     key_len = key.length();
-    if((key_len + base_message_size() + 1) > buffer_size)
-      throw API_exception("%s::%s - insufficient buffer for key (len=%lu)",
-                          description, __func__, key_len);
+    if ((key_len + base_message_size() + 1) > buffer_size)
+      throw API_exception("%s::%s - insufficient buffer for key (len=%lu)", description, __func__, key_len);
 
     memcpy(data, key.c_str(), key_len);
     data[key_len] = '\0';
   }
-  
+
   // fields
   uint64_t pool_id;
   uint32_t type;
   uint32_t pad;
   uint64_t offset;
   uint64_t key_len;
-  char     data[0];  
+  char     data[0];
 } __attribute__((packed));
 
 struct Message_INFO_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_INFO_RESPONSE;
-  static constexpr const char *description = "Message_INFO_response";
+  static constexpr uint8_t     id          = MSG_TYPE_INFO_RESPONSE;
+  static constexpr const char* description = "Message_INFO_response";
 
-  Message_INFO_response(uint64_t authid) : Message(authid, id) { }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_INFO_response(uint64_t authid) : Message(authid, id) {}
+#pragma GCC diagnostic pop
 
-  size_t base_message_size() const { return (sizeof *this); }
-  size_t message_size() const { return (sizeof *this) + value_len + 1; }
-  const char * c_str() const { return static_cast<const char*>(data); }
+  size_t      base_message_size() const { return (sizeof *this); }
+  size_t      message_size() const { return (sizeof *this) + value_len + 1; }
+  const char* c_str() const { return static_cast<const char*>(data); }
 
-  void set_value(size_t buffer_size, const void * value, size_t len) {
+  void set_value(size_t buffer_size, const void* value, size_t len)
+  {
     if (UNLIKELY((len + 1 + (sizeof *this)) > buffer_size))
       throw API_exception("%s::%s - insufficient buffer (value len=%lu)", description, __func__, len);
 
     memcpy(data, value, len); /* only copy key and set value length */
     data[len] = '\0';
-    value_len = len; 
+    value_len = len;
   }
-  
+
   // fields
   union {
     size_t value;
     size_t value_len;
   };
   offset_t offset;
-  char   data[0];
+  char     data[0];
 } __attribute__((packed));
 
 ////////////////////////////////////////////////////////////////////////
 // HANDSHAKE
 
 struct Message_handshake : public Message {
-  Message_handshake(uint64_t auth_id, uint64_t sequence)
-      : Message(auth_id, id), seq(sequence),
-        protocol(PROTOCOL_V1)
+  Message_handshake(uint64_t auth_id, uint64_t sequence) : Message(auth_id, id), seq(sequence), protocol(PROTOCOL_V1)
   {
     msg_len = (sizeof *this);
   }
 
-  static constexpr uint8_t id = MSG_TYPE_HANDSHAKE;
-  static constexpr const char *description = "Message_handshake";
+  static constexpr uint8_t     id          = MSG_TYPE_HANDSHAKE;
+  static constexpr const char* description = "Message_handshake";
   // fields
   uint64_t seq;
   uint8_t  protocol;
@@ -508,29 +504,27 @@ struct Message_handshake : public Message {
 // HANDSHAKE REPLY
 
 enum {
-  HANDSHAKE_REPLY_FLAG_CERT=0x1,
+  HANDSHAKE_REPLY_FLAG_CERT = 0x1,
 };
 
 struct Message_handshake_reply : public Message {
-  static constexpr uint8_t id = MSG_TYPE_HANDSHAKE_REPLY;
-  static constexpr const char *description = "Message_handshake_reply";
+  static constexpr uint8_t     id          = MSG_TYPE_HANDSHAKE_REPLY;
+  static constexpr const char* description = "Message_handshake_reply";
 
-  Message_handshake_reply(size_t buffer_size,
-                          uint64_t auth_id,
-                          uint64_t sequence,
-                          uint64_t session_id,
-                          size_t   max_message_size,
-                          unsigned char * x509_cert_ptr,
-                          uint32_t x509_cert_len)
-      : Message(auth_id, id), seq(sequence),
-        session_id(session_id), max_message_size(max_message_size),
+  Message_handshake_reply(size_t         buffer_size,
+                          uint64_t       auth_id,
+                          uint64_t       sequence,
+                          uint64_t       session_id,
+                          size_t         max_message_size,
+                          unsigned char* x509_cert_ptr,
+                          uint32_t       x509_cert_len)
+      : Message(auth_id, id), seq(sequence), session_id(session_id), max_message_size(max_message_size),
         x509_cert_len(x509_cert_len)
   {
     msg_len = boost::numeric_cast<uint32_t>(sizeof(Message_handshake_reply)) + x509_cert_len;
-    if(msg_len > buffer_size)
-      throw Logic_exception("%s::%s - insufficient buffer for Message_handshake_reply",
-                            description, __func__);
-    if(x509_cert_ptr && (x509_cert_len > 0)) {
+    if (msg_len > buffer_size)
+      throw Logic_exception("%s::%s - insufficient buffer for Message_handshake_reply", description, __func__);
+    if (x509_cert_ptr && (x509_cert_len > 0)) {
       memcpy(x509_cert, x509_cert_ptr, x509_cert_len);
     }
   }
@@ -548,91 +542,83 @@ struct Message_handshake_reply : public Message {
 // CLOSE SESSION
 
 struct Message_close_session : public Message {
-  static constexpr uint8_t id = MSG_TYPE_CLOSE_SESSION;
-  static constexpr const char *description = "Message_close_session";
+  static constexpr uint8_t     id          = MSG_TYPE_CLOSE_SESSION;
+  static constexpr const char* description = "Message_close_session";
 
-  Message_close_session(uint64_t auth_id)
-      : Message(auth_id, id)
-  {
-    msg_len = (sizeof *this);
-  }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_close_session(uint64_t auth_id) : Message(auth_id, id) { msg_len = (sizeof *this); }
+#pragma GCC diagnostic pop
 
   // fields
   uint64_t seq;
 
 } __attribute__((packed));
 
-
 #pragma GCC diagnostic push
 #if 8 <= __GNUC__
 #pragma GCC diagnostic ignored "-Wpacked-not-aligned"
 #endif
 struct Message_stats : public Message {
+  static constexpr uint8_t     id          = MSG_TYPE_STATS;
+  static constexpr const char* description = "Message_stats";
 
-  static constexpr uint8_t id = MSG_TYPE_STATS;
-  static constexpr const char *description = "Message_stats";
-
-  Message_stats(uint64_t auth,
-                const Component::IMCAS::Shard_stats& shard_stats) : Message(auth, id)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_stats(uint64_t auth, const Component::IMCAS::Shard_stats& shard_stats) : Message(auth, id)
   {
     stats = shard_stats;
   }
+#pragma GCC diagnostic pop
 
   size_t message_size() const { return sizeof(Message_stats); }
   // fields
-  Component::IMCAS::Shard_stats stats; 
+  Component::IMCAS::Shard_stats stats;
 } __attribute__((packed));
 #pragma GCC diagnostic pop
-
-
 
 ////////////////////////////////////////////////////////////////////////
 // ADO MESSAGES
 
 struct Message_ado_request : public Message {
+  static constexpr uint8_t     id          = MSG_TYPE_ADO_REQUEST;
+  static constexpr const char* description = "Message_ado_request";
 
-  static constexpr uint8_t id = MSG_TYPE_ADO_REQUEST;
-  static constexpr const char *description = "Message_ado_request";
-
-  Message_ado_request(size_t buffer_size,
-                      uint64_t auth_id,
-                      uint64_t request_id,
-                      uint64_t pool_id,
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_ado_request(size_t             buffer_size,
+                      uint64_t           auth_id,
+                      uint64_t           request_id,
+                      uint64_t           pool_id,
                       const std::string& key,
-                      const void * invocation_data,
-                      size_t invocation_data_len,
-                      uint32_t flags,
-                      size_t odvl = 4096) :
-    Message(auth_id, id),
-    request_id(request_id),
-    pool_id(pool_id),
-    ondemand_val_len(odvl),
-    flags(flags)
-    
+                      const void*        invocation_data,
+                      size_t             invocation_data_len,
+                      uint32_t           flags,
+                      size_t             odvl = 4096)
+      : Message(auth_id, id), request_id(request_id), pool_id(pool_id), ondemand_val_len(odvl), flags(flags)
+
   {
     this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data_len);
-    key_len = key.size();
-    msg_len = boost::numeric_cast<decltype(msg_len)>(message_size());
-    
-    
+    key_len                   = key.size();
+    msg_len                   = boost::numeric_cast<decltype(msg_len)>(message_size());
+
     if (buffer_size < message_size())
-      throw API_exception("%s::%s - insufficient buffer for Message_ado_request",
-                          description, __func__);
+      throw API_exception("%s::%s - insufficient buffer for Message_ado_request", description, __func__);
 
     memcpy(data, key.c_str(), key.size());
     data[key_len] = '\0';
 
-    if(invocation_data_len > 0)
-      memcpy(&data[key_len+1], invocation_data, invocation_data_len);
+    if (invocation_data_len > 0) memcpy(&data[key_len + 1], invocation_data, invocation_data_len);
   }
-  
-  size_t message_size() const { return sizeof(Message_ado_request) + key_len + invocation_data_len + 1; }
-  //  std::string command() const { return std::string(data); }
-  const char* key() const { return reinterpret_cast<const char*>(data); }
-  const uint8_t * request() const { return static_cast<const uint8_t*>(&data[key_len+1]); }
-  size_t request_len() const { return this->invocation_data_len; }
-  bool is_async() const { return flags & Component::IMCAS::ADO_FLAG_ASYNC; }
-  
+#pragma GCC diagnostic pop
+
+  size_t         message_size() const { return sizeof(Message_ado_request) + key_len + invocation_data_len + 1; }
+  const char*    key() const { return reinterpret_cast<const char*>(data); }
+  const uint8_t* request() const { return static_cast<const uint8_t*>(&data[key_len + 1]); }
+  size_t         request_len() const { return this->invocation_data_len; }
+  bool           is_async() const { return flags & Component::IMCAS::ADO_FLAG_ASYNC; }
+  size_t         get_key_len() const { return key_len; }
+
   // fields
   uint64_t request_id; /*< id or sender timestamp counter */
   uint64_t pool_id;
@@ -641,50 +627,45 @@ struct Message_ado_request : public Message {
   uint32_t invocation_data_len; /*< does not include null terminator */
   uint32_t flags;
   uint8_t  data[];
-  
+
 } __attribute__((packed));
 
-
 struct Message_put_ado_request : public Message {
+  static constexpr uint8_t     id          = MSG_TYPE_PUT_ADO_REQUEST;
+  static constexpr const char* description = "Message_put_ado_request";
 
-  static constexpr uint8_t id = MSG_TYPE_PUT_ADO_REQUEST;
-  static constexpr const char *description = "Message_put_ado_request";
-
-  Message_put_ado_request(size_t buffer_size,
-                          uint64_t auth_id,
-                          uint64_t request_id,
-                          uint64_t pool_id,
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++" // missing initializers
+  Message_put_ado_request(size_t             buffer_size,
+                          uint64_t           auth_id,
+                          uint64_t           request_id,
+                          uint64_t           pool_id,
                           const std::string& key,
-                          const void * invocation_data,
-                          size_t invocation_data_len,                          
-                          const void * value,
-                          size_t value_len,
-                          size_t root_len,
-                          uint32_t flags) :
-    Message(auth_id, id),
-    request_id(request_id),
-    pool_id(pool_id),
-    flags(flags),
-    val_len(value_len),
-    root_val_len(root_len)
+                          const void*        invocation_data,
+                          size_t             invocation_data_len,
+                          const void*        value,
+                          size_t             value_len,
+                          size_t             root_len,
+                          uint32_t           flags)
+      : Message(auth_id, id), request_id(request_id), pool_id(pool_id), flags(flags), val_len(value_len),
+        root_val_len(root_len)
   {
     assert(invocation_data);
     assert(invocation_data_len > 0);
     assert(value);
     assert(value_len > 0);
-    
+
     this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data_len);
-    key_len = key.size();
-    msg_len = boost::numeric_cast<decltype(msg_len)>(message_size());
-    
+    key_len                   = key.size();
+    msg_len                   = boost::numeric_cast<decltype(msg_len)>(message_size());
+
     if (buffer_size < message_size())
-      throw API_exception("%s::%s - insufficient buffer for Message_ado_request",
-                          description, __func__);
+      throw API_exception("%s::%s - insufficient buffer for Message_ado_request", description, __func__);
 
     memcpy(data, key.c_str(), key.size());
     data[key_len] = '\0'; /* gratuitous terminate of key string */
-    byte * ptr = static_cast<byte*>(&data[key_len+1]);
-    
+    byte* ptr     = static_cast<byte*>(&data[key_len + 1]);
+
     /* copy in invocation data */
     memcpy(ptr, invocation_data, invocation_data_len);
 
@@ -693,89 +674,117 @@ struct Message_put_ado_request : public Message {
 
     val_addr = reinterpret_cast<uint64_t>(value);
   }
-  
-  size_t message_size() const {
-    return sizeof(Message_put_ado_request) + key_len + 1 + invocation_data_len + val_len;
-  }
-  
+#pragma GCC diagnostic pop
+
+  size_t message_size() const { return sizeof(Message_put_ado_request) + key_len + 1 + invocation_data_len + val_len; }
+
   const char* key() const { return reinterpret_cast<const char*>(data); }
-  const void * request() const { return static_cast<const void*>(&data[key_len+1]); }
-  const void * value() const { return static_cast<const void*>(static_cast<const byte *>(request()) + invocation_data_len); }
+  size_t      get_key_len() const { return key_len; }
+  const void* request() const { return static_cast<const void*>(&data[key_len + 1]); }
+  const void* value() const
+  {
+    return static_cast<const void*>(static_cast<const byte*>(request()) + invocation_data_len);
+  }
   size_t request_len() const { return this->invocation_data_len; }
   size_t value_len() const { return this->val_len; }
   size_t root_len() const { return this->root_val_len; }
-  bool is_async() const { return flags & Component::IMCAS::ADO_FLAG_ASYNC; }
-  
+  bool   is_async() const { return flags & Component::IMCAS::ADO_FLAG_ASYNC; }
+
   // fields
   uint64_t request_id; /*< id or sender timestamp counter */
   uint64_t pool_id;
-  uint64_t key_len; /*< does not include null terminator */
+  uint64_t key_len;             /*< does not include null terminator */
   uint32_t invocation_data_len; /*< does not include null terminator */
   uint32_t flags;
   uint64_t val_len;
   uint64_t val_addr;
   uint64_t root_val_len;
   uint8_t  data[];
-  
+
 } __attribute__((packed));
-
-
 
 struct Message_ado_response : public Message {
+  static constexpr uint8_t     id          = MSG_TYPE_ADO_RESPONSE;
+  static constexpr const char* description = "Message_ado_response";
 
-  static constexpr uint8_t id = MSG_TYPE_ADO_RESPONSE;
-  static constexpr const char *description = "Message_ado_response";
-
-  Message_ado_response(size_t buffer_size,
-                       status_t status,
-                       uint64_t auth_id,
-                       uint64_t request_id,
-                       void * response_data,
-                       size_t response_data_len)
-    :   Message(auth_id, id),
-        request_id(request_id)
+  Message_ado_response(size_t buffer_size, status_t status, uint64_t auth_id, uint64_t request_id)
+      : Message(auth_id, id), max_buffer_size(buffer_size), request_id(request_id)
   {
     set_status(status);
-    
-    response_len = boost::numeric_cast<decltype(response_len)>(response_data_len);
 
-    if (buffer_size < message_size())
-      throw API_exception("%s::%s - insufficient buffer for Message_ado_response",
-                          description, __func__);
-
-    msg_len = boost::numeric_cast<decltype(msg_len)>(message_size());
-
-    if(response_data && response_len > 0) {
-      memcpy(data, response_data, response_len);
-      data[response_len] = '\0';
-    }
+    msg_len = boost::numeric_cast<decltype(msg_len)>(sizeof(Message_ado_response));
   }
-  
-  void append_buffer(void * buffer, uint32_t buffer_len) {
+
+  inline size_t get_response_count() const { return response_count; }
+  inline size_t message_size() const { return msg_len; }
+
+  /**
+   * Add buffer to the network protocol response message. TODO how do
+   * we check for overflow?
+   */
+  void append_response(void* buffer, size_t buffer_len, uint32_t layer_id)
+  {
+    assert(buffer);
+    assert(buffer_len);
+
+    if (msg_len + buffer_len > max_buffer_size) throw API_exception("Message_ado_response out of space");
+
+    uint32_t* size_ptr = reinterpret_cast<uint32_t*>(&data[response_len]);
+#ifdef RESPONSE_DATA_DEBUG
+    PLOG("Shard_ado: converting ADO-IPC response to NPC: %lu", buffer_len);
+    hexdump(buffer, buffer_len);
+#endif
+    *size_ptr       = boost::numeric_cast<uint32_t>(buffer_len); /* add size prefix */
+    *(size_ptr + 1) = layer_id;                                  /* add layer identifier */
+    response_len += 8;                                           /* sizeof(uint32_t) * 2; */
     memcpy(&data[response_len], buffer, buffer_len);
     response_len += boost::numeric_cast<uint32_t>(buffer_len);
+
+    msg_len += (boost::numeric_cast<uint32_t>(buffer_len + 8));
+    response_count++;
   }
-  
-  inline size_t message_size() const { return sizeof(Message_ado_response) + response_len + 1; }
-  inline const uint8_t * response() const { return data; }
-  
+
+  /**
+   *  Get from response vector. This is called at the MCAS client side.
+   */
+  void client_get_response(uint32_t index, void*& out_data, size_t& out_data_len, uint32_t& out_layer_id) const
+  {
+    if (index >= response_count) throw std::range_error("invalid response index");
+
+    const byte* ptr = reinterpret_cast<const byte*>(data);
+
+    size_t pos = 0;
+    while (index > 0) {
+      auto size_ptr = reinterpret_cast<const uint32_t*>(ptr + pos);
+      pos += *size_ptr + 8; /* sizeof(uint32_t) * 2 */
+      index--;
+    }
+
+    out_data_len = *reinterpret_cast<const uint32_t*>(ptr + pos);
+    out_layer_id = *reinterpret_cast<const uint32_t*>(ptr + pos + 4);
+    out_data     = ::malloc(out_data_len);
+    assert(out_data_len < 1000);
+    ::memcpy(out_data, ptr + pos + 8, out_data_len);
+
+#ifdef RESPONSE_DATA_DEBUG
+    PNOTICE("Client-side got buffer_len: %lu (%.*s)", out_data_len, boost::numeric_cast<int>(out_data_len),
+            reinterpret_cast<char*>(out_data));
+    hexdump(out_data, out_data_len);
+#endif
+  }
+
   // fields
+  size_t   max_buffer_size;
   uint64_t request_id; /*< id or sender timestamp counter */
-  uint32_t response_len; /*< does not include null terminator */
-  uint32_t flags;
+  uint32_t flags          = 0;
+  uint32_t response_len   = 0;
+  uint8_t  response_count = 0;
   uint8_t  data[];
-  
+
 } __attribute__((packed));
 
-
-
-
-
-
-static_assert(sizeof(Message_IO_request) % 8 == 0,
-              "Message_IO_request should be 64bit aligned");
-static_assert(sizeof(Message_IO_response) % 8 == 0,
-              "Message_IO_request should be 64bit aligned");
+static_assert(sizeof(Message_IO_request) % 8 == 0, "Message_IO_request should be 64bit aligned");
+static_assert(sizeof(Message_IO_response) % 8 == 0, "Message_IO_request should be 64bit aligned");
 
 }  // namespace Protocol
 }  // namespace mcas

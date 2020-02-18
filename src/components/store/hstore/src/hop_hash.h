@@ -12,13 +12,14 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_HOP_HASH_H
-#define _COMANCHE_HSTORE_HOP_HASH_H
+#ifndef _MCAS_HSTORE_HOP_HASH_H
+#define _MCAS_HSTORE_HOP_HASH_H
 
 #include "segment_layout.h"
 
 #include "bucket_control_unlocked.h"
 #include "construction_mode.h"
+#include "hash_bucket.h"
 #include "hop_hash_log.h"
 #include "trace_flags.h"
 #include "persist_controller.h"
@@ -27,7 +28,6 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #include <atomic>
-#include <cassert>
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint32_t */
 #include <functional> /* equal_to */
@@ -113,30 +113,35 @@ namespace impl
 			std::size_t index() const { return sb().index(); }
 			const segment_and_bucket_t &sb() const { return _sb; }
 			Referent &ref() const { return *_ref; }
+			/* A "content" bucket_ref also owns the "in-use bit, which, for space reasons,
+			 * is currently stored in the "owner" object.
+			 * The holder of a content lock can get the owner ref for the sole purpose of
+			 * accessing the in-use bit.
+			 */
+			owner &owner_ref() const { return *static_cast<hash_bucket<typename Referent::value_type> *>(_ref); }
 		};
 
-	template <typename Bucket, typename Owner, typename SharedMutex>
+	template <typename Bucket, typename Referent, typename SharedMutex>
 		struct bucket_unique_lock
-			: public bucket_ref<Bucket, Owner>
+			: public bucket_ref<Bucket, Referent>
 			, public std::unique_lock<SharedMutex>
 		{
-			using base_ref = bucket_ref<Bucket, Owner>;
+			using base_ref = bucket_ref<Bucket, Referent>;
 			using typename base_ref::segment_and_bucket_t;
 			bucket_unique_lock(
-				Owner &b_
+				Referent &b_
 				, const segment_and_bucket_t &i_
 				, SharedMutex &m_
 			)
-				: bucket_ref<Bucket, Owner>(&b_, i_)
-				, std::unique_lock<SharedMutex>(m_)
+				: bucket_ref<Bucket, Referent>(&b_, i_)
+				, std::unique_lock<SharedMutex>((hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), Referent::lock_id), m_))
 			{
-				hop_hash_log<TRACE_LOCK>::write(__func__, " ", this->index());
 			}
 			bucket_unique_lock(bucket_unique_lock &&) = default;
 			bucket_unique_lock &operator=(bucket_unique_lock &&other_)
 			{
-				hop_hash_log<TRACE_LOCK>::write(__func__, " ", this->index()
-					, "->", other_.index());
+				hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), Referent::lock_id
+					, "->", other_.index(), Referent::lock_id);
 				std::unique_lock<SharedMutex>::operator=(std::move(other_));
 				base_ref::operator=(std::move(other_));
 				return *this;
@@ -145,7 +150,7 @@ namespace impl
 			{
 				if ( this->owns_lock() )
 				{
-					hop_hash_log<TRACE_LOCK>::write(__func__, " ", this->index());
+					hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), Referent::lock_id);
 				}
 			}
 			template <typename HopHash>
@@ -171,12 +176,12 @@ namespace impl
 				: base_ref(&b_, i_)
 				, base_lock(m_)
 			{
-				hop_hash_log<TRACE_LOCK>::write( __func__, " ", this->index());
+				hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index());
 			}
 			bucket_shared_lock(bucket_shared_lock &&) = default;
 			auto operator=(bucket_shared_lock &&other_) -> bucket_shared_lock &
 			{
-				hop_hash_log<TRACE_LOCK>::write(__func__, " ", this->index(), "->", other_.index());
+				hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index(), "->", other_.index());
 				base_lock::operator=(std::move(other_));
 				base_ref::operator=(std::move(other_));
 				return *this;
@@ -185,7 +190,7 @@ namespace impl
 			{
 				if ( this->owns_lock() )
 				{
-					hop_hash_log<TRACE_LOCK>::write(__func__, " ", this->index());
+					hop_hash_log<HSTORE_TRACE_LOCK>::write(LOG_LOCATION, this->index());
 				}
 			}
 		};
@@ -195,14 +200,10 @@ namespace impl
 		{
 			Mutex _m_owner;
 			Mutex _m_content;
-			/* current state of ownership *for hop_hash::lock_shared/lock_uniqe/unlock
-			 * purposes only*. Not maintained (or needed) for other users.
-			 */
-			enum { SHARED, UNIQUE } _state;
+		public:
 			bucket_mutexes()
 				: _m_owner{}
 				, _m_content{}
-				, _state{SHARED}
 			{}
 		};
 
@@ -268,6 +269,14 @@ namespace impl
 		{
 			using allocator_traits_type = std::allocator_traits<Allocator>;
 		public:
+#if HSTORE_TRACE_RESIZE
+			using persist_controller<
+				typename std::allocator_traits<Allocator>::template rebind_alloc
+				<
+					std::pair<const Key, T>
+				>
+			>::segment_count_actual;
+#endif
 			using key_type        = Key;
 			using mapped_type     = T;
 			using value_type      = std::pair<const key_type, mapped_type>;
@@ -289,22 +298,36 @@ namespace impl
 			using const_local_iterator = hop_hash_const_local_iterator<hop_hash_base>;
 			using persist_data_t =
 				persist_map<typename allocator_traits_type::template rebind_alloc<value_type>>;
+#if ! HSTORE_TRACE_RESIZE
 		private:
+#endif
 			using bix_t = size_type; /* sufficient for all bucket indexes */
+		private:
 			using hash_result_t = typename hasher::result_type;
+#if HSTORE_TRACE_RESIZE
+		public:
+#endif
 			using bucket_t = hash_bucket<value_type>;
 			using content_t = content<value_type>;
+		private:
 			using bucket_mutexes_t = bucket_mutexes<SharedMutex>;
 			using bucket_control_t = bucket_control<bucket_t, SharedMutex>;
 			using bucket_aligned_t = typename bucket_control_t::bucket_aligned_t;
+#if ! TRACED_OWNER && ! TRACED_CONTENT
 			static_assert(sizeof(bucket_aligned_t) <= 64, "Bucket size exceeds presumed cache line size (64)");
+#endif
 			using bucket_allocator_t =
 				typename allocator_traits_type::template rebind_alloc<bucket_aligned_t>;
 			using owner_unique_lock_t = bucket_unique_lock<bucket_t, owner, SharedMutex>;
 			using owner_shared_lock_t = bucket_shared_lock<bucket_t, owner, SharedMutex>;
 			using content_unique_lock_t = bucket_unique_lock<bucket_t, content_t, SharedMutex>;
 			using content_shared_lock_t = bucket_shared_lock<bucket_t, content_t, SharedMutex>;
+#if HSTORE_TRACE_RESIZE
+		public:
+#endif
 			using segment_and_bucket_t = segment_and_bucket<bucket_t>;
+			void ownership_check() const;
+		public:
 			static constexpr auto _segment_capacity =
 				persist_controller_t::_segment_capacity;
 			/* Need to adjust hash and bucket_ix interpretations in more places
@@ -337,6 +360,11 @@ namespace impl
 				return persist_controller_t::segment_count_actual().value();
 			}
 
+			six_t segment_count_not_stable() const
+			{
+				return persist_controller_t::segment_count_actual().value_not_stable();
+			}
+
 			auto bucket_ix(const hash_result_t h) const -> bix_t;
 			auto bucket_expanded_ix(const hash_result_t h) const -> bix_t;
 
@@ -346,6 +374,12 @@ namespace impl
 				bix_t bi
 				, content_unique_lock_t bf
 			) -> content_unique_lock_t;
+
+			template <typename Lock, typename K>
+				auto content_index_of_key(
+					Lock &bi
+					, const K &k
+				) const -> owner::index_type;
 
 			template <typename Lock, typename K>
 				auto locate_key(
@@ -396,6 +430,7 @@ namespace impl
 			auto owner_value_at(owner_shared_lock_t &bi) const -> owner::value_type;
 
 			auto make_segment_and_bucket(bix_t ix) const -> segment_and_bucket_t;
+			auto make_segment_and_bucket_unsafe(bix_t ix) const -> segment_and_bucket_t;
 			auto make_segment_and_bucket_for_iterator(
 				bix_t ix
 			) const -> segment_and_bucket_t;
@@ -414,7 +449,7 @@ namespace impl
 
 			auto owned_by_owner_mask(const segment_and_bucket_t &a) const -> owner::value_type;
 			bool is_free_by_owner(const segment_and_bucket_t &a) const;
-			bool is_free(const segment_and_bucket_t &a);
+			bool is_Free(const segment_and_bucket_t &a);
 			bool is_free(const segment_and_bucket_t &a) const;
 
 			/* computed distance from first to last, accounting for the possibility that
@@ -451,6 +486,13 @@ namespace impl
 			template <typename K>
 				auto erase(const K &key) -> size_type;
 
+			auto erase(iterator it) -> iterator;
+
+			template <typename K>
+				auto find(const K &key) -> iterator;
+			template <typename K>
+				auto find(const K &key) const -> const_iterator;
+
 			template <typename K>
 				auto at(const K &key) -> mapped_type &;
 			template <typename K>
@@ -460,11 +502,11 @@ namespace impl
 				auto count(const K &k) const -> size_type;
 			auto begin() -> iterator
 			{
-				return iterator(make_segment_and_bucket_at_begin());
+				return iterator(make_segment_and_bucket_at_begin(), 0U);
 			}
 			auto end() -> iterator
 			{
-				return iterator(make_segment_and_bucket_at_end());
+				return iterator(make_segment_and_bucket_at_end(), 0U);
 			}
 			auto begin() const -> const_iterator
 			{
@@ -476,11 +518,11 @@ namespace impl
 			}
 			auto cbegin() const -> const_iterator
 			{
-				return const_iterator(make_segment_and_bucket_at_begin());
+				return const_iterator(make_segment_and_bucket_at_begin(), 0U);
 			}
 			auto cend() const -> const_iterator
 			{
-				return const_iterator(make_segment_and_bucket_at_end());
+				return const_iterator(make_segment_and_bucket_at_end(), 0U);
 			}
 
 			using persist_controller_t::bucket_count;
@@ -516,16 +558,6 @@ namespace impl
 				auto sb = make_segment_and_bucket_for_iterator(n);
 				return const_local_iterator(sb, owner::value_type(0));
 			}
-
-			/* use trylock to attempt a shared lock */
-			template <typename K>
-				auto lock_shared(const K &k) -> bool;
-			/* use trylock to attempt a unique lock */
-			template <typename K>
-				auto lock_unique(const K &k) -> bool;
-			/* unlock (from write if write exists, else read */
-			template <typename K>
-				void unlock(const K &key);
 			auto size() const -> size_type;
 
 			bool set_auto_resize(bool v1) { auto v0 = _auto_resize; _auto_resize = v1; return v0; }
@@ -672,12 +704,8 @@ template <
 		using base::count;
 
 		/* lookup */
+		using base::find;
 		using base::at;
-
-		/* locking */
-		using base::lock_shared;
-		using base::lock_unique;
-		using base::unlock;
 
 		template <typename HopHash>
 			friend class impl::hop_hash_local_iterator_impl;
@@ -721,17 +749,25 @@ namespace impl
 				>
 		{
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
-			segment_and_bucket_t _sb;
-			owner::value_type _mask;
+			segment_and_bucket_t _sb_owner;
+			owner::index_type _content_index;
 			void advance_to_in_use()
 			{
-				if ( _mask != 0 )
+				while ( _content_index != owner::size && ! _sb_owner.deref().is_in_use(_content_index) )
 				{
-					for ( ; ( _mask & 1U ) == 0; _mask >>= 1 )
-					{
-						_sb.incr_with_wrap();
-					}
+					++_content_index;
 				}
+				if ( _content_index == owner::size )
+				{
+					_content_index = 0;
+					_sb_owner.incr_with_wrap();
+				}
+			}
+			segment_and_bucket_t sb_content() const
+			{
+				segment_and_bucket_t sbc(_sb_owner);
+				sbc.add_small(_content_index);
+				return sbc;
 			}
 
 		protected:
@@ -741,12 +777,11 @@ namespace impl
 			/* HopHash 106 (Iterator) */
 			auto deref() const -> typename base::reference
 			{
-				return _sb.deref().content<typename HopHash::value_type>::value();
+				return sb_content().deref().content<typename HopHash::value_type>::value();
 			}
 			void incr()
 			{
-				_sb.incr_with_wrap();
-				_mask >>= 1;
+				++_content_index;
 				advance_to_in_use();
 			}
 		public:
@@ -764,9 +799,9 @@ namespace impl
 				);
 			/* HopHash 109 (ForwardIterator) - handled by 107 */
 		public:
-			hop_hash_local_iterator_impl(const segment_and_bucket_t &sb_, owner::value_type mask_)
-				: _sb(sb_)
-				, _mask(mask_)
+			hop_hash_local_iterator_impl(const segment_and_bucket_t &sb_owner_)
+				: _sb_owner(sb_owner_)
+				, _content_index(0)
 			{
 				advance_to_in_use();
 			}
@@ -781,12 +816,24 @@ namespace impl
 				>
 		{
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
-			segment_and_bucket_t _sb;
+			/* ERROR: iterator runs through non-empty content.
+			 * It should run through owners, indexing the content within each owner
+			 * that is necessary to allow erase(), which needs both to locate both owner bucket
+			 * and content bucket, to take an iterator.
+			 */
+			segment_and_bucket_t _sb_owner;
+			unsigned _content_index;
+			/* The "end" value is the past the last _sb_owner, that is (last segment, last bucket+1) */
 			void advance_to_in_use()
 			{
-				while ( _sb.can_incr_without_wrap() && _sb.deref().state_get() != HopHash::bucket_t::IN_USE )
+				while ( ! _sb_owner.at_end() && ! _sb_owner.deref().is_in_use(_content_index) )
 				{
-					_sb.incr_without_wrap();
+					++_content_index;
+					if ( _content_index == owner::size )
+					{
+						_content_index = 0;
+						_sb_owner.incr_without_wrap();
+					}
 				}
 			}
 
@@ -794,14 +841,26 @@ namespace impl
 			using base =
 				std::iterator<std::forward_iterator_tag, typename HopHash::value_type>;
 
+			segment_and_bucket_t sb_content() const
+			{
+				segment_and_bucket_t sbc(_sb_owner);
+				sbc.add_small(_content_index);
+				return sbc;
+			}
+
 			/* HopHash 106 (Iterator) */
 			auto deref() const -> typename base::reference
 			{
-				return _sb.deref().content<typename HopHash::value_type>::value();
+				return sb_content().deref().content<typename HopHash::value_type>::value();
 			}
 			void incr()
 			{
-				_sb.incr_without_wrap();
+				++_content_index;
+				if ( _content_index == owner::size )
+				{
+					_content_index = 0;
+					_sb_owner.incr_without_wrap();
+				}
 				advance_to_in_use();
 			}
 		public:
@@ -819,11 +878,13 @@ namespace impl
 				);
 			/* HopHash 109 (ForwardIterator) - handled by 107 */
 		public:
-			hop_hash_iterator_impl(const segment_and_bucket_t &sb_)
-				: _sb(sb_)
+			hop_hash_iterator_impl(const segment_and_bucket_t &sb_owner_, const owner::index_type ix_)
+				: _sb_owner(sb_owner_)
+				, _content_index(ix_)
 			{
 				advance_to_in_use();
 			}
+			friend class impl::hop_hash_iterator<HopHash>;
 		};
 
 	template <typename HopHash>
@@ -902,9 +963,12 @@ namespace impl
 		{
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			using typename hop_hash_iterator_impl<HopHash>::base;
+			const auto &sb_owner() const { return this->_sb_owner; }
+			using hop_hash_iterator_impl<HopHash>::sb_content;
+			auto content_index() const { return this->_content_index; }
 		public:
-			hop_hash_iterator(const segment_and_bucket_t & i)
-				: hop_hash_iterator_impl<HopHash>(i)
+			hop_hash_iterator(const segment_and_bucket_t & sb_, owner::index_type ix_)
+				: hop_hash_iterator_impl<HopHash>(sb_, ix_)
 			{}
 			/* HopHash 106 (Iterator) */
 			auto operator*() const -> typename base::reference
@@ -929,6 +993,15 @@ namespace impl
 				return ti;
 			}
 			/* HopHash 109 (ForwardIterator) - handled by 107 */
+			template <
+				typename Key
+				, typename T
+				, typename Hash
+				, typename Pred
+				, typename Allocator
+				, typename SharedMutex
+			>
+				friend class hop_hash_base;
 		};
 
 	template <typename HopHash>
@@ -938,6 +1011,9 @@ namespace impl
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			using typename hop_hash_iterator_impl<HopHash>::base;
 		public:
+			hop_hash_const_iterator(const segment_and_bucket_t & sb_, owner::index_type ix_)
+				: hop_hash_iterator_impl<HopHash>(sb_, ix_)
+			{}
 			hop_hash_const_iterator(typename HopHash::size_type i)
 				: hop_hash_iterator_impl<HopHash>(i)
 			{}
@@ -972,7 +1048,7 @@ namespace impl
 			, const hop_hash_local_iterator_impl<HopHash> b
 		)
 		{
-			return a._mask == b._mask;
+			return a._sb_owner == b._sb_owner && a._content_index == b._content_index;
 		}
 
 	template <typename HopHash>
@@ -990,7 +1066,7 @@ namespace impl
 			, const hop_hash_iterator_impl<HopHash> b
 		)
 		{
-			return a._sb == b._sb;
+			return a._sb_owner == b._sb_owner && a._content_index == b._content_index;
 		}
 
 	template <typename HopHash>

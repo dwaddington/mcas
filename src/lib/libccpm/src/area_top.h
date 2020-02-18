@@ -18,10 +18,8 @@
 #include "list_item.h"
 #include <ccpm/interfaces.h>
 #include <array>
-#include <cassert>
 #include <cstddef>
 #include <vector>
-#include <sys/uio.h> /* iovec */
 
 struct iovec;
 
@@ -110,7 +108,9 @@ namespace ccpm
 	public:
 		static area_top *create(const ::iovec &iov);
 
-		static area_top *restore(const ::iovec &iov, ownership_callback_t resolver);
+		static area_top *restore(const ::iovec &iov, const ownership_callback_t &resolver);
+
+		bool includes(const void *addr) const;
 
 		/* Free byte count. Required by users */
 		std::size_t bytes_free() const;
