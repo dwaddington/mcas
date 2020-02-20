@@ -88,7 +88,7 @@ class Fabric_connection_base {
   static void completion_callback(void *   context,
                                   status_t st,
                                   std::uint64_t,  // completion_flags,
-                                  std::size_t,    //   len,
+                                  std::size_t len,    //   len,
                                   void *error_data,
                                   void *param) noexcept
   {
@@ -98,7 +98,7 @@ class Fabric_connection_base {
     static constexpr bool option_DEBUG = false;
 
     if (UNLIKELY(st != S_OK)) {
-      PERR("Fabric_connection_base: fabric operation failed st != S_OK (st=%d, context=%p)", st, context);
+      PERR("Fabric_connection_base: fabric operation failed st != S_OK (st=%d, context=%p, len=%lu)", st, context, len);
       PERR("Error: %s", static_cast<char *>(error_data));
       return;
     }
@@ -200,7 +200,7 @@ class Fabric_connection_base {
     if (!val_buffer) {
       /* if packet is small enough use inject */
       if (iov->iov_len <= _transport->max_inject_size()) {
-        if (option_DEBUG > 2) PLOG("Fabric_connection_base: posting send with inject (%p)", iov->iov_base);
+        if (option_DEBUG > 2) PLOG("Fabric_connection_base: posting send with inject (%p,len=%lu)", iov->iov_base, iov->iov_len);
 
         _transport->inject_send(iov->iov_base, iov->iov_len);
         free_buffer(buffer); /* buffer can be immediately released; see fi_inject */

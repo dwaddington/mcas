@@ -54,6 +54,17 @@ class Shard : public Shard_transport {
   static constexpr size_t ADO_MAP_RESERVE     = 2048;
 
  private:
+
+  struct rename_info_t {
+    rename_info_t(const Component::IKVStore::pool_t pool_, 
+                  const std::string& from_,
+                  const std::string& to_) : pool(pool_), from(from_), to(to_) {}
+
+    Component::IKVStore::pool_t pool;
+    std::string from;
+    std::string to;
+  };
+  
   struct lock_info_t {
     Component::IKVStore::pool_t pool;
     Component::IKVStore::key_t  key;
@@ -73,6 +84,7 @@ class Shard : public Shard_transport {
   using buffer_t           = Shard_transport::buffer_t;
   using index_map_t        = std::unordered_map<pool_t, Component::IKVIndex *>;
   using locked_value_map_t = std::unordered_map<const void *, lock_info_t>;
+  using rename_map_t       = std::unordered_map<const void *, rename_info_t>;
   using task_list_t        = std::list<Shard_task *>;
 
   unsigned _debug_level;
@@ -141,9 +153,12 @@ class Shard : public Shard_transport {
                     const std::string  ado_cores,
                     float              ado_core_num);
 
+  /* locked values are those from put_direct and get_direct */
   void add_locked_value(const pool_t pool_id, Component::IKVStore::key_t key, void *target, size_t target_len);
-
   void release_locked_value(const void *target);
+
+  void add_pending_rename(const pool_t pool_id, const void * target, const std::string& from, const std::string& to);
+  void release_pending_rename(const void * target);
 
   void initialize_components(const std::string &backend,
                              const std::string &index,
@@ -307,6 +322,7 @@ class Shard : public Shard_transport {
   ado_map_t                                 _ado_map;
   std::vector<Connection_handler *>         _handlers;
   locked_value_map_t                        _locked_values;
+  rename_map_t                              _pending_renames;
   task_list_t                               _tasks;
   std::set<work_request_key_t>              _outstanding_work;
   std::vector<work_request_t *>             _failed_async_requests;

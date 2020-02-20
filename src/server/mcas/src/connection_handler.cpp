@@ -115,7 +115,7 @@ int Connection_handler::tick()
         }
 
         if (_posted_value_buffer) {
-          /* add action to release lock */
+          /* add action to release lock, this will be picked up by shard */
           add_pending_action(action_t{ACTION_RELEASE_VALUE_LOCK, _posted_value_buffer->base()});
 
           delete _posted_value_buffer; /* delete descriptor */
@@ -141,9 +141,8 @@ int Connection_handler::tick()
     }
     case POST_HANDSHAKE: {
       if (option_DEBUG > 2) PMAJOR("Shard State: %lu %p POST_HANDSHAKE", _tick_count, static_cast<const void *>(this));
-      //    post_recv_buffer(allocate());
 
-      for (size_t i = 0; i < NUM_SHARD_BUFFERS / 2; i++) post_recv_buffer(allocate());
+      post_recv_buffer(allocate());
 
       set_state(WAIT_HANDSHAKE);
       break;
@@ -169,6 +168,11 @@ int Connection_handler::tick()
             iob->length(), auth_id(), 1 /* seq */, max_message_size(), reinterpret_cast<uint64_t>(this),
             nullptr,  // cert
             0);
+
+        if(option_DEBUG > 2) {
+          PINF("RDMA: max message size (%lu)", max_message_size());
+        }
+                 
         /* post response */
         reply_iob->set_length(reply_msg->msg_len);
         post_send_buffer(reply_iob);
@@ -180,8 +184,7 @@ int Connection_handler::tick()
     case WAIT_HANDSHAKE_RESPONSE_COMPLETION: {
       if (check_for_posted_send_complete()) {
         if (option_DEBUG > 2)
-          PMAJOR("Shard State: %lu %p WAIT_HANDSHAKE_RESPONSE_COMPLETION "
-                 "complete.",
+          PMAJOR("Shard State: %lu %p WAIT_HANDSHAKE_RESPONSE_COMPLETION complete.",
                  _tick_count, static_cast<const void *>(this));
         set_state(POST_MSG_RECV);
       }

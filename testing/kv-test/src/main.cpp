@@ -184,6 +184,49 @@ TEST_F(KV_test, BasicPutGetOperations)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(KV_test, PutDirect)
+{
+  using namespace Component;
+
+  const std::string poolname = "PutDirect";
+  
+  auto pool = mcas->create_pool(poolname,
+                                GB(1),   /* size */
+                                0, /* flags */
+                                100); /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  //  ASSERT_OK(mcas->put(pool, key0, value0, 0));
+
+  size_t user_buffer_len = MB(128);
+  void * user_buffer = aligned_alloc(KB(4), user_buffer_len);
+  IMCAS::memory_handle_t mem = mcas->register_direct_memory(user_buffer, user_buffer_len);
+
+  ASSERT_OK(mcas->put_direct(pool, "someLargeObject", user_buffer, user_buffer_len, mem));
+  ASSERT_OK(mcas->put_direct(pool, "anotherLargeObject", user_buffer, user_buffer_len, mem));
+
+  std::vector<uint64_t> attrs;
+  ASSERT_OK(mcas->get_attribute(pool, IMCAS::Attribute::COUNT, attrs));
+  ASSERT_TRUE(attrs[0] == 2); /* there should be only one object */
+  
+
+  size_t user_buffer2_len = MB(128);
+  void * user_buffer2 = aligned_alloc(KB(4), user_buffer_len);
+  IMCAS::memory_handle_t mem2 = mcas->register_direct_memory(user_buffer2, user_buffer2_len);
+
+  ASSERT_OK(mcas->get_direct(pool, "someLargeObject", user_buffer2, user_buffer2_len, mem2));
+
+  ASSERT_TRUE(memcmp(user_buffer, user_buffer2, user_buffer_len) == 0); /* integrity check */
+
+  ASSERT_OK(mcas->unregister_direct_memory(mem2));
+  ASSERT_OK(mcas->unregister_direct_memory(mem));
+            
+  ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
+  free(user_buffer);
+}  
+
 TEST_F(KV_test, AsyncPutErase)
 {
   using namespace Component;

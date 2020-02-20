@@ -411,7 +411,8 @@ status_t Connection_handler::two_stage_put_direct(const pool_t                 p
 
     /* wait for response from header before posting the value */
 
-    if (option_DEBUG) PMAJOR("got response (status=%u) from put direct header", response_msg->get_status());
+    if (option_DEBUG) PMAJOR("got response (status=%u) from put direct header",
+                             response_msg->get_status());
 
     /* if response is not OK, don't follow with the value */
     if (response_msg->get_status() != S_OK) {
@@ -423,12 +424,14 @@ status_t Connection_handler::two_stage_put_direct(const pool_t                 p
   buffer_t *value_buffer = reinterpret_cast<buffer_t *>(handle);
   value_buffer->set_length(value_len);
   assert(value_buffer->check_magic());
+  assert(value_len > 0);
 
   if (option_DEBUG)
     PLOG("value_buffer: (iov_len=%lu, region=%p, desc=%p)", value_buffer->iov->iov_len,
          static_cast<const void *>(value_buffer->region), value_buffer->desc);
 
-  sync_send(value_buffer);  // client owns buffer
+
+  sync_send(value_buffer);  /* caller owns buffer */
 
   if (option_DEBUG) {
     PINF("two_stage_put_direct: complete");

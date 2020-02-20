@@ -19,6 +19,7 @@
 #include <api/kvindex_itf.h>
 #include <common/dump_utils.h>
 #include <common/utils.h>
+#include <common/str_utils.h>
 #include <libpmem.h>
 #include <nupm/mcas_mod.h>
 #include <zlib.h>
@@ -221,6 +222,7 @@ void Shard::main_loop()
             case Connection_handler::ACTION_RELEASE_VALUE_LOCK:
               if (_debug_level > 2) PLOG("releasing value lock (%p)", action.parm);
               release_locked_value(action.parm);
+              release_pending_rename(action.parm);
               break;
             default:
               throw Logic_exception("unknown action type");
@@ -511,7 +513,9 @@ void Shard::process_message_pool_request(Connection_handler *handler, Protocol::
   handler->post_response(response_iob);
 }
 
-void Shard::add_locked_value(const pool_t pool_id, Component::IKVStore::key_t key, void *target, size_t target_len)
+void Shard::add_locked_value(const pool_t pool_id,
+                             Component::IKVStore::key_t key,
+                             void *target, size_t target_len)
 {
   auto i = _locked_values.find(target);
   if (i == _locked_values.end()) {
@@ -543,6 +547,58 @@ void Shard::release_locked_value(const void *target)
   }
 }
 
+/* note, target address is used because it is unique for the shard */
+void Shard::add_pending_rename(const pool_t pool_id, const void* target, const std::string& from, const std::string& to)
+{
+  if(_debug_level > 2)
+    PLOG("added pending rename %p %s->%s", target, from.c_str(), to.c_str());
+    
+  assert(_pending_renames.find(target) ==  _pending_renames.end());
+
+  _pending_renames.emplace(std::piecewise_construct,
+                           std::forward_as_tuple(target),
+                           std::forward_as_tuple(pool_id, from,to));
+}
+
+void Shard::release_pending_rename(const void* target)
+{
+  try {
+  auto info = _pending_renames.at(target);
+
+  if(_debug_level > 2)
+    PLOG("renaming (%s) to (%s)", info.from.c_str(), info.to.c_str());
+  
+  void* value;
+  size_t value_len = 8;
+  Component::IKVStore::key_t keyh;
+
+  /* we do the lock/unlock first, because there might not be a prior
+     object so this will create one on demand. */
+  if(_i_kvstore->lock(info.pool, info.to, Component::IKVStore::STORE_LOCK_WRITE, value, value_len, keyh) < 0)
+    throw Logic_exception("release_pending_rename lock failed");
+
+  if(_i_kvstore->unlock(info.pool, keyh) != S_OK)
+    throw Logic_exception("release_pending_rename unlock failed");
+
+  if(_i_kvstore->swap_keys(info.pool, info.from, info.to) != S_OK)
+    throw Logic_exception("release_pending_rename swap_keys failed");
+    
+  if(_i_kvstore->erase(info.pool, info.from) != S_OK)
+    throw Logic_exception("release_pending_rename erase failed");
+
+  _pending_renames.erase(target);
+  
+  /* now make available in the index */
+  add_index_key(info.pool, info.to);
+
+  }
+  catch(std::out_of_range& err) {
+    /* silent exception; there may not be a rename for this object
+       if the release is coming from a get_direct
+     */
+  }
+}
+  
 void Shard::process_message_IO_request(Connection_handler *handler, Protocol::Message_IO_request *msg)
 {
   using namespace Component;
@@ -575,7 +631,10 @@ void Shard::process_message_IO_request(Connection_handler *handler, Protocol::Me
       goto send_response;
     }
 
-    std::string k(msg->key(), msg->key_len);
+    std::string actual_key(msg->key(), msg->key_len);
+    std::string k("___pending_");
+    k += actual_key; /* we embed the actual key for recovery purposes */
+    
     /* create (if needed) and lock value */
     Component::IKVStore::key_t key_handle;
     status_t rc = _i_kvstore->lock(msg->pool_id, k, IKVStore::STORE_LOCK_WRITE, target, target_len, key_handle);
@@ -596,17 +655,15 @@ void Shard::process_message_IO_request(Connection_handler *handler, Protocol::Me
 
     auto pool_id = msg->pool_id;
 
-    /* register clean up task for value */
+    /* register clean and rename tasks for value */
     add_locked_value(pool_id, key_handle, target, target_len);
+    add_pending_rename(pool_id, target, k, actual_key);
 
     /* register memory unless pre-registered */
     Connection_base::memory_region_t region = handler->ondemand_register(target, target_len);
 
     /* set up value memory to receive value from network */
     handler->set_pending_value(target, target_len, region);
-
-    /* update index ; position OK? */
-    add_index_key(msg->pool_id, k);
 
     Protocol::Message_IO_response *response =
         new (iob->base()) Protocol::Message_IO_response(iob->length(), handler->auth_id());

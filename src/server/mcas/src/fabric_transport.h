@@ -26,7 +26,7 @@ namespace mcas
 class Connection_handler;
 
 class Fabric_transport {
-  bool option_DEBUG;
+  bool _fabric_debug;
 
  public:
   static constexpr unsigned INJECT_SIZE = 128;
@@ -37,9 +37,9 @@ class Fabric_transport {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++" // uninitialized _fabric, _server_factory
   Fabric_transport(const std::string provider, const std::string device, unsigned port)
-    : option_DEBUG( mcas::Global::debug_level > 1 )
+    : _fabric_debug( mcas::Global::debug_level > 1 )
   {
-    if (option_DEBUG)
+    if (_fabric_debug)
       PLOG("fabric_transport: (provider=%s, device=%s, port=%u)", provider.c_str(), device.c_str(), port);
 
     init(provider, device, port);
@@ -58,7 +58,7 @@ class Fabric_transport {
   {
     using namespace Component;
 
-    if (option_DEBUG) PLOG("Fabric: bound to device (%s)", device.c_str());
+    if (_fabric_debug) PLOG("Fabric: bound to device (%s)", device.c_str());
 
     /* FABRIC */
     auto i_fabric_factory = static_cast<IFabric_factory*>(load_component("libcomponent-fabric.so", net_fabric_factory));

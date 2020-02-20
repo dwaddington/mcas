@@ -395,7 +395,8 @@ class IKVStore : public Component::IBase {
 
   /**
    * Atomically (crash-consistent for pmem) swap keys (K,V)(K',V') -->
-   * (K,V')(K',V)
+   * (K,V')(K',V).  Before calling this API, both KV-pairs must be
+   * unlocked.  
    *
    * @param pool Pool handle
    * @param key First key
@@ -406,7 +407,7 @@ class IKVStore : public Component::IBase {
    */
   virtual status_t swap_keys(const pool_t pool, const std::string key0, const std::string key1)
   {
-    return E_NOT_SUPPORTED; /* to remove after 313 */
+    return E_NOT_SUPPORTED; 
   }
 
   /**
