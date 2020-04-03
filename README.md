@@ -12,9 +12,9 @@ The key attributes of the solution are:
 
 ## Documentation
 
-* [Quick Start](./doc/quick_start.md)
-* [Overview](./doc/MCAS_overview.md)
-* [More documentation](./doc/index.md)
+* [Quick Start](./info/quick_start.md)
+* [Overview](./info/MCAS_overview.md)
+* [More documentation](./info/index.md)
 
 ## How to Build
 
@@ -38,6 +38,22 @@ Create build directory at root level.  We normally use `mcas/build`:
 mkdir build
 cd build
 cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+```
+
+Sometimes we build with an alternate compiler:
+
+```bash
+mkdir clang
+cd clang
+cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+```
+
+Or with code coverage:
+
+```bash
+mkdir coverage
+cd coverage
+cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=1 -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
 ```
 
 ### one-time build
