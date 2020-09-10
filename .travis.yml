@@ -45,8 +45,7 @@ before_install:
     tail -f /dev/null
   - docker ps
   - docker exec -t ${CONTAINER_NAME} bash  -c "
-    cd /travis ; 
-    git submodule update --init --recursive ;
+    cd /travis ;     
     cd /travis/deps ;
     ${BOOTSTRAP_FILE} ;
     "
@@ -54,6 +53,7 @@ before_install:
 script:
   - docker exec -t ${CONTAINER_NAME} bash -c "
     cd /travis &&
+    git submodule update --init --recursive &&
     ./tools/check_contents.sh ./src &&
     mkdir build &&
     cd build &&
