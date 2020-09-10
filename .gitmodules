@@ -1,11 +1,10 @@
 [submodule "src/lib/tbb"]
 	path = src/lib/tbb
 	url = https://github.com/dwaddington/tbb.git
-[submodule "src/lib/libzyre"]
-	path = src/lib/libzyre
+[submodule "src/lib/zyre"]
+	path = src/lib/zyre
 	url = https://github.com/dwaddington/zyre.git
 	branch = v2_branch
 [submodule "src/lib/GSL"]
 	path = src/lib/GSL
-	url = https://github.com/microsoft/GSL.git
-	branch = v3.0.1
+	url = https://github.com/dwaddington/GSL.git
