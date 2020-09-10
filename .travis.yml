@@ -4,7 +4,6 @@ language: minimal
 branches:
   only:
     - master
-    - dw
 
 sudo: required
 
