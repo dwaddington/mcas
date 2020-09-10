@@ -4,7 +4,6 @@ language: minimal
 branches:
   only:
     - master
-    - dw
 
 sudo: required
 
@@ -53,6 +52,7 @@ before_install:
 script:
   - docker exec -t ${CONTAINER_NAME} bash -c "
     cd /travis &&
+    git submodule update --init --recursive &&
     ./tools/check_contents.sh ./src &&
     mkdir build &&
     cd build &&
