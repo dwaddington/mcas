@@ -20,11 +20,10 @@
 #include <cstdint> /* uint64_t */
 #include <vector>
 
-class cnxn_state;
+struct cnxn_state;
 
-class cb_ctxt
+struct cb_ctxt
 {
-public:
   using cb_t = void (*)(cb_ctxt *ctxt, ::status_t stat, std::size_t len);
 private:
   cnxn_state *_state;
@@ -36,12 +35,12 @@ private:
   cb_ctxt *_response;
   const char *_id;
 public:
-  static Component::IFabric_op_completer::complete_definite cb;
+  static component::IFabric_op_completer::complete_definite cb;
   explicit cb_ctxt(
     cnxn_state &
     , cb_t cb_call
     , cb_ctxt *response
-    , Component::IFabric_connection &cnxn
+    , component::IFabric_connection &cnxn
     , std::size_t buffer_size
     , std::uint64_t remote_key
     , std::size_t msg_size

@@ -12,6 +12,8 @@
 */
 
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion" // needed by libfabric 1.9
 #pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <rdma/fabric.h>
 #pragma GCC diagnostic pop

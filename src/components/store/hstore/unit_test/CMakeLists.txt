@@ -6,6 +6,7 @@ enable_language(CXX C ASM)
 set(CMAKE_CXX_STANDARD 14)
 
 find_library(GTEST_LIB NAMES GTEST PATHS /usr/local/lib,/usr/lib)
+
 find_library(PROFILER_LIB NAMES profiler PATHS /usr/local/lib,/usr/local/lib64,/usr/lib,/usr/lib64)
 if ("${PROFILER_LIB}" STREQUAL "PROFILER_LIB-NOTFOUND")
 set(PROFILER "")
@@ -13,7 +14,8 @@ else()
 set(PROFILER "profiler")
 add_definitions(-DHAS_PROFILER=1)
 endif()
-add_definitions(-DCONFIG_DEBUG)
+
+add_definitions(-DCONFIG_DEBUG) # P{LOG,DEG,INF,WRN,ERR} control
 
 include_directories(../../../../lib/common/include)
 include_directories(../../../)

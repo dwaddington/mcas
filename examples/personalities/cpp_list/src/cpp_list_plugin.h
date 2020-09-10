@@ -26,7 +26,7 @@
 #include <cpp_list_proto_generated.h>
 #include <ccpm/interfaces.h>
 
-class ADO_structured_plugin : public Component::IADO_plugin
+class ADO_structured_plugin : public component::IADO_plugin
 {  
 private:
   static constexpr bool option_DEBUG = true;
@@ -53,9 +53,9 @@ public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x59564581,0x9e1b,0x4811,0xbdb2,0x19,0x57,0xa0,0xa6,0x84,0x57);
   
-  void * query_interface(Component::uuid_t& itf_uuid) override {
-    if(itf_uuid == Component::IADO_plugin::iid()) {
-      return (void *) static_cast<Component::IADO_plugin*>(this);
+  void * query_interface(component::uuid_t& itf_uuid) override {
+    if(itf_uuid == component::IADO_plugin::iid()) {
+      return (void *) static_cast<component::IADO_plugin*>(this);
     }
     else return NULL; // we don't support this interface
   }
@@ -85,11 +85,11 @@ public:
 
 private:
 
-  status_t process_putvar_command(const Structured_ADO_protocol::PutVariable * command,
+  status_t process_putvar_command(const structured_ADO_protocol::PutVariable * command,
                                   const ccpm::region_vector_t& regions);
 
 
-  status_t process_invoke_command(const Structured_ADO_protocol::Invoke * command,
+  status_t process_invoke_command(const structured_ADO_protocol::Invoke * command,
                                   const ccpm::region_vector_t& regions,
                                   void*& out_work_response,
                                   size_t& out_work_response_len);

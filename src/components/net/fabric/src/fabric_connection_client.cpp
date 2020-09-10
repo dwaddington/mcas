@@ -16,6 +16,7 @@
 
 #include "bad_dest_addr_alloc.h"
 #include "event_producer.h"
+#include "fabric.h" /* choose_port */
 #include "fabric_check.h" /* CHECK_FI_ERR */
 #include "fabric_runtime_error.h"
 #include "fabric_str.h" /* tostr */
@@ -87,7 +88,7 @@ Fabric_connection_client::Fabric_connection_client(
   , std::uint16_t control_port_
 )
 try
-  : Fabric_op_control(fabric_, ev_, info_, std::unique_ptr<Fd_control>(new Fd_control(remote_, control_port_)), set_peer_early)
+  : Fabric_op_control(fabric_, ev_, info_, std::make_unique<Fd_control>(remote_, fabric_.choose_port(control_port_)), set_peer_early)
   , _ev(ev_)
 {
   if ( ep_info().ep_attr->type == FI_EP_MSG )

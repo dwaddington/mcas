@@ -24,12 +24,12 @@
  * (and limited to those fabrics supported by the available software and hardware).
  */
 class Fabric_factory
-  : public Component::IFabric_factory
+  : public component::IFabric_factory
 {
 public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0xfac3a5ae,0xcf34,0x4aff,0x8321,0x19,0x08,0x21,0xa9,0x9f,0xd3);
-  void *query_interface(Component::uuid_t& itf_uuid) override;
+  void *query_interface(component::uuid_t& itf_uuid) override;
 
   Fabric_factory();
   /**
@@ -38,18 +38,20 @@ public:
    * @param json_configuration Configuration string in JSON
    * form. e.g. {
    *   "caps":["FI_MSG","FI_RMA"],
+   *   "name": { "name" : "10.0.0.1/8" },
    *   "fabric_attr": { "prov_name" : "verbs" },
    *   "bootstrap_addr":"10.0.0.1:9999" }
    * @return
    *
    * caps:
+   * name: same format as fi_fabric_attr::name
    * prov_name: same format as fi_fabric_attr::prov_name
    *
    * @throw fabric_bad_alloc : std::bad_alloc - out of memory
    * @throw std::domain_error : json file parse-detected error
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    */
-  Component::IFabric * make_fabric(const std::string& json_configuration) override;
+  component::IFabric * make_fabric(const std::string& json_configuration) override;
 };
 
 #endif

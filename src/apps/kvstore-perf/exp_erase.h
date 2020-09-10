@@ -10,7 +10,7 @@
 
 class ExperimentErase : public Experiment
 {
-  std::size_t _i;
+  pool_entry_offset_t _i;
   std::vector<double> _start_time;
   std::vector<double> _latencies;
   BinStatistics _latency_stats;

@@ -13,20 +13,45 @@
 #include "connection_handler.h"
 
 #include "mcas_config.h"
-#include "shard.h"
+
+static constexpr unsigned EXTRA_BISCUITS = 0;
 
 namespace mcas
 {
+Connection_handler::Connection_handler(unsigned debug_level_, gsl::not_null<Factory *> factory, gsl::not_null<Connection *> connection)
+    : Connection_base(debug_level_, factory, connection),
+      Region_manager(debug_level_, connection),
+      _debug_level{debug_level_},
+      _mr_vector{},
+      _tick_count(0),
+      _auth_id(0),
+      _pending_msgs{},
+      _pending_actions
+{
+}
+#if 0
+    , _freq_mhz(common::get_rdtsc_frequency_mhz())
+#endif
+, _pool_manager(), _stats{} {}
+
+Connection_handler::~Connection_handler()
+{
+  dump_stats();
+#if 0
+    exit(0); /* for profiler, if not using --forced-exit */
+#endif
+}
+
 int Connection_handler::tick()
 {
-  using namespace mcas::Protocol;
+  using namespace Protocol;
 
   auto response = TICK_RESPONSE_CONTINUE;
   _tick_count++;
 
 #if 0
   auto now = rdtsc();
-  
+
   /* output IOPS */
   if (_stats.next_stamp == 0) {
     _stats.next_stamp = now + (_freq_mhz * 1000000.0);
@@ -39,177 +64,145 @@ int Connection_handler::tick()
   }
 #endif
 
+  /* */
   if (check_network_completions() == Fabric_connection_base::Completion_state::CLIENT_DISCONNECT) {
     PMAJOR("Client disconnected.");
-    return mcas::Connection_handler::TICK_RESPONSE_CLOSE;
+    _state = State::CLIENT_DISCONNECTED;
+    return Connection_handler::TICK_RESPONSE_CLOSE;
+  }
+
+  if (_send_value_posted_count != 0) {
+    ++_stats.wait_send_value_misses;
   }
 
   switch (_state) {
-    case POST_MSG_RECV: { /*< post buffer to receive new message */
-      if (option_DEBUG > 2) PMAJOR("Shard State: %lu %p POST_MSG_RECV", _tick_count, static_cast<const void *>(this));
-      post_recv_buffer(allocate());
-      set_state(WAIT_NEW_MSG_RECV);
-
-      break;
-    }
-    case WAIT_NEW_MSG_RECV: {
-      if (check_for_posted_recv_complete()) { /*< check for recv completion */
-
-        const auto iob = posted_recv();
+    case WAIT_NEW_MSG_RECV:
+      if (check_for_posted_recv_complete()) /*< check for recv completion */
+      {
+        auto iob = posted_recv();
         assert(iob);
 
-        const Message *msg = mcas::Protocol::message_cast(iob->base());
-        assert(msg);
+        const auto msg = Protocol::message_cast(iob->base());
+        msg_recv_log(msg, __func__);
 
-        switch (msg->type_id) {
-          case MSG_TYPE_IO_REQUEST: {
+        //        PNOTICE("Recv message: crc32 (id=%lx, len=%u)", msg->auth_id(), msg->msg_len());
+
+        switch (msg->type_id()) {
+          case MSG_TYPE_IO_REQUEST:
             if (option_DEBUG > 2) PMAJOR("Shard: IO_REQUEST");
-            _pending_msgs.push_back(iob);
-            set_state(POST_MSG_RECV);
+            _pending_msgs.push(iob);
+            post_recv_buffer(allocate_recv());
             break;
-          }
+
           case MSG_TYPE_PUT_ADO_REQUEST:
-          case MSG_TYPE_ADO_REQUEST: {
+          case MSG_TYPE_ADO_REQUEST:
             if (option_DEBUG > 2) PMAJOR("Shard: ADO_REQUEST");
-            _pending_msgs.push_back(iob);
-            set_state(POST_MSG_RECV);
+            _pending_msgs.push(iob);
+            assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+            post_recv_buffer(allocate_recv());
             break;
-          }
-          case MSG_TYPE_CLOSE_SESSION: {
+
+          case MSG_TYPE_CLOSE_SESSION:
+            assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+            post_recv_buffer(allocate_recv());
             if (option_DEBUG > 2) PMAJOR("Shard: CLOSE_SESSION");
             free_recv_buffer();
             response = TICK_RESPONSE_CLOSE;
             break;
-          }
-          case MSG_TYPE_POOL_REQUEST: {
+
+          case MSG_TYPE_POOL_REQUEST:
             if (option_DEBUG > 2) PMAJOR("Shard: POOL_REQUEST");
-            _pending_msgs.push_back(iob);
-            set_state(POST_MSG_RECV); /* move state to new message recv */
+            _pending_msgs.push(iob);
+            assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+            post_recv_buffer(allocate_recv());
             break;
-          }
-          case MSG_TYPE_INFO_REQUEST: {
+
+          case MSG_TYPE_INFO_REQUEST:
             if (option_DEBUG > 2) PMAJOR("Shard: INFO_REQUEST");
-            _pending_msgs.push_back(iob);
-            set_state(POST_MSG_RECV); /* move state to new message recv */
+            _pending_msgs.push(iob);
+            assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+            post_recv_buffer(allocate_recv());
             break;
-          }
+
           default:
-            throw Logic_exception("unhandled message (type:%x)", msg->type_id);
+            throw Logic_exception("unhandled message (type:%x)", int(msg->type_id()));
         }
 
-        _stats.recv_msg_count++;
+        ++_stats.recv_msg_count;
 
-        if (option_DEBUG > 2) PMAJOR("Shard State: %lu %p WAIT_MSG_RECV complete", _tick_count, static_cast<const void *>(this));
+        if (option_DEBUG > 2)
+          PMAJOR("Shard State: %lu %p WAIT_MSG_RECV complete", _tick_count, static_cast<const void *>(this));
       }
       else {
-        _stats.wait_msg_recv_misses++;
+        ++_stats.wait_msg_recv_misses;
       }
 
       break;
-    }
-    case WAIT_SEND_VALUE:
-    case WAIT_RECV_VALUE: {
-      if (check_for_posted_value_complete()) {
-        if (option_DEBUG > 2) {
-          PMAJOR("Shard State: %lu %p WAIT_SEND/RECV_VALUE ok", _tick_count, static_cast<const void *>(this));
-        }
 
-        if (_posted_value_buffer) {
-          /* add action to release lock, this will be picked up by shard */
-          add_pending_action(action_t{ACTION_RELEASE_VALUE_LOCK, _posted_value_buffer->base()});
+    case INITIAL: {
+      static int handshakes = 0;
+      handshakes++;
+      if (option_DEBUG > 2)
+        PMAJOR("Shard State: %lu %p POST_HANDSHAKE (%d)", _tick_count, static_cast<const void *>(this), handshakes);
 
-          delete _posted_value_buffer; /* delete descriptor */
-          _posted_value_buffer = nullptr;
-        }
+      assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+      post_recv_buffer(allocate_recv());
 
-        if (option_DEBUG > 2) PMAJOR("Shard State: %lu %p WAIT_RECV_VALUE_COMPLETE", _tick_count, static_cast<const void *>(this));
-
-        if (_state == WAIT_RECV_VALUE)
-          _stats.recv_msg_count++;
-        else
-          _stats.send_msg_count++;
-
-        set_state(POST_MSG_RECV);
+      /* For an unknown reason, allocating an extra buffer or three makes the
+       * hstore benchmark run about 10% faster */
+      for (auto i = EXTRA_BISCUITS; i != 0; --i) {
+        assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+        post_recv_buffer(allocate_recv());
       }
-      else
-        _stats.wait_recv_value_misses++;
-      break;
-    }
-    case INITIALIZE: {
-      set_state(POST_HANDSHAKE);
-      break;
-    }
-    case POST_HANDSHAKE: {
-      if (option_DEBUG > 2) PMAJOR("Shard State: %lu %p POST_HANDSHAKE", _tick_count, static_cast<const void *>(this));
-
-      post_recv_buffer(allocate());
 
       set_state(WAIT_HANDSHAKE);
       break;
     }
-    case WAIT_HANDSHAKE: {
+
+    case CLIENT_DISCONNECTED: {
+      break;
+    }
+
+    case WAIT_HANDSHAKE:
+      static int resp_handshakes = 0;
       if (check_for_posted_recv_complete()) {
-        if (option_DEBUG > 2) PMAJOR("Shard State: %lu %p WAIT_HANDSHAKE complete", _tick_count, static_cast<const void *>(this));
+        resp_handshakes ++;
+        if (option_DEBUG > 2)
+          PLOG("Shard State: %lu %p WAIT_HANDSHAKE complete (%d)", _tick_count, static_cast<const void *>(this), resp_handshakes);
 
         const auto iob = posted_recv();
         assert(iob);
 
-        const auto msg = mcas::Protocol::message_cast(iob->base())->ptr_cast<Message_handshake>();
+        const auto msg = Protocol::message_cast(iob->base())->ptr_cast<Message_handshake>();
 
         if (msg->get_status() != S_OK) throw General_exception("handshake status != S_OK (%d)", msg->get_status());
 
         /* set authentication token ; TODO - verify token with AAA */
-        set_auth_id(msg->auth_id);
+        set_auth_id(msg->auth_id());
 
-        auto reply_iob = allocate();
+        auto reply_iob = allocate_send();
         assert(reply_iob);
 
-        auto reply_msg = new (reply_iob->base()) mcas::Protocol::Message_handshake_reply(
+        auto reply_msg = new (reply_iob->base()) Protocol::Message_handshake_reply(
             iob->length(), auth_id(), 1 /* seq */, max_message_size(), reinterpret_cast<uint64_t>(this),
             nullptr,  // cert
             0);
 
-        if(option_DEBUG > 2) {
+        if (option_DEBUG > 2) {
           PINF("RDMA: max message size (%lu)", max_message_size());
         }
-                 
-        /* post response */
-        reply_iob->set_length(reply_msg->msg_len);
-        post_send_buffer(reply_iob);
-        free_buffer(iob);
-        set_state(WAIT_HANDSHAKE_RESPONSE_COMPLETION);
-      }
-      break;
-    }
-    case WAIT_HANDSHAKE_RESPONSE_COMPLETION: {
-      if (check_for_posted_send_complete()) {
-        if (option_DEBUG > 2)
-          PMAJOR("Shard State: %lu %p WAIT_HANDSHAKE_RESPONSE_COMPLETION complete.",
-                 _tick_count, static_cast<const void *>(this));
-        set_state(POST_MSG_RECV);
-      }
-      break;
-    }
 
+        /* post response */
+        reply_iob->set_length(reply_msg->msg_len());
+        assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+        post_recv_buffer(allocate_recv());
+        post_send_buffer(reply_iob, reply_msg, __func__);
+        free_buffer(iob);
+        set_state(WAIT_NEW_MSG_RECV);
+      }
+      break;
   }  // end switch
   return response;
-}
-
-void Connection_handler::set_pending_value(void *target, size_t target_len, memory_region_t region)
-{
-  assert(target);
-  assert(target_len);
-
-  if (option_DEBUG > 2) PLOG("set_pending_value (target=%p, target_len=%lu, handle=%p)", target, target_len, static_cast<const void *>(region));
-
-  auto desc = get_memory_descriptor(region);
-  assert(desc);
-  _posted_value_buffer             = new buffer_t(target, target_len, region, desc); /* allocate buffer descriptor */
-  _posted_value_buffer->flags      = Buffer_manager<Fabric_connection_base>::BUFFER_FLAGS_EXTERNAL;
-  _posted_value_buffer_outstanding = true;
-
-  post_recv_value_buffer(_posted_value_buffer);
-  set_state(State::WAIT_RECV_VALUE);
 }
 
 }  // namespace mcas

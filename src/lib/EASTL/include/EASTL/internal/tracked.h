@@ -148,7 +148,7 @@ namespace eastl
 				track_1(r_);
 			}
 
-			weak_tracked(const Tracker &r_, const weak_tracked<Type, Tracker, ID> &other_) noexcept
+			weak_tracked(const Tracker &, const weak_tracked<Type, Tracker, ID> &other_) noexcept
 				: _t(other_._t)
 			{
 				track_1();

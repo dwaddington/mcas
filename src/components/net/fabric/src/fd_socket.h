@@ -15,14 +15,14 @@
 #ifndef _FD_SOCKET_H_
 #define _FD_SOCKET_H_
 
-#include "delete_copy.h"
+#include <common/fd_open.h>
 
+#include <common/delete_copy.h>
 #include <cstddef> /* size_t */
 
 class Fd_socket
+  : public common::Fd_open
 {
-  int _fd;
-  void close() noexcept;
   DELETE_COPY(Fd_socket);
 public:
   Fd_socket();
@@ -30,9 +30,8 @@ public:
    * @throw std::logic_error : initialized with a negative value
    */
   explicit Fd_socket(int fd_);
-  ~Fd_socket();
-  Fd_socket(Fd_socket &&) noexcept;
-  Fd_socket &operator=(Fd_socket &&) noexcept;
+  Fd_socket(Fd_socket &&) noexcept = default;
+  Fd_socket &operator=(Fd_socket &&) noexcept = default;
   /*
    * @throw std::system_error - sending data on socket
    */
@@ -41,9 +40,6 @@ public:
    * @throw std::system_error - receiving data on socket
    */
   void recv(void *buf, std::size_t size) const;
-  int fd() const { return _fd; }
-  bool good() const { return _fd != -1; }
-  operator bool() const { return good(); }
 };
 
 #endif

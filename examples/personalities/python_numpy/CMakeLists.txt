@@ -9,6 +9,7 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
   message("-- Building Python support.")
 
+  get_filename_component(PYTHON_VER ${PYTHON} NAME)                                                                                
   set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
   execute_process ( COMMAND ${PYTHON} -m site --user-site OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -21,7 +22,7 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   message("--        include : ${PYTHON_INCLUDE_DIR}")
   set(CMAKE_CXX_STANDARD 14)
 
-  find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin")
+  find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
 
   if (NOT FLATC)
     message(FATAL_ERROR ": Flatc compiler not found")
@@ -41,6 +42,8 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
   include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
   include_directories(${PYTHON_INCLUDE_DIR})
+  include_directories(/usr/local/lib/${PYTHON_VER}/dist-packages/numpy/core/include)
+  include_directories(/usr/lib64/${PYTHON_VER}/site-packages/numpy/core/include)
 
   link_directories(${PYTHON_LIB_DIR})
   link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) 

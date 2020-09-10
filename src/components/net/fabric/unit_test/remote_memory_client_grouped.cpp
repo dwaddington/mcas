@@ -23,7 +23,7 @@
 #include <vector>
 
 remote_memory_client_grouped::remote_memory_client_grouped(
-  Component::IFabric &fabric_
+  component::IFabric &fabric_
   , const std::string &fabric_spec_
   , const std::string ip_address_
   , std::uint16_t port_
@@ -81,14 +81,14 @@ catch ( std::exception &e )
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
 }
 
-void remote_memory_client_grouped::send_disconnect(Component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)
+void remote_memory_client_grouped::send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)
 {
   send_msg(cnxn_, rm_, &quit_flag_, sizeof quit_flag_);
 }
 
-std::unique_ptr<Component::IFabric_communicator> remote_memory_client_grouped::allocate_group() const
+std::unique_ptr<component::IFabric_communicator> remote_memory_client_grouped::allocate_group() const
 {
-  return std::unique_ptr<Component::IFabric_communicator>(_cnxn->allocate_group());
+  return std::unique_ptr<component::IFabric_communicator>(_cnxn->allocate_group());
 }
 
 std::size_t remote_memory_client_grouped::max_message_size() const

@@ -29,9 +29,18 @@
 #include "allocator_rc.h"
 #include "allocator_cc.h"
 
-#include "hop_hash.h"
+#if __GNUC__ > 7
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
 
+#include "hop_hash.h"
 #include "hstore_nupm.h"
+
+#if __GNUC__ > 7
+#pragma GCC diagnostic pop
+#endif
+
 #include "region.h"
 
 #include "hstore_open_pool.h"
@@ -45,14 +54,15 @@
 #include <string>
 
 template <typename T>
-  class pool_manager;
+  struct pool_manager;
 class Devdax_manager;
 template <typename Handle, typename Allocator, typename Table, typename Lock>
-  class session;
+  struct session;
 
-class hstore
-  : public Component::IKVStore
+struct hstore
+  : public component::IKVStore
 {
+private:
   using alloc_t = typename hstore_alloc_type<Persister>::alloc_t;
   using heap_alloc_shared_t = typename hstore_alloc_type<Persister>::heap_alloc_shared_t;
   using heap_alloc_t = typename hstore_alloc_type<Persister>::heap_alloc_t;
@@ -63,12 +73,12 @@ class hstore
 #if THREAD_SAFE_HASH == 1
   /* thread-safe hash */
   using hstore_shared_mutex = std::shared_timed_mutex;
-  static constexpr auto thread_model = Component::IKVStore::THREAD_MODEL_MULTI_PER_POOL;
+  static constexpr auto thread_model = component::IKVStore::THREAD_MODEL_MULTI_PER_POOL;
   static constexpr auto is_thread_safe = true;
 #else
 /* not a thread-safe hash */
   using hstore_shared_mutex = dummy::shared_mutex;
-  static constexpr auto thread_model = Component::IKVStore::THREAD_MODEL_SINGLE_PER_POOL;
+  static constexpr auto thread_model = component::IKVStore::THREAD_MODEL_SINGLE_PER_POOL;
   static constexpr auto is_thread_safe = false;
 #endif
 
@@ -91,10 +101,11 @@ private:
   using pool_manager_t = pool_manager<open_pool_t>;
   std::shared_ptr<pool_manager_t> _pool_manager;
   std::mutex _pools_mutex;
-  using pools_map = std::map<open_pool_t *, std::unique_ptr<open_pool_t>>;
+  using pools_map = std::multimap<void *, std::shared_ptr<open_pool_t>>;
   pools_map _pools;
-  auto locate_session(Component::IKVStore::pool_t pid) -> open_pool_t *;
-  auto move_pool(IKVStore::pool_t pid) -> std::unique_ptr<open_pool_t>;
+  auto locate_session(component::IKVStore::pool_t pid) -> open_pool_t *;
+  auto move_pool(IKVStore::pool_t pid) -> std::shared_ptr<open_pool_t>;
+  unsigned debug_level() const;
 
 public:
   /**
@@ -118,10 +129,10 @@ public:
     0x1f1bf8cf,0xc2eb,0x4710,0x9bf1,0x63,0xf5,0xe8,0x1a,0xcf,0xbd
   );
 
-  void * query_interface(Component::uuid_t& itf_uuid) override {
+  void * query_interface(component::uuid_t& itf_uuid) override {
     return
-      itf_uuid == Component::IKVStore::iid()
-      ? static_cast<Component::IKVStore *>(this)
+      itf_uuid == component::IKVStore::iid()
+      ? static_cast<component::IKVStore *>(this)
       : nullptr
       ;
   }
@@ -132,7 +143,7 @@ public:
 
 public:
 
-  int thread_safety() const;
+  int thread_safety() const override;
 
   /**
    * Check capability of component
@@ -145,12 +156,12 @@ public:
 
   pool_t create_pool(const std::string &name,
                      std::size_t size,
-                     std::uint32_t flags,
+                     component::IKVStore::flags_t flags,
                      std::uint64_t expected_obj_count
                      ) override;
 
   pool_t open_pool(const std::string &name,
-                   std::uint32_t flags) override;
+                   component::IKVStore::flags_t flags) override;
 
   status_t delete_pool(const std::string &name) override;
 
@@ -164,14 +175,14 @@ public:
                const std::string &key,
                const void * value,
                std::size_t value_len,
-               std::uint32_t flags = FLAGS_NONE) override;
+               component::IKVStore::flags_t flags = FLAGS_NONE) override;
 
   status_t put_direct(pool_t pool,
                       const std::string& key,
                       const void * value,
                       std::size_t value_len,
                       memory_handle_t handle = HANDLE_NONE,
-                      std::uint32_t flags = FLAGS_NONE) override;
+                      component::IKVStore::flags_t flags = FLAGS_NONE) override;
 
   status_t get(pool_t pool,
                const std::string &key,
@@ -182,7 +193,7 @@ public:
                       const std::string &key,
                       void* out_value,
                       std::size_t& out_value_len,
-                      Component::IKVStore::memory_handle_t handle) override;
+                      component::IKVStore::memory_handle_t handle) override;
 
   status_t get_attribute(pool_t pool,
                                  Attribute attr,
@@ -199,7 +210,7 @@ public:
                 lock_type_t type,
                 void*& out_value,
                 std::size_t& out_value_len,
-                Component::IKVStore::key_t& out_key,
+                component::IKVStore::key_t& out_key,
                 const char ** out_key_ptr) override;
 
   status_t resize_value(pool_t pool
@@ -208,7 +219,8 @@ public:
                         , std::size_t        alignment) override;
 
   status_t unlock(pool_t pool,
-                  Component::IKVStore::key_t key_handle) override;
+                  component::IKVStore::key_t key_handle,
+                  component::IKVStore::unlock_flags_t flags) override;
 
   status_t apply(pool_t pool,
                  const std::string& key,
@@ -232,9 +244,9 @@ public:
                                  std::size_t key_len,
                                  const void * value,
                                  std::size_t value_len,
-                                 tsc_time_t timestamp)> function,
-               epoch_time_t t_begin,
-               epoch_time_t t_end) override;
+                                 common::tsc_time_t timestamp)> function,
+               common::epoch_time_t t_begin,
+               common::epoch_time_t t_end) override;
 
   status_t map_keys(pool_t pool,
                std::function<int(const std::string& key)> function) override;
@@ -280,8 +292,8 @@ public:
   status_t deref_pool_iterator(
     pool_t pool
     , pool_iterator_t iter
-    , epoch_time_t t_begin
-    , epoch_time_t t_end
+    , common::epoch_time_t t_begin
+    , common::epoch_time_t t_end
     , pool_reference_t & ref
     , bool & time_match
     , bool increment
@@ -293,10 +305,8 @@ public:
   ) override;
 };
 
-class hstore_factory : public Component::IKVStore_factory
+struct hstore_factory : public component::IKVStore_factory
 {
-public:
-
   /**
    * Component/interface management
    *
@@ -306,21 +316,12 @@ public:
     0xfacbf8cf,0xc2eb,0x4710,0x9bf1,0x63,0xf5,0xe8,0x1a,0xcf,0xbd
   );
 
-  void * query_interface(Component::uuid_t& itf_uuid) override;
+  void * query_interface(component::uuid_t& itf_uuid) override;
 
   void unload() override;
 
-  Component::IKVStore * create(const std::string &owner,
-                               const std::string &name) override;
-
-  Component::IKVStore * create(const std::string &owner,
-                               const std::string &name,
-                               const std::string &dax_map) override;
-
-  Component::IKVStore * create(unsigned debug_level,
-                               const std::string &owner,
-                               const std::string &name,
-                               const std::string &dax_map) override;
+  component::IKVStore * create(unsigned debug_level,
+                               const IKVStore_factory::map_create &mc) override;
 };
 
 #endif

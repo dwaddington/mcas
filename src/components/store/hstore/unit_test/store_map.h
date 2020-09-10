@@ -19,13 +19,12 @@
 #include <map>
 
 // The fixture for testing class Foo.
-class store_map
+struct store_map
 {
-public:
   struct impl_spec
   {
     std::string       name;
-    Component::uuid_t factory_id;
+    component::uuid_t factory_id;
   };
 
   using impl_map_t = std::map<std::string, impl_spec>;

@@ -26,9 +26,14 @@
 #include "fabric_util.h" /* make_fi_infodup */
 #include "pointer_cast.h"
 
+#include <common/logging.h> /* PLOG */
 #include <sys/uio.h> /* iovec */
+#include <sys/time.h> /* rusage */
+#include <sys/resource.h> /* rusage */
+#include <sys/mman.h> /* madvise */
 
 #include <algorithm> /* find_if */
+#include <iostream>
 #include <iterator> /* back_inserter */
 #include <memory> /* make_unique */
 #include <stdexcept> /* domain_error, range_error */
@@ -52,6 +57,27 @@ namespace
   {
     return o << "[" << v.iov_base << ".." << iov_end(v) << ")";
   }
+
+  long ru_flt()
+  {
+    rusage usage;
+    auto rc = ::getrusage(RUSAGE_SELF, &usage);
+    return rc == 0 ? usage.ru_minflt + usage.ru_majflt : 0;
+  }
+  bool mr_trace = std::getenv("FABRIC_MR_TRACE");
+}
+
+ru_flt_counter::ru_flt_counter(bool report_)
+  : _report(report_)
+  , _ru_flt_start(ru_flt())
+{}
+
+ru_flt_counter::~ru_flt_counter()
+{
+  if ( _report )
+  {
+    PLOG("fault count %li", ru_flt() - _ru_flt_start);
+  }
 }
 
 /**
@@ -72,6 +98,8 @@ Fabric_memory_control::Fabric_memory_control(
   , _domain(_fabric.make_fid_domain(*_domain_info, this))
   , _m{}
   , _mr_addr_to_mra{}
+  , _paging_test(bool(std::getenv("FABRIC_PAGING_TEST")))
+  , _fault_counter(_paging_test || bool(std::getenv("FABRIC_PAGING_REPORT")))
 {
 }
 
@@ -89,15 +117,40 @@ struct mr_and_address
   ::iovec v;
 };
 
-auto Fabric_memory_control::register_memory(const void * addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_) -> Component::IFabric_connection::memory_region_t
+namespace
+{
+  void print_registry(const std::multimap<const void *, std::unique_ptr<mr_and_address>> &matm)
+  {
+    unsigned i = 0;
+    const unsigned limit = 0;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+    for ( const auto &j : matm )
+    {
+      if ( i < limit )
+      {
+        std::cerr << "Token " << pointer_cast<component::IFabric_memory_region>(&*j.second) << " mr " << j.second->mr << " " << j.second->v << "\n";
+      }
+      else
+      {
+        std::cerr << "Token (suppressed " << matm.size() - limit << " more)\n";
+        break;
+      }
+      ++i;
+    }
+#pragma GCC diagnostic pop
+  }
+}
+
+auto Fabric_memory_control::register_memory(const void * addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_) -> component::IFabric_connection::memory_region_t
 {
   auto mra =
     std::make_unique<mr_and_address>(
       make_fid_mr_reg_ptr(addr_,
-                                size_,
-                                std::uint64_t(FI_SEND|FI_RECV|FI_READ|FI_WRITE|FI_REMOTE_READ|FI_REMOTE_WRITE),
-                                key_,
-                                flags_)
+                          size_,
+                          std::uint64_t(FI_SEND|FI_RECV|FI_READ|FI_WRITE|FI_REMOTE_READ|FI_REMOTE_WRITE),
+                          key_,
+                          flags_)
       , addr_
       , size_
     );
@@ -113,10 +166,12 @@ auto Fabric_memory_control::register_memory(const void * addr_, std::size_t size
    * Operations which access remote memory will need the memory key.
    * If the domain has FI_MR_PROV_KEY set, we need to return the actual key.
    */
-#if 0
-  std::cerr << "Registered mr " << it->second->mr << " " << it->second->v << "\n";
-#endif
-  return pointer_cast<Component::IFabric_memory_region>(&*it->second);
+  if ( mr_trace )
+  {
+    std::cerr << "Registered token " << pointer_cast<component::IFabric_memory_region>(&*it->second) << " mr " << it->second->mr << " " << it->second->v << "\n";
+    print_registry(_mr_addr_to_mra);
+  }
+  return pointer_cast<component::IFabric_memory_region>(&*it->second);
 }
 
 void Fabric_memory_control::deregister_memory(const memory_region_t mr_)
@@ -134,20 +189,29 @@ void Fabric_memory_control::deregister_memory(const memory_region_t mr_)
     std::find_if(
       lb
       , ub
-      , [&mra, &scan_count] ( const map_addr_to_mra::value_type &m ) { ++scan_count; return m.second->mr == mra->mr; }
+      , [&mra, &scan_count] ( const map_addr_to_mra::value_type &m ) { ++scan_count; return &*m.second == mra; }
   );
 
   if ( it == ub )
   {
     std::ostringstream err;
-    err << __func__ << " mr " << mra->mr << " (with range " << mra->v << ")"
+    err << __func__ << " token " << mra << " mr " << mra->mr << " (with range " << mra->v << ")"
       << " not found in " << scan_count << " of " << _mr_addr_to_mra.size() << " registry entries";
+    std::cerr << "Deregistered token " << mra << " mr " << mra->mr << " failed, not in \n";
+    print_registry(_mr_addr_to_mra);
     throw std::logic_error(err.str());
   }
-#if 0
-  std::cerr << "Deregistered addr " << it->second->mr << " " << it->second->v << "\n";
-#endif
+  if ( mr_trace )
+  {
+    std::cerr << "Deregistered token (before) " << mra << " mr/sought " << mra->mr << " mr/found " << it->second->mr << " " << it->second->v << "\n";
+    print_registry(_mr_addr_to_mra);
+  }
   _mr_addr_to_mra.erase(it);
+  if ( mr_trace )
+  {
+    std::cerr << "Deregistered token (after)\n";
+    print_registry(_mr_addr_to_mra);
+  }
 }
 
 std::uint64_t Fabric_memory_control::get_memory_remote_key(const memory_region_t mr_) const noexcept
@@ -249,6 +313,11 @@ fid_mr * Fabric_memory_control::make_fid_mr_reg_ptr(
      */
     /* Note: this was once observed to return "Bad address" when the (GPU) memory seemed properly aligned. */
     CHECK_FI_ERR(::fi_mr_reg(&*_domain, buf, len, access, offset, key, flags, &f, context));
+    if ( _paging_test )
+    {
+      auto rc = ::madvise(const_cast<void *>(buf), len, MADV_DONTNEED);
+      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", buf, len, rc ? " refused " : "accepted");
+    }
   }
   catch ( const fabric_runtime_error &e )
   {

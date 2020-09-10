@@ -25,7 +25,7 @@
 #include <ccpm/immutable_string_table.h>
 #include "cpp_symtab_types.h"
 
-using namespace Symtab_ADO_protocol;
+using namespace symtab_ADO_protocol;
 using namespace ccpm;
 
 std::vector<const char *> pointer_table;
@@ -45,7 +45,9 @@ void ADO_symtab_plugin::launch_event(const uint64_t auth_id,
                                      const std::string& pool_name,
                                      const size_t pool_size,
                                      const unsigned int pool_flags,
-                                     const size_t expected_obj_count)
+                                     const unsigned int memory_type,
+                                     const size_t expected_obj_count,
+                                     const std::vector<std::string>& params)
 {
 }
 
@@ -60,13 +62,13 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
                                     response_buffer_vector_t& response_buffers)
 {
   using namespace flatbuffers;
-  using namespace Symtab_ADO_protocol;
+  using namespace symtab_ADO_protocol;
   using namespace cpp_symtab_personality;
 
   auto value = values[0].ptr;
 
   constexpr size_t buffer_increment = KB(32); /* granularity for memory expansion */
-  
+
   //  PLOG("invoke: value=%p value_len=%lu", value, value_len);
 
   auto& root = *(new (value) Value_root);
@@ -83,7 +85,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
   /* instantiate immutable string table */
   ccpm::Immutable_string_table<> string_table(root.get_regions(), force_init);
 
-  
+
   Verifier verifier(static_cast<const uint8_t*>(in_work_request), in_work_request_len);
   if(!VerifyMessageBuffer(verifier)) {
     PMAJOR("unknown command flatbuffer");
@@ -110,7 +112,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
       string_table.expand(::iovec{buffer, buffer_increment});
       goto retry;
     }
-    
+
     return S_OK;
   }
 
@@ -125,7 +127,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
               );
 
     PMAJOR("Sort complete.");
-    
+
     for(unsigned i=0;i<10;i++) {
       PLOG("[%u] %s", i, pointer_table[i]);
     }
@@ -145,7 +147,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
                                8,
                                mem)!=S_OK)
       throw std::runtime_error("unable to allocate memory for index");
-    
+
     root.index = new (mem) std::vector<const char*>(pointer_table.size());
 
     for(size_t i=0;i<pointer_table.size();i++) {
@@ -154,14 +156,14 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
     root.index_size = pointer_table.size();
     pmem_flush(mem, index_size);
     pmem_flush(&root.index_size, sizeof(root.index_size));
-    pmem_flush(&root.index, index_size);    
+    pmem_flush(&root.index, index_size);
     PLOG("Index (%lu entries) built OK.", root.index_size);
 
     for(unsigned i=0;i<10;i++) {
       PLOG("[%u-%p] %s", i, &root.index[i],  (*root.index)[i]);
     }
     PLOG("...");
-    
+
     return S_OK;
   }
 
@@ -188,9 +190,9 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
       PLOG("Found it! (%p)", *i);
       auto result = new uint64_t;
       *result = reinterpret_cast<uint64_t>(*i);
-      response_buffers.push_back(response_buffer_t{result,sizeof(uint64_t),false});
+      response_buffers.emplace_back(result,sizeof(uint64_t),false);
     }
-                          
+
     return S_OK;
   }
 
@@ -198,7 +200,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
   if(get_string_request) {
     char* sym_id = reinterpret_cast<char *>(get_string_request->symbol());
     PLOG("Request symbol:%p", sym_id);
-    response_buffers.push_back(response_buffer_t{sym_id, strlen(sym_id), true});
+    response_buffers.emplace_back(sym_id, strlen(sym_id), true);
     return S_OK;
   }
 
@@ -215,7 +217,7 @@ status_t ADO_symtab_plugin::shutdown() {
  * Factory-less entry point
  *
  */
-extern "C" void *factory_createInstance(Component::uuid_t &interface_iid) {
+extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
   PLOG("instantiating cpp-symtab-plugin");
   if (interface_iid == Interface::ado_plugin)
     return static_cast<void *>(new ADO_symtab_plugin());

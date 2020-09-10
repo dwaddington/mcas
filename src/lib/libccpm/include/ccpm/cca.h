@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019,2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -16,24 +16,34 @@
 
 #include <ccpm/interfaces.h>
 #include <iosfwd>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace ccpm
 {
-	class area_top;
-	class cca
-		: public IHeapGrowable
+	struct area_top;
+	struct cca
+		: public IHeap_expandable
 	{
 	private:
-		using top_vec_t = std::vector<area_top *>;
+		using top_vec_t = std::vector<std::unique_ptr<area_top>>;
 		top_vec_t _top;
-		top_vec_t::size_type _last_top_allocate;
-		top_vec_t::size_type _last_top_free;
+		top_vec_t::difference_type _last_top_allocate;
+		top_vec_t::difference_type _last_top_free;
 		explicit cca();
+
+		void init(
+			const region_vector_t &regions
+			, ownership_callback_t resolver
+			, const bool force_init
+		);
 	public:
 		explicit cca(const region_vector_t &regions, ownership_callback_t resolver);
 
 		explicit cca(const region_vector_t &regions);
+
+		~cca();
 
 		cca(const cca &) = delete;
 		const cca& operator=(const cca &) = delete;

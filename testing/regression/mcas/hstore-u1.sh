@@ -1,5 +1,8 @@
 #!/bin/bash
 
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+. "$DIR/functions.sh"
+
 #
 # Test hstore. Not really an mcas test, but left in mcas until we find a better place for it.
 #
@@ -19,8 +22,4 @@ trap "kill -9 $TEST_PID &> /dev/null" EXIT
 # wait for client to complete
 wait $TEST_PID
 
-if < $TEST_LOG fgrep '[  FAILED  ]' > /dev/null; then
-    echo -e "Test $TESTID ($DESC): \e[31mfail\e[0m"
-else
-    echo -e "Test $TESTID ($DESC): \e[32mpassed\e[0m"
-fi
+pass_fail $CLIENT_LOG $TESTID $DESC

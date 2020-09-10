@@ -28,6 +28,7 @@
 #include <common/cycles.h>
 #include <common/logging.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <algorithm>   //for std::generate_n
 #include <functional>  //for std::function
 #include <string>
@@ -36,7 +37,7 @@ __attribute__((constructor)) static void _init_rand() {
   srand(static_cast<unsigned int>(rdtsc()));
 }
 
-namespace Common
+namespace common
 {
 std::string string_replace(std::string &subject, const std::string &search,
                            const std::string &replace) {
@@ -54,10 +55,10 @@ std::string random_string(size_t length) {
                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                            "abcdefghijklmnopqrstuvwxyz";
     const size_t max_index = (sizeof(charset) - 1);
-    return charset[rand() % max_index];
+    return charset[(rand() & INT_MAX) % max_index];
   };
   std::string str(length, 0);
   std::generate_n(str.begin(), length, randchar);
   return str;
 }
-}  // namespace Common
+}  // namespace common

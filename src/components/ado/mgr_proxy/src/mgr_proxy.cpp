@@ -23,33 +23,36 @@
 #include <common/utils.h>
 #include <sys/types.h>
 #include <cassert>
+#include <threadipc/queue.h>
 #include "mgr_proxy.h"
 
-using namespace Component;
+using namespace component;
+using namespace common;
 using namespace std;
-using namespace Common;
-using namespace Threadipc;
+using namespace threadipc;
 
 ADO_manager_proxy::ADO_manager_proxy(unsigned    debug_level_,
-                                     int         shard_,
+                                     unsigned    shard_,
                                      std::string cores_,
                                      float       cpu_num_)
-    : shard(shard_), debug_level(debug_level_), cores(cores_), cpu_num(cpu_num_)
+    : _shard(shard_), _debug_level(debug_level_), _cores(cores_), _cpu_num(cpu_num_)
 {
+  (void)_debug_level; // unused
 }
 
 ADO_manager_proxy::ADO_manager_proxy()
-  : shard(0),
-    debug_level(0),
-    cores(""),
-    cpu_num(1)
+  : _shard(0),
+    _debug_level(0),
+    _cores(""),
+    _cpu_num(1)
 {}
 
 ADO_manager_proxy::~ADO_manager_proxy() {}
 
 IADO_proxy *ADO_manager_proxy::create(const uint64_t auth_id,
-                                      Component::IKVStore * kvs,
-                                      Component::IKVStore::pool_t pool_id,
+                                      const unsigned debug_level_,
+                                      component::IKVStore * kvs,
+                                      component::IKVStore::pool_t pool_id,
                                       const std::string &pool_name,
                                       const size_t pool_size,
                                       const unsigned int pool_flags,
@@ -60,46 +63,45 @@ IADO_proxy *ADO_manager_proxy::create(const uint64_t auth_id,
                                       SLA * sla)
 {
   (void)sla; // unused
-  if (!Thread_ipc::instance()->schedule_to_mgr(shard, cores, cpu_num,
-                                               value_memory_numa_zone)) {
-    throw General_exception("schedule_to_mgr thread ipc enqueue fail!");
-  };
+  Thread_ipc::instance()->schedule_to_mgr(_shard, _cores, _cpu_num,
+                                          value_memory_numa_zone);
 
-  struct message *msg = NULL;
+  struct threadipc::Message *msg = NULL;
   Thread_ipc::instance()->get_next_ado(msg);
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-compare" // msg->shard_core is unsigned, this->shard is signed. Intentional?
-  while (!msg || msg->shard_core != shard || msg->op != Operation::schedule) {
+  while (!msg || msg->shard_core != _shard || msg->op != Operation::schedule) {
     if (msg) Thread_ipc::instance()->add_to_ado(msg);
     Thread_ipc::instance()->get_next_ado(msg);
   }
-#pragma GCC diagnostic pop
+
 
   // TODO:ask manager what memory;
   int memory = MB(1);
 
-  Component::IBase *comp = Component::load_component("libcomponent-adoproxy.so",
-                                                     Component::ado_proxy_factory);
+  component::IBase *comp = component::load_component("libcomponent-adoproxy.so",
+                                                     component::ado_proxy_factory);
 
-  auto fact = static_cast<IADO_proxy_factory *>
-    (comp->query_interface(IADO_proxy_factory::iid()));
+  auto fact =
+    make_itf_ref(
+      static_cast<IADO_proxy_factory *>(
+        comp->query_interface(IADO_proxy_factory::iid())
+      )
+    );
 
   assert(fact);
 
-  IADO_proxy *ado = fact->create(auth_id, kvs, pool_id, pool_name,
-                                 pool_size, pool_flags,
-                                 expected_obj_count, filename, args, msg->cores,
-                                 memory, msg->core_number, msg->numa_zone);
+  auto ado =
+    make_itf_ref(fact->create(auth_id, debug_level_,
+			      kvs, pool_id, pool_name,
+			      pool_size, pool_flags,
+			      expected_obj_count, filename, args, msg->cores,
+			      memory, msg->core_number, msg->numa_zone)
+    );
 
-  fact->release_ref();
+  Thread_ipc::instance()->register_to_mgr(_shard, msg->cores,
+                                          ado->ado_id());
 
-  if (!Thread_ipc::instance()->register_to_mgr(shard, msg->cores,
-                                               ado->ado_id())) {
-    throw General_exception("register_to_mgr enqueue failed!");
-  };
-
-  return ado;
+  return ado.release();
 }
 
 bool ADO_manager_proxy::has_exited(IADO_proxy *ado)
@@ -107,16 +109,16 @@ bool ADO_manager_proxy::has_exited(IADO_proxy *ado)
   return ado->has_exited();
 }
 
-status_t ADO_manager_proxy::shutdown(IADO_proxy *ado)
+status_t ADO_manager_proxy::shutdown_ado(IADO_proxy *ado)
 {
-  ado->release_ref();
+  auto ado_ref = make_itf_ref(ado);
   return S_OK;
 }
 /**
  * Factory entry point
  *
  */
-extern "C" void *factory_createInstance(Component::uuid_t component_id)
+extern "C" void *factory_createInstance(component::uuid_t component_id)
 {
   if (component_id == ADO_manager_proxy_factory::component_id()) {
     return static_cast<void *>(new ADO_manager_proxy_factory());

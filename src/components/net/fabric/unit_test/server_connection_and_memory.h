@@ -19,20 +19,19 @@
 #include <boost/core/noncopyable.hpp>
 #include <cstdint> /* uint64_t */
 
-namespace Component
+namespace component
 {
   class IFabric_server_factory;
 }
 
-class server_connection_and_memory
+struct server_connection_and_memory
   : public server_connection
   , public registered_memory
   , public remote_memory_accessor
   , private boost::noncopyable
 {
-public:
   server_connection_and_memory(
-    Component::IFabric_server_factory &ep
+    component::IFabric_server_factory &ep
     , std::size_t memory_size
     , std::uint64_t remote_key
   );

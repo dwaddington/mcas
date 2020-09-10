@@ -12,10 +12,13 @@
 */
 #include "store_map.h"
 
+#include <common/json.h>
+#include <string>
+
 const std::string store_map::impl_default = "hstore-cc";
 const store_map::impl_map_t store_map::impl_map = {
-  { "hstore-cc", { "hstore-cc", Component::hstore_factory } }
-  , { "hstore", { "hstore", Component::hstore_factory } }
+  { "hstore-cc", { "hstore-cc", component::hstore_factory } }
+  , { "hstore", { "hstore", component::hstore_factory } }
 };
 
 namespace
@@ -34,8 +37,17 @@ const store_map::impl_spec *const store_map::impl =
   ? impl_map.find(impl_default)
   : impl_env_it)->second
   ;
+
+namespace c_json = common::json;
+using json = c_json::serializer<c_json::dummy_writer>;
 const std::string store_map::location =
   store_loc
   ? store_loc
-  : "[ { \"region_id\": 0, \"path\" : \"/dev/dax0.0\", \"addr\" : \"0x9000000000\" } ]"
+  : json::array(
+      json::object(
+        json::member("region_id", json::number(0))
+        , json::member("path", "/dev/dax0.0")
+        , json::member("addr", 0x9000000000)
+      )
+    ).str()
   ;

@@ -42,12 +42,12 @@ std::shared_ptr<::fi_info> make_fi_info()
   return info;
 }
 
-std::shared_ptr<::fi_info> make_fi_infodup(const ::fi_info &info_, const std::string &)
+std::shared_ptr<::fi_info> make_fi_infodup(const ::fi_info &info_, const std::string &why_)
 {
   auto info = std::shared_ptr<::fi_info>(::fi_dupinfo(&info_), ::fi_freeinfo);
   if ( ! info )
   {
-    throw fabric_bad_alloc("fi_info (dup)");
+    throw fabric_bad_alloc("fi_info (dup for " + why_ + ")");
   }
 
   return info;

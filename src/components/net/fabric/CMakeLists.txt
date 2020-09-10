@@ -8,7 +8,7 @@ add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 add_subdirectory(./unit_test)
 
-add_definitions(-DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG) # P{LOG,DEG,INF,WRN,ERR} control
 
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # rdma
 include_directories(../../../lib/common/include/)

@@ -25,17 +25,20 @@
 
 #include <cstdlib> /* ptrdiff_t */
 
-class sbrk_addr
+#if 0
+struct sbrk_addr
 {
+private:
   char *location;
   std::uint64_t offset;
 };
+#endif
 
 template <typename T, unsigned Offset>
-	class pointer_sbrk;
+	struct pointer_sbrk;
 
 template <unsigned Offset>
-	class pointer_sbrk<void, Offset>
+	struct pointer_sbrk<void, Offset>
 		: public PMEMoid
 	{
 	public:
@@ -50,7 +53,7 @@ template <unsigned Offset>
 	};
 
 template <unsigned Offset>
-	class pointer_sbrk<const void, Offset>
+	struct pointer_sbrk<const void, Offset>
 		: public PMEMoid
 	{
 	public:
@@ -65,9 +68,10 @@ template <unsigned Offset>
 	};
 
 template <typename T, unsigned Offset>
-	class pointer_sbrk
+	struct pointer_sbrk
 		: public PMEMoid
 	{
+	private:
 		const void *offset_address() const noexcept
 		{
 			return static_cast<const char *>(pmemobj_direct(*this)) + Offset;

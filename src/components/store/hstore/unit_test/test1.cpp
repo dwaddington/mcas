@@ -24,19 +24,20 @@
 #include <sstream>
 #include <string>
 
-using namespace Component;
+using namespace component;
 
 namespace {
 
-class memo_lock
+struct memo_lock
 {
-  Component::IKVStore * _kvstore;
-  Component::IKVStore::pool_t *_pool;
+private:
+  component::IKVStore * _kvstore;
+  component::IKVStore::pool_t *_pool;
 public:
   IKVStore::key_t k;
   memo_lock(
-    Component::IKVStore *kvstore_
-    , Component::IKVStore::pool_t *pool_
+    component::IKVStore *kvstore_
+    , component::IKVStore::pool_t *pool_
   )
     : _kvstore(kvstore_)
     , _pool(pool_)
@@ -48,33 +49,31 @@ public:
   {
     if ( IKVStore::KEY_NONE != k )
     {
-      auto r = _kvstore->unlock(*_pool, k);
+      auto r = _kvstore->unlock(*_pool, k, component::IKVStore::UNLOCK_FLAGS_FLUSH);
       EXPECT_EQ(S_OK, r);
     }
   }
 };
 
-class shared_lock
+struct shared_lock
   : private memo_lock
 {
-public:
   using memo_lock::k;
   shared_lock(
-    Component::IKVStore *kvstore_
-    , Component::IKVStore::pool_t *pool_
+    component::IKVStore *kvstore_
+    , component::IKVStore::pool_t *pool_
   )
     : memo_lock(kvstore_, pool_)
   {}
 };
 
-class exclusive_lock
+struct exclusive_lock
   : private memo_lock
 {
-public:
   using memo_lock::k;
   exclusive_lock(
-    Component::IKVStore *kvstore_
-    , Component::IKVStore::pool_t *pool_
+    component::IKVStore *kvstore_
+    , component::IKVStore::pool_t *pool_
   )
     : memo_lock(kvstore_, pool_)
   {}
@@ -111,8 +110,8 @@ class KVStore_test : public ::testing::Test {
   static bool pmem_simulated;
   /* persistent memory is effective (either real, indicated by no PMEM_IS_PMEM_FORCE or simulated by PMEM_IS_PMEM_FORCE 0 not 1 */
   static bool pmem_effective;
-  static Component::IKVStore * _kvstore;
-  static Component::IKVStore::pool_t pool;
+  static component::IKVStore * _kvstore;
+  static component::IKVStore::pool_t pool;
 
   static const std::size_t estimated_object_count;
 
@@ -154,8 +153,8 @@ constexpr std::size_t KVStore_test::many_count_target_large;
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
 bool KVStore_test::pmem_effective = ! getenv("PMEM_IS_PMEM_FORCE") || getenv("PMEM_IS_PMEM_FORCE") == std::string("0");
-Component::IKVStore * KVStore_test::_kvstore;
-Component::IKVStore::pool_t KVStore_test::pool;
+component::IKVStore * KVStore_test::_kvstore;
+component::IKVStore::pool_t KVStore_test::pool;
 
 const std::size_t KVStore_test::estimated_object_count = pmem_simulated ? estimated_object_count_small : estimated_object_count_large;
 
@@ -185,15 +184,20 @@ TEST_F(KVStore_test, Instantiate)
 {
   /* create object instance through factory */
   auto link_library = "libcomponent-" + store_map::impl->name + ".so";
-  Component::IBase * comp = Component::load_component(link_library,
+  component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
   ASSERT_TRUE(comp);
-  auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = component::make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
   /* numa node 0 */
-  _kvstore = fact->create("owner", "numa0", store_map::location);
-
-  fact->release_ref();
+  _kvstore =
+     fact->create(
+      0
+      , {
+          { +component::IKVStore_factory::k_name, "numa0"}
+          , { +component::IKVStore_factory::k_dax_config, store_map::location }
+        }
+    );
 }
 
 TEST_F(KVStore_test, RemoveOldPool)
@@ -221,15 +225,38 @@ TEST_F(KVStore_test, CreatePool)
    *  - by 8U to account for current AVL_LB allocator alignment requirements
    */
   pool = _kvstore->create_pool(pool_name(), ( many_count_target * 64U * 3U * 2U + 4 * single_value_size ) * 8U, 0, estimated_object_count);
-  if ( 0 == int64_t(pool) )
+  ASSERT_NE(0, int64_t(pool));
+  auto pool2 = _kvstore->open_pool(pool_name());
   {
-    ASSERT_EQ("Pool not create, USE_DRAM was ", std::getenv("USE_DRAM") ? std::getenv("USE_DRAM") : " not set");
+    void *v0;
+    size_t s = 4096;
+    auto r0 = _kvstore->allocate_pool_memory(pool, 8, s, v0);
+    EXPECT_EQ(S_OK, r0);
+    void *v1;
+    auto r1 = _kvstore->allocate_pool_memory(pool, 8, s, v1);
+    EXPECT_EQ(S_OK, r1);
+    EXPECT_NE(v0, v1);
   }
+  {
+    auto rc = _kvstore->close_pool(pool2);
+    EXPECT_EQ(S_OK, rc);
+  }
+  {
+    auto rc = _kvstore->close_pool(pool);
+    EXPECT_EQ(S_OK, rc);
+  }
+  /* All open handles closed */
+  {
+    auto rc = _kvstore->close_pool(pool2);
+    EXPECT_NE(S_OK, rc);
+  }
+  pool = _kvstore->open_pool(pool_name());
   ASSERT_LT(0, int64_t(pool));
 }
 
 TEST_F(KVStore_test, BasicGet0)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -255,6 +282,7 @@ TEST_F(KVStore_test, BasicGet0)
 
 TEST_F(KVStore_test, BasicPut)
 {
+  ASSERT_NE(nullptr, _kvstore);
   single_value.resize(single_value_size);
 
   auto r = _kvstore->put(pool, single_key, single_value.data(), single_value.length());
@@ -263,6 +291,7 @@ TEST_F(KVStore_test, BasicPut)
 
 TEST_F(KVStore_test, BasicGet1)
 {
+  ASSERT_NE(nullptr, _kvstore);
   void * value = nullptr;
   size_t value_len = 0;
   auto r = _kvstore->get(pool, single_key, value, value_len);
@@ -278,6 +307,7 @@ TEST_F(KVStore_test, BasicGet1)
 
 TEST_F(KVStore_test, BasicPutLocked)
 {
+  ASSERT_NE(nullptr, _kvstore);
   single_value.resize(single_value_size);
   void *value0 = nullptr;
   std::size_t value0_len = 0;
@@ -315,7 +345,7 @@ TEST_F(KVStore_test, BasicPutLocked)
     }
   }
 
-  auto small_size = 16; /* Small, but large enough to preserve all characters in "Hello world!" */
+  std::size_t small_size = 16; /* Small, but large enough to preserve all characters in "Hello world!" */
 
   /* resize to an inline size. */
   {
@@ -436,6 +466,7 @@ TEST_F(KVStore_test, BasicPutLocked)
 
 TEST_F(KVStore_test, BasicGet2)
 {
+  ASSERT_NE(nullptr, _kvstore);
   void * value = nullptr;
   size_t value_len = 0;
   auto r = _kvstore->get(pool, single_key, value, value_len);
@@ -452,6 +483,7 @@ TEST_F(KVStore_test, BasicGet2)
 /* hstore issue 41 specifies different implementations for same-size replace vs different-size replace. */
 TEST_F(KVStore_test, BasicReplaceSameSize)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     single_value_updated_same_size.resize(single_value_size);
     auto r = _kvstore->put(pool, single_key, single_value_updated_same_size.data(), single_value_updated_same_size.length());
@@ -471,6 +503,7 @@ TEST_F(KVStore_test, BasicReplaceSameSize)
 
 TEST_F(KVStore_test, BasicReplaceDifferentSize)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     auto r = _kvstore->put(pool, single_key, single_value_updated_different_size.data(), single_value_updated_different_size.length());
     EXPECT_EQ(S_OK, r);
@@ -489,6 +522,7 @@ TEST_F(KVStore_test, BasicReplaceDifferentSize)
 
 TEST_F(KVStore_test, PopulateMany)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   std::mt19937_64 r0{};
   for ( auto i = std::size_t(); i != many_count_target; ++i )
@@ -506,6 +540,7 @@ TEST_F(KVStore_test, PopulateMany)
 
 TEST_F(KVStore_test, PutMany)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   many_count_actual = 0;
 
@@ -537,6 +572,7 @@ TEST_F(KVStore_test, PutMany)
 
 TEST_F(KVStore_test, BasicMap)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   auto value_len_sum = std::size_t();
   _kvstore->map(
@@ -557,6 +593,7 @@ TEST_F(KVStore_test, BasicMap)
 
 TEST_F(KVStore_test, BasicMapKeys)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   auto key_len_sum = std::size_t();
   _kvstore->map_keys(
@@ -574,6 +611,7 @@ TEST_F(KVStore_test, BasicMapKeys)
 
 TEST_F(KVStore_test, Count1)
 {
+  ASSERT_NE(nullptr, _kvstore);
   auto count = _kvstore->count(pool);
   /* count should reflect Put, PutMany */
   EXPECT_EQ(single_count + many_count_actual, count);
@@ -592,6 +630,7 @@ TEST_F(KVStore_test, CountByBucket)
 
 TEST_F(KVStore_test, ClosePool)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -632,6 +671,7 @@ TEST_F(KVStore_test, OpenPool)
 
 TEST_F(KVStore_test, Size2a)
 {
+  ASSERT_NE(nullptr, _kvstore);
   auto count = _kvstore->count(pool);
   /* count should reflect Put, PutMany */
   EXPECT_EQ(single_count + many_count_actual, count);
@@ -639,6 +679,7 @@ TEST_F(KVStore_test, Size2a)
 
 TEST_F(KVStore_test, BasicGet3)
 {
+  ASSERT_NE(nullptr, _kvstore);
   void * value = nullptr;
   size_t value_len = 0;
   auto r = _kvstore->get(pool, single_key, value, value_len);
@@ -652,6 +693,7 @@ TEST_F(KVStore_test, BasicGet3)
 
 TEST_F(KVStore_test, BasicGetAttribute)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::VALUE_LEN, attr, &single_key);
@@ -664,7 +706,7 @@ TEST_F(KVStore_test, BasicGetAttribute)
         EXPECT_EQ(attr[0], single_value_updated_different_size.length());
       }
     }
-    r = _kvstore->get_attribute(pool, Component::IKVStore::Attribute(0), attr, &single_key);
+    r = _kvstore->get_attribute(pool, component::IKVStore::Attribute(0), attr, &single_key);
     EXPECT_EQ(E_NOT_SUPPORTED, r);
     r = _kvstore->get_attribute(pool, IKVStore::VALUE_LEN, attr, nullptr);
     EXPECT_EQ(E_BAD_PARAM, r);
@@ -688,6 +730,7 @@ TEST_F(KVStore_test, BasicGetAttribute)
 
 TEST_F(KVStore_test, ResizeAttribute)
 {
+  ASSERT_NE(nullptr, _kvstore);
   std::vector<uint64_t> attr;
 
   auto r = _kvstore->get_attribute(pool, IKVStore::AUTO_HASHTABLE_EXPANSION, attr, nullptr);
@@ -720,6 +763,7 @@ TEST_F(KVStore_test, ResizeAttribute)
 
 TEST_F(KVStore_test, Size2b)
 {
+  ASSERT_NE(nullptr, _kvstore);
   auto count = _kvstore->count(pool);
   /* count should reflect PutMany */
   EXPECT_EQ(single_count + many_count_actual, count);
@@ -727,6 +771,7 @@ TEST_F(KVStore_test, Size2b)
 
 TEST_F(KVStore_test, GetMany)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -764,6 +809,7 @@ TEST_F(KVStore_test, GetMany)
 
 TEST_F(KVStore_test, GetManyAllocating)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   for ( auto i = 0; i != get_expand; ++i )
   {
@@ -789,6 +835,7 @@ TEST_F(KVStore_test, GetManyAllocating)
 
 TEST_F(KVStore_test, GetDirectMany)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   for ( auto i = 0; i != get_expand; ++i )
   {
@@ -813,6 +860,7 @@ TEST_F(KVStore_test, GetDirectMany)
 
 TEST_F(KVStore_test, GetRegions)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   std::vector<::iovec> v;
   auto r = _kvstore->get_pool_regions(pool, v);
@@ -836,6 +884,7 @@ TEST_F(KVStore_test, GetRegions)
 
 TEST_F(KVStore_test, LockMany)
 {
+  ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
   /* Lock for read (should succeed)
    * Lock again for read (should succeed).
@@ -848,7 +897,7 @@ TEST_F(KVStore_test, LockMany)
   for ( auto &kv : kvv )
   {
 #if __cplusplus < 201703
-    static constexpr auto KEY_NONE = IKVStore::KEY_NONE+0;
+    static constexpr auto KEY_NONE = +IKVStore::KEY_NONE;
 #else
     static constexpr auto KEY_NONE = IKVStore::KEY_NONE;
 #endif
@@ -919,6 +968,7 @@ TEST_F(KVStore_test, LockMany)
 
 TEST_F(KVStore_test, Size2c)
 {
+  ASSERT_NE(nullptr, _kvstore);
   /* verify that item still exists */
   { // 770
     void * value = nullptr;
@@ -945,6 +995,7 @@ TEST_F(KVStore_test, Size2c)
  */
 TEST_F(KVStore_test, BasicUpdate)
 {
+  ASSERT_NE(nullptr, _kvstore);
   /* verify that item still exists */
   { // 796
     void * value = nullptr;
@@ -992,6 +1043,7 @@ TEST_F(KVStore_test, BasicUpdate)
 
 TEST_F(KVStore_test, BasicErase)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1014,6 +1066,7 @@ TEST_F(KVStore_test, BasicErase)
 
 TEST_F(KVStore_test, EraseMany)
 {
+  ASSERT_NE(nullptr, _kvstore);
   auto erase_count = 0;
   for ( auto &kv : kvv )
   {
@@ -1036,8 +1089,45 @@ TEST_F(KVStore_test, EraseMany)
   EXPECT_EQ(lock_count, count);
 }
 
+TEST_F(KVStore_test, AllocDealloc4K)
+{
+  ASSERT_NE(nullptr, _kvstore);
+  {
+    std::vector<uint64_t> attr;
+    auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
+    EXPECT_EQ(S_OK, r);
+    if ( S_OK == r )
+    {
+      EXPECT_GE(100, attr[0]);
+      PINF("Percent used %zu", attr[0]);
+    }
+  }
+
+  std::set<void *> allocations{};
+
+  /* Many 4K allocations */
+  for ( auto i = 0; i != 1000; ++i )
+  {
+    void *v = nullptr;
+    size_t s = 4096;
+    auto r = _kvstore->allocate_pool_memory(pool, 8, s, v);
+    EXPECT_EQ(S_OK, r);
+    EXPECT_EQ(0, allocations.count(v));
+    allocations.insert(v);
+    EXPECT_EQ(1, allocations.count(v));
+  }
+
+  /* Many 4K frees */
+  for ( auto v : allocations )
+  {
+    auto r = _kvstore->free_pool_memory(pool, v, 4096);
+    EXPECT_EQ(S_OK, r);
+  }
+}
+
 TEST_F(KVStore_test, AllocDealloc)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1053,10 +1143,10 @@ TEST_F(KVStore_test, AllocDealloc)
 #if 0
   /* alignment is now a "hint", so 0 alignment is no longer an error */
   auto r = _kvstore->allocate_pool_memory(pool, 100, 0, v);
-  EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* zero aligmnent */
+  EXPECT_EQ(component::IKVStore::E_BAD_ALIGNMENT, r); /* zero aligmnent */
 #endif
   auto r = _kvstore->allocate_pool_memory(pool, 100, 1, v);
-  EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* alignment less than sizeof(void *) */
+  EXPECT_EQ(component::IKVStore::E_BAD_ALIGNMENT, r); /* alignment less than sizeof(void *) */
 
   /* allocate various sizes */
   void *v128 = nullptr;
@@ -1101,6 +1191,7 @@ TEST_F(KVStore_test, AllocDealloc)
 
 TEST_F(KVStore_test, DeletePool)
 {
+  ASSERT_NE(nullptr, _kvstore);
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1119,28 +1210,28 @@ TEST_F(KVStore_test, DeletePool)
 /* copied from mapstore */
 TEST_F(KVStore_test, Timestamps)
 {
+	ASSERT_NE(nullptr, _kvstore);
 	(void) KVStore_test::single_count;
 	(void) KVStore_test::single_value_size;
 	(void) KVStore_test::many_count_actual;
 	(void) KVStore_test::extant_count;
-	ASSERT_TRUE(_kvstore);
 	pool = _kvstore->create_pool("timestamp-test.pool", MB(32));
 
 	/* if timestamping is enabled */
 	if ( _kvstore->get_capability(IKVStore::Capability::WRITE_TIMESTAMPS) )
 	{
-		auto t0 = epoch_now();
+	        auto t0 = common::epoch_now();
 		unsigned delay = 2;
 
 		std::vector<std::string> keys;
 		for ( unsigned i=0; i<10; ++i )
 		{
-			keys.push_back(Common::random_string(8));
+			keys.push_back(common::random_string(8));
 		}
 
 		for ( unsigned i=0; i != keys.size(); ++i )
 		{
-			auto value = Common::random_string(16);
+			auto value = common::random_string(16);
 			PLOG("adding key-value pair (%s)", keys[i].c_str());
 			_kvstore->put(pool, keys[i], value.c_str(), value.size());
 			sleep(delay);
@@ -1156,11 +1247,11 @@ TEST_F(KVStore_test, Timestamps)
 				, const size_t key_len
 				, const void* // value
 				, const size_t // value_len
-				, const tsc_time_t timestamp
+				, const common::tsc_time_t timestamp
 			) -> bool
 			{
 				++key_count;
-				PLOG("Timestamped record: %.*s @ %lu", int(key_len), static_cast<const char *>(key), timestamp);
+				PLOG("Timestamped record: %.*s @ %lu", int(key_len), static_cast<const char *>(key), timestamp.raw());
 				return true;
 			}
 			, 0
@@ -1169,7 +1260,9 @@ TEST_F(KVStore_test, Timestamps)
 		EXPECT_EQ(keys.size(), key_count);
 
 		unsigned wait = 5;
-		auto t0_plus_wait = t0 + wait;
+		auto t0_plus_wait = t0;
+		t0_plus_wait.add_seconds(wait);
+		
 		/* First two keys should not be listed */
 		PLOG("After %u seconds", wait);
 		key_count = 0;
@@ -1180,12 +1273,14 @@ TEST_F(KVStore_test, Timestamps)
 				, const size_t key_len
 				, const void* // value
 				, const size_t // value_len
-				, const tsc_time_t timestamp
+				, const common::tsc_time_t timestamp
 			) -> bool
 			{
 				++key_count;
-				PLOG("After %u Timestamped record: %.*s @ %lu", wait
-					, int(key_len), static_cast<const char *>(key), timestamp
+				std::ostringstream ts;
+				ts << timestamp;
+				PLOG("After %u Timestamped record: %.*s @ %s", wait
+					, int(key_len), static_cast<const char *>(key), ts.str().c_str()
 				);
 				return true;
 			}
@@ -1195,23 +1290,24 @@ TEST_F(KVStore_test, Timestamps)
 		);
 		EXPECT_EQ(keys.size() - unsigned(std::ceil(double(wait)/double(delay))), key_count);
 
-		auto t_before_swap = epoch_now();
+		auto t_before_swap = common::epoch_now();
 
 		for ( unsigned i=0; i+1 < keys.size(); ++i )
 		{
-			auto value = Common::random_string(16);
-			auto key = Common::random_string(8);
+			auto value = common::random_string(16);
+			auto key = common::random_string(8);
 			PLOG("swapping keys (%s, %s)", keys[i].c_str(), keys[i+1].c_str());
 			_kvstore->swap_keys(pool, keys[i], keys[i+1]);
 			sleep(delay);
 		}
 
-		auto t_after_swap = epoch_now() + 1; /* adjust for coarse granularity */
+		auto t_after_swap = common::epoch_now();
+		t_after_swap.add_seconds(1); /* adjust for coarse granularity */
 
 		PLOG(
-			"Timestamps remaining from before swap [%llu .. %llu]"
-			, static_cast<unsigned long long>(t_before_swap)
-			, static_cast<unsigned long long>(t_after_swap)
+			"Timestamps remaining from before swap [%lu .. %lu]"
+			, t_before_swap.seconds()
+			, t_after_swap.seconds()
 		);
 		key_count = 0;
 		_kvstore->map(
@@ -1221,17 +1317,19 @@ TEST_F(KVStore_test, Timestamps)
 				, const size_t key_len
 				, const void* // value
 				, const size_t // value_len
-				, const tsc_time_t timestamp
+				, const common::tsc_time_t timestamp
 			) -> bool
 			{
 				++key_count;
-				PLOG("Before swaps record: %.*s @ %lu"
-					, int(key_len), static_cast<const char *>(key), timestamp
+				std::ostringstream ts;
+				ts << timestamp;
+				PLOG("Before swaps record: %.*s @ %s"
+					, int(key_len), static_cast<const char *>(key), ts.str().c_str()
 				);
 				return true;
 			}
 			, 0
-			, t_before_swap - 1 /* adjust for closed interval requirement */
+			, t_before_swap.sub_seconds(1) /* adjust for closed interval requirement */
 		);
 		EXPECT_EQ(0, key_count);
 
@@ -1244,12 +1342,14 @@ TEST_F(KVStore_test, Timestamps)
 				, const size_t key_len
 				, const void* // value
 				, const size_t // value_len
-				, const tsc_time_t timestamp
+				, const common::tsc_time_t timestamp
 			) -> bool
 			{
 				++key_count;
-				PLOG("During swaps record: %.*s @ %lu"
-					, int(key_len), static_cast<const char *>(key), timestamp
+				std::ostringstream ts;
+				ts << timestamp;
+				PLOG("During swaps record: %.*s @ %s"
+					, int(key_len), static_cast<const char *>(key), ts.str().c_str()
 				);
 				return true;
 			}
@@ -1267,12 +1367,14 @@ TEST_F(KVStore_test, Timestamps)
 				, const size_t key_len
 				, const void* // value
 				, const size_t // value_len
-				, const tsc_time_t timestamp
+				, const common::tsc_time_t timestamp
 			) -> bool
 			{
 				++key_count;
-				PLOG("After swaps record: %.*s @ %lu"
-					, int(key_len), static_cast<const char *>(key), timestamp
+				std::ostringstream ts;
+				ts << timestamp;
+				PLOG("After swaps record: %.*s @ %s"
+					, int(key_len), static_cast<const char *>(key), ts.str().c_str()
 				);
 				return true;
 			}
@@ -1283,8 +1385,8 @@ TEST_F(KVStore_test, Timestamps)
 	}
 
   PLOG("Closing pool.");
-  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
-  ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
+  ASSERT_NE(IKVStore::POOL_ERROR+0, pool);
+  ASSERT_EQ(S_OK, _kvstore->close_pool(pool));
 }
 
 /* copied from mapstore */
@@ -1293,14 +1395,14 @@ TEST_F(KVStore_test, Iterator)
   ASSERT_TRUE(_kvstore);
   pool = _kvstore->create_pool("iterator-test.pool", MB(32));
 
-  epoch_time_t now = 0;
+  common::epoch_time_t now = 0;
 
   for ( unsigned i=0; i<10; ++i )
   {
-    auto value = Common::random_string(16);
-    auto key = Common::random_string(8);
+    auto value = common::random_string(16);
+    auto key = common::random_string(8);
 
-    if(i==5) { sleep(2); now = epoch_now(); }
+    if(i==5) { sleep(2); now = common::epoch_now(); }
 
     PLOG("(%u) adding key-value pair key(%s) value(%s)", i, key.c_str(),value.c_str());
     _kvstore->put(pool, key, value.c_str(), value.size());
@@ -1333,18 +1435,18 @@ TEST_F(KVStore_test, Iterator)
     PLOG("iterator: key(%.*s) value(%.*s) %lu",
          int(ref.key_len), static_cast<const char *>(ref.key),
          int(ref.value_len), static_cast<const char *>(ref.value),
-         ref.timestamp);
+         ref.timestamp.seconds());
   }
   _kvstore->close_pool_iterator(pool, iter);
   ASSERT_TRUE(rc == E_OUT_OF_BOUNDS);
 
   iter = _kvstore->open_pool_iterator(pool);
-  ASSERT_TRUE(now > 0);
+  ASSERT_TRUE(now.seconds() > 0);
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, now, ref, time_match, true)) == S_OK) {
     PLOG("(time-constrained) iterator: key(%.*s) value(%.*s) %lu (match=%s)",
          int(ref.key_len), static_cast<const char *>(ref.key),
          int(ref.value_len), static_cast<const char *>(ref.value),
-         ref.timestamp,
+         ref.timestamp.seconds(),
          time_match ? "y":"n");
   }
   _kvstore->close_pool_iterator(pool, iter);
@@ -1360,12 +1462,12 @@ TEST_F(KVStore_test, Iterator)
     PLOG("iterator: key(%.*s) value(%.*s) %lu",
          int(ref.key_len), static_cast<const char *>(ref.key),
          int(ref.value_len), static_cast<const char *>(ref.value),
-         ref.timestamp);
+         ref.timestamp.seconds());
     ++i;
     if ( i == 5 ) {
       /* disturb iteration */
-      auto value = Common::random_string(16);
-      auto key = Common::random_string(8);
+      auto value = common::random_string(16);
+      auto key = common::random_string(8);
       PLOG("adding key-value pair key(%s) value(%s)", key.c_str(),value.c_str());
       _kvstore->put(pool, key, value.c_str(), value.size());
     }
@@ -1376,7 +1478,6 @@ TEST_F(KVStore_test, Iterator)
   ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
   ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
 }
-
 
 /* copied from mapstore */
 #define ASSERT_OK(X) ASSERT_TRUE(S_OK == X)
@@ -1402,11 +1503,30 @@ TEST_F(KVStore_test, KeySwap)
 
   PLOG("left: %.*s", int(new_left.iov_len), static_cast<const char *>(new_left.iov_base));
   PLOG("right: %.*s", int(new_right.iov_len), static_cast<const char *>(new_right.iov_base));
-  ASSERT_TRUE(strncmp(static_cast<const char *>(new_left.iov_base), right_value.c_str(), new_left.iov_len) == 0);
-  ASSERT_TRUE(strncmp(static_cast<const char *>(new_right.iov_base), left_value.c_str(), new_right.iov_len) == 0);
+  ASSERT_EQ(0, strncmp(static_cast<const char *>(new_left.iov_base), right_value.c_str(), new_left.iov_len));
+  ASSERT_EQ(0, strncmp(static_cast<const char *>(new_right.iov_base), left_value.c_str(), new_right.iov_len));
   _kvstore->free_memory(new_left.iov_base);
   _kvstore->free_memory(new_right.iov_base);
-  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
+  ASSERT_NE(pool, IKVStore::POOL_ERROR+0);
+  ASSERT_EQ(S_OK, _kvstore->close_pool(pool));
+}
+
+/* copied from mapstore */
+TEST_F(KVStore_test, OutOfMemory)
+{
+  ASSERT_TRUE(_kvstore);
+  pool = _kvstore->create_pool("oom", MB(32));
+
+  {
+    status_t rc = S_OK;
+    while ( rc == S_OK )
+    {
+      void *p = 0;
+      rc = _kvstore->allocate_pool_memory(pool, MB(1), 8, p);
+      (void) p;
+    }
+    EXPECT_EQ(IKVStore::E_TOO_LARGE, rc);
+  }
   ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
 }
 

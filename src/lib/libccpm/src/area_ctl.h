@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -23,14 +23,17 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <ios> // ios_base::fmtflags
 #include <limits>
 #include <stdexcept>
 
 #include <iosfwd>
 
+#define USE_MAGIC 1
+
 namespace ccpm
 {
-	class area_top;
+	struct area_top;
 
 	/*
 	 * |<- origin of the area_ctl element map                   |<- this area_ctl
@@ -39,9 +42,9 @@ namespace ccpm
 	 *  ---------------------------------------------------------==========-----------
 	 *
 	 * area_ctl:
-	 *  ------------------------------------------------------------------------------
-	 * | _magic | _sub_size | _element_count | _doubt | element_alloc | element_state |
-	 *  ------------------------------------------------------------------------------
+	 *  ----------------------------------------------------------------------------------------
+	 * | _full_height | _level | _element_count | _doubt | _alloc_bits | element_state | _magic |
+	 *  ----------------------------------------------------------------------------------------
 	 *
 	 *   Note: The "elements" orgin is the beginning of the *first descendants*
 	 *   of an area_ctl. But the array pf area_ctls (from the most distant first
@@ -81,7 +84,7 @@ namespace ccpm
 	 *
 	 * elements:
 	 *  ------------------------------------------------------
-	 * | (_element_count - front_pad_count) @ _sub_size bytes |
+	 * | (_element_count - front_pad_count) @ sub_size() bytes |
 	 *  ------------------------------------------------------
 	 *
 	 * Non-persistent state
@@ -92,7 +95,7 @@ namespace ccpm
 	 *
 	 * area_ctl chains (for those area_ctls with any free elements):
 	 *
-	 *   During normal execution, area_ctls of the same _sub_size *and* maximum free
+	 *   During normal execution, area_ctls of the same sub_size() *and* maximum free
 	 *   element run are double linked. The links do not persist across a crash; the
 	 *   chains must be rebuilt, possibly over time.
 	 *   area_top pointer to each doubly-linked list. The pointers are in a
@@ -122,35 +125,38 @@ namespace ccpm
 	 *   be able to perform an exhaustive search for an allocation of any given size.
 	 *   The information from that exhaustive search should be used to rebuild the
 	 *   area_ctl chains.
-	 *
 	 */
-	class alignas(std::uint64_t) area_ctl
+
+	struct alignas(uint64_t) area_ctl
 		: public list_item
 	{
-	public:
 		/* arbitrary number of atomic words (containing allocation status) which
 		 * cover an area) */
 		using index_t = unsigned;
-		using level_ix_t = unsigned;
+		using level_ix_t = std::uint8_t;
+#if 1
+		static constexpr index_t ct_atomic_words = 1;
+#define USE_PADDING 8
+#elif 0
+		static constexpr index_t ct_atomic_words = 2;
+#define USE_PADDING 0
+#else
 		static constexpr index_t ct_atomic_words = 4;
+#define USE_PADDING 48
+#endif
 		static constexpr std::size_t min_alloc_size = 8;
 
 	private:
 		static constexpr index_t alloc_states_per_word = ccpm::alloc_states_per_word;
 		static constexpr index_t max_elements = ct_atomic_words * alloc_states_per_word;
-
 		static constexpr std::uint64_t magic = 0x0123456789abcdef;
-		std::uint64_t _magic0;
 		/* Every area_ctl has the height of the full tree, which is also the count
 		 * of area_ctl elements at the start of the space.
 		 */
 		level_ix_t _full_height;
 		level_ix_t _level;
 		index_t _element_count;
-/* Now that _level is included, _sub_size should be unnecessary */
-#if 1
-		std::size_t _sub_size;
-#endif
+
 		/* _dt is used (non-zero) only in the top level area. It appears in all
 		 * other areas only for consistency. Some day it might be used in more
 		 * than one area for multi-thread allocation.
@@ -163,11 +169,26 @@ namespace ccpm
 		 * Contain no information for free elements.
 		 */
 		std::array<sub_state, max_elements> _element_state;
-		std::uint64_t _magic1;
+		std::uint64_t _magic;
+
+#if USE_PADDING
+		char _padding[USE_PADDING];
+#endif
 
 		/* functions */
 
-		area_ctl(level_ix_t level, std::size_t sub_size, index_t element_count, level_ix_t header_ct, level_ix_t full_height);
+		/*
+		 * level: Level of this control. 0 is the lowest level, containing elements if size 8.
+		 * element_count: Count of elements which will fit in this ctl.
+		 * header_ct: ??
+		 * full_height: The number of levels in the full tree.
+		 */
+		area_ctl(
+			level_ix_t level
+			, index_t element_count
+			, level_ix_t header_ct
+			, level_ix_t full_height
+		);
 		/* Simple constructor. Used, if necessary, to create area_ctl at offset 0
 		 * in the region
 		 */
@@ -175,6 +196,9 @@ namespace ccpm
 
 		area_ctl *area_prev() { return static_cast<area_ctl *>(this->prev()); }
 		area_ctl *area_next() { return static_cast<area_ctl *>(this->next()); }
+
+		static std::size_t sub_size(level_ix_t level);
+		std::size_t sub_size() const;
 
 		/* functions prefixed "el" operate on one or more of all elements in the
 		 * element state array
@@ -286,12 +310,12 @@ namespace ccpm
 
 		void *element_void(index_t ix)
 		{
-			return area_byte() + ix * _sub_size;
+			return area_byte() + ix * sub_size();
 		}
 
 		const void *element_void(index_t ix) const
 		{
-			return area_byte() + ix * _sub_size;
+			return area_byte() + ix * sub_size();
 		}
 
 		area_ctl *area_child(index_t ix)
@@ -337,7 +361,7 @@ namespace ccpm
 
 	public:
 		level_ix_t full_height() const { return _full_height; }
-		bool is_valid() const { return _magic0 == magic && _magic1 == magic; }
+		bool is_valid() const { return _magic == magic; }
 		static level_ix_t height(std::size_t bytes);
 		static auto commission(
 			void *start
@@ -377,17 +401,16 @@ namespace ccpm
 			, level_ix_t current_level_ix
 		) -> std::size_t;
 
-		void print(std::ostream &o_, level_ix_t level_) const;
+		void print(std::ostream &o_, level_ix_t level_, std::ios_base::fmtflags size_format_) const;
 
 		void set_allocated(void *p, std::size_t bytes);
 		void set_deallocated(void *p, std::size_t bytes);
-		void restore(const ownership_callback_t &resolver_);
-		level_ix_t height() const;
-
+		auto restore(const ownership_callback_t &resolver_) -> area_ctl &;
+		level_ix_t level() const;
 		index_t el_max_free_run() const
 		{
 			index_t m = 0;
-			for ( auto ix = 0; ix != ct_atomic_words && m != 64; ++ix )
+			for ( unsigned ix = 0U; ix != ct_atomic_words && m != 64; ++ix )
 			{
 				m = std::max(m, aw_count_max_free_run(_alloc_bits[ix]));
 			}
@@ -405,7 +428,7 @@ namespace ccpm
 		 */
 		static level_ix_t size_to_level(std::size_t bytes_)
 		{
-			auto level = 0;
+			level_ix_t level = 0U;
 
 			/* level 0 is area_ctl::min_alloc_size * (alloc_states_per_word-1) or fewer */
 			std::size_t limit = min_alloc_size * (alloc_states_per_word-1);
@@ -432,6 +455,8 @@ namespace ccpm
 			 * return area_ctl::min_alloc_size * exp(subdivision_size, substates_per_word);
 			 */
 		}
+		static index_t max_free_element_count(level_ix_t level);
+		static auto root(void *ptr) -> area_ctl *;
 	};
 }
 

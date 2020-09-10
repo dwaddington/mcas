@@ -5,6 +5,7 @@
 
 ## Configuration
 * [Server Configuration Files](./MCAS_server_config_files.md)
+* [Server Configuration Schema](./MCAS_server_config_schema.md)
 
 ## APIs
 * [C++](./cpp_api.md)
@@ -14,7 +15,8 @@
 * [kvstore-perf benchmark](./benchmarking.md)
 
 ## Deployment
-* [Docker Containerization](./docker.md)
+* [ADO Docker Containerization](./ado_docker.md)
+* [MCAS Docker Containerization](./docker.md)
 * [Kubernetes Deployment](./kubernetes.md)
 * [Virtualization with QEMU/KVM](./VM_deployment.md)
 

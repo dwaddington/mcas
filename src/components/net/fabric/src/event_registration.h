@@ -20,17 +20,18 @@
 #ifndef _EVENT_REGISTRATION_H_
 #define _EVENT_REGISTRATION_H_
 
-#include "delete_copy.h"
+#include <common/delete_copy.h>
 
 #include "rdma-fabric.h" /* fid_t */
 
-class event_consumer;
-class event_producer;
+struct event_consumer;
+struct event_producer;
 struct fid_ep;
 struct fid_pep;
 
-class event_registration
+struct event_registration
 {
+private:
   event_producer &_ev;
   ::fid_t _ep;
 public:

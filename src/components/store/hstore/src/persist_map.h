@@ -31,22 +31,23 @@
 
 namespace impl
 {
-	class allocation_state_emplace;
-	class allocation_state_pin;
-	class allocation_state_extend;
+	struct allocation_state_emplace;
+	struct allocation_state_pin;
+	struct allocation_state_extend;
 	using segment_count_actual_t = value_unstable<segment_layout::six_t, 1>;
 
 	template <typename Allocator>
-		class persist_controller;
+		struct persist_controller;
 
 	template <typename Allocator>
-		class persist_map
+		struct persist_map
 		{
+		private:
 			using value_type = typename Allocator::value_type;
 			static constexpr std::size_t segment_align = 64U;
-	public:
+		public:
 			using bucket_aligned_t = bucket_aligned<hash_bucket<value_type>>;
-	private:
+		private:
 			using allocator_traits_type = std::allocator_traits<Allocator>;
 			using bucket_allocator_t =
 				typename allocator_traits_type::template rebind_alloc<bucket_aligned_t>;
@@ -85,6 +86,7 @@ namespace impl
 			allocation_state_extend *_asx;
 		public:
 			persist_map(
+				AK_ACTUAL
 				std::size_t n
 				, Allocator av
 				, allocation_state_emplace *ase_
@@ -93,11 +95,14 @@ namespace impl
 				, allocation_state_extend *asx_
 			);
 			persist_map(persist_map &&) = default;
-			void do_initial_allocation(persist_controller<Allocator> *pc);
+			void do_initial_allocation(
+				AK_ACTUAL
+				persist_controller<Allocator> *pc
+			);
 			void reconstitute(Allocator av);
 			allocation_state_emplace &ase() { return *_ase; }
 			allocation_state_extend &asx() { return *_asx; }
-			friend class persist_controller<Allocator>;
+			friend struct persist_controller<Allocator>;
 		};
 }
 

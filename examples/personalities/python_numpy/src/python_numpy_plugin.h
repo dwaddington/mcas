@@ -26,7 +26,7 @@
 #include <api/ado_itf.h>
 
 
-class ADO_python_numpy_plugin : public Component::IADO_plugin
+class ADO_python_numpy_plugin : public component::IADO_plugin
 {  
 private:
   unsigned _debug_level = 0;
@@ -51,9 +51,9 @@ public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0xe5edffcd,0xee74,0x4f92,0x8dc8,0x7e,0xfe,0xa6,0xea,0x45,0x4e);
   
-  void * query_interface(Component::uuid_t& itf_uuid) override {
-    if(itf_uuid == Component::IADO_plugin::iid()) {
-      return (void *) static_cast<Component::IADO_plugin*>(this);
+  void * query_interface(component::uuid_t& itf_uuid) override {
+    if(itf_uuid == component::IADO_plugin::iid()) {
+      return (void *) static_cast<component::IADO_plugin*>(this);
     }
     else return NULL; // we don't support this interface
   }
@@ -84,7 +84,7 @@ public:
     return S_OK;
   }
 
-  status_t shutdown();
+  status_t shutdown() override;
 
 };
 

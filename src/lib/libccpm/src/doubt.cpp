@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,12 +13,15 @@
 
 #include "doubt.h"
 
-#define DOUBT_FINE_TRACE 0
-#if DOUBT_FINE_TRACE
 #include "logging.h"
-#endif
 #include <libpmem.h>
 #include <cstddef>
+#include <cstdlib> // getenv
+
+namespace
+{
+	auto doubt_fine_trace = std::getenv("CCA_DOUBT_FINE_TRACE");
+}
 
 template <typename P>
 	void persist(
@@ -32,17 +35,15 @@ template <typename P>
 #define PERSIST_N(p, ct) do { ::pmem_persist(p, (sizeof *p) * ct); } while (0)
 
 void ccpm::doubt::set(
-	const char *
-#if DOUBT_FINE_TRACE
-		fn
-#endif
+	const char *fn
 	, void *p_
 	, std::size_t bytes_
 )
 {
-#if DOUBT_FINE_TRACE
-	PLOG(PREFIX "set %s: doubt area %p.%zu", LOCATION, fn, p_, bytes_);
-#endif
+	if ( doubt_fine_trace )
+	{
+		PLOG(PREFIX "set %s: doubt area %p.%zu", LOCATION, fn, p_, bytes_);
+	}
 	_bytes = bytes_;
 	_in_doubt = p_;
 	PERSIST(*this);
@@ -50,8 +51,10 @@ void ccpm::doubt::set(
 
 void *ccpm::doubt::get() const
 {
-#if DOUBT_FINE_TRACE
-	PLOG(PREFIX "get: doubt area %p.%zu", LOCATION, _in_doubt, _bytes);
-#endif
+	if ( doubt_fine_trace )
+	{
+		PLOG(PREFIX "get: doubt area %p.%zu", LOCATION, _in_doubt, _bytes);
+	}
+
 	return _in_doubt;
 }

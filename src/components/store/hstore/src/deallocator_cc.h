@@ -23,26 +23,25 @@
 #include <type_traits> /* true_type, false_type */
 
 template <typename T, typename Persister>
-	class deallocator_cc;
+	struct deallocator_cc;
 
 template <>
-	class deallocator_cc<void, persister>
+	struct deallocator_cc<void, persister>
 	{
-	public:
 		using value_type = void;
 	};
 
 template <typename Persister>
-	class deallocator_cc<void, Persister>
+	struct deallocator_cc<void, Persister>
 	{
-	public:
 		using value_type = void;
 	};
 
 template <typename T, typename Persister = persister>
-	class deallocator_cc
+	struct deallocator_cc
 		: public Persister
 	{
+	private:
 		heap_cc _pool;
 	public:
 		using value_type = T;

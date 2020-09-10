@@ -1,1 +1,1 @@
-Placeholder for github pages website
+Placeholder for github pages.

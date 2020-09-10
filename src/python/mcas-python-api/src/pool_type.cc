@@ -23,6 +23,7 @@ static PyObject * pool_get(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_get_direct(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds);
+static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_get_size(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_erase(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_configure(Pool* self, PyObject *args, PyObject *kwds);
@@ -57,7 +58,6 @@ Pool_dealloc(Pool *self)
 }
 
 static PyMemberDef Pool_members[] = {
-  //  {"port", T_ULONG, offsetof(Pool, _port), READONLY, "Port"},
   {NULL}
 };
 
@@ -68,6 +68,7 @@ PyDoc_STRVAR(get_doc,"Pool.get(key) -> Read value from pool.");
 PyDoc_STRVAR(get_size_doc,"Pool.get_size(key) -> Get size of a value.");
 PyDoc_STRVAR(get_direct_doc,"Pool.get_direct(key) -> Read bytearray value from pool using zero-copy.");
 PyDoc_STRVAR(invoke_ado_doc,"Pool.invoke_ado(key,msg) -> Send ADO message.");
+PyDoc_STRVAR(invoke_put_ado_doc,"Pool.invoke_put_ado(key,msg,value) -> Send ADO message and perform a pre-put.");
 PyDoc_STRVAR(close_doc,"Pool.close() -> Forces pool closure. Otherwise close happens on deletion.");
 PyDoc_STRVAR(count_doc,"Pool.count() -> Get number of objects in the pool.");
 PyDoc_STRVAR(erase_doc,"Pool.erase(key) -> Erase object from the pool.");
@@ -84,6 +85,7 @@ static PyMethodDef Pool_methods[] = {
   {"get",(PyCFunction) pool_get, METH_VARARGS | METH_KEYWORDS, get_doc},
   {"get_direct",(PyCFunction) pool_get_direct, METH_VARARGS | METH_KEYWORDS, get_direct_doc},
   {"invoke_ado",(PyCFunction) pool_invoke_ado, METH_VARARGS | METH_KEYWORDS, invoke_ado_doc},
+  {"invoke_put_ado",(PyCFunction) pool_invoke_put_ado, METH_VARARGS | METH_KEYWORDS, invoke_put_ado_doc},
   {"get_size",(PyCFunction) pool_get_size, METH_VARARGS | METH_KEYWORDS, get_size_doc},
   {"erase",(PyCFunction) pool_erase, METH_VARARGS | METH_KEYWORDS, erase_doc},
   {"configure",(PyCFunction) pool_configure, METH_VARARGS | METH_KEYWORDS, configure_doc},
@@ -235,7 +237,7 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
 
   unsigned int flags = 0;
   status_t hr;
-  Component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(p, p_len);
+  component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(p, p_len);
 
   if(handle == nullptr) {
     PyErr_SetString(PyExc_RuntimeError,"RDMA memory registration failed");
@@ -295,7 +297,7 @@ static PyObject * pool_get(Pool* self, PyObject *args, PyObject *kwds)
                              out_p,
                              out_p_len);
 
-  if(hr == Component::IKVStore::E_KEY_NOT_FOUND) {
+  if(hr == component::IKVStore::E_KEY_NOT_FOUND) {
     Py_RETURN_NONE;
   }
   else if(hr != S_OK || out_p == nullptr) {
@@ -335,7 +337,7 @@ static PyObject * pool_get_direct(Pool* self, PyObject *args, PyObject *kwds)
   std::string k(key);
   
   auto hr = self->_mcas->get_attribute(self->_pool,
-                                       Component::IKVStore::Attribute::VALUE_LEN,
+                                       component::IKVStore::Attribute::VALUE_LEN,
                                        v,
                                        &k);
 
@@ -353,7 +355,7 @@ static PyObject * pool_get_direct(Pool* self, PyObject *args, PyObject *kwds)
   void * p = (void *) PyBytes_AsString(result);
 
   /* register memory */
-  Component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(p, p_len);
+  component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(p, p_len);
 
   if(handle == nullptr) {
     PyErr_SetString(PyExc_RuntimeError,"RDMA memory registration failed");
@@ -404,7 +406,7 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   std::string request(command);
   assert(request.size() > 0);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<component::IMCAS::ADO_response> response;
 
   status_t hr = self->_mcas->invoke_ado(self->_pool,
                                         key,
@@ -422,6 +424,74 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
 
   return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
 }
+
+
+static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"key",
+                                 "command",
+                                 "value",
+                                 NULL};
+
+  const char * key = nullptr;
+  PyObject * value = nullptr;
+  const char * command = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "ssO",
+                                    const_cast<char**>(kwlist),
+                                    &key,
+                                    &value,
+                                    &command)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  void * p = nullptr;
+  size_t p_len = 0;
+  if(PyByteArray_Check(value)) {
+    p = PyByteArray_AsString(value);
+    p_len = PyByteArray_Size(value);
+  }
+  else if(PyUnicode_Check(value)) {
+    p = PyUnicode_DATA(value);
+    p_len = PyUnicode_GET_SIZE(value);
+  }
+  else {
+    PyErr_SetString(PyExc_RuntimeError,"bad value parameter");
+    return NULL;
+  }
+
+
+  assert(self->_mcas);
+  assert(self->_pool);
+
+  std::string request(command);
+  assert(request.size() > 0);
+
+  std::vector<component::IMCAS::ADO_response> response;
+
+  status_t hr = self->_mcas->invoke_put_ado(self->_pool,
+                                            key,
+                                            request.c_str(),
+                                            request.size(),
+                                            p,
+                                            p_len,
+                                            0, // root len
+                                            component::IMCAS::ADO_FLAG_CREATE_ON_DEMAND, // flags
+                                            response);
+
+  if(hr != S_OK) {
+    std::stringstream ss;
+    ss << "invoke_ado failed (" << hr << ")";
+    PyErr_SetString(PyExc_RuntimeError,ss.str().c_str());
+    return NULL;
+  }
+
+  return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+}
+
 
 
 static PyObject * pool_get_size(Pool* self, PyObject *args, PyObject *kwds)
@@ -446,7 +516,7 @@ static PyObject * pool_get_size(Pool* self, PyObject *args, PyObject *kwds)
   std::string k(key);
   
   auto hr = self->_mcas->get_attribute(self->_pool,
-                                       Component::IKVStore::Attribute::VALUE_LEN,
+                                       component::IKVStore::Attribute::VALUE_LEN,
                                        v,
                                        &k);
 
@@ -647,12 +717,12 @@ static PyObject * pool_get_attribute(Pool* self, PyObject *args, PyObject *kwds)
   std::vector<uint64_t> v;
   std::string k(key);
   std::string attr(attrstr);
-  Component::IKVStore::Attribute attribute;
+  component::IKVStore::Attribute attribute;
   
   if(attr == "length")
-    attribute = Component::IKVStore::Attribute::VALUE_LEN;
+    attribute = component::IKVStore::Attribute::VALUE_LEN;
   else if(attr == "crc32")
-    attribute = Component::IKVStore::Attribute::CRC32;
+    attribute = component::IKVStore::Attribute::CRC32;
   else {
     PyErr_SetString(PyExc_RuntimeError,"bad attribute name");
     return NULL;    

@@ -25,9 +25,8 @@
 
 #include <cstddef>
 
-class persister_nupm
+struct persister_nupm
 {
-public:
 	static void persist(const void * a, std::size_t sz)
 	{
 		pmem_persist(a,sz);

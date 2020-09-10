@@ -22,13 +22,13 @@
 #include <functional> /* ref */
 #include <iostream> /* cerr */
 
-namespace Component
+namespace component
 {
   class IFabric_server_factory;
 }
 
 void pingpong_server::listener(
-  Component::IFabric_server_factory &factory_
+  component::IFabric_server_factory &factory_
   , std::size_t buffer_size_
   , std::uint64_t remote_key_base_
   , unsigned iteration_count_
@@ -82,7 +82,7 @@ catch ( std::exception &e )
 }
 
 pingpong_server::pingpong_server(
-  Component::IFabric_server_factory &factory_
+  component::IFabric_server_factory &factory_
   , std::uint64_t buffer_size_
   , std::uint64_t remote_key_base_
   , unsigned iteration_count_
@@ -90,18 +90,21 @@ pingpong_server::pingpong_server(
 )
   : _stat{}
   , _th(
-    &pingpong_server::listener
-    , this
-    , std::ref(factory_), buffer_size_, remote_key_base_, iteration_count_, msg_size_
-  )
+      std::async(
+        std::launch::async
+        , &pingpong_server::listener
+        , this
+        , std::ref(factory_), buffer_size_, remote_key_base_, iteration_count_, msg_size_
+      )
+    )
 {
 }
 
 pingpong_stat pingpong_server::time()
 {
-  if ( _th.joinable() )
+  if ( _th.valid() )
   {
-    _th.join();
+    _th.get();
   }
   return _stat;
 }
@@ -109,9 +112,9 @@ pingpong_stat pingpong_server::time()
 pingpong_server::~pingpong_server()
 try
 {
-  if ( _th.joinable() )
+  if ( _th.valid() )
   {
-    _th.join();
+    _th.get();
   }
 }
 catch ( std::exception &e )

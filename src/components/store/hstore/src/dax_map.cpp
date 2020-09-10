@@ -14,12 +14,17 @@
 
 #include "dax_map.h"
 
+#include <common/json.h>
+#include <rapidjson/error/en.h>
+#include <rapidjson/prettywriter.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wshadow"
 #include <rapidjson/schema.h>
 #pragma GCC diagnostic pop
-#include <rapidjson/error/en.h>
+#include <rapidjson/stringbuffer.h>
 
+#include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -36,13 +41,21 @@
  *     "properties": {
  *       "region_id": { "type": "integer", "minimum": 0 },
  *       "path": { "type": "string" },
- *       "addr": { "type": "string" },
+ *       "addr": { "type": "integer", "minimum": 0 },
  *     },
  *     "required" : [ "region_id", "path", "addr" ]
  *   }
  * }
  *
  */
+
+namespace dax_config
+{
+	constexpr const char * region_id = "region_id";
+	constexpr const char * path = "path";
+	constexpr const char * addr = "addr";
+}
+
 namespace
 {
 	std::string error_report(const std::string &prefix, const std::string &text, const rapidjson::Document &doc)
@@ -50,27 +63,85 @@ namespace
 		return prefix + " '" + text + "': " + rapidjson::GetParseError_En(doc.GetParseError()) + " at " + std::to_string(doc.GetErrorOffset());
 	}
 
-	rapidjson::SchemaDocument make_schema_doc()
+    using PrettyWriter = rapidjson::PrettyWriter<rapidjson::StringBuffer>;
+
+	auto make_schema_string()
 	{
-		static const char *dax_map_schema =
-			"{\n"
-				"\"type\": \"array\",\n"
-				"\"items\": {\n"
-					"\"type\": \"object\",\n"
-					"\"properties\": {\n"
-						"\"region_id\": { \"type\": \"integer\", \"minimum\": 0 },\n"
-						"\"path\": { \"type\": \"string\" },\n"
-						"\"addr\": { \"type\": \"string\" }\n"
-					"},\n"
-					"\"required\" : [ \"region_id\", \"path\", \"addr\" ]\n"
-				"}\n"
-			"}\n"
-			;
+		namespace c_json = common::json;
+		namespace schema = c_json::schema;
+		using json = c_json::serializer<PrettyWriter>;
+
+		auto schema_object =
+		  json::object
+		  ( json::member(schema::description, "The DAX memory spaces are made available to a shard for persistent storage.")
+		  , json::member(schema::type, schema::array)
+		  , json::member
+		    ( schema::items
+		    , json::object
+		      ( json::member(schema::description, "Identification of DAX memory space to use as one 'region' of a shard's persistent storage")
+		      , json::member(schema::type, schema::object)
+		      , json::member
+		        ( schema::properties
+		        , json::object
+		          ( json::member
+		            ( dax_config::region_id
+		            , json::object
+		              ( json::member(schema::description, "An integer, unique in the array")
+		              , json::member(schema::examples, "0")
+		              , json::member(schema::type, schema::integer)
+		                , json::member(schema::minimum, json::number(0))
+		              )
+		            )
+		          , json::member
+		            ( dax_config::path
+		            , json::object
+		              ( json::member(schema::description, "Full path to the DAX file to be used")
+		              , json::member(schema::examples, "/dev/dax0.0")
+		              , json::member(schema::type, schema::string)
+		              )
+		            )
+		          , json::member
+		            ( dax_config::addr
+		            , json::object
+		              ( json::member(schema::description, "Virtual address to which to mmap the DAX file. When used in a server configuration, a string representing a C-style hexadecimal value is accepted and converted to an integer")
+		              , json::member(schema::examples, json::array(241591910))
+		              , json::member(schema::type, schema::integer)
+		              , json::member(schema::minimum, json::number(0))
+		              )
+		            )
+		          )
+		        )
+		      , json::member
+		        ( schema::required
+		        , json::array
+		          ( dax_config::region_id
+		          , dax_config::path
+		          , dax_config::addr
+		          )
+		        )
+		      )
+		    )
+		  )
+		;
+
+		rapidjson::StringBuffer buffer;
+		PrettyWriter writer(buffer);
+		schema_object.serialize(writer);
+		return buffer.GetString();
+	}
+
+	rapidjson::SchemaDocument make_schema_doc(unsigned debug_level_)
+	{
+		static const std::string dax_map_schema = make_schema_string();
+		if ( 4 < debug_level_ )
+        {
+          std::cerr << dax_map_schema;
+        }
 		rapidjson::Document doc;
-		doc.Parse(dax_map_schema);
+		doc.Parse(dax_map_schema.c_str());
 		if ( doc.HasParseError() )
 		{
-			throw std::logic_error(error_report("Bad JSON dax_map_schema", dax_map_schema, doc));
+			throw std::logic_error(error_report("Bad JSON dax_map_schema", dax_map_schema.c_str(), doc));
 		}
 		return rapidjson::SchemaDocument(doc);
 	}
@@ -87,7 +158,7 @@ namespace
 	 * map of strings to json parse functions
 	 */
 	template <typename S>
-		using parse_map = translate_map<void (*)(const json_value, S *)>;
+		using parse_map = translate_map<void (*)(json_value, S *)>;
 
 	template <typename V>
 		V parse_scalar(json_value &v);
@@ -107,11 +178,7 @@ namespace
 		{
 			if ( ! v.IsUint64() )
 			{
-				if ( ! v.IsString() )
-				{
-					throw std::domain_error("not a uint64 or a string");
-				}
-				return std::stoull(v.GetString(), nullptr, 0);
+				throw std::domain_error("not a uint64");
 			}
 			return v.GetUint64();
 		}
@@ -129,9 +196,8 @@ namespace
 	/* assignment */
 
 	template <typename V>
-		class Assign
+		struct assignment
 		{
-		public:
 			template <typename S, V S::*M>
 			static void assign_scalar(json_value &v, S *s)
 			{
@@ -139,16 +205,16 @@ namespace
 			}
 		};
 
-#define SET_SCALAR(S,M) Assign<decltype(S::M)>::assign_scalar<S, &S::M>
+#define SET_SCALAR(S,M) assignment<decltype(S::M)>::assign_scalar<S, &S::M>
 
 	parse_map<nupm::Devdax_manager::config_t> config_t_attr
 	{
-		{ "region_id", SET_SCALAR(nupm::Devdax_manager::config_t, region_id) },
-		{ "path", SET_SCALAR(nupm::Devdax_manager::config_t, path) },
-		{ "addr", SET_SCALAR(nupm::Devdax_manager::config_t, addr) },
+		{ dax_config::region_id, SET_SCALAR(nupm::Devdax_manager::config_t, region_id) },
+		{ dax_config::path, SET_SCALAR(nupm::Devdax_manager::config_t, path) },
+		{ dax_config::addr, SET_SCALAR(nupm::Devdax_manager::config_t, addr) },
 	};
 
-	std::vector<nupm::Devdax_manager::config_t> parse_devdax_string(const std::string &dax_map_)
+	std::vector<nupm::Devdax_manager::config_t> parse_devdax_string(unsigned debug_level_, const std::string &dax_map_)
 	{
 		std::vector<nupm::Devdax_manager::config_t> dax_config;
 		rapidjson::Document doc;
@@ -160,7 +226,7 @@ namespace
 			}
 		}
 
-		auto schema_doc(make_schema_doc());
+		auto schema_doc(make_schema_doc(debug_level_));
 		rapidjson::SchemaValidator validator(schema_doc);
 
 		if ( ! doc.Accept(validator) )
@@ -207,8 +273,10 @@ namespace
 }
 
 Devdax_manager::Devdax_manager(
-	const std::string &dax_map
+	unsigned debug_level_
+	, const std::string &dax_map
 	, bool force_reset
 )
-	: nupm::Devdax_manager(parse_devdax_string(dax_map), force_reset)
+	: nupm::Devdax_manager(parse_devdax_string(debug_level_, dax_map), force_reset)
+	, _debug_level(debug_level_)
 {}

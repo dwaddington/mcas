@@ -51,8 +51,18 @@ Fabric_server_generic_factory::Fabric_server_generic_factory(Fabric &fabric_, ev
   , _open{}
   , _end{}
   , _eq{eq_}
-  , _th{&Fabric_server_generic_factory::listen, this, addr_, port_, _end.fd_read(), std::ref(*_pep)
-  }
+  , _listen_exception(nullptr)
+  , _listener(
+    std::async(
+      std::launch::async
+      , &Fabric_server_generic_factory::listen
+      , this
+      , addr_
+      , port_
+      , _end.fd_read()
+      , std::ref(*_pep)
+    )
+  )
 {
 }
 
@@ -62,11 +72,11 @@ try
   char c{};
   auto sz = ::write(_end.fd_write(), &c, 1);
   (void) sz;
-  _th.join();
+  _listener.get();
 }
 catch ( const std::exception &e )
 {
-  std::cerr << "SERVER connection shutdown error " << e.what();
+  std::cerr << __func__ << ": SERVER connection error: " << e.what();
 }
 
 size_t Fabric_server_generic_factory::max_message_size() const noexcept
@@ -79,6 +89,8 @@ std::string Fabric_server_generic_factory::get_provider_name() const
   return _info.fabric_attr->prov_name;
 }
 
+static int pending_count = 1;
+
 void Fabric_server_generic_factory::cb(std::uint32_t event, ::fi_eq_cm_entry &entry_) noexcept
 try
 {
@@ -88,6 +100,7 @@ try
     {
       auto conn = new_server(_fabric, _eq, *entry_.info);
       std::lock_guard<std::mutex> g{_m_pending};
+      pending_count++;
       _pending.push(conn);
     }
     break;
@@ -100,7 +113,7 @@ catch ( const std::exception &e )
   std::cerr << __func__ << " (Fabric_server_factory) " << e.what() << "\n";
 }
 
-void Fabric_server_generic_factory::err(::fi_eq_err_entry &) noexcept
+void Fabric_server_generic_factory::err(::fid_eq *, ::fi_eq_err_entry &) noexcept
 {
   /* The passive endpoint receives an error. As it is not a connection request, ignore it. */
 }
@@ -163,6 +176,7 @@ void Fabric_server_generic_factory::listen(
   , int end_fd_
   , ::fid_pep &pep_
 )
+try
 {
   Fd_socket listen_fd(make_listener(ip_addr_, port_));
 
@@ -172,6 +186,12 @@ void Fabric_server_generic_factory::listen(
   fabric_types::addr_ep_t pep_name(get_name(&_pep->fid));
 
   listen_loop(end_fd_, pep_name, listen_fd);
+}
+catch ( const std::exception &e )
+{
+  std::cerr << __func__ << " (Fabric_server_factory) listen failure " << e.what() << "\n";
+  _listen_exception = std::current_exception();
+  throw;
 }
 
 void Fabric_server_generic_factory::listen_loop(
@@ -218,6 +238,7 @@ void Fabric_server_generic_factory::listen_loop(
             auto e = errno;
             system_fail(e, (" in accept fd " + std::to_string(listen_fd_.fd())));
           }
+
           Fd_control conn_fd(r);
           /* NOTE: Fd_control needs a timeout. */
 
@@ -262,6 +283,7 @@ void Fabric_server_generic_factory::listen_loop(
 
 Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
 {
+#if 1
   /* clumsy way to limit the scope of a lock_guard: immediate call of a lambda */
   auto c = [this] () {
     std::lock_guard<std::mutex> g{_m_pending};
@@ -275,9 +297,28 @@ Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
     )->expect_event(FI_CONNECTED);
 
     _open.add(c);
+    return &*c;
+  }
+#else
+  static int count = 1;
+  {
+    std::lock_guard<std::mutex> g{_m_pending};
+    auto f = _pending.remove();
+    if(f) {
+      _open.add(f);
+      PNOTICE("** removed pending added to _open %d", count);
+      count++;
+      return f.get();
+    }
+  }
+#endif
+
+  if ( _listen_exception )
+  {
+    std::rethrow_exception(_listen_exception);
   }
 
-  return &*c;
+  return nullptr;
 }
 
 std::vector<Fabric_memory_control *> Fabric_server_generic_factory::connections()

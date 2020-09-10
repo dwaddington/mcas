@@ -19,9 +19,10 @@
 #include <stdexcept>
 #include <string>
 
-class pobj_bad_alloc
+struct pobj_bad_alloc
 	: public std::bad_alloc
 {
+private:
 	int _err;
 	std::string _what;
 public:

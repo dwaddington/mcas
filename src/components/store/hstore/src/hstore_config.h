@@ -35,11 +35,12 @@
 #define LOCATION LOCATION_STATIC, static_cast<const void *>(this)
 
 /* JIRA DAWN-292 requested a compile-configured grain size, default 32MiB 1<<25 */
-#if ! defined HSTORE_GRAIN_SIZE
-#define HSTORE_GRAIN_SIZE (std::size_t(1)<<25)
+#if ! defined HSTORE_LOG_GRAIN_SIZE
+#define HSTORE_LOG_GRAIN_SIZE DM_REGION_LOG_GRAIN_SIZE
 #endif
 
 /* timestamps are enabled to match mapstore. To disable, compile with -DENABLE_TIMESTAMPS=0 */
+
 #if ! defined ENABLE_TIMESTAMPS
 #define ENABLE_TIMESTAMPS 1
 #endif

@@ -4,6 +4,7 @@
 #include "get_vector_from_string.h"
 #include "program_options.h"
 
+#include "common/json.h"
 #include "rapidjson/filereadstream.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -28,6 +29,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #define MCAS_PATH "libcomponent-mcasclient.so"
@@ -59,7 +61,8 @@ namespace
 
     char spath[PATH_MAX];
     snprintf(spath, PATH_MAX, "/sys/dev/char/%u:%u/size",
-             major(statbuf.st_rdev), minor(statbuf.st_rdev));
+      major(statbuf.st_rdev), minor(statbuf.st_rdev)
+    );
     std::ifstream sizestr(spath);
     size_t size = 0;
     sizestr >> size;
@@ -76,16 +79,6 @@ namespace
     }
     /* at most one bit is set in the result */
     return n;
-  }
-
-  std::string quote(const std::string &s)
-  {
-    return "\"" + s + "\"";
-  }
-
-  std::string json_map(const std::string &key, const std::string &value)
-  {
-    return quote(key) + ": " + value;
   }
 
   // returns file size in bytes
@@ -134,7 +127,6 @@ Experiment::Experiment(std::string name_, const ProgramOptions &options)
   , _cores(options.cores)
   , _devices(options.devices)
   , _core_list()
-  , _execution_time()
   , _start_time(options.start_time)
   , _duration_directed(options.duration ? std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(std::chrono::seconds(*options.duration)) : boost::optional<std::chrono::high_resolution_clock::duration>())
   , _end_time_directed()
@@ -144,24 +136,36 @@ Experiment::Experiment(std::string name_, const ProgramOptions &options)
   , _report_filename(options.report_file_name)
   , _do_json_reporting(options.do_json_reporting)
   , _test_name(name_)
-  , _memory_handle(Component::IKVStore::HANDLE_NONE)
   , _store()
-  , _pool()
+  , _pool(component::IKVStore::POOL_ERROR)
   , _server_address(options.server_address)
+  , _provider(options.provider)
   , _port(options.port)
   , _port_increment(options.port_increment ? *options.port_increment : 0)
   , _device_name(options.device_name)
+  , _src_addr(options.src_addr)
   , _pci_address(options.pci_addr)
+  , _first_iter(true)
+  , _ready(false)
   , timer()
+  , _memory_handle(debug_level())
   , _verbose(options.verbose)
   , _summary(options.summary)
+  , _element_size_on_disk(std::size_t(-1))
+  , _element_size(std::size_t(-1))
+  , _elements_in_use(0)
   , _pool_element_start(0)
   , _pool_element_end(0)
+  , _elements_stored(0)
+  , _total_data_processed(0)
   , _bin_count(options.bin_count)
   , _bin_threshold_min(options.bin_threshold_min)
   , _bin_threshold_max(options.bin_threshold_max)
-  , _bin_increment()
   , _core_to_device_map(make_core_to_device_map(_cores, _devices))
+{
+}
+
+Experiment::~Experiment()
 {
 }
 
@@ -185,7 +189,7 @@ void Experiment::_print_highest_count_bin(BinStatistics& stats, unsigned core)
   }
 }
 
-long Experiment::GetDataInputSize(std::size_t index)
+std::size_t Experiment::GetDataInputSize(std::size_t index)
 {
   std::string value = g_data->value(index);
 
@@ -209,20 +213,20 @@ auto Experiment::make_core_to_device_map(const std::string &cores, const std::st
 
   core_to_device_map_t core_to_device_map;
   std::transform(
-     core_v.begin()
-     , core_v.end()
-     , device_v.begin()
-     , std::inserter(
-       core_to_device_map
-       , core_to_device_map.end())
-     , [] (unsigned c, dotted_pair<unsigned> d) { return std::make_pair(c, d); }
+    core_v.begin()
+    , core_v.end()
+    , device_v.begin()
+    , std::inserter(
+      core_to_device_map
+      , core_to_device_map.end())
+    , [] (unsigned c, dotted_pair<unsigned> d) { return std::make_pair(c, d); }
   );
   return core_to_device_map;
 }
 
 int Experiment::initialize_store(unsigned core)
 {
-  using namespace Component;
+  using namespace component;
 
   IBase * comp;
 
@@ -270,7 +274,7 @@ int Experiment::initialize_store(unsigned core)
 
   try
   {
-    auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+    auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
     if ( component_is( "mcas" ) ) {
       auto port = _port;
@@ -278,14 +282,29 @@ int Experiment::initialize_store(unsigned core)
       {
         port += (_get_core_index(core) / _port_increment);
       }
-      auto url = _server_address + ":" + std::to_string(port);
-      PLOG("(%d) server url: (%s)", _get_core_index(core), url.c_str());
-      if ( ! _device_name )
+      auto server_url = _server_address + ":" + std::to_string(port);
+      PLOG("(%d) server url: (%s)", _get_core_index(core), server_url.c_str());
+      IKVStore_factory::map_create mc
+        {
+          { +IKVStore_factory::k_dest_addr, _server_address }
+          , { +IKVStore_factory::k_dest_port, std::to_string(port) }
+        };
+      if ( _src_addr )
       {
-        throw std::runtime_error("Component " + _component + " has no device_name");
+        mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_src_addr, *_src_addr));
       }
-      _store = fact->create(_debug_level, _owner, url, *_device_name);
-      PMAJOR("mcas component instance: %p", static_cast<const void *>(_store));
+      if ( _device_name )
+      {
+        mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_interface, *_device_name));
+      }
+      if ( _provider )
+      {
+        mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_provider, *_provider));
+      }
+
+      _store.reset(fact->create(_debug_level, mc));
+
+      PMAJOR("mcas component instance: %p", static_cast<const void *>(_store.get()));
     }
     else if ( component_is( "hstore" ) || component_is("dummystore") ) {
       auto device = core_to_device(core);
@@ -297,44 +316,54 @@ int Experiment::initialize_store(unsigned core)
         throw std::runtime_error("Component " + _component + " has no device_name");
       }
       std::size_t dax_stride = round_up_to_pow2(dev_dax_max_size(*_device_name));
-      std::size_t dax_node_stride = round_up_to_pow2(dev_dax_max_count_per_node(*_device_name)) * dax_stride;
+      std::size_t dax_node_stride = round_up_to_pow2(dev_dax_max_count_per_node()) * dax_stride;
 
       unsigned region_id = 0;
-      std::ostringstream addr;
       /* stride ignores dax "major" number, so /dev/dax0.n and /dev/dax1.n map to the same memory */
-      addr << std::showbase << std::hex << dax_base + dax_node_stride * device.first + dax_stride * device.second;
+      std::uint64_t addr = dax_base + dax_node_stride * device.first + dax_stride * device.second;
+#if 0
+      std::ostringstream addr_o;
+      addr_o << std::showbase << std::hex << addr;
+#endif
       std::ostringstream device_full_name;
       device_full_name << *_device_name << (std::isdigit(_device_name->back()) ? "." : "") << device;
-      std::ostringstream device_map;
-      device_map <<
-        "[ "
-          " { "
-            + json_map("region_id", std::to_string(region_id))
-            /* actual device name is <device_name>.<device>, e.g. /dev/dax0.2 */
-            + ", " + json_map("path", quote(device_full_name.str()))
-            + ", " + json_map("addr", quote(addr.str()))
-            + " }"
-        " ]";
-      _store = fact->create(_debug_level, "name", _owner, device_map.str());
+      namespace c_json = common::json;
+      using json = c_json::serializer<c_json::dummy_writer>;
+
+      auto device_map = json::array(
+        json::object(
+          json::member("region_id", region_id)
+          , json::member("path", device_full_name.str())
+#if 0
+          , json::member("addr", addr_o.str())
+#else
+          , json::member("addr", addr)
+#endif
+        )
+      );
+
+      _store.reset(
+        fact->create(
+          _debug_level
+          , {
+            { +component::IKVStore_factory::k_owner, _owner}
+            , { +component::IKVStore_factory::k_dax_config, device_map.str() }
+          }
+        )
+      );
     }
     else {
-      _store = fact->create("owner", _owner);
+      _store.reset(fact->create(0, {}));
     }
-
-    if (_verbose)
-    {
-      PINF("factory: release_ref on %p", static_cast<const void *>(&fact));
-    }
-    fact->release_ref();
   }
   catch ( const Exception &e )
   {
-    PERR("factory creation step failed: %s. Aborting experiment.", e.cause());
+    PERR("factory creation step failed, aborting experiment: %s", e.cause());
     throw;
   }
   catch ( const std::exception &e )
   {
-    PERR("factory creation step failed: %s. Aborting experiment.", e.what());
+    PERR("factory creation step failed, aborting experiment: %s", e.what());
     throw;
   }
   catch(...)
@@ -347,6 +376,7 @@ int Experiment::initialize_store(unsigned core)
 }
 
 void Experiment::initialize(unsigned core)
+try
 {
   if ( auto rc = initialize_store(core) )
   {
@@ -359,21 +389,7 @@ void Experiment::initialize(unsigned core)
   {
     if ( component_uses_direct_memory() )
     {
-      std::lock_guard<std::mutex> g(g_write_lock);
-
-      size_t data_size = sizeof(Data) + ((sizeof(KV_pair) + g_data->key_len() + g_data->value_len() ) * _pool_num_objects);
-      data_size = round_up_to_pow2(data_size);
-
-      if (_verbose) {
-        PINF("allocating %zu of aligned, direct memory. Aligned to %d", data_size,  MB(2));
-      }
-
-      auto data_ptr = static_cast<KV_pair*>(aligned_alloc(MB(2), data_size));
-      madvise(data_ptr, data_size, MADV_HUGEPAGE|MADV_DONTFORK);
-
-      _memory_handle = _store->register_direct_memory(data_ptr, data_size);
-
-      g_data->initialize_data(data_ptr);
+      _memory_handle = direct_memory_registered_kv(debug_level(), _store.get(), g_data->value_space, g_data->value_space_size);
     }
   }
   catch ( const Exception &e ) {
@@ -396,7 +412,7 @@ void Experiment::initialize(unsigned core)
   }
 
   // initialize experiment
-  int core_index = _get_core_index(core);
+  auto core_index = _get_core_index(core);
   std::string poolname = _pool_name + "." + std::to_string(core_index);
   _pool_name_local = std::string(poolname);
   auto path = _pool_path + poolname;
@@ -446,7 +462,7 @@ void Experiment::initialize(unsigned core)
   try
   {
     _pool = _store->create_pool(_pool_path + _pool_name_local, _pool_size, _pool_flags, _pool_num_objects * HT_SIZE_FACTOR);
-    if ( _pool == Component::IKVStore::POOL_ERROR )
+    if ( _pool == component::IKVStore::POOL_ERROR )
     {
       PERR("create_pool failed");
       throw std::runtime_error("create_pool failed: returned IKVStore::POOL_ERROR. Aborting experiment.");
@@ -511,6 +527,11 @@ void Experiment::initialize(unsigned core)
 #endif
   _ready = true;
 }
+catch ( ... )
+{
+  _ready = true;
+  throw;
+}
 
 // if experiment should be delayed, stop here and wait. Otherwise, start immediately
 void Experiment::wait_for_delayed_start(unsigned core)
@@ -537,10 +558,9 @@ std::size_t Experiment::dev_dax_max_size(const std::string & dev_dax_prefix_)
 
 /* maximun number of dax devices in any numa node.
  * Limitations:
- *   Assumes /dev/dax<node>.<number> representation)
  *   Considers only dax devices specified in the device string.
  */
-unsigned Experiment::dev_dax_max_count_per_node(const std::string & /* dev_dax_prefix_ */)
+unsigned Experiment::dev_dax_max_count_per_node()
 {
   std::map<unsigned, unsigned> dev_count {};
   for ( auto & it : _core_to_device_map )
@@ -558,14 +578,14 @@ unsigned Experiment::dev_dax_max_count_per_node(const std::string & /* dev_dax_p
   return size;
 }
 
-dotted_pair<unsigned> Experiment::core_to_device(int core)
+dotted_pair<unsigned> Experiment::core_to_device(unsigned core)
 {
-   auto core_it = _core_to_device_map.find(core);
-   if ( core_it == _core_to_device_map.end() )
-   {
-     throw std::logic_error("no core " + std::to_string(core_it->first) + " in map");
-   }
-   return core_it->second;
+  auto core_it = _core_to_device_map.find(core);
+  if ( core_it == _core_to_device_map.end() )
+  {
+    throw std::logic_error("no core " + std::to_string(core_it->first) + " in map");
+  }
+  return core_it->second;
 }
 
 void Experiment::_update_aggregate_iops(double iops)
@@ -584,7 +604,7 @@ void Experiment::summarize()
 }
 
 void Experiment::cleanup(unsigned core) noexcept
-try 
+try
 {
   try
   {
@@ -606,108 +626,23 @@ try
     throw;
   }
 
-  try
+  if ( _pool != component::IKVStore::POOL_ERROR )
   {
-    if (component_uses_direct_memory())
+    try
     {
-      _store->unregister_direct_memory(_memory_handle);
-    }
-  }
-  catch ( const Exception &e )
-  {
-    PERR("unregister_direct_memory failed: %s. Aborting experiment.", e.cause());
-    throw;
-  }
-  catch ( const std::exception &e )
-  {
-    PERR("unregister_direct_memory failed: %s. Aborting experiment.", e.what());
-    throw;
-  }
-  catch(...)
-  {
-    PERR("%s", "unregister_direct_memory failed!");
-    throw;
-  }
+      auto rc = _store->close_pool(_pool);
 
-  try
-  {
-    auto rc = _store->close_pool(_pool);
-
-    if (rc != S_OK)
-    {
-      PERR("close_pool returned error code %d", rc);
-      throw std::runtime_error("close_pool returned error code " + std::to_string(rc));
+      if (rc != S_OK)
+      {
+        PERR("close_pool returned error code %d", rc);
+        throw std::runtime_error("close_pool returned error code " + std::to_string(rc));
+      }
     }
-  }
-  catch(...)
-  {
-    PERR("%s", "close_pool failed!");
-    throw;
-  }
-
-#if 0
-  try
-  {
-    if (_verbose)
+    catch(...)
     {
-        std::cout << "cleanup: attempting to delete pool: " << _pool_path << _pool_name_local;
+      PERR("%s", "close_pool failed!");
+      throw;
     }
-
-    auto rc = _store->delete_pool(_pool_path + _pool_name_local);
-    if (S_OK != rc)
-    {
-      auto e = "delete_pool returned error code " + std::to_string(rc);
-      PERR("%s", e.c_str());
-      throw std::runtime_error(e);
-    }
-
-    if (_verbose)
-    {
-      std::cout << " ...done!" << std::endl;
-    }
-  }
-  catch ( const Exception &e )
-  {
-    PERR("delete_pool failed: %s. Ending experiment.", e.cause());
-    //    throw; // TODO: fix
-  }
-  catch ( const std::exception &e )
-  {
-    PERR("delete_pool failed: %s. Ending experiment.", e.what());
-    //    throw; // TODO: fix
-  }
-  catch(...)
-  {
-    PERR("%s", "delete_pool failed! Ending experiment.");
-    ///    throw; // TODO: fix
-  }
-#endif
-  try
-  {
-    if (_verbose)
-    {
-      std::cout << "cleanup: attempting to release_ref on store at " << &_store;
-    }
-
-    if (_verbose)
-    {
-      std::cout << " ...done!" << std::endl;
-    }
-  }
-  catch ( const Exception &e )
-  {
-    PERR("release_ref call on _store failed: %s.", e.cause());
-    throw;
-  }
-  catch ( const std::exception &e )
-  {
-    PERR("release_ref failed: %s.", e.what());
-    throw;
-  }
-  catch(...)
-  {
-    PERR("%s", "release_ref call on _store failed!");
-    throw;
   }
 }
 catch ( ... )
@@ -733,7 +668,7 @@ unsigned Experiment::_get_core_index(unsigned core)
   if (_core_list.empty())
   {
     // construct list
-    _core_list = get_vector_from_string<int>(_cores);
+    _core_list = get_vector_from_string<unsigned>(_cores);
   }
 
   // this is inefficient, but number of cores should be relatively small (hundreds at most)
@@ -771,13 +706,13 @@ rapidjson::Document Experiment::_get_report_document()
       throw std::system_error(std::error_code(er, std::system_category()), e);
     }
 
-    size_t buffer_size = GetFileSize(_report_filename);
+    auto file_size = GetFileSize(_report_filename);
+
+    /* error indication is silently ignored */
+    auto buffer_size = file_size == -1 ? 0 : std::size_t(file_size);
 
     const size_t MIN_READ_BUFFER_SIZE = 4;  // if FileReadStream has a buffer smaller than this, it'll assert
-    if (buffer_size < MIN_READ_BUFFER_SIZE)
-    {
-      buffer_size = MIN_READ_BUFFER_SIZE;
-    }
+    buffer_size = std::max(buffer_size, MIN_READ_BUFFER_SIZE);
 
     std::vector<char> readBuffer(buffer_size);
 
@@ -954,7 +889,7 @@ rapidjson::Value Experiment::_add_statistics_to_report(BinStatistics& stats, rap
   return bin_object;
 }
 
-BinStatistics Experiment::_compute_bin_statistics_from_vectors(std::vector<double> data, std::vector<double> data_bins, int bin_count, double bin_min, double bin_max, std::size_t elements)
+BinStatistics Experiment::_compute_bin_statistics_from_vectors(std::vector<double> data, std::vector<double> data_bins, unsigned bin_count, double bin_min, double bin_max, std::size_t elements)
 {
   if (data.size() != data_bins.size())
   {
@@ -971,7 +906,7 @@ BinStatistics Experiment::_compute_bin_statistics_from_vectors(std::vector<doubl
   return stats;
 }
 
-BinStatistics Experiment::_compute_bin_statistics_from_vector(std::vector<double> data, int bin_count, double bin_min, double bin_max)
+BinStatistics Experiment::_compute_bin_statistics_from_vector(std::vector<double> data, unsigned bin_count, double bin_min, double bin_max)
 {
   BinStatistics stats(bin_count, bin_min, bin_max);
 
@@ -1034,29 +969,33 @@ std::string Experiment::create_report(const std::string component_)
 }
 unsigned long Experiment::GetElementSize(unsigned core, std::size_t index)
 {
-  if (_element_size <= 0)
+  if ( _element_size == 0 || _element_size == std::size_t(-1) )
   {
     std::string path = _pool_path + "/" +  _pool_name + "." + std::to_string(core) + "/" + g_data->key(index);
-    _element_size = GetFileSize(path);
+    auto file_size = GetFileSize(path);
 
-    if (_element_size == -1)  // this means GetFileSize failed, maybe due to RDMA
+    if ( file_size == -1 )  // this means GetFileSize failed, maybe due to RDMA
     {
       _element_size = GetDataInputSize(index);
     }
+    else
+    {
+      _element_size = std::size_t(file_size);
+    }
   }
 
-  if (_element_size_on_disk == -1)  // -1 is reserved value and impossible (must be positive size)
+  if ( _element_size_on_disk == std::size_t(-1) )  // -1 is reserved value and impossible (must be positive size)
   {
-    long block_size = GetBlockSize(_pool_path);
+    auto block_size = GetBlockSize(_pool_path);
 
     // take the larger of the two
-    if (_element_size > block_size || component_uses_rdma())
+    if (_element_size > std::size_t(block_size) || component_uses_rdma())
     {
       _element_size_on_disk = _element_size;
     }
     else
     {
-      _element_size_on_disk = block_size;
+      _element_size_on_disk = std::size_t(block_size);
     }
   }
 
@@ -1065,16 +1004,19 @@ unsigned long Experiment::GetElementSize(unsigned core, std::size_t index)
 
 void Experiment::_update_data_process_amount(unsigned core, std::size_t index)
 {
-
-  if (_element_size == -1)  // -1 is reserved and impossible
+  if (_element_size == std::size_t(-1))  // -1 is reserved and impossible
   {
     std::string path = _pool_path + "/" +  _pool_name + "." + std::to_string(core) + "/" + g_data->key(index);
-    _element_size = GetFileSize(path);
+    auto file_size = GetFileSize(path);
 
-    if (_element_size == -1)  // this means GetFileSize failed, maybe due to RDMA
+    if ( file_size == -1 )  // this means GetFileSize failed, maybe due to RDMA
     {
       _element_size = g_data->value_len();
       //      _element_size = GetDataInputSize(index);
+    }
+    else
+    {
+      _element_size = std::size_t(file_size);
     }
   }
   assert(_element_size > 0);
@@ -1086,7 +1028,7 @@ double Experiment::_calculate_current_throughput()
 {
   if (_verbose)
     {
-      PINF("throughput calculation: %lu data (element size %ld)", _total_data_processed, _element_size);
+      PINF("throughput calculation: %lu data (element size %zd)", _total_data_processed, _element_size);
     }
 
   double size_mb = double(_total_data_processed) * 0.000001;  // bytes -> MB
@@ -1096,7 +1038,7 @@ double Experiment::_calculate_current_throughput()
   return throughput;
 }
 
-void Experiment::_populate_pool_to_capacity(unsigned core, Component::IKVStore::memory_handle_t memory_handle)
+void Experiment::_populate_pool_to_capacity(unsigned core, component::IKVStore::memory_handle_t memory_handle)
 {
   // how much space do we have?
   if (_verbose)
@@ -1104,7 +1046,7 @@ void Experiment::_populate_pool_to_capacity(unsigned core, Component::IKVStore::
     std::cout << "_populate_pool_to_capacity start: _pool_num_components = " << _pool_num_objects << ", _elements_stored = " << _elements_stored << ", _pool_element_end = " << _pool_element_end << std::endl;
   }
 
-  unsigned long current = _pool_element_end;  // first run: should be 0 (start index)
+  auto current = _pool_element_end;  // first run: should be 0 (start index)
   long maximum_elements = -1;
   _pool_element_start = current;
 
@@ -1115,61 +1057,78 @@ void Experiment::_populate_pool_to_capacity(unsigned core, Component::IKVStore::
     _debug_print(core, debug_start.str());
   }
 
-  bool can_add_more_in_batch = (current - _pool_element_start) != static_cast<unsigned long>(maximum_elements);
-  bool can_add_more_overall = current != _pool_num_objects;
+  bool can_add_more_in_batch = (current - _pool_element_start) != maximum_elements;
+  bool can_add_more_overall = std::size_t(current) != _pool_num_objects;
 
   _element_size = g_data->value_len();
-  void * readback_buffer = malloc(_element_size);
-  auto readback_memory_handle = _store->register_direct_memory(readback_buffer, _element_size);
-  
+  void * readback_buffer = aligned_alloc(PAGE_SIZE,
+                                         round_up_page(_element_size));
+  if ( readback_buffer == nullptr )
+  {
+    throw std::bad_alloc();
+  }
+  auto readback_memory_handle = direct_memory_registered_kv(debug_level(), _store.get(), readback_buffer, _element_size);
+
+  /* NOTE: put_direct handles long data, but does nothing for long keys.
+   */
   while ( can_add_more_in_batch && can_add_more_overall )
   {
     try
     {
       assert(g_data->value_len() > 0);
+      auto current_sz = std::size_t(current);
+      // auto write_memory_handle = direct_memory_registered_kv(_store.get(), const_cast<void *>(g_data->value(current_sz)), g_data->value_len());
       int rc =
-        memory_handle == Component::IKVStore::HANDLE_NONE
-        ? _store->put(_pool, g_data->key(current), g_data->value(current), g_data->value_len())
-        : _store->put_direct(_pool, g_data->key(current), g_data->value(current), g_data->value_len(), memory_handle)
+        memory_handle == component::IKVStore::HANDLE_NONE
+        ? _store->put(_pool, g_data->key(current_sz), g_data->value(current_sz), g_data->value_len())
+        : _store->put_direct(_pool, g_data->key(current_sz), g_data->value(current_sz), g_data->value_len(), memory_handle)
         ;
 
       if (rc != S_OK)
       {
         std::ostringstream e;
-        PERR("put or put_direct returned %d", rc);
-        PERR("%s.", e.str().c_str());
+        e << "put or put_direct returned " << rc << " (-55 is out of space)";
+        PERR("%s: %s.", __func__, e.str().c_str());
         throw std::runtime_error(e.str());
       }
 
       /* read back elements that have been put - this will make sure they are register on
          the server side when mapstore is being used. */
       size_t s = _element_size;
-      rc = memory_handle == Component::IKVStore::HANDLE_NONE
-        ? _store->get(_pool, g_data->key(current), readback_buffer, s)
-        : _store->get_direct(_pool, g_data->key(current), readback_buffer, s, readback_memory_handle);
+      rc = memory_handle == component::IKVStore::HANDLE_NONE
+        ? _store->get(_pool, g_data->key(current_sz), readback_buffer, s)
+        : _store->get_direct(_pool, g_data->key(current_sz), readback_buffer, s, readback_memory_handle.mr());
       ;
-      if(rc != S_OK) PLOG("rc=%d", rc);
-      assert(rc == S_OK);
-      
+
+      if (rc != S_OK)
+      {
+        std::ostringstream e;
+        e << "readback get or get_direct returned " << rc << " (-55 is out of space)";
+        PERR("%s: %s.", __func__, e.str().c_str());
+        throw std::runtime_error(e.str());
+      }
+
       ++_elements_stored;
     }
     catch ( const std::exception &e )
     {
-      std::cerr << "current = " << current << std::endl;
-      PERR("populate_pool_to_capacity failed at put call: %s.", e.what());
+      std::ostringstream s;
+      s << __func__ << ": " << "failed at put call " << current << "/" << _pool_num_objects << ": " << e.what();
+      PERR("%s", s.str().c_str());
       throw;
     }
     catch(...)
     {
-      std::cerr << "current = " << current << std::endl;
-      PERR("%s", "_populate_pool_to_capacity failed at put call");
+      std::ostringstream s;
+      s << "populate_pool_to_capacity failed at put call " << current << "/" << _pool_num_objects;
+      PERR("%s", s.str().c_str());
       throw;
     }
 
     // calculate maximum number of elements we can put in pool at one time
     if (_element_size_on_disk == 0)
     {
-      _element_size_on_disk = int(GetElementSize(core, current));
+      _element_size_on_disk = GetElementSize(core, std::size_t(current));
 
       if (_verbose)
       {
@@ -1193,8 +1152,8 @@ void Experiment::_populate_pool_to_capacity(unsigned core, Component::IKVStore::
 
     ++current;
 
-    can_add_more_in_batch = (current - _pool_element_start) != static_cast<unsigned long>(maximum_elements);
-    can_add_more_overall = current != _pool_num_objects;
+    can_add_more_in_batch = (current - _pool_element_start) != maximum_elements;
+    can_add_more_overall = std::size_t(current) != _pool_num_objects;
   }
 
   free(readback_buffer);
@@ -1211,6 +1170,12 @@ void Experiment::_populate_pool_to_capacity(unsigned core, Component::IKVStore::
 
   _pool_element_end = current;
 
+  {
+    /* cheat: signal the mcas server to start profiling */
+    std::vector<uint64_t> v(1);
+    auto rc = _store->get_attribute(_pool, component::IKVStore::COUNT, v);
+    assert(rc == S_OK );
+  }
   if (_verbose)
   {
     std::cout << "_pool_element_end = " << _pool_element_end << std::endl;
@@ -1228,10 +1193,10 @@ void Experiment::_populate_pool_to_capacity(unsigned core, Component::IKVStore::
 // assumptions: i_ is tracking current element in use
 void Experiment::_enforce_maximum_pool_size(unsigned core, std::size_t i_)
 {
-  _elements_in_use++;
+  ++_elements_in_use;
 
   // erase elements that exceed pool capacity and start again
-  if ((_elements_in_use * static_cast<unsigned long>(_element_size_on_disk)) >= _pool_size)
+  if ((_elements_in_use * _element_size_on_disk) >= _pool_size)
   {
     bool timer_running_at_start = timer.is_running();  // if timer was running, pause it
 
@@ -1296,7 +1261,7 @@ void Experiment::_enforce_maximum_pool_size(unsigned core, std::size_t i_)
   }
 }
 
-void Experiment::_erase_pool_entries_in_range(std::size_t start, std::size_t finish)
+void Experiment::_erase_pool_entries_in_range(pool_entry_offset_t start, pool_entry_offset_t finish)
 {
   if (_verbose)
   {
@@ -1307,14 +1272,14 @@ void Experiment::_erase_pool_entries_in_range(std::size_t start, std::size_t fin
   {
     for (auto i = start; i < finish; ++i)
     {
-      auto rc = _store->erase(_pool, g_data->key(i));
+      auto rc = _store->erase(_pool, g_data->key(std::size_t(i)));
 
       if (rc != S_OK)
       {
         auto e = "IKVStore::erase returned " + std::to_string(rc);
         PERR("%s.", e.c_str());
         throw std::runtime_error(e);
-       }
+      }
     }
   }
   catch ( ... )

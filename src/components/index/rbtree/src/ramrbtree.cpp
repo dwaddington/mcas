@@ -5,7 +5,7 @@
 
 #define SINGLE_THREADED
 
-using namespace Component;
+using namespace component;
 using namespace std;
 
 RamRBTree::RamRBTree(const std::string& owner, const std::string& name)
@@ -57,6 +57,7 @@ status_t RamRBTree::find(const std::string& key_expression,
 
   offset_t end_position = _index.size();
   unsigned attempts =0;
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch" // enumeration value ‘FIND_TYPE_NONE’ not handled in switch
   switch (find_type) {
@@ -78,6 +79,7 @@ status_t RamRBTree::find(const std::string& key_expression,
       break;
     case FIND_TYPE_EXACT:
       for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
+        PLOG("Getting from position %lu", out_matched_pos);
         string key = RamRBTree::get(out_matched_pos);
         if (key.compare(key_expression) == 0) {
           out_matched_key = key;
@@ -115,7 +117,7 @@ status_t RamRBTree::find(const std::string& key_expression,
  * Factory entry point
  *
  */
-extern "C" void* factory_createInstance(Component::uuid_t component_id)
+extern "C" void* factory_createInstance(component::uuid_t component_id)
 {
   if (component_id == RamRBTree_factory::component_id()) {
     return static_cast<void*>(new RamRBTree_factory());

@@ -42,7 +42,7 @@ void perishable::check()
 auto perishable::make_syndrome() -> syndrome
 {
 	syndrome sy(100);
-	int sz = ::backtrace(&sy[0], int(sy.size()));
+	auto sz = unsigned(::backtrace(&sy[0], int(sy.size())));
 	sy.resize(sz);
 	return sy;
 }
@@ -68,14 +68,14 @@ bool perishable::tick()
 #if 0
 			return ! seen.insert(sy).second;
 #else
-            auto seen_count = ++seen[sy];
-            if ( seen_count < 3 )
-            {
-                PWRN(PREFIX_STATIC " new perishable syndrome", LOCATION_STATIC);
+			auto seen_count = ++seen[sy];
+			if ( seen_count < 3 )
+			{
+				PWRN(PREFIX_STATIC " new perishable syndrome", LOCATION_STATIC);
 				check();
 				return false;
-            }
-            return true;
+			}
+			return true;
 #endif
 		}
 

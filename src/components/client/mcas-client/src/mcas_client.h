@@ -21,18 +21,82 @@
 #ifndef __MCAS_CLIENT_COMPONENT_H__
 #define __MCAS_CLIENT_COMPONENT_H__
 
+#include "connection.h"
+#include "mcas_client_config.h"
+#include "registered_direct_memory.h"
+
 #include <api/components.h>
 #include <api/fabric_itf.h>
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
 #include <api/mcas_itf.h>
+#include <api/itf_ref.h>
 
-#include "connection.h"
-#include "mcas_client_config.h"
+#include <boost/optional.hpp>
+
+#include <cstdint> /* uint16_t */
+#include <memory>  /* unique_ptr */
+#include <string>
+
+struct registered_direct_memory {
+private:
+  unsigned                          _debug_level;
+  mcas::client::Connection_base *   _im;
+  component::IMCAS::memory_handle_t _mh;
+
+ public:
+  registered_direct_memory(unsigned debug_level_, mcas::client::Connection_base *im_, void *base_, const size_t len_)
+      : _debug_level(debug_level_),
+        _im(im_),
+        _mh(_im->register_direct_memory(base_, len_))
+  {
+    if (2 < _debug_level) {
+      PLOG("%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_mh), base_, len_);
+    }
+  }
+  registered_direct_memory(const registered_direct_memory &) = delete;
+  registered_direct_memory(registered_direct_memory &&other_)
+      : _debug_level(other_._debug_level),
+        _im(nullptr),
+        _mh(other_._mh)
+  {
+    std::swap(_im, other_._im);
+  }
+  registered_direct_memory &operator=(const registered_direct_memory &) = delete;
+
+  auto mh() const { return _mh; }
+  ~registered_direct_memory()
+  {
+    if (_im) {
+      if (2 < _debug_level) {
+        PLOG("%s %p", __func__, static_cast<const void *>(_mh));
+      }
+      _im->unregister_direct_memory(_mh);
+    }
+  }
+};
+
+class Mcas_client_debug {
+ public:
+  Mcas_client_debug() {}
+  Mcas_client_debug(unsigned debug_level, const void *ths, const std::string &ip_addr, std::uint16_t port);
+  ~Mcas_client_debug();
+};
+
+class Open_connection {
+  mcas::client::Connection_handler *_open_cnxn;
+
+ public:
+  Open_connection() : _open_cnxn() {}
+  Open_connection(mcas::client::Connection_handler &_connection);
+  Open_connection(const Open_connection &) = delete;
+  Open_connection &operator=(const Open_connection &) = delete;
+  ~Open_connection();
+};
 
 class MCAS_client
-    : public virtual Component::IKVStore
-    , public virtual Component::IMCAS {
+    : public virtual component::IKVStore
+    , public virtual component::IMCAS {
   friend class MCAS_client_factory;
 
  private:
@@ -42,33 +106,26 @@ class MCAS_client
   /**
    * Constructor
    *
-   *
-   */
-  /**
-   * Constructor
-   *
    * @param debug_level Debug level (e.g., 0-3)
    * @param owner Owner information (not used)
    * @param addr_port_str Address and port info (e.g. 10.0.0.22:11911)
-   * @param device NIC device (e.g., mlnx5_0)
+   * @param device NIC device (e.g., mlx5_0)
+   * @param provider fabric provider ("verbs" or "sockets")
    *
    */
-  MCAS_client(const unsigned     debug_level,
-              const std::string &owner,
-              const std::string &addr_port_str,
-              const std::string &device);
+ public:
+  MCAS_client(unsigned                            debug_level,  // temp srd/dest devider
+              const boost::optional<std::string> &src_device,
+              const boost::optional<std::string> &src_addr,
+              const boost::optional<std::string> &provider,
+              const std::string &                 dest_addr,
+              std::uint16_t                       port,
+              unsigned                            patience);
 
   MCAS_client(const MCAS_client &) = delete;
   MCAS_client &operator=(const MCAS_client &) = delete;
 
- public:
-  using pool_t = Component::IKVStore::pool_t;
-
-  /**
-   * Destructor
-   *
-   */
-  virtual ~MCAS_client();
+  using pool_t = component::IKVStore::pool_t;
 
   /**
    * Component/interface management
@@ -80,13 +137,13 @@ class MCAS_client
   DECLARE_COMPONENT_UUID(0x2f666078, 0xcb8a, 0x4724, 0xa454, 0xd1, 0xd8, 0x8d, 0xe2, 0xdb, 0x87);
   // clang-format on
 
-  void *query_interface(Component::uuid_t &itf_uuid) override
+  void *query_interface(component::uuid_t &itf_uuid) override
   {
-    if (itf_uuid == Component::IKVStore::iid()) {
-      return static_cast<Component::IKVStore *>(this);
+    if (itf_uuid == component::IKVStore::iid()) {
+      return static_cast<component::IKVStore *>(this);
     }
-    else if (itf_uuid == Component::IMCAS::iid()) {
-      return static_cast<Component::IMCAS *>(this);
+    else if (itf_uuid == component::IMCAS::iid()) {
+      return static_cast<component::IMCAS *>(this);
     }
     else {
       return NULL;  // we don't support this interface
@@ -114,7 +171,7 @@ class MCAS_client
 
   virtual status_t delete_pool(const IKVStore::pool_t pool) override;
 
-  virtual status_t configure_pool(const Component::IKVStore::pool_t pool, const std::string &json) override;
+  virtual status_t configure_pool(const component::IKVStore::pool_t pool, const std::string &json) override;
 
   virtual status_t put(const pool_t       pool,
                        const std::string &key,
@@ -136,6 +193,14 @@ class MCAS_client
                              async_handle_t &       out_handle,
                              const unsigned int     flags = IMCAS::FLAGS_NONE) override;
 
+  virtual status_t async_put_direct(const IKVStore::pool_t          pool,
+                                    const std::string &             key,
+                                    const void *                    value,
+                                    const size_t                    value_len,
+                                    async_handle_t &                out_handle,
+                                    const IKVStore::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
+                                    const unsigned int              flags  = IMCAS::FLAGS_NONE) override;
+
   virtual status_t check_async_completion(async_handle_t &handle) override;
 
   virtual status_t get(const pool_t       pool,
@@ -143,11 +208,44 @@ class MCAS_client
                        void *&            out_value, /* release with free() */
                        size_t &           out_value_len) override;
 
+  virtual status_t async_get_direct(const pool_t                 pool,
+                              const std::string &          key,
+                              void *                       out_value,
+                              size_t &                     out_value_len,
+                              async_handle_t &          out_handle,
+                              const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) override;
+
   virtual status_t get_direct(const pool_t                 pool,
                               const std::string &          key,
                               void *                       out_value,
                               size_t &                     out_value_len,
                               const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) override;
+
+  virtual status_t get_direct_offset(const IMCAS::pool_t          pool,
+                                     const offset_t               offset,
+                                     size_t &                     length,
+                                     void *                       out_buffer,
+                                     const IMCAS::memory_handle_t handle) override;
+
+  virtual status_t async_get_direct_offset(const IMCAS::pool_t          pool,
+                                           const offset_t               offset,
+                                           size_t &                     length,
+                                           void *                       out_buffer,
+                                           async_handle_t &             out_handle,
+                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) override;
+
+  virtual status_t put_direct_offset(const IMCAS::pool_t          pool,
+                                     const offset_t               offset,
+                                     size_t &                     length,
+                                     const void *                 out_buffer,
+                                     const IMCAS::memory_handle_t handle) override;
+
+  virtual status_t async_put_direct_offset(const IMCAS::pool_t          pool,
+                                           const offset_t               offset,
+                                           size_t &                     length,
+                                           const void *                 out_buffer,
+                                           async_handle_t &             out_handle,
+                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) override;
 
   virtual status_t erase(const pool_t pool, const std::string &key) override;
 
@@ -185,6 +283,15 @@ class MCAS_client
                               std::vector<IMCAS::ADO_response> &out_response,
                               const size_t                      value_size = 0) override;
 
+  virtual status_t async_invoke_ado(const IMCAS::pool_t               pool,
+                                    const std::string &               key,
+                                    const void *                      request,
+                                    const size_t                      request_len,
+                                    const ado_flags_t                 flags,
+                                    std::vector<IMCAS::ADO_response> &out_response,
+                                    async_handle_t &                  out_async_handle,
+                                    const size_t                      value_size = 0) override;
+
   virtual status_t invoke_put_ado(const IKVStore::pool_t            pool,
                                   const std::string &               key,
                                   const void *                      request,
@@ -196,22 +303,35 @@ class MCAS_client
                                   std::vector<IMCAS::ADO_response> &out_response) override;
 
  private:
-  Component::IFabric_factory *_factory;
-  Component::IFabric *        _fabric;
-  Component::IFabric_client * _transport;
-
-  mcas::Client::Connection_handler *_connection;
+  Mcas_client_debug                                 _debug;
+  component::Itf_ref<component::IFabric_factory>    _factory;
+  std::unique_ptr<component::IFabric>               _fabric;
+  std::unique_ptr<component::IFabric_client>        _transport;
+  std::unique_ptr<mcas::client::Connection_handler> _connection;
+  Open_connection                                   _open_connection;
 
  private:
+  static void set_debug(unsigned debug_level, const void *ths, const std::string &ip_addr, std::uint16_t port);
+  static auto load_factory() -> component::IFabric_factory *;
+  static auto make_fabric(component::IFabric_factory &,
+                          const std::string &ip_addr,
+                          const std::string &provider,
+                          const std::string &device) -> component::IFabric *;
+  static auto make_fabric(component::IFabric_factory &,
+                          const boost::optional<std::string> &src_addr,
+                          const boost::optional<std::string> &interface,
+                          const boost::optional<std::string> &provider) -> component::IFabric *;
+
   void open_transport(const std::string &device,
                       const std::string &ip_addr,
                       const int          port,
                       const std::string &provider);
-
-  void close_transport();
+#if 0
+  auto make_registered_direct_memory(void *vaddr, const size_t len) -> /* mcas::client:: */ registered_direct_memory; // <mcas::client::Fabric_transport::buffer_t>;
+#endif
 };
 
-class MCAS_client_factory : public Component::IMCAS_factory {
+class MCAS_client_factory : public component::IMCAS_factory {
  public:
   /**
    * Component/interface management
@@ -223,13 +343,13 @@ class MCAS_client_factory : public Component::IMCAS_factory {
   DECLARE_COMPONENT_UUID(0xfac66078, 0xcb8a, 0x4724, 0xa454, 0xd1, 0xd8, 0x8d, 0xe2, 0xdb, 0x87);
   // clang-format on
 
-  void *query_interface(Component::uuid_t &itf_uuid) override
+  void *query_interface(component::uuid_t &itf_uuid) override
   {
-    if (itf_uuid == Component::IMCAS_factory::iid()) {
-      return static_cast<Component::IMCAS_factory *>(this);
+    if (itf_uuid == component::IMCAS_factory::iid()) {
+      return static_cast<component::IMCAS_factory *>(this);
     }
-    else if (itf_uuid == Component::IKVStore_factory::iid()) {
-      return static_cast<Component::IKVStore_factory *>(this);
+    else if (itf_uuid == component::IKVStore_factory::iid()) {
+      return static_cast<component::IKVStore_factory *>(this);
     }
     else
       return NULL;  // we don't support this interface
@@ -237,25 +357,19 @@ class MCAS_client_factory : public Component::IMCAS_factory {
 
   void unload() override { delete this; }
 
-  Component::IMCAS *mcas_create(unsigned           debug_level,
-                                const std::string &owner,
-                                const std::string &addr,
-                                const std::string &device) override
-  {
-    Component::IMCAS *obj = static_cast<Component::IMCAS *>(new MCAS_client(debug_level, owner, addr, device));
-    obj->add_ref();
-    return obj;
-  }
+  component::IMCAS *mcas_create(unsigned                            debug_level,
+      unsigned patience,
+                                const std::string &                 owner,
+                                const boost::optional<std::string> &src_nic_device,
+                                const boost::optional<std::string> &src_ip_addr,
+                                const std::string &                 dest_addr_with_port) override;
 
-  Component::IKVStore *create(unsigned           debug_level,
+  component::IKVStore *create(unsigned           debug_level,
                               const std::string &owner,
                               const std::string &addr,
-                              const std::string &device) override
-  {
-    Component::IKVStore *obj = static_cast<Component::IKVStore *>(new MCAS_client(debug_level, owner, addr, device));
-    obj->add_ref();
-    return obj;
-  }
+                              const std::string &device) override;
+
+  component::IKVStore *create(unsigned debug_level, const std::map<std::string, std::string> &) override;
 };
 
 #endif

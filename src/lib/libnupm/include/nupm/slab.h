@@ -35,7 +35,7 @@
 #include <sstream>
 #include <vector>
 
-namespace Core
+namespace core
 {
 namespace Slab
 {
@@ -44,11 +44,12 @@ namespace Slab
  *
  */
 template <typename T>
-class CRuntime : public Common::Base_slab_allocator {
+class CRuntime : public common::Base_slab_allocator {
  public:
+  CRuntime() {}
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-  CRuntime(size_t slots = -1, bool exact = false) {}
+  CRuntime(size_t slots, bool exact = false) {}
 #pragma GCC diagnostic pop
   void* alloc() { return ::malloc(sizeof(T)); }
   size_t free(void* ptr) {
@@ -64,8 +65,8 @@ class CRuntime : public Common::Base_slab_allocator {
  *
  */
 struct __BasicElementHeader {
-  union {
-    struct {
+  union u {
+    struct s {
       bool used : 1;
       unsigned resv : 7;
     } use;
@@ -87,7 +88,7 @@ class __BasicElement { /**< order and packing is important */
  */
 template <typename T = void*,
           template <typename U> class Element = Slab::__BasicElement>
-class Allocator : public Common::Base_slab_allocator {
+class Allocator : public common::Base_slab_allocator {
  private:
   static const bool option_DEBUG = true;    /**< toggle to activate debugging */
   static const unsigned MIN_ELEMENTS = 128; /**< sanity bounds */
@@ -110,6 +111,8 @@ class Allocator : public Common::Base_slab_allocator {
   Header* _header;
   bool _reconstructed;
 
+  Allocator(const Allocator &) = delete;
+  Allocator &operator=(const Allocator &) = delete;
  public:
   /**
    * Constructor.  Attempts to recreate from existing region (using the magic
@@ -298,7 +301,7 @@ class Allocator : public Common::Base_slab_allocator {
     if ((pval_addr < region_addr) ||
         (pval_addr > (region_addr + _header->region_size))) {
       PWRN("free on invalid pointer (%p)", pval);
-      return -1;
+      return static_cast<size_t>(-1);
     }
 
     if (option_DEBUG) PDBG("freeing slab element: %p", pval);
@@ -361,7 +364,7 @@ class Allocator : public Common::Base_slab_allocator {
     PLOG("      : memory range  (%p-%p) %ld KB", reinterpret_cast<void*>(_header), reinterpret_cast<void*>(top),
          REDUCE_KB((top - base)));
     PLOG("      : chksum        (%x)",
-         Common::chksum32(_header, _header->region_size));
+         common::chksum32(_header, _header->region_size));
     PLOG("%s", "---------------------------------------------------");
 
 #ifdef SHOW_ENTRIES

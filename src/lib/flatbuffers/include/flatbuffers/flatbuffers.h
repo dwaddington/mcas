@@ -17,6 +17,9 @@
 #ifndef FLATBUFFERS_H_
 #define FLATBUFFERS_H_
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+
 #include "flatbuffers/base.h"
 
 namespace flatbuffers {
@@ -2276,5 +2279,7 @@ volatile __attribute__((weak)) const char *flatbuffer_version_string =
   #pragma warning(pop)
 #endif
 // clang-format on
+
+#pragma GCC diagnostic push
 
 #endif  // FLATBUFFERS_H_

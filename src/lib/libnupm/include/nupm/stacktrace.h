@@ -26,7 +26,7 @@
 #include <sstream>
 #include <string>
 
-namespace Core
+namespace core
 {
 // This function produces a stack backtrace with demangled function & method
 // names.
@@ -50,7 +50,7 @@ std::string stack_trace(int skip = 1) {
                int(2 + sizeof(void *) * 2), callstack[i],
                status == 0 ? demangled
                            : info.dli_sname == 0 ? symbols[i] : info.dli_sname,
-               (char *) callstack[i] - (char *) info.dli_saddr);
+               static_cast<char *>(callstack[i]) - static_cast<char *>(info.dli_saddr));
       free(demangled);
 
       trace_buf << buf;

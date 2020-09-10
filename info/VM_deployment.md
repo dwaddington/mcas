@@ -228,7 +228,7 @@ sudo taskset --cpu-list 28-31,84-87 qemu-system-x86_64 \
      -append 'root=/dev/sda2 console=ttyS0' \
      -object memory-backend-file,id=mem1,share=on,mem-path=/dev/dax1.0,size=720G,align=2M \
      -device nvdimm,id=nvdimm1,memdev=mem1 \
-     -fsdev local,id=mdev,path=/home/danielwaddington,security_model=none -device virtio-9p-pci,fsdev=mdev,mount_tag=host \
+     -fsdev local,id=mdev,path=/opt/mcas,security_model=none -device virtio-9p-pci,fsdev=mdev,mount_tag=host \
      -nographic \
      -device e1000,netdev=net0,mac=a4:bf:01:21:f5:bd \
      -netdev tap,id=net0,script=./qemu-ifup

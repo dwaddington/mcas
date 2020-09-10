@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,8 +14,8 @@
 #include "area_ctl.h"
 
 #include "area_top.h"
-#include "div.h"
 #include "logging.h"
+#include <common/utils.h>
 #include <libpmem.h>
 #include <algorithm>
 #include <cassert>
@@ -23,9 +23,26 @@
 #include <limits>
 #include <stdexcept>
 
+#include <boost/io/ios_state.hpp>
 #include <iomanip>
 #include <ostream>
-#include <sstream>
+#include <sstream> /* ostringstream */
+#include <stdexcept> /* range_error */
+
+/*
+ * To avoid excess allocation to ensure alignment, sizeof(ccpm::area_ctl) should be
+ * a multiple of the expected common-case alignment. For hop_hash "segments" this
+ * is 64 (cache line size) and for hop_hash values this is 8 (the default alignment
+ * for a hop_hash value). There is no portable way to ensure the size (without also
+ * ensuring alignment, which could be 64 for segments but should not be so large
+ * for values, so we use a padding field at the end of ccpm::area_ctl and check its
+ * effect here.
+ */
+
+static_assert(sizeof(ccpm::area_ctl) % 64 == 0, "area_ctl is not 64-byte aligned");
+static_assert(sizeof(ccpm::area_ctl) % 32 == 0, "area_ctl is not 32-byte aligned");
+static_assert(sizeof(ccpm::area_ctl) % 16 == 0, "area_ctl is not 16-byte aligned");
+static_assert(sizeof(ccpm::area_ctl) % 8 == 0, "area_ctl is not 8-byte aligned");
 
 /*
  * TODO:
@@ -41,8 +58,9 @@ template <typename P>
 #define PERSIST(x) do { persist(x); } while (0)
 #define PERSIST_N(p, ct) do { ::pmem_persist(p, (sizeof *p) * ct); } while (0)
 
-class verifier
+struct verifier
 {
+private:
 	const ccpm::area_ctl *_a;
 public:
 	verifier(const ccpm::area_ctl *a_)
@@ -61,44 +79,61 @@ public:
 constexpr ccpm::area_ctl::index_t ccpm::area_ctl::ct_atomic_words;
 constexpr std::size_t ccpm::area_ctl::min_alloc_size;
 
-/* Constructor for just enough of an area_ctl to hold _full_height */
+/* Constructor for just enough of an area_ctl to hold _full_height
+ * Also used as the simplified area_ctl constructior for the possibly most-common case: level 0, header_ct_ 0, element_count max_elements
+ */
 ccpm::area_ctl::area_ctl(level_ix_t full_height_)
-	: _magic0(magic)
-	, _full_height(full_height_)
-	, _level()
-	, _element_count()
-	, _sub_size()
+	: _full_height(full_height_)
+	, _level(0)
+	, _element_count(max_elements)
 	, _dt()
-	, _alloc_bits{0}
+	, _alloc_bits{{0}}
 	, _element_state()
-	, _magic1(magic)
+#if USE_MAGIC
+	, _magic(magic)
+#endif
+#if USE_PADDING
+	, _padding()
+#endif
 {
+	assert(reinterpret_cast<uintptr_t>(this) % alignof(area_ctl) == 0);
+#if USE_PADDING
+	(void)_padding; // unused
+#endif
+	persist(*this);
 }
 
 ccpm::area_ctl::area_ctl(
-	unsigned level_
-	, std::size_t sub_size_
+	level_ix_t level_
 	, index_t element_count_
-	, unsigned header_ct_
+	, level_ix_t header_ct_
 	, level_ix_t full_height_
 )
-	: _magic0(0U + magic)
-	, _full_height(full_height_)
+	: _full_height(full_height_)
 	, _level(level_)
 	, _element_count(element_count_)
-	, _sub_size(sub_size_)
 	, _dt()
-	, _alloc_bits{0}
+	, _alloc_bits{{0}}
 	, _element_state()
-	, _magic1(magic)
+#if USE_MAGIC
+	, _magic(magic)
+#endif
+#if USE_PADDING
+	, _padding()
+#endif
 {
+#if USE_PADDING
+	(void)_padding; // unused
+#endif
+
 	assert(reinterpret_cast<uintptr_t>(this) % alignof(area_ctl) == 0);
 	/* *** element_bitmap *** */
 
 	/* These are available for allocation */
 
-	/* These are permanently "allocated, reserved" because they are past end of
-	 * storage */
+	/* Elements in the range [element_count_ .. max_elements) are permanently
+	 * marked "allocated, reserved" because they are past end of storage
+	 */
 	el_reserve_range(element_count_, max_elements);
 
 	/* If we are at the lowest level, or allocation at a lower level would cause
@@ -110,15 +145,15 @@ ccpm::area_ctl::area_ctl(
 	if (
 		_level == 0
 		||
-		alloc_states_per_word < front_pad_count(header_ct_ + 1, _sub_size / alloc_states_per_word)
+		alloc_states_per_word < front_pad_count(level_ix_t(header_ct_ + 1), sub_size() / alloc_states_per_word)
 	)
 	{
 		/* These are permanently "allocated" to instances of area_ctl */
-		el_reserve_range(0, front_pad_count(header_ct_ + _level));
+		el_reserve_range(0, front_pad_count(level_ix_t(header_ct_ + _level)));
 
 		/* If not at lowest level, and in case we are constructing the initial
 		 * area_ctl, the origin needs an area_ctl with at least _full_height field
-		 * so that recovery an find the root area_ctl.
+		 * so that recovery can find the root area_ctl.
 		 */
 		if ( _level != 0 )
 		{
@@ -128,16 +163,26 @@ ccpm::area_ctl::area_ctl(
 	}
 	else
 	{
-		new_subdivision(header_ct_ + 1);
+		new_subdivision(level_ix_t(header_ct_ + 1));
 	}
 
 	/* elements are uninitialized. The allocator perhaps ought to zero them on
 	 * allacation
 	 */
-
-	_magic0 = magic;
-	_magic1 = magic;
+#if USE_MAGIC
+	_magic = magic;
+#endif
 	persist(*this);
+}
+
+auto ccpm::area_ctl::sub_size(level_ix_t level) -> std::size_t
+{
+	return area_ctl::min_alloc_size * (1U << log2_alloc_states_per_word * level);
+}
+
+auto ccpm::area_ctl::sub_size() const -> std::size_t
+{
+	return sub_size(_level);
 }
 
 auto ccpm::area_ctl::commission(
@@ -146,24 +191,14 @@ auto ccpm::area_ctl::commission(
 ) -> area_ctl *
 {
 	auto h = height(size_);
-	auto top_level = h - 1;
-	std::size_t subdivision_size = area_ctl::min_alloc_size;
-	/* subdivision size at height 1 is area_ctl::min_alloc_size. Increases by
-	 * alloc_states_per_word for each additional level
-	 */
-	for ( auto i = top_level; i != 0; --i )
-	{
-		subdivision_size *= alloc_states_per_word;
-	}
-
+	auto top_level = level_ix_t(h - 1);
 	auto pos = static_cast<area_ctl *>(start_) + top_level;
 	return
 		new
 			(pos)
 			area_ctl(
 				top_level
-				, subdivision_size
-				, index_t(size_ / subdivision_size)
+				, index_t(size_ / sub_size(top_level))
 				, 1
 				, h
 			)
@@ -175,21 +210,24 @@ bool ccpm::area_ctl::includes(const void *ptr) const
 	return
 		this <= ptr
 		&&
-		static_cast<const char *>(ptr) < static_cast<const char *>(static_cast<const void *>(this)) + _element_count * _sub_size
+		static_cast<const char *>(ptr) < static_cast<const char *>(static_cast<const void *>(this)) + _element_count * sub_size()
 		;
 }
 
-/* Precondition: this area has a run of ct_atomic_words empty slots */
-auto ccpm::area_ctl::new_subdivision(unsigned header_ct_) -> area_ctl *
+/* Precondition: this area has a run of ct_atomic_words empty slots
+ *
+ */
+auto ccpm::area_ctl::new_subdivision(level_ix_t header_ct_) -> area_ctl *
 {
 	verifier v(this);
 	const auto ix = el_find_n_free(ct_atomic_words);
 	/* caller should have checked that the area had at least ct_atomic_words
-	 * empty slots */
+	 * empty slots
+	 */
 	assert(ix != _element_count);
 	const index_t element_count = max_elements;
 	/* construct area */
-	assert(_sub_size > element_count);
+	assert(sub_size() > element_count);
 	/* Okay to construct the area before acquiring ownership, because the code
 	 * is not multithreaded. A multithreaded version should add a "doubt" element
 	 * for subdivision allocation, and modify state only *after* obtaining
@@ -204,31 +242,41 @@ auto ccpm::area_ctl::new_subdivision(unsigned header_ct_) -> area_ctl *
 	 */
 
 	const auto pac =
-		new
+		( _level == 1 && header_ct_ == 0 )
+		/* possibly-common case fast path */
+		? new (element_byte(ix)) area_ctl(_full_height)
+		/* slow path */
+		: new
 			/* An area_ctl at _level is (_level * sizeof *this) bytes past
 			 * the start of the first parent element
 			 */
 			(element_byte(ix) + (_level-1) * (sizeof *this))
 			area_ctl(
-				_level - 1
-				, _sub_size / alloc_states_per_word
+				level_ix_t(_level - 1)
 				, element_count
 				, header_ct_
 				, _full_height
-			);
+			)
+		;
 	auto &aw = el_allocate_n(ix, ct_atomic_words, sub_state::subdivision);
 	PERSIST(aw);
 
 	return pac;
 }
 
-unsigned ccpm::area_ctl::height(std::size_t bytes_)
+auto ccpm::area_ctl::height(std::size_t bytes_) -> level_ix_t
 {
-	auto h = 1;
+	level_ix_t h = 1U;
 
 	std::size_t subdivision_size = min_alloc_size;
 	while ( subdivision_size * ccpm::area_ctl::max_elements < bytes_ )
 	{
+		if ( subdivision_size * alloc_states_per_word <= subdivision_size )
+		{
+			std::ostringstream s;
+			s << "Area size " << std::hex << std::showbase << bytes_ << " bytes exceeds maximum " << subdivision_size << " bytes";
+			throw std::range_error(s.str());
+		}
 		subdivision_size *= ccpm::alloc_states_per_word;
 		++h;
 	}
@@ -447,15 +495,24 @@ auto ccpm::area_ctl::el_deallocate_n(
 }
 
 /* pad count, in elements */
-auto ccpm::area_ctl::front_pad_count(const unsigned header_ct_) const -> index_t
+auto ccpm::area_ctl::front_pad_count(const level_ix_t header_ct_) const -> index_t
 {
 	verifier v(this);
-	return front_pad_count(header_ct_, _sub_size);
+	return front_pad_count(header_ct_, sub_size());
 }
 
-auto ccpm::area_ctl::front_pad_count(const unsigned header_ct_, std::size_t sub_size_) -> index_t
+auto ccpm::area_ctl::front_pad_count(const level_ix_t header_ct_, std::size_t sub_size_) -> index_t
 {
 	return index_t(div_round_up(sizeof(area_ctl) * header_ct_, sub_size_));
+}
+
+auto ccpm::area_ctl::max_free_element_count(const level_ix_t level) -> index_t
+{
+	return
+		alloc_states_per_word
+		- 
+		( ct_atomic_words == 1 ? front_pad_count(1, sub_size(level)) : 0 )
+		;
 }
 
 std::size_t ccpm::area_ctl::bytes_free() const
@@ -465,7 +522,7 @@ std::size_t ccpm::area_ctl::bytes_free() const
 	for ( index_t ix = 0; ix != _element_count; ++ix )
 	{
 		r +=
-			el_is_free(ix) ? _sub_size
+			el_is_free(ix) ? sub_size()
 			: el_is_subdivision(ix) ? area_child(ix)->bytes_free()
 			: std::size_t(0);
 	}
@@ -486,7 +543,7 @@ auto ccpm::area_ctl::elements_free_local() const -> index_t
 std::size_t ccpm::area_ctl::bytes_free_local() const
 {
 	verifier v(this);
-	return elements_free_local() * _sub_size;
+	return elements_free_local() * sub_size();
 }
 
 std::size_t ccpm::area_ctl::bytes_free_sub() const
@@ -532,11 +589,9 @@ auto ccpm::area_ctl::locate_element(
 	}
 
 	const auto offset =
-		static_cast<const char *>(ptr_)
-		- element_byte(0)
-		;
-	auto ix = index_t(offset / _sub_size);
-	const auto ix_offset = offset % _sub_size;
+		std::size_t( static_cast<const char *>(ptr_) - element_byte(0) );
+	auto ix = index_t(offset / sub_size());
+	const auto ix_offset = offset % sub_size();
 	if ( el_is_free(ix) )
 	{
 		assert( ! el_is_free(ix) );
@@ -568,8 +623,8 @@ auto ccpm::area_ctl::locate_element(
 	else
 	{
 		/* not an exact hit, look for the sub-allocation */
-		assert( _sub_size != min_alloc_size );
-		if ( _sub_size == min_alloc_size )
+		assert( sub_size() != min_alloc_size );
+		if ( sub_size() == min_alloc_size )
 		{
 			throw
 				std::runtime_error("locate_element: implausible ptr (not minimally aligned)");
@@ -621,7 +676,7 @@ void ccpm::area_ctl::deallocate_local(
 	 * But the discovered run size always be at least enough to contain
 	 * bytes_.
 	 */
-	assert(div_round_up(bytes_, _sub_size) <= run_size);
+	assert(div_round_up(bytes_, sub_size()) <= run_size);
 	/* two-step release:
 	 * (1) reclaim space,
 	 * (2) tell client that we have reclaimed the space
@@ -642,11 +697,15 @@ void ccpm::area_ctl::deallocate_local(
 	/* Need to move or add this area in the chains, but do not know whether the
 	 * element is currently in a chain. Remove if it is a chain, then add.
 	 */
-	if ( top_->is_in_chain(this, _level, old_run) )
+	auto new_run = el_max_free_run();
+	if ( new_run != old_run && this->is_in_list() )
 	{
 		this->remove();
 	}
-	top_->restore_to_chain(this, _level, el_max_free_run());
+	if ( ! this->is_in_list() )
+	{
+		top_->restore_to_chain(this, _level, new_run);
+	}
 }
 
 void ccpm::area_ctl::deallocate(area_top *const top_, void * & ptr_, const std::size_t bytes_)
@@ -674,7 +733,7 @@ void ccpm::area_ctl::set_allocated_local(const index_t ix_, const std::size_t by
 	verifier v(this);
 	el_allocate_n(
 		ix_
-		, index_t(div_round_up(bytes_, _sub_size))
+		, index_t(div_round_up(bytes_, sub_size()))
 		, aligned_ ? sub_state::client_aligned : sub_state::client_unaligned
 	);
 }
@@ -689,7 +748,7 @@ void ccpm::area_ctl::set_deallocated(void *const p_, const std::size_t bytes_)
 void ccpm::area_ctl::set_deallocated_local(const index_t ix_, const std::size_t bytes_)
 {
 	verifier v(this);
-	auto &aw = el_deallocate_n(ix_, index_t(div_round_up(bytes_, _sub_size)));
+	auto &aw = el_deallocate_n(ix_, index_t(div_round_up(bytes_, sub_size())));
 	PERSIST(aw);
 }
 
@@ -730,18 +789,18 @@ void ccpm::area_ctl::allocate(
 
 	/* Allocation must fall within the area; logic bug if it did not. */
 	assert(element_void(0) <= pr);
-	assert(pr + bytes_ < element_void(_element_count));
+	assert(pr + bytes_ <= element_void(_element_count));
 
 	/* index of first element to allocate */
-	const auto ix_begin = index_t((pr - p0) / _sub_size);
+	const index_t ix_begin = index_t(index_t(pr - p0) / sub_size());
 	/* Note whether the allocation aligns with the start of an element.
 	 * Remember that for deallocation sanity check.
 	 */
-	const auto is_element_aligned = (pr - p0) % _sub_size == 0;
+	const auto is_element_aligned = index_t(pr - p0) % sub_size() == 0;
 	/* end of allocation range */
 	const auto pr_end = pr + bytes_;
 	/* index past last element to allocate */
-	const auto ix_end = index_t(div_round_up(pr_end - p0, _sub_size));
+	const auto ix_end = div_round_up(index_t(pr_end - p0), sub_size());
 	/* under no circumstance should the end of the result go beyond the end of the
 	 * run found by el_find_n_free
 	 */
@@ -749,7 +808,7 @@ void ccpm::area_ctl::allocate(
 	const auto run_length_as_aligned = ix_end - ix_begin;
 
 	/* two-step release: (1) tell client about the space, (2) release the space */
-	dt_.set(__func__, pr, run_length_as_aligned * _sub_size);
+	dt_.set(__func__, pr, run_length_as_aligned * sub_size());
 	ptr_ = pr;
 	PERSIST(ptr_);
 	auto &aw =
@@ -778,7 +837,7 @@ void ccpm::area_ctl::allocate(
  * area_top chain */
 auto ccpm::area_ctl::restore_all(
 	area_top *const top_
-	, const unsigned current_level_ix_
+	, const level_ix_t current_level_ix_
 ) -> std::size_t
 {
 	verifier v(this);
@@ -790,11 +849,14 @@ auto ccpm::area_ctl::restore_all(
 	auto longest_run = el_max_free_run();
 	if ( longest_run > 0 )
 	{
+		/* reset linked list element, which is left over from previous chain */
+		force_reset();
+		/* place in chain */
 		top_->restore_to_chain(this, current_level_ix_, longest_run);
 		++count;
 	}
 
-	/* (First test is for performance only, elements at level 0 will never be
+	/* (First test is for performance only: elements at level 0 will never be
 	 * subdivided.
 	 */
 	if ( current_level_ix_ != 0 )
@@ -806,7 +868,7 @@ auto ccpm::area_ctl::restore_all(
 				count +=
 					area_child(e_ix)->restore_all(
 						top_
-						, current_level_ix_ - 1U
+						, level_ix_t(current_level_ix_ - 1U)
 					);
 			}
 		}
@@ -814,7 +876,7 @@ auto ccpm::area_ctl::restore_all(
 	return count;
 }
 
-void ccpm::area_ctl::print(std::ostream &o_, unsigned indent_) const
+void ccpm::area_ctl::print(std::ostream &o_, level_ix_t indent_, std::ios_base::fmtflags format_) const
 {
 	verifier v(this);
 	const auto si = std::string(indent_*2, ' ');
@@ -825,9 +887,14 @@ void ccpm::area_ctl::print(std::ostream &o_, unsigned indent_) const
 	++indent_;
 	const auto sj = std::string(indent_*2, ' ');
 
-	o_ << sj << "level " << _level
-		<< ", " << _element_count << "(" << elements_free_local() << " free)"
-		<< " x " << _sub_size << " bytes" << "\n";
+    {
+		boost::io::ios_flags_saver s(o_);
+		o_ << sj << "level " << unsigned(_level)
+			<< ", " << _element_count << "(" << elements_free_local() << " free)"
+			<< " x " << std::showbase;
+		o_.setf(format_, std::ios_base::basefield);
+		o_ << sub_size() << " bytes" << "\n";
+    }
 	for ( index_t ix = 0; ix != _element_count; ++ix )
 	{
 		if ( el_is_free(ix) )
@@ -841,7 +908,7 @@ void ccpm::area_ctl::print(std::ostream &o_, unsigned indent_) const
 				o_ << sj << element_void(ix) << ": element " << ix << ":"
 					<< el_subdivision_run_at(ix)
 					<< " " << "subdivision\n";
-				area_child(ix)->print(o_, indent_ + 1);
+				area_child(ix)->print(o_, level_ix_t(indent_ + 1U), format_);
 				o_ << sj << "end subdivision\n";
 				break;
 			case sub_state::reserved:
@@ -871,7 +938,7 @@ void ccpm::area_ctl::print(std::ostream &o_, unsigned indent_) const
 	o_ << si << "area_ctl end\n";
 }
 
-void ccpm::area_ctl::restore(const ownership_callback_t &resolver_)
+auto ccpm::area_ctl::restore(const ownership_callback_t &resolver_) -> area_ctl &
 {
 	PLOG(PREFIX "restore %p", LOCATION, static_cast<void *>(this));
 	verifier v(this);
@@ -903,19 +970,50 @@ void ccpm::area_ctl::restore(const ownership_callback_t &resolver_)
 			_dt.clear(__func__);
 		}
 	}
+	return *this;
 }
 
-unsigned ccpm::area_ctl::height() const
+auto ccpm::area_ctl::level() const -> level_ix_t
 {
-	verifier v(this);
-	auto s = _sub_size;
-	unsigned h = 1;
-	while ( s > min_alloc_size )
+	return _level;
+}
+
+auto ccpm::area_ctl::root(void *const ptr_) -> area_ctl *
+{
+	/* The base of the region contains an array of area_ctls.
+	 * The first area_ctl is probably not the root of the area_ctl tree,
+	 * but it contains the height of the tree, and the last area_ctl
+	 * in the array (at position height-1) *is* the root area_ctl.
+	 */
+	auto ctl0 = static_cast<area_ctl *>(ptr_);
+	unsigned full_height = ctl0->full_height();
+	if ( 0 == full_height || 42 < full_height )
 	{
-		assert(s % alloc_states_per_word == 0);
-		++h;
-		s /= alloc_states_per_word;
+		std::ostringstream s{};
+		s << "area at " << ctl0 << " does not look like an area: implausible full height " << full_height;
+		throw std::domain_error(s.str());
 	}
-	assert(s == min_alloc_size);
-	return h;
+
+	for ( const auto *c = ctl0; c != &ctl0[ctl0->full_height()]; ++c )
+	{
+		if ( c->_magic != magic )
+		{
+			std::ostringstream s{};
+			s << "in area " << ctl0 << ", area_ctl at " << c << " has bad magic number";
+			throw std::domain_error(s.str());
+		}
+		if ( c->full_height() != full_height )
+		{
+			std::ostringstream s{};
+			s << "in area " << ctl0 << ", area_ctl at " << c << " full_height field is " << unsigned(c->full_height()) << " expected " << full_height;
+			throw std::domain_error(s.str());
+		}
+		if ( c->_level != c - ctl0 )
+		{
+			std::ostringstream s{};
+			s << "in area " << ctl0 << ", area_ctl at " << c << " level field is " << unsigned(c->_level) << " expected " << (c - ctl0);
+			throw std::domain_error(s.str());
+		}
+	}
+	return &ctl0[ctl0->full_height()-1];
 }

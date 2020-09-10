@@ -21,12 +21,15 @@
 
 #include <sys/uio.h>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
 
 class Devdax_manager;
 
 template <typename PersistData, typename Heap, typename HeapAllocator>
-  class region
+  struct region
   {
+  private:
     static constexpr std::uint64_t magic_value = HeapAllocator::magic_value; // 0xc74892d72eed493a;
   public:
     using heap_type = Heap;
@@ -40,8 +43,12 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
 
   public:
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
     region(
-      std::uint64_t uuid_
+      AK_ACTUAL
+      unsigned debug_level
+      , std::uint64_t uuid_
       , std::size_t size_
       , std::size_t expected_obj_count
       , unsigned numa_node_
@@ -49,37 +56,41 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
       : magic(0)
       , _uuid(uuid_)
       , _heap(
+        debug_level
 #if USE_CC_HEAP == 4
-		&_persist_data.ase()
+        , &_persist_data.ase()
         , (&_persist_data.aspd())
         , (&_persist_data.aspk())
         , &_persist_data.asx()
-        ,
 #endif
-        this+1
-        , size_ - sizeof(*this)
+        , this+1
+        , adjust_size(size_)
         , numa_node_
       )
       , _persist_data(
-		expected_obj_count
-		, typename PersistData::allocator_type(locate_heap())
-	)
+        AK_REF
+        expected_obj_count
+        , typename PersistData::allocator_type(locate_heap())
+    )
     {
       magic = magic_value;
       persister_nupm::persist(this, sizeof *this);
     }
+#pragma GCC diagnostic pop
 
     /* The "reanimate" (or "reconsitute") constructor */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
     region(
-      const std::unique_ptr<Devdax_manager> & devdax_manager_
+      unsigned debug_level
+      , const std::unique_ptr<Devdax_manager> & devdax_manager_
     )
       : magic(0)
       , _uuid(this->_uuid)
       , _heap(
-        devdax_manager_
+        debug_level
+        , devdax_manager_
 #if USE_CC_HEAP == 4
         , &this->_persist_data.ase()
         , &this->_persist_data.aspd()
@@ -102,6 +113,17 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
 #endif
     }
 #pragma GCC diagnostic pop
+
+    auto adjust_size(std::size_t sz_)
+    {
+      if ( sz_ < sizeof *this )
+      {
+        std::ostringstream s;
+        s << "Have " << std::hex << std::showbase << sz_ << " bytes. Cannot create a persisted region from less than " << sizeof *this << " bytes";
+        throw std::range_error(s.str());
+      }
+      return sz_ - sizeof *this;
+    }
 
     HeapAllocator locate_heap() { return HeapAllocator(&_heap); }
     persist_data_type &persist_data() { return _persist_data; }

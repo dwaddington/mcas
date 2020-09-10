@@ -40,9 +40,10 @@ namespace
 		{
 			aw &= aw >> 1;
 		}
-		return aw == 0 ? ccpm::alloc_states_per_word-n+1 : __builtin_ctzll(aw);
+		return aw == 0 ? ccpm::alloc_states_per_word-n+1 : unsigned(__builtin_ctzll(aw));
 	}
 
+#if 0 // ununsed
 	/* find n free bits. The loop is O(bit_count(aw) - n). Good for large n */
 	inline auto find_n_free_order_w(ccpm::atomic_word aw, const unsigned n) -> unsigned
 	{
@@ -57,6 +58,7 @@ namespace
 		}
 		return pos;
 	}
+#endif
 }
 
 /* in the atomic word aw, return the index of a start of a run of n free elements

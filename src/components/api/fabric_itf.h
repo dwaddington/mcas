@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -64,10 +64,8 @@
 
 struct iovec; /* definition in <sys/uio.h> */
 
-namespace Component
+namespace component
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 class IFabric_runtime_error : public std::runtime_error {
  public:
@@ -132,13 +130,21 @@ class IFabric_op_completer {
                                                         std::uint64_t completion_flags,
                                                         std::size_t   len,
                                                         void *        error_data,
-                                                        void *        param) noexcept;
+                                                        void *        param)
+#if 2017030L <= __cplusplus
+	noexcept
+#endif
+	  ;
   using complete_param_tentative_ptr_noexcept = cb_acceptance (*)(void *context,
                                                                   ::status_t,
                                                                   std::uint64_t completion_flags,
                                                                   std::size_t   len,
                                                                   void *        error_data,
-                                                                  void *        param) noexcept;
+                                                                  void *        param)
+#if 2017030L <= __cplusplus
+	noexcept
+#endif
+	  ;
 
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
@@ -223,6 +229,8 @@ class IFabric_op_completer {
      - support for statistics collection
   */
 };
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic pop
 
 /**
@@ -508,6 +516,7 @@ class IFabric_server_factory : public IFabric_passive_endpoint {
    * @throw std::system_error, e.g. for locking
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : read error on event pipe
+   * @throw std::system_error : failure to listen for connections
    */
   virtual IFabric_server *get_new_connection() = 0;
 
@@ -692,9 +701,13 @@ class IFabric {
   virtual IFabric_client_grouped *open_client_grouped(const std::string &json_configuration,
                                                       const std::string &remote_endpoint,
                                                       std::uint16_t      port) = 0;
+  /*
+   * provideri name in the fabric.
+   */
+  virtual const char *prov_name() const noexcept = 0;
 };
 
-class IFabric_factory : public Component::IBase {
+class IFabric_factory : public component::IBase {
  public:
   DECLARE_INTERFACE_UUID(0xfac3d083, 0xe629, 0x46c9, 0x86fa, 0x6f, 0x96, 0x40, 0x61, 0x10, 0xdf);
 
@@ -716,8 +729,6 @@ class IFabric_factory : public Component::IBase {
   virtual IFabric *make_fabric(const std::string &json_configuration) = 0;
 };
 
-#pragma GCC diagnostic pop
-
-}  // namespace Component
+}  // namespace component
 
 #endif  // __API_FABRIC_ITF__

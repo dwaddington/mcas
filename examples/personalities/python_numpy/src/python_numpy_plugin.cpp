@@ -15,6 +15,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion-null"
 #pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wcast-qual"
 
 #include <numpy/arrayobject.h>
 #include <Python.h>
@@ -172,7 +173,7 @@ status_t ADO_python_numpy_plugin::shutdown()
  * Factory-less entry point 
  * 
  */
-extern "C" void * factory_createInstance(Component::uuid_t& interface_iid)
+extern "C" void * factory_createInstance(component::uuid_t& interface_iid)
 {
   if(interface_iid == Interface::ado_plugin) 
     return static_cast<void*>(new ADO_python_numpy_plugin());

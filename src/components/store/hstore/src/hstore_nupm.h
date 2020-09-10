@@ -15,7 +15,7 @@
 #ifndef COMANCHE_HSTORE_NUPM_H
 #define COMANCHE_HSTORE_NUPM_H
 
-#include "hstore_pool_manager.h"
+#include "pool_manager.h"
 
 #include "hstore_nupm_types.h"
 #include "hstore_open_pool.h"
@@ -28,7 +28,7 @@
 #include <cstdlib> /* getenv */
 
 template <typename PersistData, typename Heap, typename HeapAllocator>
-  class region;
+  struct region;
 
 #pragma GCC diagnostic push
 /* Note: making enable_shared_from_this private avoids the non-virtual-dtor error but
@@ -38,19 +38,16 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
 
 /* Region is region<persist_data_t, heap_rc>, Table is hstore::table_t Allocator is table_t::allocator_type, LockType is hstore::locK_type_t */
 template <typename Region, typename Table, typename Allocator, typename LockType>
-  class hstore_nupm
-    : public pool_manager<::open_pool<std::unique_ptr<Region, region_closer<hstore_nupm<Region, Table, Allocator, LockType>, Region>>>>
-    , public std::enable_shared_from_this<hstore_nupm<Region, Table, Allocator, LockType>>
+  struct hstore_nupm
+    : public pool_manager<::open_pool<non_owner<Region>>>
   {
-  public:
     using region_type = Region;
   private:
     using table_t = Table;
     using allocator_t = Allocator;
     using lock_type_t = LockType;
-    using region_closer_t = region_closer<hstore_nupm<region_type, table_t, allocator_t, lock_type_t>, Region>;
   public:
-    using open_pool_handle = ::open_pool<std::unique_ptr<region_type, region_closer_t>>;
+    using open_pool_handle = ::open_pool<non_owner<region_type>>;
   private:
     std::unique_ptr<Devdax_manager> _devdax_manager;
     unsigned _numa_node;
@@ -62,26 +59,40 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       , std::size_t size_
       , std::size_t expected_obj_count
     );
-
+#if 0
     bool debug();
+#endif
+    static unsigned name_to_numa_node(const std::string &name);
   public:
-    hstore_nupm(const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_, bool debug_);
+    hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_);
 
     virtual ~hstore_nupm();
 
     const std::unique_ptr<Devdax_manager> & devdax_manager() const override { return _devdax_manager; }
     void pool_create_check(std::size_t) override;
 
-    auto pool_create(
+    auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-      , int flags_
+    ) -> std::tuple<void *, std::size_t, std::uint64_t> override;
+
+    auto pool_create_2(
+      AK_FORMAL
+      void *v_
+      , std::size_t size_
+      , std::uint64_t uuid_
+      , component::IKVStore::flags_t flags_
       , std::size_t expected_obj_count_
     ) -> std::unique_ptr<open_pool_handle> override;
 
-    auto pool_open(
+    auto pool_open_1(
       const pool_path &path_
-      , int flags_
+    ) -> void * override;
+
+    auto pool_open_2(
+      AK_FORMAL
+      void * addr_
+      , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<open_pool_handle> override;
 
     void pool_close_check(const std::string &) override;

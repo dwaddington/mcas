@@ -13,6 +13,7 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // zero-size array
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Wshadow" // hides constructors
 #include <rdma/fi_domain.h>
 #pragma GCC diagnostic pop

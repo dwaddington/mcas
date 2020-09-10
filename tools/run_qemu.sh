@@ -13,7 +13,7 @@ sudo qemu-system-x86_64 -m 16G \
                    -smp 32 \
                    -append 'root=/dev/sda1 console=ttyS0 default_hugepagesz=1GB hugepagesz=1G hugepages=1 intel_iommu=on iommu=pt vfio_iommu_type1.allow_unsafe_interrupts=1' \
                    -net user,vlan=0 -net nic,vlan=0 \
-                   -fsdev local,id=mdev,path=/home/fengggli,security_model=none -device virtio-9p-pci,fsdev=mdev,mount_tag=host_mount \
+                   -fsdev local,id=mdev,path=/opt/mcas,security_model=none -device virtio-9p-pci,fsdev=mdev,mount_tag=host_mount \
                    -enable-kvm \
                    -vga std \
                    -redir tcp:2222::22

@@ -19,10 +19,12 @@
 
 #include "hints.h"
 
+#include "fabric_bad_alloc.h"
 #include "fabric_util.h" /* make_fi_info */
 
 #include <cassert>
 #include <cstring> /* strdup */
+#include <new> /* bad_alloc */
 
 /**
  * Fabric/RDMA-based network component
@@ -43,12 +45,21 @@ hints &hints::mode(uint64_t c) { _info->mode = c; return *this; }
 
 hints &hints::mr_mode(int m) { _info->domain_attr->mr_mode = m; return *this; }
 
-hints &hints::prov_name(const char *n)
+hints &hints::prov_name(const char *p)
 {
-  assert(! _info->fabric_attr->prov_name);
-  _info->fabric_attr->prov_name = ::strdup(n); return *this;
+	if ( ! _info->fabric_attr )
+	{
+		_info->fabric_attr = static_cast<fi_fabric_attr *>(std::calloc(sizeof *_info->fabric_attr, 1));
+	}
+	if ( ! _info->fabric_attr )
+	{
+		throw fabric_bad_alloc("calloc(abric_attr)");
+	}
+	::free(_info->fabric_attr->prov_name);
+	_info->fabric_attr->prov_name = ::strdup(p);
+	return *this;
 }
 
-const char *hints::prov_name() const { return _info->fabric_attr->prov_name; }
+const char *hints::prov_name() const { return _info->fabric_attr ? _info->fabric_attr->prov_name : nullptr; }
 
 const fi_info &hints::data() { return *_info; }

@@ -56,6 +56,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
 
+#include <common/common.h>
 #include <assert.h>
 #include <fcntl.h> /* For O_* constants */
 #include <semaphore.h>
@@ -68,7 +69,7 @@
 #include <common/utils.h>
 #include "memory.h"
 
-namespace Common
+namespace common
 {
 /**
  * Single-producer, single-consumer class based on Vyukov's algorithm.
@@ -100,7 +101,7 @@ public:
       
     // clear buffer
     _buffer = static_cast<T*>(buffer);
-    __builtin_memset(_buffer, 0, sizeof(T) * queue_size);
+    __builtin_memset(buffer, 0, sizeof(T) * queue_size);
   }
 
   /**
@@ -124,12 +125,12 @@ public:
    * @return True if enqueued OK. False if blocked, or full.
    */
   bool enqueue(const T &elem) {
+
     const size_t head = _head.load(std::memory_order_relaxed);
 
     if (((_tail.load(std::memory_order_acquire) - (head + 1)) & _mask) >= 1) {
       _buffer[head & _mask] = elem;
       _head.store(head + 1, std::memory_order_release);
-      //	assert(reinterpret_cast<unsigned long>(elem) >= 0x8000000000);
       return true;
     }
     return false;
@@ -148,7 +149,6 @@ public:
     if (((_head.load(std::memory_order_acquire) - tail) & _mask) >= 1) {
       output = _buffer[_tail & _mask];
       _tail.store(tail + 1, std::memory_order_release);
-      //	assert(reinterpret_cast<unsigned long>(output) >= 0x8000000000);
       return true;
     }
     return false;
@@ -167,7 +167,7 @@ public:
   void *buffer_base() const { return static_cast<void *>(_buffer); }
 
   static size_t memory_footprint(size_t queue_size) {
-    return sizeof(Common::Spsc_bounded_lfq<T>) +
+    return sizeof(common::Spsc_bounded_lfq<T>) +
       (sizeof(T) * queue_size);
   }
 
@@ -224,7 +224,7 @@ public:
   virtual ~Spsc_bounded_lfq_sleeping() { sem_destroy(&_sem); }
 
   static size_t memory_footprint(size_t queue_size) {
-    return sizeof(Common::Spsc_bounded_lfq<T>) +
+    return sizeof(common::Spsc_bounded_lfq<T>) +
       (sizeof(T) * queue_size);
   }
 
@@ -294,11 +294,9 @@ public:
         //     continue;
         //   else PLOG("errno=%d", errno);
         // }
-        PNOTICE("sem_wait going to sleep");
         if(sem_wait(&_sem) == -1)
           throw General_exception("sem_wait failed");
 
-        PNOTICE("sem_wait woke up");
         //        while ((s = ) == -1 && errno == EINTR)
         //          continue; /* Restart if interrupted by handler */
         //        PLOG("errno=%d", errno);
@@ -497,7 +495,7 @@ private:
 #endif
 
   
-}  // namespace Common
+}  // namespace common
 
 #pragma GCC diagnostic pop
 #endif

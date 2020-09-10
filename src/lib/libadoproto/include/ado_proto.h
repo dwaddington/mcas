@@ -30,6 +30,8 @@
 #include <memory>
 #include <string>
 
+#define DEBUG 
+
 class Buffer_header;
 
 using buffer_space_shared_ptr_t = ADO_protocol_buffer::space_shared_ptr_t;
@@ -39,12 +41,13 @@ using buffer_space_dedicated_ptr_t = ADO_protocol_buffer::space_dedicated_ptr_t;
  * Class to help UIPC message construction (both sides)
  *
  */
+
 class ADO_protocol_builder
 {
 public:
-  static constexpr size_t MAX_MESSAGE_SIZE  = 4096;
-  static constexpr size_t QUEUE_SIZE        = 8;
-  static constexpr size_t POLL_SLEEP_USEC   = 500000;
+  static constexpr size_t MAX_MESSAGE_SIZE  = MB(2); //4096;
+  static constexpr size_t QUEUE_SIZE        = 32; 
+  static constexpr size_t POLL_SLEEP_USEC   = 1000; /* 1 ms */
   static constexpr size_t POLL_RETRY_LIMIT  = 1000000;
 
   static_assert(MAX_MESSAGE_SIZE > 64, "MAX_MESSAGE_SIZE too small");
@@ -60,6 +63,7 @@ private:
   /* get a buffer from the dedicated pool */
   buffer_space_dedicated_ptr_t get_buffer()
   {
+    std::lock_guard<std::mutex> g{_b_mutex};
     assert( ! _buffer.empty() );
     auto tmp = _buffer.back().release();
     auto a = buffer_space_dedicated_ptr_t(tmp, this);
@@ -93,13 +97,15 @@ private:
     }
     return rc;
   }
+  
 public:
   enum class Role {
     CONNECT,
     ACCEPT,
   };
 
-  ADO_protocol_builder(const std::string& channel_prefix,
+  ADO_protocol_builder(unsigned option_debug,
+		       const std::string& channel_prefix,
                        Role role);
 
   ~ADO_protocol_builder();
@@ -110,16 +116,21 @@ public:
 
   void send_bootstrap(const uint64_t auth_id,
                       const std::string& pool_name,
-                      size_t pool_size,
-                      unsigned int pool_flags,
-                      uint64_t expected_obj_count,
-                      bool open_existing);
+                      const size_t pool_size,
+                      const unsigned int pool_flags,
+                      const unsigned int memory_type,
+                      const uint64_t expected_obj_count,
+                      const bool open_existing);
 
   void send_bootstrap_response();
 
-  void send_op_event(Component::ADO_op event);
+  void send_op_event(component::ADO_op event);
 
-  void send_op_event_response(Component::ADO_op event);
+  void send_op_event_response(component::ADO_op event);
+
+  void send_cluster_event(const std::string& sender,
+			  const std::string& type,
+			  const std::string& content);
   
   void send_shutdown();
 
@@ -144,24 +155,25 @@ public:
 
   void send_work_response(status_t status,
                           uint64_t work_key,
-                          const Component::IADO_plugin::response_buffer_vector_t& response_buffers);
+                          const component::IADO_plugin::response_buffer_vector_t& response_buffers);
 
   ssize_t recv_from_proxy(void * target, const size_t target_len);
 
   /* shard-side, must not block */
   bool recv_from_ado_work_completion(uint64_t& work_key,
                                      status_t& status,
-                                     Component::IADO_plugin::response_buffer_vector_t& response_buffers);
+                                     component::IADO_plugin::response_buffer_vector_t& response_buffers);
 
   /* table operations */
   void send_table_op_create(const uint64_t work_request_id,
                             const std::string& key,
                             const size_t value_len,
-                            const int flags);
+                            const std::uint64_t flags);
 
   void send_table_op_open(const uint64_t work_request_id,
                           const std::string& key,
-                          const int flags);
+                          const size_t value_len,
+                          const std::uint64_t flags);
 
   void send_table_op_resize(const uint64_t work_request_id,
                             const std::string& key,
@@ -177,16 +189,16 @@ public:
 
   void send_find_index_request(const std::string& key_expression,
                                offset_t begin_position,
-                               Component::IKVIndex::find_t find_type);
+                               component::IKVIndex::find_t find_type);
 
   void send_vector_response(const status_t status,
-                            const Component::IADO_plugin::Reference_vector& rv);
+                            const component::IADO_plugin::Reference_vector& rv);
 
-  void send_vector_request(const epoch_time_t t_begin,
-                           const epoch_time_t t_end);
+  void send_vector_request(const common::epoch_time_t t_begin,
+                           const common::epoch_time_t t_end);
 
   void recv_vector_response(status_t& status,
-                            Component::IADO_plugin::Reference_vector& out_vector);
+                            component::IADO_plugin::Reference_vector& out_vector);
 
   void send_pool_info_request();
 
@@ -199,21 +211,21 @@ public:
   /* shard-side, must not block */
 
   bool recv_vector_request(const Buffer_header * buffer,
-                           epoch_time_t& t_begin,
-                           epoch_time_t& t_end);
+                           common::epoch_time_t& t_begin,
+                           common::epoch_time_t& t_end);
 
   bool recv_pool_info_request(const Buffer_header * buffer);
   
   bool recv_table_op_request(const Buffer_header * buffer,
                              uint64_t& work_request_id,
-                             Component::ADO_op& op,
+                             component::ADO_op& op,
                              std::string& key,
                              size_t& value_len,
                              size_t& value_alignment,
                              void*& addr);
 
   bool recv_op_event_response(const Buffer_header * buffer,
-                              Component::ADO_op& op);
+                              component::ADO_op& op);
 
   bool recv_index_op_request(const Buffer_header * buffer,
                              std::string& key_expression,
@@ -224,13 +236,13 @@ public:
                               const void * value_addr = nullptr,
                               size_t value_len = 0,
                               const char * key_addr = nullptr,
-                              Component::IKVStore::key_t key_handle = nullptr);
+                              component::IKVStore::key_t key_handle = nullptr);
 
   void recv_table_op_response(status_t& status,
                               void *& out_value_addr,
                               size_t * p_out_value_len = nullptr,
                               const char ** out_key_ptr = nullptr,
-                              Component::IKVStore::key_t * out_key_handle = nullptr);
+                              component::IKVStore::key_t * out_key_handle = nullptr);
 
   void recv_find_index_response(status_t& status,
                                 offset_t& out_matched_position,
@@ -240,38 +252,48 @@ public:
                                 const offset_t matched_position,
                                 const std::string& matched_key);
 
-  void send_iterate_request(const epoch_time_t t_begin,
-                            const epoch_time_t t_end,
-                            Component::IKVStore::pool_iterator_t iterator);
+  void send_iterate_request(const common::epoch_time_t t_begin,
+                            const common::epoch_time_t t_end,
+                            component::IKVStore::pool_iterator_t iterator);
 
   void recv_iterate_response(status_t& status,
-                             Component::IKVStore::pool_iterator_t& iterator,
-                             Component::IKVStore::pool_reference_t& reference);
+                             component::IKVStore::pool_iterator_t& iterator,
+                             component::IKVStore::pool_reference_t& reference);
 
   bool recv_iterate_request(const Buffer_header * buffer,
-                            epoch_time_t& t_begin,
-                            epoch_time_t& t_end,
-                            Component::IKVStore::pool_iterator_t& iterator);
+                            common::epoch_time_t& t_begin,
+                            common::epoch_time_t& t_end,
+                            component::IKVStore::pool_iterator_t& iterator);
 
   void send_iterate_response(const status_t rc,
-                             Component::IKVStore::pool_iterator_t iterator,
-                             Component::IKVStore::pool_reference_t reference);
+                             component::IKVStore::pool_iterator_t iterator,
+                             component::IKVStore::pool_reference_t reference);
 
   void send_unlock_request(const uint64_t work_id,
-                           const Component::IKVStore::key_t key_handle);
+                           const component::IKVStore::key_t key_handle);
 
   bool recv_unlock_response(status_t& status);
 
   bool recv_unlock_request(const Buffer_header * buffer,
                            uint64_t& work_id,
-                           Component::IKVStore::key_t& key_handle);
+                           component::IKVStore::key_t& key_handle);
 
   void send_unlock_response(const status_t status);
+
+  void send_configure_request(const uint64_t options);
+
+  bool recv_configure_request(const Buffer_header * buffer,
+                              uint64_t& options);
+
+  void send_configure_response(const status_t status);
+
+  bool recv_configure_response(status_t& status);
   
   /* free the singleton buffer */
   void free_ipc_buffer(void * p)
   {
     assert(p);
+    std::lock_guard<std::mutex> g{_b_mutex};
 #ifdef DEBUG
     assert(std::find_if(_buffer.begin(), _buffer.end(),
                          [&] (auto &e) { return e.get() == p; }) == _buffer.end());
@@ -330,12 +352,13 @@ public:
 
 private:
   std::string _channel_prefix;
-  channel_wrap _channel;
-  channel_wrap _channel_callback;
+  Channel_wrap _channel;
+  Channel_wrap _channel_callback;
   /* A non-shared buffer "pool," for messages.
    * Required because the ADO interface does not otherwise ensure that a buffer
    * is available. We hope that the ADO protocol will not exhaust the pool.
    */
+  std::mutex _b_mutex; // buffer guard
   std::vector<buffer_space_shared_ptr_t> _buffer;
 };
 

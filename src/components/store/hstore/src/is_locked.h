@@ -19,10 +19,9 @@
 
 namespace impl
 {
-	class is_locked
+	struct is_locked
 		: public std::runtime_error
 	{
-	public:
 		is_locked()
 			: std::runtime_error("already locked")
 		{}

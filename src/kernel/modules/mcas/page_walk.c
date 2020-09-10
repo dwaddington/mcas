@@ -19,7 +19,7 @@
 #error This code is written for X86-64 only.
 #endif
 
-//#define DEBUG
+#define DEBUG
 
 /*
  * The dumper groups pagetable entries of the same type into one, and for
@@ -132,6 +132,9 @@ int walk_page_table(u64 vaddr, u64* paddr)
     }
 
     if (pmd_large(*pmd)) {
+#ifdef DEBUG
+      pr_info("mcas: page table walker, page is huge.");
+#endif
       *paddr = pmd_pfn(*pmd) << PAGE_SHIFT;
       return 0;
     }

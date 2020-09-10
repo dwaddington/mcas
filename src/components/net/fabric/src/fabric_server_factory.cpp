@@ -38,15 +38,15 @@ std::shared_ptr<Fabric_memory_control> Fabric_server_factory::new_server(Fabric 
     );
 }
 
-Component::IFabric_server * Fabric_server_factory::get_new_connection()
+component::IFabric_server * Fabric_server_factory::get_new_connection()
 {
   return static_cast<Fabric_server *>(Fabric_server_generic_factory::get_new_connection());
 }
 
-std::vector<Component::IFabric_server *> Fabric_server_factory::connections()
+std::vector<component::IFabric_server *> Fabric_server_factory::connections()
 {
   auto g = Fabric_server_generic_factory::connections();
-  std::vector<Component::IFabric_server *> v;
+  std::vector<component::IFabric_server *> v;
   std::transform(
     g.begin()
     , g.end()
@@ -59,7 +59,7 @@ std::vector<Component::IFabric_server *> Fabric_server_factory::connections()
   return v;
 }
 
-void Fabric_server_factory::close_connection(Component::IFabric_server * cnxn_)
+void Fabric_server_factory::close_connection(component::IFabric_server * cnxn_)
 {
   return Fabric_server_generic_factory::close_connection(static_cast<Fabric_server *>(cnxn_));
 }

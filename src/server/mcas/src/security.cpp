@@ -15,9 +15,7 @@ class Shard_security_state {
   const unsigned _debug_level = 3;
 
  public:
-  Shard_security_state(const std::string &certs_path)
-    : _cert(nullptr),
-      _cert_base64{}
+  Shard_security_state(const std::string &certs_path) : _cert(nullptr), _cert_base64{}
   {
     try {
       FILE *fp = fopen(certs_path.c_str(), "r");
@@ -75,7 +73,8 @@ class Shard_security_state {
 };
 
 Shard_security::Shard_security(const std::string &certs_path)
-    : _certs_path(certs_path), _auth_enabled(!_certs_path.empty()),
+    : _certs_path(certs_path),
+      _auth_enabled(!_certs_path.empty()),
       _state(std::make_shared<Shard_security_state>(certs_path))
 {
   if (_debug_level > 1) PMAJOR("Shard_security: auth=%s cert path (%s)", _auth_enabled ? "y" : "n", certs_path.c_str());

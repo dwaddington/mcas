@@ -34,10 +34,11 @@
 #ifndef __COMMON_CHECKSUM_H__
 #define __COMMON_CHECKSUM_H__
 
+#include <common/common.h>
 #include <common/types.h>
 #include <zlib.h>
 
-namespace Common
+namespace common
 {
 /**
  * Simple 32bit checksum
@@ -47,11 +48,21 @@ namespace Common
  *
  * @return 32-bit checksum
  */
-inline uint32_t chksum32(void *buffer, size_t len) {
+inline uint32_t chksum32(const void *buffer, const size_t len) {
   auto chksum = crc32(0, nullptr, 0);
   chksum = crc32(chksum, static_cast<const unsigned char *>(buffer), uInt(len));
   return uint32_t(chksum);
 }
-}  // namespace Common
+
+inline auto chksum32(unsigned long chksum,
+		     const void *buffer,
+		     const size_t len) {
+  chksum = crc32(chksum, static_cast<const unsigned char *>(buffer), uInt(len));
+  return chksum;
+}
+
+inline auto chksum32_nil() {  return crc32(0, nullptr, 0); }
+
+}  // namespace common
 
 #endif

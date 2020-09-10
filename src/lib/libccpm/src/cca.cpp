@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -19,11 +19,15 @@
 #include <cassert>
 #include <ostream>
 
-#define FINE_TRACE 0
-#if FINE_TRACE
 #include <iostream>
-static unsigned i = 0;
-#endif
+namespace
+{
+	static unsigned accession = 0;
+	static const char *c_trace_level = std::getenv("CCA_FINE_TRACE");
+	unsigned trace_level = c_trace_level ? unsigned(std::stoull(c_trace_level)) : 0U;
+	bool trace_coarse() { return 0 < trace_level; }
+	bool trace_fine() { return 1 < trace_level; }
+}
 
 ccpm::cca::cca()
 	: _top()
@@ -34,13 +38,17 @@ ccpm::cca::cca()
 ccpm::cca::cca(const region_vector_t &regions, ownership_callback_t resolver)
 	: cca()
 {
-	reconstitute(regions, resolver, false);
+	init(regions, resolver, false);
 }
 
 ccpm::cca::cca(const region_vector_t &regions)
 	: cca()
 {
-	reconstitute(regions, nullptr, true);
+	init(regions, nullptr, true);
+}
+
+ccpm::cca::~cca()
+{
 }
 
 bool ccpm::cca::reconstitute(
@@ -49,27 +57,37 @@ bool ccpm::cca::reconstitute(
 	, const bool force_init_
 )
 {
-	PLOG(PREFIX "reconsitiute (%s)", LOCATION, force_init_ ? "init" : "recover");
 	if ( ! _top.empty() ) { return false; }
+	init(regions_, resolver_, force_init_);
+	return ! _top.empty() && force_init_;
+}
+
+void ccpm::cca::init(
+	const region_vector_t &regions_
+	, ownership_callback_t resolver_
+	, const bool force_init_
+)
+{
+	PLOG(PREFIX "(%s)", LOCATION, force_init_ ? "clear" : "recover");
 	for ( const auto & r : regions_ )
 	{
 		_top.push_back(
 			force_init_
-			? area_top::create(r)
-			: area_top::restore(r, resolver_)
+			? std::make_unique<area_top>(r, trace_level, std::cerr)
+			: std::make_unique<area_top>(r, resolver_, trace_level, std::cerr)
 		);
 	}
-#if FINE_TRACE
-	this->print(std::cerr);
-#endif
-	return ! _top.empty() && force_init_;
+	if ( trace_fine() )
+	{
+		this->print(std::cerr);
+	}
 }
 
 void ccpm::cca::add_regions(const region_vector_t &regions_)
 {
 	for ( const auto & r : regions_ )
 	{
-		area_top::create(r);
+		_top.push_back(std::make_unique<area_top>(r, trace_level, std::cerr));
 	}
 }
 
@@ -93,26 +111,31 @@ auto ccpm::cca::allocate(
 {
 	assert(ptr_ == nullptr);
 	/* Try all regions, round robin.
-	 * When ranges are available, theis can be done by a concactenation
+	 * When ranges are available, this can be done by a concatenation
 	 * of the ranges [i .. end) and [begin .. i)
 	 * Until then, use two loops.
 	 */
 
 	auto split = _top.begin() + _last_top_allocate;
-#if FINE_TRACE
-	PLOG(PREFIX "AL %u", LOCATION, i++);
-	this->print(std::cerr);
-#endif
+	if (  trace_coarse() )
+	{
+		PLOG(PREFIX "AL %u %zx", LOCATION, accession++, bytes_);
+	}
+	if ( trace_fine() )
+	{
+		this->print(std::cerr);
+	}
 	for ( auto it = split; it != _top.end(); ++it )
 	{
 		(*it)->allocate(ptr_, bytes_, alignment_);
 		if ( ptr_ != nullptr )
 		{
 			_last_top_allocate = it - _top.begin();
-#if FINE_TRACE
-			PLOG(PREFIX "allocate %p.%zx", LOCATION, ptr_, bytes_);
-			this->print(std::cerr);
-#endif
+			if ( trace_fine() )
+			{
+				PLOG(PREFIX "allocate %p.%zx", LOCATION, ptr_, bytes_);
+				this->print(std::cerr);
+			}
 			return S_OK;
 		}
 	}
@@ -123,12 +146,18 @@ auto ccpm::cca::allocate(
 		if ( ptr_ != nullptr )
 		{
 			_last_top_allocate = it - _top.begin();
-#if FINE_TRACE
-			PLOG(PREFIX "allocate %p.%zx", LOCATION, ptr_, bytes_);
-			this->print(std::cerr);
-#endif
+			if ( trace_fine() )
+			{
+				PLOG(PREFIX "allocate %p.%zx", LOCATION, ptr_, bytes_);
+				this->print(std::cerr);
+			}
 			return S_OK;
 		}
+	}
+
+	if ( trace_coarse() )
+	{
+		this->print(std::cerr, "Failed allocate " + std::to_string(bytes_) + " aligned " + std::to_string(alignment_));
 	}
 
 	return E_FAIL;
@@ -139,10 +168,11 @@ auto ccpm::cca::free(
 	, std::size_t bytes_
 ) -> status_t
 {
-#if FINE_TRACE
-	PLOG(PREFIX "cca DE %u %p", LOCATION, i++, ptr_);
-	this->print(std::cerr);
-#endif
+	if ( trace_coarse() )
+	{
+		PLOG(PREFIX "cca DE %u %p", LOCATION, accession++, ptr_);
+		this->print(std::cerr);
+	}
 
 	/* Change when ranges appear (see note for allocate) */
 	auto split = _top.begin() + _last_top_free;
@@ -188,7 +218,7 @@ void ccpm::cca::print(std::ostream &o_, const std::string &title_) const
 	o_ << title_ << ": " << "\n";
 	for ( const auto & t : _top )
 	{
-		t->print(o_, 1);
+		t->print(o_, std::ios_base::hex);
 	}
 	o_ << title_ << " end" << "\n";
 }

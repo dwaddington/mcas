@@ -33,17 +33,20 @@
 #include <common/stack.h>
 #include <common/types.h>
 #include <common/utils.h>
+#include <iostream>
 #include <vector>
 #include <cstdlib> // exit
 
-namespace Core
+//#define DEBUG_AVL_ALLOCATOR
+
+namespace core
 {
 /**
  * Defines an allocated (free or not free) region of memory. This is
  * basically the node of the AVL tree.
  *
  */
-class Memory_region : public Core::AVL_node<Memory_region> {
+class Memory_region : public core::AVL_node<Memory_region> {
   friend class AVL_range_allocator;
 
  private:
@@ -63,7 +66,10 @@ class Memory_region : public Core::AVL_node<Memory_region> {
    * @param size Size of memory region in bytes
    *
    */
-  Memory_region(addr_t addr, size_t size) : _addr(addr), _size(size), _padding{} {}
+  Memory_region(addr_t addr, size_t size) : _addr(addr), _size(size), _padding{}
+  {
+    (void)_padding; // unused
+  }
 
   Memory_region(const Memory_region &) = delete;
   Memory_region &operator=(const Memory_region &) = delete;
@@ -77,12 +83,12 @@ class Memory_region : public Core::AVL_node<Memory_region> {
   virtual ~Memory_region() {}
 
 
-  /** 
+  /**
    * Check that region contains address
-   * 
-   * @param addr 
-   * 
-   * @return 
+   *
+   * @param addr
+   *
+   * @return
    */
   bool contains(addr_t addr) const
   {
@@ -156,7 +162,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
    * @return
    */
   Memory_region* left() {
-    return static_cast<Memory_region*>(subtree[Core::LEFT]);
+    return static_cast<Memory_region*>(subtree[core::LEFT]);
   }
 
   /**
@@ -166,7 +172,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
    * @return
    */
   Memory_region* right() {
-    return static_cast<Memory_region*>(subtree[Core::RIGHT]);
+    return static_cast<Memory_region*>(subtree[core::RIGHT]);
   }
 
  protected:
@@ -255,7 +261,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
       return result;
 
 #else
-    Common::Fixed_stack<Memory_region*> stack;  // good for debugging
+    common::Fixed_stack<Memory_region*> stack;  // good for debugging
     stack.push(node);
 
     while (!stack.empty()) {
@@ -309,7 +315,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
       }
     }
 #else
-    Common::Fixed_stack<Memory_region*> stack;  // good for debugging
+    common::Fixed_stack<Memory_region*> stack;  // good for debugging
     stack.push(node);
 
     while (!stack.empty()) {
@@ -333,6 +339,7 @@ class Memory_region : public Core::AVL_node<Memory_region> {
 
 } __attribute__((packed));
 
+
 /**
  * Simple AVL-based heap memory manager.  Template provides slab
  * allocator for node elements.
@@ -342,7 +349,7 @@ class AVL_range_allocator {
  private:
   static constexpr bool option_DEBUG = false;
 
-  Core::Slab::CRuntime<Memory_region> __default_allocator;
+  core::Slab::CRuntime<Memory_region> __default_allocator;
 
   AVL_tree<Memory_region>* _tree;
 
@@ -369,7 +376,7 @@ class AVL_range_allocator {
    * @param size Size of memory slab in bytes
    *
    */
-  AVL_range_allocator(Common::Base_slab_allocator& slab,
+  AVL_range_allocator(common::Base_slab_allocator& slab,
                       addr_t start,
                       size_t size)
       : __default_allocator{}
@@ -377,14 +384,18 @@ class AVL_range_allocator {
       , _slab(slab) {
     assert(size > 0);
 
+#ifdef DEBUG_AVL_ALLOCATOR
+    PNOTICE("AVL: slab %lu MB", REDUCE_MB(size));
+#endif
+
     /* establish root */
-    Core::AVL_node<Core::Memory_region>** root = nullptr;
+    core::AVL_node<core::Memory_region>** root = nullptr;
     bool newroot = true;
 
     if (slab.is_reconstructed()) {
       newroot = false;
       /* the first entry will be the root (at least it should be!) */
-      root = reinterpret_cast<Core::AVL_node<Core::Memory_region>**>(
+      root = reinterpret_cast<core::AVL_node<core::Memory_region>**>(
           (reinterpret_cast<addr_t>(slab.get_first_element())));
 
       if (option_DEBUG) PLOG("reconstructed root pointer: %p", static_cast<const void *>(root));
@@ -392,7 +403,7 @@ class AVL_range_allocator {
     else {
       /* create root pointer on slab */
       root =
-          reinterpret_cast<Core::AVL_node<Core::Memory_region>**>(slab.alloc());
+          reinterpret_cast<core::AVL_node<core::Memory_region>**>(slab.alloc());
 
       if (option_DEBUG) PLOG("new root pointer: %p", static_cast<void*>(root));
 
@@ -439,6 +450,10 @@ class AVL_range_allocator {
     /* delete node memory */
     _tree->apply_topdown([=](void* p, size_t) {
       Memory_region* mr = static_cast<Memory_region*>(p);
+      if ( option_DEBUG )
+      {
+        PLOG("%s: region %p, 0x%zx, %s", __func__, mr->paddr(), mr->size(), mr->is_free() ? "free" : "used");
+      }
       _slab.free(mr);
     });
     _slab.free(_tree->root());
@@ -453,7 +468,12 @@ class AVL_range_allocator {
    *
    * @return Pointer to
    */
-  Memory_region* alloc(size_t size, size_t alignment = 0) {
+  Memory_region* alloc(size_t size, size_t alignment = 0)
+  try {
+
+#ifdef DEBUG_AVL_ALLOCATOR
+    PNOTICE("AVL: request  %lu MB", REDUCE_MB(size));
+#endif
 
     /* look for fitting region that is aligned */
     Memory_region* root = static_cast<Memory_region*>(*(_tree->root()));
@@ -467,6 +487,11 @@ class AVL_range_allocator {
       assert(root->find_free_region(root, size, alignment) == nullptr);
       assert(alignment > 0);
 
+      /* Two problems:
+       * 1) 1 MiB regions require 1 MiB alignment. Why?
+       * 2) size + alignment is sufficient, but not necessary, condition for obtaining an aligned region.
+       *    Should try for smaller sizes which *might* also provide sufficiently aligned regions.
+       */
       Memory_region* region = root->find_free_region(root, size + alignment, 8);
       if (region == nullptr)
         throw General_exception("AVL_range_allocator: failed to allocate (size=%ld alignment=%lu free=%lu)",
@@ -554,6 +579,10 @@ class AVL_range_allocator {
         if (!p)
           throw General_exception("AVL_range_allocator: failed to allocate %ld units", size);
 
+        /* Problem: we create the leftover region from the right part of the original region
+         * But if the right part of the original region satisfies alignement criteria, we should create
+         * create the leftover region from whichever end gives the best alignment to the leftover region.
+         */
         Memory_region* left_over =
             new (p) Memory_region(aligned_region->_addr + size, aligned_region->_size - size);
 
@@ -569,7 +598,21 @@ class AVL_range_allocator {
       }
     }
 
+#ifdef DEBUG_AVL_ALLOCATOR
+    PNOTICE("AVL: remaining free: %lu MB", REDUCE_MB(get_free()));
+#endif
     return aligned_region;
+  }
+  catch ( const Exception &e )
+  {
+    if ( option_DEBUG )
+    {
+      PINF("%s: size 0x%zx, alignement 0x%zx, %s", __func__, size, alignment, e.cause());
+      std::string s;
+      dump_info(&s);
+      std::cout << s << "\n";
+    }
+    throw;
   }
 
   /**
@@ -625,7 +668,7 @@ class AVL_range_allocator {
     if(region->_size < size)
       throw Logic_exception("alloc_at failed because region (%lx,%lu) "
                             "is insufficient for requested size (%lu)",
-                            region->_addr, region->_size, size);
+                            std::size_t(region->_addr), std::size_t(region->_size), size);
 
     Memory_region* middle = nullptr;
 
@@ -695,6 +738,10 @@ class AVL_range_allocator {
    * @param size Size of region in bytes
    */
   void add_new_region(addr_t addr, size_t size) {
+
+#ifdef DEBUG_AVL_ALLOCATOR
+    PNOTICE("AVL: add to slab %lu MB", REDUCE_MB(size));
+#endif
     assert(addr > 0);
     assert(size > 0);
     void* p = _slab.alloc();
@@ -721,7 +768,7 @@ class AVL_range_allocator {
     Memory_region* region = find(addr);
     if (region == nullptr) {
       PERR("invalid call to %s: bad address", __func__);
-      return -1;
+      return size_t(-1);
     }
 
     size_t return_count = region->_size;
@@ -817,7 +864,7 @@ class AVL_range_allocator {
  private:
   /* NOTE: specifically no members that will be on the stack */
 
-  Common::Base_slab_allocator&_slab; /**< volatile slab allocator for metadata */
+  common::Base_slab_allocator&_slab; /**< volatile slab allocator for metadata */
   //  addr_t _base;
 };
 
@@ -828,7 +875,7 @@ class AVL_range_allocator {
  * allocated for SPDK IO buffers etc.
  *
  */
-class Arena_allocator : public Common::Base_memory_allocator {
+class Arena_allocator : public common::Base_memory_allocator {
  public:
   /**
    * Constructor
@@ -838,7 +885,7 @@ class Arena_allocator : public Common::Base_memory_allocator {
    * @param region_size Size of memory region
    *
    */
-  Arena_allocator(Common::Base_slab_allocator& metadata_slab, const void* region,
+  Arena_allocator(common::Base_slab_allocator& metadata_slab, const void* region,
                   size_t region_size)
       : _range_allocator(metadata_slab, reinterpret_cast<addr_t>(region), region_size) {
     if (!region)
@@ -868,7 +915,7 @@ class Arena_allocator : public Common::Base_memory_allocator {
       Memory_region* mr = _range_allocator.alloc(size);
       assert(mr);
       return reinterpret_cast<void*>(mr->addr());
-    } catch (General_exception &e) {
+    } catch (const General_exception &e) {
       PERR("Arena_allocator: out of memory %s", e.cause());
       std::exit(0);
     }
@@ -894,9 +941,9 @@ class Arena_allocator : public Common::Base_memory_allocator {
    */
   size_t get_size(void* ptr) {
     assert(ptr);
-    const Core::Memory_region* region = _range_allocator.find(reinterpret_cast<addr_t>(ptr));
+    const core::Memory_region* region = _range_allocator.find(reinterpret_cast<addr_t>(ptr));
     if (region == nullptr)
-      return -1;
+      return std::size_t(-1);
     else
       return region->size();
   }
@@ -977,7 +1024,7 @@ class Arena_allocator : public Common::Base_memory_allocator {
   }
 
  private:
-  Core::AVL_range_allocator _range_allocator;
+  core::AVL_range_allocator _range_allocator;
 };
 
 /**
@@ -1041,8 +1088,8 @@ class Region_allocator {
    *
    * @return Pointer to memory region node
    */
-  const Core::Memory_region* contains(addr_t region) {
-    return static_cast<const Core::Memory_region*>(_range_allocator.find(region));
+  const core::Memory_region* contains(addr_t region) {
+    return static_cast<const core::Memory_region*>(_range_allocator.find(region));
   }
 
   /**
@@ -1059,19 +1106,19 @@ class Region_allocator {
   void dump_info() { _range_allocator.dump_info(); }
 
  private:
-  Core::Slab::CRuntime<Core::Memory_region> _slab;
-  Core::AVL_range_allocator _range_allocator;
+  core::Slab::CRuntime<core::Memory_region> _slab;
+  core::AVL_range_allocator _range_allocator;
 };
 }  // namespace Core
 
 template <>
-	struct mr_traits<Core::AVL_range_allocator>
+	struct mr_traits<core::AVL_range_allocator>
 	{
-		static auto allocate(Core::AVL_range_allocator *pmr, unsigned, std::size_t bytes, std::size_t alignment)
+		static auto allocate(core::AVL_range_allocator *pmr, unsigned, std::size_t bytes, std::size_t alignment)
 		{
 			return pmr->alloc(bytes, alignment)->addr();
 		}
-		static auto deallocate(Core::AVL_range_allocator *pmr, unsigned, void *p, std::size_t, std::size_t)
+		static auto deallocate(core::AVL_range_allocator *pmr, unsigned, void *p, std::size_t, std::size_t)
 		{
 			return pmr->free(reinterpret_cast<addr_t>(p));
 		}

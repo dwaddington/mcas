@@ -28,13 +28,15 @@
 
 /*
   Authors:
-  Copyright (C) 2014, Daniel G. Waddington <daniel.waddington@acm.org>
+  Copyright (C) 2014, 2020 Daniel G. Waddington <daniel.waddington@acm.org>
 */
 
 #include "common/dump_utils.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <execinfo.h>
+#include <unistd.h>
 
 void hexdump(const void *data, const size_t len) {
   printf("HEXDUMP-(%p)---------------------------------------------", data);
@@ -61,4 +63,15 @@ void asciidump(const void *data, const size_t len) {
     printf("%c%c ", 0xf & (d[i] >> 4), 0xf & d[i]);
   }
   printf("\n");
+}
+
+void dump_backtrace()
+{
+  void *array[32];
+  
+  // get void*'s for all entries on the stack
+  auto size = backtrace(array, 32);
+
+  // print out all the frames to stderr
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
 }

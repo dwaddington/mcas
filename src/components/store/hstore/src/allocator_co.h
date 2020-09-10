@@ -24,13 +24,12 @@
 #include <new> /* bad_alloc */
 
 template <typename T, typename Persister>
-	class allocator_co;
+	struct allocator_co;
 
 template <>
-	class allocator_co<void, persister>
+	struct allocator_co<void, persister>
 		: public deallocator_co<void, persister>
 	{
-	public:
 		using deallocator_type = deallocator_co<void, persister>;
 		using typename deallocator_type::pointer;
 		using typename deallocator_type::const_pointer;
@@ -38,10 +37,9 @@ template <>
 	};
 
 template <typename Persister>
-	class allocator_co<void, Persister>
+	struct allocator_co<void, Persister>
 		: public deallocator_co<void, Persister>
 	{
-	public:
 		using deallocator_type = deallocator_co<void, Persister>;
 		using typename deallocator_type::pointer;
 		using typename deallocator_type::const_pointer;
@@ -49,9 +47,10 @@ template <typename Persister>
 	};
 
 template <typename T, typename Persister = persister>
-	class allocator_co
+	struct allocator_co
 		: public deallocator_co<T, Persister>
 	{
+	private:
 		heap_co *_heap;
 	public:
 		using deallocator_type = deallocator_co<T, Persister>;

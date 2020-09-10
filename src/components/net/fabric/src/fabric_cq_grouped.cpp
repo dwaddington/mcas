@@ -65,7 +65,7 @@ void Fabric_cq_grouped::queue_completion(::status_t status_, const Fabric_cq::fi
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_old &cb_, ::status_t status_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_old &cb_, ::status_t status_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
@@ -84,7 +84,7 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_definite &cb_, ::status_t status_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_definite &cb_, ::status_t status_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
@@ -103,11 +103,11 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_tentative &cb_, ::status_t status_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_tentative &cb_, ::status_t status_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
-  if ( g_context->cq() == this && cb_(g_context->context(), status_, cq_entry_.flags, cq_entry_.len, nullptr) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+  if ( g_context->cq() == this && cb_(g_context->context(), status_, cq_entry_.flags, cq_entry_.len, nullptr) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
   {
     ++ct_total;
   }
@@ -121,7 +121,7 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_param_definite &cb_, ::status_t status_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_param_definite &cb_, ::status_t status_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
@@ -140,11 +140,11 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_param_tentative &cb_, ::status_t status_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_param_tentative &cb_, ::status_t status_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
-  if ( g_context->cq() == this && cb_(g_context->context(), status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+  if ( g_context->cq() == this && cb_(g_context->context(), status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
   {
     ++ct_total;
   }
@@ -158,7 +158,7 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, ::status_t status_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, ::status_t status_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
@@ -177,11 +177,11 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, ::status_t status_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, ::status_t status_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry_.op_context));
-  if ( g_context->cq() == this && cb_(g_context->context(), status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+  if ( g_context->cq() == this && cb_(g_context->context(), status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
   {
     ++ct_total;
   }
@@ -195,7 +195,7 @@ std::size_t Fabric_cq_grouped::process_or_queue_completion(const Fabric_cq::fi_c
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_old &cb_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -203,7 +203,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
   return process_or_queue_completion(err_entry, cb_, E_FAIL);
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_definite &cb_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -211,7 +211,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
   return process_or_queue_completion(err_entry, cb_, E_FAIL);
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -219,7 +219,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
   return process_or_queue_completion(err_entry, cb_, E_FAIL);
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -227,7 +227,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
   return process_or_queue_completion(err_entry, cb_, E_FAIL, cb_param_);
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -235,7 +235,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
   return process_or_queue_completion(err_entry, cb_, E_FAIL, cb_param_);
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -243,7 +243,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
   return process_or_queue_completion(err_entry, cb_, E_FAIL, cb_param_);
 }
 
-std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::process_cq_comp_err(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   /* ERROR: the error context is not necessarily the expected context, and therefore may not be an async_req_record */
   const ::fi_cq_err_entry e{_cq.get_cq_comp_err()};
@@ -259,7 +259,7 @@ std::size_t Fabric_cq_grouped::process_cq_comp_err(const Component::IFabric_op_c
    * @return Number of completions processed
    */
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -277,7 +277,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -295,7 +295,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -307,7 +307,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
     k.unlock();
     auto &cq_entry{std::get<0>(c)};
     std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry.op_context));
-    if ( cb_(g_context->context(), std::get<1>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+    if ( cb_(g_context->context(), std::get<1>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
     {
       ++ct_total;
     }
@@ -323,7 +323,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -341,7 +341,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -353,7 +353,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
     k.unlock();
     auto &cq_entry{std::get<0>(c)};
     std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry.op_context));
-    if ( cb_(g_context->context(), std::get<1>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+    if ( cb_(g_context->context(), std::get<1>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
     {
       ++ct_total;
     }
@@ -369,7 +369,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -387,7 +387,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq_grouped::drain_old_completions(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t ct_total = 0U;
   std::unique_lock<std::mutex> k{_m_completions};
@@ -399,7 +399,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
     k.unlock();
     auto &cq_entry{std::get<0>(c)};
     std::unique_ptr<async_req_record> g_context(static_cast<async_req_record *>(cq_entry.op_context));
-    if ( cb_(g_context->context(), std::get<1>(c), cq_entry.flags, cq_entry.len, nullptr) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+    if ( cb_(g_context->context(), std::get<1>(c), cq_entry.flags, cq_entry.len, nullptr) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
     {
       ++ct_total;
     }
@@ -415,7 +415,7 @@ std::size_t Fabric_cq_grouped::drain_old_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq_grouped::poll_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   auto ct_total = drain_old_completions(cb_);
 
@@ -453,7 +453,7 @@ std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq_grouped::poll_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   auto ct_total = drain_old_completions(cb_);
 
@@ -491,7 +491,7 @@ std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t ct_total = 0U;
   bool drained = false;
@@ -530,7 +530,7 @@ std::size_t Fabric_cq_grouped::poll_completions_tentative(const Component::IFabr
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   auto ct_total = drain_old_completions(cb_, cb_param_);
 
@@ -568,7 +568,7 @@ std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   bool drained = false;
@@ -607,7 +607,7 @@ std::size_t Fabric_cq_grouped::poll_completions_tentative(const Component::IFabr
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   auto ct_total = drain_old_completions(cb_, cb_param_);
 
@@ -645,7 +645,7 @@ std::size_t Fabric_cq_grouped::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_cq_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   bool drained = false;

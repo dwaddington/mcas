@@ -35,6 +35,7 @@
 #ifndef __COMMON_ATOMIC_H__
 #define __COMMON_ATOMIC_H__
 
+#include <common/common.h>
 #include <common/types.h>
 #include <common/utils.h>
 
@@ -73,7 +74,7 @@ inline bool __sync_bool_compare_and_swap(volatile int *dest, int cmp_val,
 #endif
 #endif
 
-namespace Common
+namespace common
 {
 #if defined(USE_GCC_CAS_INTRINSIC) && defined(__cplusplus)
 
@@ -191,6 +192,6 @@ class Atomic {
 #else
 #error Atomic requires sync intrinsics
 #endif
-}  // namespace Common
+}  // namespace common
 
 #endif

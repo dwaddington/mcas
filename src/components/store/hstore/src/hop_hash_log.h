@@ -19,8 +19,8 @@
 #include <string>
 #include <sstream>
 
-#define LOG_LOCATION_STATIC __func__, ":", __LINE__, " "
-#define LOG_LOCATION LOG_LOCATION_STATIC, static_cast<const void *>(this), " "
+#define LOG_LOCATION_STATIC __FILE__, ":", __LINE__, " ", __func__, "() "
+#define LOG_LOCATION LOG_LOCATION_STATIC, "this(", static_cast<const void *>(this), ") "
 
 namespace hop_hash_log_impl
 {
@@ -28,11 +28,12 @@ namespace hop_hash_log_impl
 }
 
 template <bool>
-	class hop_hash_log;
+	struct hop_hash_log;
 
 template <>
-	class hop_hash_log<true>
+	struct hop_hash_log<true>
 	{
+	private:
 		static void wr(std::ostream &)
 		{
 		}
@@ -55,9 +56,8 @@ template <>
 	};
 
 template <>
-	class hop_hash_log<false>
+	struct hop_hash_log<false>
 	{
-	public:
 		template<typename... Args>
 			static void write(const Args & ...)
 			{

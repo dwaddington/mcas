@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,23 +14,35 @@
 #include "area_top.h"
 
 #include "area_ctl.h"
-#include "div.h"
+#include <common/utils.h>
 #include <cassert>
+#include <iostream>
 #include <stdexcept>
 #include <ostream>
 #include <sys/uio.h> /* iovec */
 
 /* scan the chains of free pointers, starting with the least acceptable length
  * (min_run_length_) and ending at the greatest possible length (alloc_states_per_word)
- * to find the first non-empty list. This would be quicker If the enn-empty tiers
+ * to find the first non-empty list. This would be quicker If the non-empty tiers
  * were chained, or a bitmask of non-empty tiers were kept.
  */
 auto ccpm::level_hints::find_free_ctl_ix(
-	unsigned min_run_length_
+	const unsigned min_run_length_
 ) const -> free_ctls_t::size_type
 {
 	auto ix = tier_ix_from_run_length(min_run_length_);
 	for ( ; ix != alloc_states_per_word && _free_ctls[ix].empty() ; ++ix )
+	{
+	}
+	return ix;
+}
+
+auto ccpm::level_hints::find_mac_ctl_ix(
+	const unsigned mac_run_length_
+) const -> free_ctls_t::size_type
+{
+	auto ix = tier_ix_from_run_length(mac_run_length_);
+	for ( ; ix-1 != 0 && _free_ctls[ix-1].empty(); --ix )
 	{
 	}
 	return ix;
@@ -46,7 +58,7 @@ auto ccpm::level_hints::tier_ix_from_run_length(
 
 auto ccpm::area_top::is_in_chain(
 	const area_ctl *a
-	, unsigned level_ix
+	, level_ix_t level_ix
 	, unsigned run_length
 ) const -> bool
 {
@@ -60,57 +72,66 @@ bool ccpm::area_top::includes(const void *addr) const
 	return _ctl && _ctl->includes(addr);
 }
 
-ccpm::area_top::area_top(area_ctl *ctl_)
-	: _ctl(ctl_)
+ccpm::area_top::area_top(
+	area_ctl *top_ctl_
+	, const unsigned trace_level_
+	, std::ostream &o_
+)
+	: _ctl(top_ctl_)
 	/* bytes_free does a full search of the existing tree.
 	 * Consider doing a full chain restoration at the same time.
 	 */
 	, _bytes_free(_ctl->bytes_free())
 	, _all_restored(false)
-	, _level(ctl_->height())
+	, _trace_level(trace_level_)
+	, _o(&o_)
+	, _level(_ctl->level()+1)
+	, _ct_allocation(0)
 {
 	/* TODO: add _ctl to appropriate free_ctl chain */
 }
 
-auto ccpm::area_top::create(const ::iovec &iov_) -> area_top *
+ccpm::area_top::~area_top()
 {
-#if 0
-	auto h = area_ctl::height(iov_.iov_len);
-	std::size_t subdivision_size = area_ctl::min_alloc_size;
-	/* subdivision size at height 1 is area_ctl::min_alloc_size. Increases by
-	 * allloc_states_per_word for each additional level
-	 */
-	for ( auto i = h; i != 1; --i )
+	if ( bool(std::getenv("CCA_SUBDIVISION_REPORT")) )
 	{
-		subdivision_size *= alloc_states_per_word;
+		try {
+		std::cout << "Allocations " << _ct_allocation << "\n";
+		std::size_t sz = 8;
+		for ( const auto &lv : _level )
+		{
+			try
+			{
+			std::cout << "probes at size " << sz
+				<< " probe success " << lv._ct_alloc_probe_success
+				<< " probe failures " << lv._ct_alloc_probe_failure
+				<< " subdivisions " << lv._ct_subdivision
+				<< "\n";
+			}
+			catch ( const std::exception & )
+			{}
+			sz *= alloc_states_per_word;
+		}
+		}
+		catch ( const std::exception & )
+		{}
 	}
-	auto c =
-		area_ctl::commission(
-			iov_.iov_base
-			, subdivision_size
-			, area_ctl::index_t(iov_.iov_len / subdivision_size)
-		);
-#else
-	auto c = area_ctl::commission(iov_.iov_base, iov_.iov_len);
-#endif
-	auto t = new area_top(c);
-	return t;
 }
 
-auto ccpm::area_top::restore(
+/* Initial area_ctl */
+ccpm::area_top::area_top(const ::iovec &iov_, const unsigned trace_level_, std::ostream &o_)
+	: area_top(area_ctl::commission(iov_.iov_base, iov_.iov_len), trace_level_, o_)
+{}
+
+/* Restored area_ctl */
+ccpm::area_top::area_top(
 	const ::iovec &iov_
 	, const ownership_callback_t &resolver_
-) -> area_top *
+	, const unsigned trace_level_
+	, std::ostream &o_
+)
+	: area_top(&area_ctl::root(iov_.iov_base)->restore(resolver_), trace_level_, o_)
 {
-	/* The base if the region contains an array of area_ctls.
-	 * The first area_ctl is probably not the root of the area_ctl tree,
-	 * but it contains the height of the tree, and the last area_ctl
-	 * in the array (at position height-1) *is* the root area_ctl.
-	 */
-	auto ctl0 = static_cast<area_ctl *>(iov_.iov_base);
-	auto ctl = &ctl0[ctl0->full_height()-1];
-	ctl->restore(resolver_);
-	return new area_top(ctl);
 }
 
 auto ccpm::area_top::bytes_free() const -> std::size_t
@@ -120,7 +141,7 @@ auto ccpm::area_top::bytes_free() const -> std::size_t
 
 void ccpm::area_top::restore_to_chain(
 	area_ctl *a_
-	, unsigned level_ix_
+	, level_ix_t level_ix_
 	, unsigned longest_run_
 )
 {
@@ -206,19 +227,19 @@ void ccpm::area_top::allocate_strategy_1(
 	void * & ptr_
 	, const size_t bytes_
 	, const size_t alignment_
-	, const unsigned level_ix_
+	, const level_hints_vec::iterator level_
 	, const unsigned run_length_
 )
 {
-	auto &level = _level[level_ix_];
 	/* One each level there are separate ctl chains for the longest free run
 	 * at each level (from 1 to substates_per_word). The index of each chain
 	 * is one less then the longest free run.
 	 */
-	assert(run_length_ < level.size());
-	auto tier_ptr = level.find_free_ctl(run_length_);
-	if ( tier_ptr != level.tier_end() )
+	assert(run_length_ < level_->size());
+	auto tier_ptr = level_->find_free_ctl(run_length_);
+	if ( tier_ptr != level_->tier_end() )
 	{
+		++level_->_ct_alloc_probe_success;
 		auto &free_ctl = *tier_ptr;
 
 		/* A viable allocation exists at free_ctl. Use it. */
@@ -230,7 +251,29 @@ void ccpm::area_top::allocate_strategy_1(
 		viable->remove();
 		if ( longest_run != 0 )
 		{
-			level.tier_from_run_length(longest_run)->insert_after(viable);
+			level_->tier_from_run_length(longest_run)->insert_after(viable);
+		}
+	}
+	else
+	{
+		++level_->_ct_alloc_probe_failure;
+		if ( trace_coarse() )
+		{
+			/* No viable allocation was found. If tracing, report the max
+			 * which was available.
+			 */
+			auto level_ix = level_ix_t(level_ - _level.begin());
+			auto ix = level_->find_mac_ctl_ix(run_length_);
+
+			if ( ix == 0 )
+			{
+				PLOG("cache level %d, needed run length %u, no runs available", level_ix, run_length_);
+			}
+			else
+			{
+				PLOG("cache level %d, needed run length %u, max available was %zu", level_ix, run_length_, ix-1);
+			}
+			print_ctls(std::cerr, std::ios_base::hex);
 		}
 	}
 }
@@ -246,7 +289,7 @@ bool ccpm::area_top::allocate_recovery_1()
 		? 0U
 		: _ctl->restore_all(
 				this
-				, unsigned(_level.size()-1)
+				, level_ix_t(_level.size()-1)
 			)
 		;
 	_all_restored = true;
@@ -254,45 +297,45 @@ bool ccpm::area_top::allocate_recovery_1()
 }
 
 /* Recovery 2: allocate from a child in a new subdivision.
- * We would prefer to allocate only at (level_ix+1). But if no free space is
+ * We would prefer to allocate only at the immediate parent of level_ix (level_ix+1).
+ * But if no free space is
  * known at that level, we have to move higher, and allocate twice, or more.
  * Go up from (level_ix+1) until we find a run of ct_atomic_words free elements.
  * Allocate that run as a subdivision, and iteratively allocate new subdivision
  * until we have allocated a subdivision for the target level.
  */
 bool ccpm::area_top::allocate_recovery_2(
-	const unsigned level_ix
+	const level_hints_vec::iterator level_
 )
 {
-	auto parent_level_ix = level_ix + 1;
+	auto parent_level = level_ + 1;
 	list_item *subdivide_tier_ptr = nullptr;
 	for (
 		;
 			(
-				parent_level_ix != _level.size()
+				parent_level != _level.end()
 				&&
 				(
 					subdivide_tier_ptr =
-						_level[parent_level_ix]
-							.find_free_ctl(area_ctl::ct_atomic_words)
+						parent_level->find_free_ctl(area_ctl::ct_atomic_words)
 				)
 				==
-				_level[parent_level_ix].tier_end()
+				parent_level->tier_end()
 			)
-		; ++parent_level_ix )
+		; ++parent_level )
 	{
 	}
 
 	if (
-		parent_level_ix != _level.size()
+		parent_level != _level.end()
 		&&
-		subdivide_tier_ptr != _level[parent_level_ix].tier_end()
+		subdivide_tier_ptr != parent_level->tier_end()
 	)
 	{
-		auto subdivide_level_ix = parent_level_ix;
+		auto subdivide_level = parent_level;
 		do
 		{
-			auto &level = _level[subdivide_level_ix];
+			auto level = subdivide_level;
 			auto &free_ctl = *subdivide_tier_ptr;
 			/* A viable allocation exists at free_ctl. Use it. */
 			auto parent = static_cast<area_ctl *>(free_ctl.next());
@@ -303,23 +346,28 @@ bool ccpm::area_top::allocate_recovery_2(
 			assert(parent);
 			/* carve out a new area_ptr from viable */
 			auto child = parent->new_subdivision(1U);
+			++level->_ct_subdivision;
 			/* The parent may have a new, shorter longest run.
 			 * If so, move it to a new chain within the level object */
 			auto parent_longest_run = parent->el_max_free_run();
 			parent->remove();
 			if ( parent_longest_run != 0 )
 			{
-				level.
+				level->
 					tier_from_run_length(parent_longest_run)->
 						insert_after(parent);
 			}
 			/* Link in the new area */
-			--subdivide_level_ix;
-			auto &child_level = _level[subdivide_level_ix];
+			--subdivide_level;
+			auto child_level = subdivide_level;
 			subdivide_tier_ptr =
-				child_level.tier_from_run_length(child->el_max_free_run());
+				child_level->tier_from_run_length(child->el_max_free_run());
 			subdivide_tier_ptr->insert_after(child);
-		} while ( subdivide_level_ix != level_ix );
+			if ( trace_fine() )
+			{
+				print(*_o, std::ios_base::hex);
+			}
+		} while ( subdivide_level != level_ );
 
 		/* A child with the maximum possible number of free elements now exists
 		 * at the necessary level. Retry the allocation, which should now succeed.
@@ -334,19 +382,21 @@ bool ccpm::area_top::allocate_recovery_2(
 
 void ccpm::area_top::allocate(
 	void * & ptr_
-	, std::size_t bytes_
-	, std::size_t alignment_
+	, const std::size_t bytes_
+	, const std::size_t alignment_
 )
 {
 	if ( _ctl )
 	{
+		++_ct_allocation;
 		const auto bytes = std::max(bytes_, area_ctl::min_alloc_size);
 		/* If there is no chained area suitable for allocation we will try to add
 		 * areas to the lists of chained areas. If any areas are added, we then
 		 * restart the search here:
 		 */
-		const auto level_ix = area_ctl::size_to_level(bytes);
-		/* If level_l is a feasible level ... */
+		auto level_ix = area_ctl::size_to_level(bytes);
+RETRY:
+		/* If _level is a feasible level ... */
 		if ( level_ix < _level.size() )
 		{
 			/* TODO: consider whether it is possible to reduce the required
@@ -365,28 +415,90 @@ void ccpm::area_top::allocate(
 			const auto run_length_for_alignment =
 				run_length_for_use
 				+
-				std::max(
-					/* Slack needed because the alignment request exceeds the
-					 * natural alignment of the level */
-					unsigned(
-						alignment_ / area_ctl::level_to_element_size(level_ix)
-					)
-					/* Slack needed because the whole region is poorly */
-					, unsigned(
-						reinterpret_cast<uintptr_t>(_ctl) % (area_ctl::level_to_element_size(level_ix)) != 0
+				unsigned(
+					std::max(
+						/* Slack needed because the alignment request exceeds the
+						 * natural alignment of the level */
+						int(alignment_ / area_ctl::level_to_element_size(level_ix)) - 1,
+						/* Slack needed because the whole region is poorly aligned */
+						int(alignment_ != 0 && reinterpret_cast<uintptr_t>(_ctl) % alignment_ != 0)
 					)
 				)
 				;
+
+			if ( trace_coarse() )
+			{
+				if ( run_length_for_use < run_length_for_alignment )
+				{
+					PWRN(
+						"byte count %zu, run length increased fron %u to %u erase 'natural' slack %zu/%zu == %u 'region' slack %u"
+						, bytes
+						, run_length_for_use
+						, run_length_for_alignment
+						, alignment_
+						, area_ctl::level_to_element_size(level_ix)
+						, unsigned(alignment_ / area_ctl::level_to_element_size(level_ix))
+						, unsigned( bool(alignment_ != 0 && reinterpret_cast<uintptr_t>(_ctl) % alignment_ != 0))
+					);
+				}
+			}
+
 			/* Should have at most doubled the number of elements */
 			assert(run_length_for_alignment <= run_length_for_use * 2);
+
+			auto level_it = _level.begin() + level_ix;
+			/* Additional run length may have pushed the allocation to a higher level.
+			 * If so, move up one level and retry.
+			 */
+			if ( level_it->size() <= run_length_for_alignment )
+			{
+				if ( trace_coarse() )
+				{
+					PLOG(
+						"bytes: %zu, increment level %u because size %u <= run_length_for_alignment %u" //
+						, bytes //
+						, level_ix //
+						, level_it->size() //
+						, run_length_for_alignment //
+					);
+				}
+				++level_ix;
+				goto RETRY;
+			}
+
+			/* The elements used for headers may make it impossible for a level
+			 * to have any area_ctl, even a newly-created one with enough free elements.
+			 * This can happen if the word_count is 1.
+			 * If this is the case, move up one level and retry.
+			 */
+			if ( area_ctl::max_free_element_count(level_ix) < run_length_for_alignment )
+			{
+				if ( trace_coarse() )
+				{
+					PLOG(
+						"bytes: %zu, increment level %u because max_free_element_count %u < run_length_for_alignment %u" //
+						, bytes //
+						, level_ix //
+						, area_ctl::max_free_element_count(level_ix) //
+						, run_length_for_alignment //
+					);
+				}
+				++level_ix;
+				goto RETRY;
+			}
 
 			allocate_strategy_1(
 				ptr_
 				, bytes
 				, alignment_
-				, level_ix
+				, level_it
 				, run_length_for_alignment
 			);
+
+			if ( ptr_ == nullptr && trace_fine() )
+			{
+				PLOG("ctl %p no cached element available", static_cast<void *>(_ctl));
+			}
 
 			while ( ptr_ == nullptr
 				&&
@@ -396,7 +508,7 @@ void ccpm::area_top::allocate(
 					allocate_recovery_1()
 					||
 					/* Recovery 2: make a new subdivision */
-					allocate_recovery_2(level_ix)
+					allocate_recovery_2(level_it)
 				)
 			)
 			{
@@ -404,9 +516,20 @@ void ccpm::area_top::allocate(
 					ptr_
 					, bytes
 					, alignment_
-					, level_ix
+					, level_it
 					, run_length_for_alignment
 				);
+				if ( ptr_ == nullptr && trace_fine() )
+				{
+					PLOG("ctl %p rechain/subdivision failed to make cached element available", static_cast<void *>(_ctl));
+				}
+			}
+		}
+		else
+		{
+			if ( trace_fine() )
+			{
+				PLOG("have %zu mac levels, need level %u for %zu requested, %zu rounded bytes", _level.size()-1, level_ix, bytes_, bytes);
 			}
 		}
 	}
@@ -422,13 +545,17 @@ void ccpm::area_top::deallocate(void * & ptr_, std::size_t bytes_)
 
 }
 
-void ccpm::area_top::print(std::ostream &o_, unsigned level_) const
+void ccpm::area_top::print(
+	std::ostream &o_
+	, std::ios_base::fmtflags format_
+) const
 {
-	const auto si = std::string(level_*2, ' ');
+	auto level_ = 0;
+	const auto si = std::string(static_cast<std::size_t>(level_ * 2), ' ');
 	if ( _ctl )
 	{
 		o_ << si << "area_top:\n";
-		_ctl->print(o_, level_ + 1);
+		_ctl->print(o_, level_ix_t(level_ + 1), format_);
 		o_ << si << "area_top end\n";
 	}
 	else
@@ -437,7 +564,38 @@ void ccpm::area_top::print(std::ostream &o_, unsigned level_) const
 	}
 }
 
+void ccpm::area_top::print_ctls(std::ostream &o_, std::ios_base::fmtflags format_) const
+{
+	auto indent = 0;
+  const auto si = std::string(static_cast<std::size_t>(indent * 2), ' ');
+  
+	auto ix = 0;
+	o_ << si << "area_top levels:\n";
+	for ( const auto & lv : _level )
+	{
+		o_ << si << " level " << ix << ": ";
+		lv.print(o_, level_ix_t(indent + 1), format_);
+		++ix;
+	}
+	o_ << si << "area_top levels end\n";
+}
+
 bool ccpm::area_top::contains(const void *p) const
 {
 	return _ctl && _ctl->contains(p);
+}
+
+void ccpm::level_hints::print(
+	std::ostream &o_
+	, level_ix_t level_
+	, std::ios_base::fmtflags // size_format_
+) const
+{
+	const auto si = std::string(level_*2, ' ');
+	o_ << si;
+	for ( const auto &fc : _free_ctls )
+	{
+		o_ << ( fc.empty() ? '_' : '!' );
+	}
+	o_ << "\n";
 }

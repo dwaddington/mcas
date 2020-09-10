@@ -47,11 +47,11 @@ TEST_F(KVIndex_test, Instantiate)
 
   ASSERT_TRUE(comp);
   auto fact =
-    static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid()));
+    make_itf_ref(
+      static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid()))
+    );
 
   _kvindex = fact->create("owner", "name");
-
-  fact->release_ref();
 }
 
 TEST_F(KVIndex_test, InsertPerf)

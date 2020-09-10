@@ -61,15 +61,22 @@ class cpu_mask_t {
   cpu_set_t cpu_set_;
 
  public:
+  using core_ix_t = unsigned;
   cpu_mask_t() : cpu_set_{} {}
 
-  void add_core(int cpu) { CPU_SET(cpu, &cpu_set_); }
+#pragma GCC diagnostic push
+#if defined __clang_major__ && __clang_major__ < 4
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+  void add_core(core_ix_t cpu) { CPU_SET(int(cpu), &cpu_set_); }
 
-  bool check_core(int cpu) { return CPU_ISSET(cpu, &cpu_set_); }
+  bool check_core(core_ix_t cpu) { return CPU_ISSET(int(cpu), &cpu_set_); }
+#pragma GCC diagnostic pop
 
-  int first_core() {
+  core_ix_t first_core() {
     if (!is_something_set()) throw General_exception("nothing set");
-    int i = 0;
+    core_ix_t i = 0;
     while (!check_core(i)) i++;
     return i;
   }
@@ -78,7 +85,13 @@ class cpu_mask_t {
     int current = 0;
     while (mask > 0) {
       if (mask & 0x1ULL) {
+#pragma GCC diagnostic push
+#if defined __clang_major__ && __clang_major__ < 4
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
         CPU_SET(current, &cpu_set_);
+#pragma GCC diagnostic pop
       }
       current++;
       mask = mask >> 1;
@@ -95,8 +108,13 @@ class cpu_mask_t {
 
   std::string string_form() {
     std::stringstream ss;
-    for (unsigned i = 0; i < 64; i++) {
+    for (core_ix_t i = 0; i < 64; i++) {
+#pragma GCC diagnostic push
+#if defined __clang_major__ && __clang_major__ < 4
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#endif
       (CPU_ISSET(i, &cpu_set_)) ? ss << "1" : ss << "0";
+#pragma GCC diagnostic pop
     }
     return ss.str();
   }

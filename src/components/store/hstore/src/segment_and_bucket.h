@@ -23,9 +23,8 @@
 namespace impl
 {
 	template <typename Bucket>
-		class segment_and_bucket
+		struct segment_and_bucket
 		{
-		public:
 			using six_t = std::size_t; /* segment indexes (but uint8_t would do) */
 			using bix_t = std::size_t; /* bucket indexes */
 		private:

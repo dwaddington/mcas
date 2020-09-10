@@ -22,23 +22,22 @@
 namespace impl
 {
 	template <typename Value>
-		class content;
+		struct content;
 	template <typename Bucket>
-		class segment_and_bucket;
+		struct segment_and_bucket;
 }
 
 namespace impl
 {
-	class owner;
+	struct owner;
 
 	template <typename Bucket, typename Referent>
-		class bucket_ref;
+		struct bucket_ref;
 
 	template <typename Bucket, typename Referent>
-		class bypass_lock
+		struct bypass_lock
 			: public bucket_ref<Bucket, Referent>
 		{
-		public:
 			bypass_lock(Referent &b_, const segment_and_bucket<Bucket> &i_)
 				: bucket_ref<Bucket, Referent>(&b_, i_)
 			{}
@@ -53,8 +52,9 @@ namespace impl
 	template <
 		typename Lock
 	>
-		class owner_print
+		struct owner_print
 		{
+		private:
 			std::size_t _ct;
 			Lock *_i;
 		public:
@@ -86,8 +86,9 @@ namespace impl
 		typename LockOwner
 		, typename LockContent
 	>
-		class bucket_print
+		struct bucket_print
 		{
+		private:
 			std::size_t _ct;
 			LockOwner *_c;
 			LockContent *_i;
@@ -103,8 +104,9 @@ namespace impl
 	template <
 		typename TableBase
 	>
-		class hop_hash_print
+		struct hop_hash_print
 		{
+		private:
 			const TableBase *_t;
 		public:
 			hop_hash_print(const TableBase &t_)
@@ -142,17 +144,18 @@ namespace impl
 
 
 	template <bool>
-		class dump;
+		struct dump;
 
 	template<>
-		class dump<true>
+		struct dump<true>
 		{
 		public:
 			template <
 				typename TableBase
 			>
-				class hop_hash_dump
+				struct hop_hash_dump
 				{
+				private:
 					const TableBase *_t;
 				public:
 					hop_hash_dump(const TableBase &t_)
@@ -182,13 +185,14 @@ namespace impl
 		};
 
 	template<>
-		class dump<false>
+		struct dump<false>
 		{
 			template <
 				typename TableBase
 			>
-				class hop_hash_dump
+				struct hop_hash_dump
 				{
+				private:
 					const TableBase *_t;
 				public:
 					hop_hash_dump(const TableBase &t_)
@@ -196,7 +200,7 @@ namespace impl
 					{}
 					const TableBase &get_hop_hash() const { return *_t; }
 				};
-		public:
+
 			template <
 				typename TableBase
 			>

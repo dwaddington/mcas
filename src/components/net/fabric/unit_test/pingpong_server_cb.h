@@ -16,7 +16,7 @@
 #include <common/types.h> /* status_t */
 #include <cstddef> /* size_t */
 
-class cb_ctxt;
+struct cb_ctxt;
 
 namespace pingpong_server_cb
 {

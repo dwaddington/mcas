@@ -27,8 +27,9 @@ namespace ccpm
 	 * the doubt through ownership_callback_t.)
 	 * Class doubt contains the element pointer when doubt exists.
 	 */
-	class doubt
+	struct doubt
 	{
+	private:
 		std::size_t _bytes;
 		void *_in_doubt;
 	public:

@@ -46,7 +46,7 @@ bool ExperimentUpdate::do_work(unsigned core)
   }
 
   // generate a new random value with the same value length to use
-  auto new_val = Common::random_string(g_data->value_len());
+  auto new_val = common::random_string(g_data->value_len());
 
   // check time it takes to complete a single put operation
   try
@@ -121,7 +121,7 @@ try {
 
   double run_time = timer.get_time_in_seconds();
   double iops = double(_i) / run_time;
-  PINF("[%u] update: IOPS--> %u (%lu operations over %2g seconds)", core, unsigned(iops), _i, run_time);
+  PINF("[%u] %s: IOPS--> %2g (%lu operations over %2g seconds)", core, test_name().c_str(), iops, _i, run_time);
   _update_aggregate_iops(iops);
 
   double throughput = _calculate_current_throughput();

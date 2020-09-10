@@ -32,14 +32,13 @@ template <unsigned Offset>
 	};
 
 template <typename T, unsigned Offset>
-	class pointer_pobj;
+	struct pointer_pobj;
 
 template <unsigned Offset>
-	class pointer_pobj<void, Offset>
+	struct pointer_pobj<void, Offset>
 		: public PMEMoid
 		, public check_offset<Offset>
 	{
-	public:
 		explicit pointer_pobj() noexcept
 			: PMEMoid()
 		{}
@@ -51,11 +50,10 @@ template <unsigned Offset>
 	};
 
 template <unsigned Offset>
-	class pointer_pobj<const void, Offset>
+	struct pointer_pobj<const void, Offset>
 		: public PMEMoid
 		, public check_offset<Offset>
 	{
-	public:
 		explicit pointer_pobj() noexcept
 			: PMEMoid()
 		{}
@@ -67,10 +65,11 @@ template <unsigned Offset>
 	};
 
 template <typename T, unsigned Offset>
-	class pointer_pobj
+	struct pointer_pobj
 		: public PMEMoid
 		, public check_offset<Offset>
 	{
+	private:
 		const void *offset_address() const noexcept
 		{
 			return static_cast<const char *>(pmemobj_direct(*this)) + Offset;

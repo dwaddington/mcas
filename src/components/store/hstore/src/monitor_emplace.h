@@ -20,8 +20,9 @@
 #include "logging.h"
 
 template <typename Allocator>
-	class monitor_emplace
+	struct monitor_emplace
 	{
+	private:
 		Allocator _a;
 	public:
 		monitor_emplace(const Allocator &a_)

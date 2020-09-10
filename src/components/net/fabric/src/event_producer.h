@@ -21,9 +21,9 @@
 #include <cstdint>
 #include <tuple>
 
-class event_consumer;
+struct event_consumer;
 
-class event_producer
+struct event_producer
 {
 protected:
   ~event_producer() {}

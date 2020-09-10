@@ -18,17 +18,16 @@
 #include <cstdint> /* uint16_t, uint64_t */
 #include <cstring> /* string */
 
-namespace Component
+namespace component
 {
   class IFabric;
 }
 
-class remote_memory_client_for_shutdown
+struct remote_memory_client_for_shutdown
   : private remote_memory_client
 {
-public:
   remote_memory_client_for_shutdown(
-    Component::IFabric &fabric
+    component::IFabric &fabric
     , const std::string &fabric_spec
     , const std::string ip_address
     , std::uint16_t port

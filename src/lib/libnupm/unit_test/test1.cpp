@@ -87,7 +87,7 @@ TEST_F(Libnupm_test, AVLRange)
   PLOG("Building AVL...");
   std::string before, after;
   {
-    Core::AVL_range_allocator avl(BASE, ARENA_SIZE);
+    core::AVL_range_allocator avl(BASE, ARENA_SIZE);
     for (size_t i = 1; i < COUNT; i++) {
       size_t s = round_up(((genrand64_int64() % 4096) + 8), 8);
       assert(s % 8 == 0);
@@ -115,7 +115,7 @@ TEST_F(Libnupm_test, AVLRange)
   /* now do reconstitution */
   PLOG("Reconstituting AVL...");
   {
-    Core::AVL_range_allocator avl(BASE, ARENA_SIZE);
+    core::AVL_range_allocator avl(BASE, ARENA_SIZE);
 
     for(auto a : log) {
       avl.alloc_at((addr_t)a.iov_base, a.iov_len);
@@ -303,8 +303,8 @@ TEST_F(Libnupm_test, RcAllocatorLBIntegrity)
 {
   const size_t ARENA_SIZE = GB(32);
   void * p = aligned_alloc(GB(1), ARENA_SIZE);
-  uint64_t tag = 1;
   ASSERT_TRUE(p);
+  uint64_t tag = 1;
 
   nupm::Rca_LB rca;
   rca.add_managed_region(p, ARENA_SIZE, 0);
@@ -520,7 +520,7 @@ TEST_F(Libnupm_test, DevdaxManager)
 
   if(uuid == 0) uuid = 1;
 
-  size_t size = GB(2);
+  size_t size = MB(256);
   ddm.debug_dump(0); /* region id 0 */
 
   PLOG("Opening existing region..");
@@ -712,7 +712,7 @@ TEST_F(Libnupm_test, TxCache)
     ((char*)p)[i*MB(2)]='a';
   }
   cpu_time_t delta = (rdtsc() - start)/NUM_PAGES;
-  PLOG("Mean PF cost: (%f usec) %lu", Common::cycles_to_usec(delta), delta);
+  PLOG("Mean PF cost: (%f usec) %lu", common::cycles_to_usec(delta), delta);
   // { // important
   //   Core::Heap_allocator<char> heap(p, p_size, "heapA");
 
@@ -726,7 +726,7 @@ TEST_F(Libnupm_test, TxCache)
   c[0] = 'a';
   cpu_time_t delta = rdtsc() - start;
   c[4096] = 'a';
-  PLOG("touched! in %ld cycles (%f usec)", delta, Common::cycles_to_usec(delta));
+  PLOG("touched! in %ld cycles (%f usec)", delta, common::cycles_to_usec(delta));
 #endif
 
   nupm::free_virtual_pages(p);
@@ -823,7 +823,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
 
   if (argc > 1) {
-    Options.uuid = atol(argv[1]);
+    Options.uuid = std::stoul(argv[1]);
   }
   auto r = RUN_ALL_TESTS();
 

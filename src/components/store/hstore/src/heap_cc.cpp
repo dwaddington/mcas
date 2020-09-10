@@ -21,6 +21,7 @@
 #include <common/utils.h> /* round_up */
 #include <algorithm>
 #include <cassert>
+#include <cstdlib> /* getenv */
 #include <memory>
 #include <numeric>
 #include <stdexcept>
@@ -29,15 +30,25 @@
 constexpr unsigned heap_cc_shared_ephemeral::log_min_alignment;
 constexpr unsigned heap_cc_shared_ephemeral::hist_report_upper_bound;
 
+namespace
+{
+#if USE_CC_HEAP == 4
+	auto leak_check_str = std::getenv("LEAK_CHECK");
+	bool leak_check = bool(leak_check_str);
+#endif
+}
+
 heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	impl::allocation_state_emplace *ase_
+	unsigned debug_level_
+	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
-	, std::unique_ptr<ccpm::IHeapGrowable> p
+	, std::unique_ptr<ccpm::IHeap_expandable> p
 	, const ccpm::region_vector_t &rv_
 )
-	: _heap(std::move(p))
+	: _debug_level(debug_level_)
+	, _heap(std::move(p))
 	, _managed_regions(rv_.begin(), rv_.end())
 	, _capacity(std::accumulate(rv_.begin(), rv_.end(), ::iovec{nullptr, 0}, [] (const auto &a, const auto &b) -> ::iovec { return {nullptr, a.iov_len + b.iov_len}; }).iov_len)
 	, _allocated(
@@ -58,24 +69,26 @@ heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
 {}
 
 heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	impl::allocation_state_emplace *ase_
+	unsigned debug_level_
+	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
 	, const ccpm::region_vector_t &rv_
 	)
-	: heap_cc_shared_ephemeral(ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(rv_), rv_)
+	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(rv_), rv_)
 {}
 
 heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	impl::allocation_state_emplace *ase_
+	unsigned debug_level_
+	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
 	, const ccpm::region_vector_t &rv_
 	, ccpm::ownership_callback_t f
 )
-	: heap_cc_shared_ephemeral(ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(rv_, f), rv_)
+	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(rv_, f), rv_)
 {}
 
 void heap_cc_shared_ephemeral::add_managed_region(const ::iovec &r_)
@@ -89,26 +102,70 @@ void heap_cc_shared_ephemeral::add_managed_region(const ::iovec &r_)
 	}
 }
 
-namespace
+std::size_t heap_cc_shared_ephemeral::free(persistent_t<void *> *p_, std::size_t sz_)
 {
-	void *page_aligned(void *a)
+	/* Our free does not know the true size, because alignment is not known.
+	 * But the pool free will know, as it can see how much has been allocated.
+	 *
+	 * The free, however, does not return a size. Pretend that it does.
+	 */
+#if USE_CC_HEAP == 4
+	/* Note: order of testing is important. An extend arm+allocate) can occur while
+	 * emplace is armed, but not vice-versa
+	 */
+	if ( _asx->is_armed() )
 	{
-		return round_up(a, 4096);
+		CPLOG(1, PREFIX "unexpected segment deallocation of %p of %zu", LOCATION, persistent_ref(*p_), sz_);
+		abort();
+#if 0
+		_asx->record_deallocation(&persistent_ref(*p_), persister_nupm());
+#endif
 	}
-
-	::iovec align(void *pool_, std::size_t sz_)
+	else if ( _ase->is_armed() )
 	{
-		auto pool = page_aligned(pool_);
-		return
-			::iovec{
-				pool
-				, std::size_t((static_cast<char *>(pool_) + sz_) - static_cast<char *>(pool))
-			};
+		_ase->record_deallocation(&persistent_ref(*p_), persister_nupm());
 	}
+	else
+	{
+		CPLOG(1, PREFIX "leaky deallocation of %p of %zu", LOCATION, persistent_ref(*p_), sz_);
+	}
+#endif
+	/* IHeap interface does not support abstract pointers. Cast to regular pointer */
+	auto sz = (_heap->free(*reinterpret_cast<void **>(p_), sz_), sz_);
+	/* We would like to carry the persistent_t through to the crash-conssitent allocator,
+	 * but for now just assume that the allocator has modifed p_, and call tick to indicate that.
+	 */
+	perishable::tick();
+	assert(sz <= _allocated);
+	_allocated -= sz;
+	_hist_free.enter(sz);
+	return sz;
 }
 
 namespace
 {
+	::iovec align(void *first_, std::size_t sz_, std::size_t alignment_)
+	{
+		auto first = reinterpret_cast<uintptr_t>(first_);
+		auto last = first + sz_;
+		/* It may not even be the case that Rca_LB does not need managed regions
+		 * aligned at all,
+		 * as the allocated slabs are aligned even if the region is not.
+		 * Some part of ado processing, though, map try mmap the area, which means
+		 * that the are must be aligned and sized to page multiples (4K or maybe 2M).
+		 */
+		last = round_down(last, alignment_);
+		auto c = round_up_t(first, alignment_);
+		/* It may not even be the case that managed regions need to be aligned at all,
+		 * as the allocated slabs are aligned even if the region is not.
+		 */
+		if ( last <= c )
+		{
+			throw std::runtime_error("Insufficent size for managed region");
+		}
+		return ::iovec{reinterpret_cast<void *>(c), last - c};
+	}
+
 	::iovec open_region(const std::unique_ptr<Devdax_manager> &devdax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 	{
 		::iovec iov;
@@ -134,8 +191,13 @@ namespace
 	}
 }
 
+/* When used with ADO, this space apparently needs a 2MiB alignment.
+ * 4 KiB produces sometimes produces a disagreement between server and AOo mappings
+ * which manifest as incorrect key and data values as seen on the ADO side.
+ */
 heap_cc_shared::heap_cc_shared(
-	impl::allocation_state_emplace *ase_
+	unsigned debug_level_
+	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
@@ -143,13 +205,14 @@ heap_cc_shared::heap_cc_shared(
 	, std::size_t sz
 	, unsigned numa_node_
 )
-	: _pool0(align(p, sz))
+	: _pool0(align(p, sz, MiB(2)))
 	, _numa_node(numa_node_)
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _eph(
 		std::make_unique<heap_cc_shared_ephemeral>(
-			ase_
+			debug_level_
+			, ase_
 			, aspd_
 			, aspk_
 			, asx_
@@ -168,11 +231,15 @@ heap_cc_shared::heap_cc_shared(
 }
 
 #if 0
-heap_cc_shared::heap_cc_shared(uint64_t pool0_uuid_, const std::unique_ptr<Devdax_manager> &devdax_manager_, unsigned numa_node_)
+heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, const std::unique_ptr<Devdax_manager> &devdax_manager_, unsigned numa_node_)
 	: _pool0(align(open_region(devdax_manager_, pool0_uuid_, numa_node_)))
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
-	, _eph(std::make_unique<heap_cc_shared_ephemeral>(add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), devdax_manager_, numa_node_, nullptr, nullptr)))
+	, _eph(
+		std::make_unique<heap_cc_shared_ephemeral>(
+			debug_level_, add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), devdax_manager_, numa_node_, nullptr, nullptr)
+		)
+	)
 {
 	/* cursor now locates the best-aligned region */
 	hop_hash_log<trace_heap_summary>::write(
@@ -189,7 +256,8 @@ heap_cc_shared::heap_cc_shared(uint64_t pool0_uuid_, const std::unique_ptr<Devda
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
 heap_cc_shared::heap_cc_shared(
-	const std::unique_ptr<Devdax_manager> &devdax_manager_
+	unsigned debug_level_
+	, const std::unique_ptr<Devdax_manager> &devdax_manager_
 	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
@@ -201,7 +269,8 @@ heap_cc_shared::heap_cc_shared(
 	, _more_region_uuids(this->_more_region_uuids)
 	, _eph(
 		std::make_unique<heap_cc_shared_ephemeral>(
-			ase_
+			debug_level_
+			, ase_
 			, aspd_
 			, aspk_
 			, asx_
@@ -262,7 +331,8 @@ auto heap_cc_shared::grow(
 		{
 			throw std::bad_alloc(); /* max # of regions used */
 		}
-		auto size = ( (increment_ - 1) / HSTORE_GRAIN_SIZE + 1 ) * HSTORE_GRAIN_SIZE;
+		const auto hstore_grain_size = std::size_t(1) << (HSTORE_LOG_GRAIN_SIZE);
+		auto size = ( (increment_ - 1) / hstore_grain_size + 1 ) * hstore_grain_size;
 		auto uuid = _more_region_uuids_size == 0 ? uuid_ : _more_region_uuids[_more_region_uuids_size-1];
 		auto uuid_next = uuid + 1;
 		for ( ; uuid_next != uuid; ++uuid_next )
@@ -355,7 +425,10 @@ void heap_cc_shared::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_
 		}
 		else
 		{
-			PLOG(PREFIX "leaky allocation, size %zu", LOCATION, sz_);
+			if ( leak_check )
+			{
+				PLOG(PREFIX "leaky allocation, size %zu", LOCATION, sz_);
+			}
 		}
 #endif
 		/* IHeap interface does not support abstract pointers. Cast to regular pointer */
@@ -382,42 +455,8 @@ void heap_cc_shared::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_
 void heap_cc_shared::free(persistent_t<void *> *p_, std::size_t sz_)
 {
 	VALGRIND_MEMPOOL_FREE(_pool0.iov_base, p_);
-	/* Our free does not know the true size, because alignment is not known.
-	 * But the pool free will know, as it can see how much has been allocated.
-	 *
-	 * The free, however, does not return a size. Pretend that it does.
-	 */
-#if USE_CC_HEAP == 4
-	/* Note: order of testing is important. An extend arm+allocate) can occur while
-	 * emplace is armed, but not vice-versa
-	 */
-	if ( _eph->_asx->is_armed() )
-	{
-		PLOG(PREFIX "unexpected segment deallocation of %p of %zu", LOCATION, persistent_ref(*p_), sz_);
-		assert(false);
-#if 0
-		_eph->_asx->record_deallocation(&persistent_ref(*p_), persister_nupm());
-#endif
-	}
-	else if ( _eph->_ase->is_armed() )
-	{
-		_eph->_ase->record_deallocation(&persistent_ref(*p_), persister_nupm());
-	}
-	else
-	{
-		PLOG(PREFIX "leaky deallocation of %p of %zu", LOCATION, persistent_ref(*p_), sz_);
-	}
-#endif
-	/* IHeap interface does not support abstract pointers. Cast to regular pointer */
-	auto sz = (_eph->_heap->free(*reinterpret_cast<void **>(p_), sz_), sz_);
-	/* We would like to carry the persistent_t through to the crash-conssitent allocator,
-	 * but for now just assume that the allocator has modifed p_, and call tick ti indicate that.
-	 */
-	perishable::tick();
+	auto sz = _eph->free(p_, sz_);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0.iov_base, " addr ", p_, " size ", sz_, "->", sz);
-	assert(sz <= _eph->_allocated);
-	_eph->_allocated -= sz;
-	_eph->_hist_free.enter(sz);
 }
 
 void heap_cc_shared::extend_arm() const

@@ -51,7 +51,13 @@ using namespace libndctl;
 
 namespace nupm
 {
-ND_control::ND_control() : _n_sockets(numa_num_configured_nodes())
+ND_control::ND_control() : _n_sockets(unsigned(numa_num_configured_nodes()))
+  , _ctx()
+  , _bus()
+  , _ns_to_socket()
+  , _ns_to_dax()
+  , _dax_to_ns()
+  , _mappings()
 {
   /* initialize context */
   if (ndctl_new(&_ctx) != 0)
@@ -76,15 +82,17 @@ ND_control::ND_control() : _n_sockets(numa_num_configured_nodes())
   }
 
   /* iterate DIMMs */
-  struct ndctl_dimm *dimm;
-  ndctl_dimm_foreach(_bus, dimm)
   {
-    unsigned int handle = ndctl_dimm_get_handle(dimm);
-    if (option_DEBUG)
-      PLOG("dimm: 0x%04x enabled:%d proc-socket:%d imc:%d channel:%d", handle,
-           ndctl_dimm_is_enabled(dimm), ndctl_dimm_handle_get_socket(dimm),
-           ndctl_dimm_handle_get_imc(dimm),
-           ndctl_dimm_handle_get_channel(dimm));
+    struct ndctl_dimm *dimm;
+    ndctl_dimm_foreach(_bus, dimm)
+    {
+      unsigned int handle = ndctl_dimm_get_handle(dimm);
+      if (option_DEBUG)
+        PLOG("dimm: 0x%04x enabled:%d proc-socket:%d imc:%d channel:%d", handle,
+             ndctl_dimm_is_enabled(dimm), ndctl_dimm_handle_get_socket(dimm),
+             ndctl_dimm_handle_get_imc(dimm),
+             ndctl_dimm_handle_get_channel(dimm));
+    }
   }
 
   /* iterate regions */
@@ -96,7 +104,7 @@ ND_control::ND_control() : _n_sockets(numa_num_configured_nodes())
         PLOG("region:%llu (%d) phys:%p type:%s interleaves:%d numa-node:%d "
              "dev:%s size:%llu",
              ndctl_region_get_resource(region), ndctl_region_get_id(region),
-             (void *) ndctl_region_get_resource(region), /* phys addr */
+             reinterpret_cast<void *>(ndctl_region_get_resource(region)), /* phys addr */
              ndctl_region_get_type_name(region),
              ndctl_region_get_interleave_ways(region),
              ndctl_region_get_numa_node(region),
@@ -137,7 +145,7 @@ ND_control::ND_control() : _n_sockets(numa_num_configured_nodes())
                  ndctl_dimm_handle_get_socket(dimm));
 
           _ns_to_socket[ndctl_namespace_get_devname(ndns)] =
-              ndctl_dimm_handle_get_socket(dimm);
+              int(ndctl_dimm_handle_get_socket(dimm));
         }
       }
     }
@@ -148,6 +156,7 @@ ND_control::ND_control() : _n_sockets(numa_num_configured_nodes())
 
 ND_control::~ND_control() noexcept(false)
 {
+  /* EXCEPTION UNSAFE */
   if (_pmem_present) {
     for (auto &m : _mappings)
       for (auto &n : m.second)
@@ -169,15 +178,15 @@ void ND_control::init_devdax()
   for (auto &p : fs::recursive_directory_iterator("/sys/bus/nd/devices")) {
     auto          path          = p.path().string();
     auto          dev_type_path = path + "/devtype";
-    std::ifstream path_strm(dev_type_path);
+    std::ifstream path_strm0(dev_type_path);
 
     /* basically, find the dax devices, see which are the nd pmem
        type and then look up the namesapce to /dev/dax id mapping */
     if (dev_type_path.substr(0, 23) != "/sys/bus/nd/devices/dax") continue;
 
-    if (!path_strm.is_open())
+    if (!path_strm0.is_open())
       throw ND_control_exception("unable to open %s", dev_type_path.c_str());
-    std::string dev_type((std::istreambuf_iterator<char>(path_strm)),
+    std::string dev_type((std::istreambuf_iterator<char>(path_strm0)),
                          std::istreambuf_iterator<char>());
     dev_type = rtrim(dev_type);
     if (dev_type == "nd_dax") { /* narrow to ND-DIMM device DAX */
@@ -218,7 +227,7 @@ void ND_control::map_regions(unsigned long base_addr)
   PLOG("map_regions: numa-zones=%u", _n_sockets);
   for (unsigned numa_zone = 0; numa_zone < _n_sockets; numa_zone++) {
     for (auto &i : _ns_to_socket) {
-      if (i.second == (int) numa_zone) {
+      if (i.second == int(numa_zone)) {
         if (_ns_to_dax.find(i.first) != _ns_to_dax.end()) {
           /* map region into virtual memory */
           PLOG("Mapping [%s] is in zone [%d]", _ns_to_dax[i.first].c_str(),
@@ -230,30 +239,26 @@ void ND_control::map_regions(unsigned long base_addr)
             throw ND_control_exception("unable to open (%s)", path.c_str());
 
           /* get size of the DAX device */
-          struct stat statbuf;
-          int         rc;
-          rc = fstat(fd, &statbuf);
-          if (rc == -1) throw ND_control_exception("fstat call failed");
-          char spath[PATH_MAX];
-          snprintf(spath, PATH_MAX, "/sys/dev/char/%u:%u/size",
-                   major(statbuf.st_rdev), minor(statbuf.st_rdev));
-          size_t size = 0;
-          {
-            std::ifstream sizestr(spath);
-            sizestr >> size;
-          }
+          size_t size = get_dax_device_size(fd);
           PLOG("size: %lu", size);
           assert(size % 2 * 1024 * 1024 == 0);
 
           /* do mmap */
           void *pmem_addr = mmap(
-              (void *) vaddr, size, PROT_READ | PROT_WRITE,
+              reinterpret_cast<void *>(vaddr), size, PROT_READ | PROT_WRITE,
               MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC,  // | MAP_HUGETLB,
               fd, 0);
 
           if (pmem_addr == MAP_FAILED) {
-            perror("");
-            throw ND_control_exception("mmap failed on PM");
+            auto e = errno;
+            std::ostringstream msg;
+            msg << __FILE__ << " ND_control::map_regions mmap failed on DRAM for region allocation"
+              << " alignment="
+              << std::hex << 0
+              << " size=" << std::dec << size << " :" << strerror(e);
+            perror(msg.str().c_str());
+
+            throw ND_control_exception("%s", msg.str().c_str());
           }
 
 #if 0
@@ -278,7 +283,7 @@ void ND_control::map_regions(unsigned long base_addr)
           vaddr += size;
 
           /* save mapping */
-          _mappings[numa_zone].push_back(std::make_pair(pmem_addr, size));
+          _mappings[int(numa_zone)].push_back(std::make_pair(pmem_addr, size));
         }
       }
     }
@@ -286,22 +291,34 @@ void ND_control::map_regions(unsigned long base_addr)
 }
 
 
-size_t get_dax_device_size(const std::string& dax_path)
+size_t get_dax_device_size(const struct stat &statbuf)
 {
-  size_t size = 0;
-  struct stat statbuf;
-
-  int fd = open(dax_path.c_str(), O_RDWR, 0666);  
-  if (fd == -1) throw General_exception("get_dax_device_size: inaccessible devdax path (%s)", dax_path.c_str());
-
-  int rc = fstat(fd, &statbuf);
-  if (rc == -1) throw ND_control_exception("fstat call failed");
   char spath[PATH_MAX];
   snprintf(spath, PATH_MAX, "/sys/dev/char/%u:%u/size",
            major(statbuf.st_rdev), minor(statbuf.st_rdev));
-  std::ifstream sizestr(spath);
-  sizestr >> size;
+  size_t size = 0;
+  {
+    std::ifstream sizestr(spath);
+    sizestr >> size;
+  }
   return size;
 }
-  
+
+size_t get_dax_device_size(const int fd)
+{
+  struct stat statbuf;
+
+  int rc = fstat(fd, &statbuf);
+  if (rc == -1) throw ND_control_exception("fstat call failed");
+  return get_dax_device_size(statbuf);
+}
+
+size_t get_dax_device_size(const std::string& dax_path)
+{
+  int fd = open(dax_path.c_str(), O_RDWR, 0666);
+  if (fd == -1) throw General_exception("get_dax_device_size: inaccessible devdax path (%s)", dax_path.c_str());
+
+  return get_dax_device_size(fd);
+}
+
 }  // namespace nupm

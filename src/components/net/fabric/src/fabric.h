@@ -15,7 +15,7 @@
 #ifndef _FABRIC_H_
 #define _FABRIC_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric */
+#include <api/fabric_itf.h> /* component::IFabric */
 #include "event_producer.h"
 
 #include "rdma-fabric.h" /* fid_t */
@@ -24,19 +24,49 @@
 #include <map>
 #include <memory> /* shared_ptr */
 #include <mutex>
+#include <cstdlib> // getenv
+#include <iosfwd> // ostream
+#include <stdlib.h> // setenv, unsetenv
 
 struct fi_info;
 struct fid_fabric;
 struct fid_eq;
 struct fid;
 
+struct env_replace
+{
+private:
+	bool _pre_exist;
+	std::string _key;
+public:
+	env_replace(const char *key_, const char *value_)
+		: _pre_exist(std::getenv(key_) != nullptr)
+		, _key(key_)
+	{
+		::setenv(key_, value_, 0);
+	}
+	~env_replace()
+	{
+		if ( ! _pre_exist )
+		{
+			::unsetenv(_key.c_str());
+		}
+	}
+	const std::string key() const { return _key; }
+	const char *value() const { return std::getenv(key().c_str()); }
+};
+
+std::ostream &operator<<(std::ostream &o, const env_replace &e);
+
 /*
  * Note: Fabric is a fabric which can create servers (IFabric_server_factory) and clients (IFabric_op_completer)
  */
 class Fabric
-  : public Component::IFabric
+  : public component::IFabric
   , private event_producer
 {
+  env_replace _env_mr_cache_monitor;
+  env_replace _env_use_odp;
   std::shared_ptr<::fi_info> _info;
   std::shared_ptr<::fid_fabric> _fabric;
   /* an event queue, in case the endpoint is connection-oriented */
@@ -63,14 +93,14 @@ class Fabric
   std::mutex _m_eq_dispatch_aep;
   eq_dispatch_t _eq_dispatch_aep;
 
-  /* BEGIN Component::IFabric */
+  /* BEGIN component::IFabric */
   /**
    * @throw std::domain_error : json file parse-detected error
    * @throw fabric_runtime_error : std::runtime_error : ::fi_passive_ep fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_pep_bind fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_listen fail
    */
-  Component::IFabric_server_factory * open_server_factory(const std::string& json_configuration, std::uint16_t control_port) override;
+  component::IFabric_server_factory * open_server_factory(const std::string& json_configuration, std::uint16_t control_port) override;
   /**
    * @throw std::domain_error : json file parse-detected error
    * @throw bad_dest_addr_alloc : std::bad_alloc
@@ -97,14 +127,14 @@ class Fabric
    * @throw std::system_error - writing event pipe (readerr_eq)
    * @throw std::system_error - receiving data on socket
    */
-  Component::IFabric_client * open_client(const std::string& json_configuration, const std::string & remote, std::uint16_t control_port) override;
+  component::IFabric_client * open_client(const std::string& json_configuration, const std::string & remote, std::uint16_t control_port) override;
   /**
    * @throw std::domain_error : json file parse-detected error
    * @throw fabric_runtime_error : std::runtime_error : ::fi_passive_ep fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_pep_bind fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_listen fail
    */
-  Component::IFabric_server_grouped_factory * open_server_grouped_factory(const std::string& json_configuration, std::uint16_t control_port) override;
+  component::IFabric_server_grouped_factory * open_server_grouped_factory(const std::string& json_configuration, std::uint16_t control_port) override;
   /**
    * @throw std::domain_error : json file parse-detected error
    * @throw bad_dest_addr_alloc : std::bad_alloc
@@ -131,8 +161,8 @@ class Fabric
    * @throw std::system_error - writing event pipe (readerr_eq)
    * @throw std::system_error - receiving data on socket
    */
-  Component::IFabric_client_grouped * open_client_grouped(const std::string& json_configuration, const std::string& remote_endpoint, std::uint16_t port) override;
-  /* END Component::IFabric */
+  component::IFabric_client_grouped * open_client_grouped(const std::string& json_configuration, const std::string& remote_endpoint, std::uint16_t port) override;
+  /* END component::IFabric */
 
   /* BEGIN event_producer */
   void register_pep(::fid_t ep, event_consumer &ec) override;
@@ -186,6 +216,10 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_passive_ep fail
    */
   std::shared_ptr<::fid_pep> make_fid_pep(::fi_info &info, void *context) const;
+
+  const char *prov_name() const noexcept override;
+
+  std::uint16_t choose_port(std::uint16_t port);
 };
 
 #endif

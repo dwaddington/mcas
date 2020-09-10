@@ -22,12 +22,11 @@
 #define __ADOMGRPROX_COMPONENT_H__
 
 #include <api/ado_itf.h>
-#include <threadipc/queue.h>
 
-class ADO_manager_proxy : public Component::IADO_manager_proxy {
+class ADO_manager_proxy : public component::IADO_manager_proxy {
  public:
   ADO_manager_proxy(unsigned    debug_level,
-                    int         shard,
+                    unsigned    shard,
                     std::string cores,
                     float       cpu_num);
   ADO_manager_proxy();
@@ -39,10 +38,10 @@ class ADO_manager_proxy : public Component::IADO_manager_proxy {
                          0x21, 0xa1, 0x91);
   // clang-format on
 
-  void *query_interface(Component::uuid_t &itf_uuid) override
+  void *query_interface(component::uuid_t &itf_uuid) override
   {
-    if (itf_uuid == Component::IADO_manager_proxy::iid())
-      return static_cast<Component::IADO_manager_proxy *>(this);
+    if (itf_uuid == component::IADO_manager_proxy::iid())
+      return static_cast<component::IADO_manager_proxy *>(this);
     else
       return NULL;  // we don't support this interface
   }
@@ -51,9 +50,10 @@ class ADO_manager_proxy : public Component::IADO_manager_proxy {
 
  public:
   
-  virtual Component::IADO_proxy *create(const uint64_t auth_id,
-                                        Component::IKVStore * kvs,
-                                        Component::IKVStore::pool_t pool_id,
+  virtual component::IADO_proxy *create(const uint64_t auth_id,
+					const unsigned debug_level,
+                                        component::IKVStore * kvs,
+                                        component::IKVStore::pool_t pool_id,
                                         const std::string &pool_name,
                                         const size_t pool_size,
                                         const unsigned int pool_flags,
@@ -61,23 +61,23 @@ class ADO_manager_proxy : public Component::IADO_manager_proxy {
                                         const std::string &         filename,
                                         std::vector<std::string> &  args,
                                         numa_node_t value_memory_numa_zone,
-                                        Component::SLA *sla = nullptr) override;
+                                        component::SLA *sla = nullptr) override;
 
-  virtual bool has_exited(Component::IADO_proxy *ado_proxy) override;
+  virtual bool has_exited(component::IADO_proxy *ado_proxy) override;
 
-  virtual status_t shutdown(Component::IADO_proxy *ado) override;
+  virtual status_t shutdown_ado(component::IADO_proxy *ado) override;
 
  private:
-  int                   shard;
-  unsigned              debug_level;
+  unsigned              _shard;
+  unsigned              _debug_level;
 #if 0 /* unused */
   shared_memory_token_t token;
 #endif
-  std::string           cores;
-  float                 cpu_num;
+  std::string           _cores;
+  float                 _cpu_num;
 };
 
-class ADO_manager_proxy_factory : public Component::IADO_manager_proxy_factory {
+class ADO_manager_proxy_factory : public component::IADO_manager_proxy_factory {
  public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0xfac20985,
@@ -91,10 +91,10 @@ class ADO_manager_proxy_factory : public Component::IADO_manager_proxy_factory {
                          0xa1,
                          0x91);  //
 
-  void *query_interface(Component::uuid_t &itf_uuid) override
+  void *query_interface(component::uuid_t &itf_uuid) override
   {
-    if (itf_uuid == Component::IADO_manager_proxy_factory::iid()) {
-      return static_cast<Component::IADO_manager_proxy_factory *>(this);
+    if (itf_uuid == component::IADO_manager_proxy_factory::iid()) {
+      return static_cast<component::IADO_manager_proxy_factory *>(this);
     }
     else
       return NULL;  // we don't support this interface
@@ -102,14 +102,14 @@ class ADO_manager_proxy_factory : public Component::IADO_manager_proxy_factory {
 
   void unload() override { delete this; }
 
-  virtual Component::IADO_manager_proxy *create(unsigned    debug_level,
-                                                int         core,
+  virtual component::IADO_manager_proxy *create(unsigned    debug_level,
+                                                unsigned    core,
                                                 std::string cores,
                                                 float       cpu_num) override
   {
-    Component::IADO_manager_proxy *obj =
-        static_cast<Component::IADO_manager_proxy *>(
-            new ADO_manager_proxy(debug_level, core, cores, cpu_num));
+    component::IADO_manager_proxy *obj =
+        static_cast<component::IADO_manager_proxy *>(
+            new ADO_manager_proxy(debug_level, unsigned(core), cores, cpu_num));
     assert(obj);
     obj->add_ref();
     return obj;

@@ -20,19 +20,20 @@
 #include <cstring> /* string */
 #include <memory> /* shared_ptr, unique_ptr */
 
-class registered_memory;
+struct registered_memory;
 
-namespace Component
+namespace component
 {
   class IFabric;
   class IFabric_client_grouped;
   class IFabric_communicaator;
 }
 
-class remote_memory_client_grouped
+struct remote_memory_client_grouped
   : public remote_memory_accessor
 {
-  std::shared_ptr<Component::IFabric_client_grouped> _cnxn;
+private:
+  std::shared_ptr<component::IFabric_client_grouped> _cnxn;
   std::size_t _memory_size;
   std::shared_ptr<registered_memory> _rm_out;
   std::uint64_t _vaddr;
@@ -41,7 +42,7 @@ class remote_memory_client_grouped
   std::uint64_t _remote_key_index_for_startup_and_shutdown;
   registered_memory &rm_out() const { return *_rm_out; }
 public:
-  remote_memory_client_grouped(Component::IFabric &fabric
+  remote_memory_client_grouped(component::IFabric &fabric
     , const std::string &fabric_spec
     , const std::string ip_address
     , std::uint16_t port
@@ -54,13 +55,13 @@ public:
 
   ~remote_memory_client_grouped();
 
-  void send_disconnect(Component::IFabric_communicator &cnxn, registered_memory &rm, char quit_flag);
+  void send_disconnect(component::IFabric_communicator &cnxn, registered_memory &rm, char quit_flag);
 
   std::uint64_t vaddr() const { return _vaddr; }
   std::uint64_t key() const { return _key; }
-  Component::IFabric_client_grouped &cnxn() { return *_cnxn; }
+  component::IFabric_client_grouped &cnxn() { return *_cnxn; }
 
-  std::unique_ptr<Component::IFabric_communicator> allocate_group() const;
+  std::unique_ptr<component::IFabric_communicator> allocate_group() const;
   std::size_t max_message_size() const;
 };
 

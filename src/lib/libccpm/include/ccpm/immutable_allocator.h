@@ -40,6 +40,7 @@ public:
                            ccpm::ownership_callback_t callback,
                            bool force_init)
   {
+    (void)debug_level; // unused
     reconstitute(regions, callback, force_init);
     assert(_root);
   }
@@ -74,7 +75,7 @@ public:
    * @brief      Force full slab persistence
    */
   void persist() {
-    pmem_persist(_root, reinterpret_cast<byte*>(_root) - _root->slab_end);
+    pmem_persist(_root, std::size_t(reinterpret_cast<byte*>(_root) - _root->slab_end));
   }
 
   /* Reconstitute allocator from existing memory (ctor)
@@ -88,7 +89,7 @@ public:
    **/
   bool reconstitute(const region_vector_t &regions,
                     ccpm::ownership_callback_t callback,
-                    const bool force_init)
+                    const bool force_init) override
   {
     if(regions.size() == 0)
       throw std::invalid_argument("invalid regions parameter");
@@ -163,7 +164,7 @@ public:
 
   status_t remaining(std::size_t& out_size) const override
   {
-    out_size = _root->slab_end - reinterpret_cast<byte*>(_root->next_free.load());
+    out_size = std::size_t(_root->slab_end - reinterpret_cast<byte*>(_root->next_free.load()));
     return S_OK;
   }
 
@@ -227,15 +228,15 @@ public:
     pmem_persist(_root->linked_slab, sizeof(_root->linked_slab));
   }
 
-  inline size_t remaining_size() const { return (_root->slab_end - _root->next_free); }
+  inline size_t remaining_size() const { return std::size_t(_root->slab_end - _root->next_free); }
 
   bool is_valid() const { return _root->magic == MAGIC; }
 
   void dump_info() const {
     PINF("-- Immutable Allocator --");
     PINF("magic    : %X", _root->magic);
-    PINF("range    : %p-%p (size %lu)", static_cast<const void *>(_root), _root->slab_end, _root->slab_end - reinterpret_cast<byte*>(_root));
-    PINF("next free: %p", _root->next_free.load());
+    PINF("range    : %p-%p (size %lu)", static_cast<const void *>(_root), static_cast<const void *>(_root->slab_end), _root->slab_end - reinterpret_cast<byte*>(_root));
+    PINF("next free: %p", static_cast<const void *>(_root->next_free.load()));
     PINF("free     : %lu/%lu",
          _root->slab_end - reinterpret_cast<byte*>(_root->next_free.load()),
          _root->slab_end - reinterpret_cast<byte*>(_root));
@@ -261,11 +262,13 @@ class Immutable_allocator
 //    public std::allocator_traits<T>
 {
 public:
+#if 0
   explicit Immutable_allocator(void * base, const size_t size, const bool force_init) noexcept
     : Immutable_allocator_base(base, size, nullptr, force_init) {
     assert(base);
     assert(size);
   };
+#endif
   explicit Immutable_allocator(region_vector_t& regions, const bool force_init) noexcept 
     : Immutable_allocator_base(regions, nullptr, force_init) {
   };
@@ -276,7 +279,7 @@ public:
   void deallocate(T*, std::size_t) noexcept {
     PWRN("deallocate on Immutable_allocator does nothing.");
   }
-  void dump_info() override {
+  void dump_info() {
     Immutable_allocator_base::dump_info();
   }
 };

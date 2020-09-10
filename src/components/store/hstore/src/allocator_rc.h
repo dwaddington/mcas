@@ -24,31 +24,28 @@
 #include <cstddef> /* size_t, ptrdiff_t */
 
 template <typename T, typename Persister>
-	class allocator_rc;
+	struct allocator_rc;
 
 template <>
-	class allocator_rc<void, persister>
+	struct allocator_rc<void, persister>
 		: public deallocator_rc<void, persister>
 	{
-	public:
 		using deallocator_type = deallocator_rc<void, persister>;
 		using typename deallocator_type::value_type;
 	};
 
 template <typename Persister>
-	class allocator_rc<void, Persister>
+	struct allocator_rc<void, Persister>
 		: public deallocator_rc<void, Persister>
 	{
-	public:
 		using deallocator_type = deallocator_rc<void, Persister>;
 		using typename deallocator_type::value_type;
 	};
 
 template <typename T, typename Persister = persister>
-	class allocator_rc
+	struct allocator_rc
 		: public deallocator_rc<T, Persister>
 	{
-	public:
 		using deallocator_type = deallocator_rc<T, Persister>;
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::size_type;
@@ -75,6 +72,7 @@ template <typename T, typename Persister = persister>
 		allocator_rc &operator=(const allocator_rc &a_) = delete;
 
 		auto allocate(
+			AK_ACTUAL
 			size_type s
 			, size_type alignment = alignof(T)
 		) -> value_type *
@@ -82,27 +80,29 @@ template <typename T, typename Persister = persister>
 			auto ptr = this->pool()->alloc(s * sizeof(T), alignment);
 			if ( ptr == 0 )
 			{
-				throw bad_alloc_cc(0, s, sizeof(T));
+				throw bad_alloc_cc(AK_REF 0, s, sizeof(T));
 			}
 			return static_cast<value_type *>(ptr);
 		}
 
 		void allocatep(
+			AK_ACTUAL
 			persistent<value_type *> &ptr
 			, size_type sz
 			, size_type alignment = alignof(T)
 		)
 		{
-			allocate(ptr, sz, alignment);
+			allocate(AK_REF ptr, sz, alignment);
 		}
 
 		void allocate(
+			AK_ACTUAL
 			value_type * &ptr
 			, size_type sz
 			, size_type alignment = alignof(T)
 		)
 		{
-			ptr = allocate(sz, alignment);
+			ptr = allocate(AK_REF sz, alignment);
 		}
 
 		void reconstitute(

@@ -20,22 +20,23 @@
 #include <string>
 #include <memory> /* shared_ptr */
 
-namespace Component
+namespace component
 {
   class IFabric;
   class IFabric_client;
   class IFabric_communicator;
 }
 
-class registered_memory;
+struct registered_memory;
 
-class remote_memory_client
+struct remote_memory_client
   : public remote_memory_accessor
 {
+private:
   static void check_complete_static(void *t, void *ctxt, ::status_t stat, std::size_t len);
   void check_complete(::status_t stat, std::size_t len);
 
-  std::shared_ptr<Component::IFabric_client> _cnxn;
+  std::shared_ptr<component::IFabric_client> _cnxn;
   std::shared_ptr<registered_memory> _rm_out;
   std::shared_ptr<registered_memory> _rm_in;
   std::uint64_t _vaddr;
@@ -49,7 +50,7 @@ protected:
   void do_quit();
 public:
   remote_memory_client(
-    Component::IFabric &fabric
+    component::IFabric &fabric
     , const std::string &fabric_spec
     , const std::string ip_address
     , std::uint16_t port
@@ -61,11 +62,11 @@ public:
 
   ~remote_memory_client();
 
-  void send_disconnect(Component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_);
+  void send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_);
 
   std::uint64_t vaddr() const { return _vaddr; }
   std::uint64_t key() const { return _key; }
-  Component::IFabric_client &cnxn() { return *_cnxn; }
+  component::IFabric_client &cnxn() { return *_cnxn; }
 
   void write(const std::string &msg_, bool force_error = false);
   void write_badly(const std::string &msg_) { return write(msg_, true); }

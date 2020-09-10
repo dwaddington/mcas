@@ -936,7 +936,7 @@ namespace Internal
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static const Internal::ignore_t ignore;
+static const Internal::ignore_t ignore{};
 #pragma GCC diagnostic pop
 
 

@@ -34,6 +34,7 @@
 #ifndef __COMMON_SPIN_LOCKS_H__
 #define __COMMON_SPIN_LOCKS_H__
 
+#include <common/common.h>
 #include <common/cpu.h>
 #include <common/logging.h>
 #include <common/types.h>
@@ -77,7 +78,7 @@ static inline void *xchg(void *ptr, void *x) {
   return x;
 }
 
-namespace Common
+namespace common
 {
 /**
  * Ticket lock spin-lock.  This type of lock is used in the Linux kernel.  It
@@ -90,19 +91,26 @@ namespace Common
  */
 class Ticket_lock {
  private:
-  union {
-    unsigned u;
-    struct {
+  struct tl_s
+  {
       unsigned short ticket; /* little endian order */
       unsigned short users;
-    } s __attribute__((packed));
+  } __attribute__((packed));
+  union {
+    unsigned u;
+    tl_s s;
   };
 
  public:
   Ticket_lock() : u(0) {}
 
   INLINE void lock() {
+#pragma GCC diagnostic push
+#if ( defined __clang_major__ && 4 <= __clang_major__ ) || 9 <= __GNUC__
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
     unsigned short me = atomic_xadd(&s.users, 1);
+#pragma GCC diagnostic pop
     while (s.ticket != me) cpu_relax();
   }
 
@@ -117,7 +125,12 @@ class Ticket_lock {
     unsigned cmp = (static_cast<unsigned>(me) << 16) + me;
     unsigned cmpnew = (static_cast<unsigned>(menew) << 16) + me;
 
+#pragma GCC diagnostic push
+#if ( defined __clang_major__ && 4 <= __clang_major__ ) || 9 <= __GNUC__
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
     if (cmpxchg(&u, cmp, cmpnew) == cmp) return 0;
+#pragma GCC diagnostic pop
 
     return E_BUSY;
   }
@@ -136,6 +149,57 @@ class Ticket_lock {
  */
 class Spin_lock {
  private:
+  volatile atomic_t _l alignas(sizeof(atomic_t));
+
+  enum {
+    UNLOCKED = 0,
+    LOCKED = 1,
+  };
+
+ public:
+  Spin_lock() : _l(UNLOCKED)
+  {
+  }
+
+  /**
+   * Take lock
+   *
+   */
+  INLINE void lock() {
+    while (!__sync_bool_compare_and_swap(&_l, UNLOCKED, LOCKED)) {
+      while (_l) cpu_relax(); /* unsafe spin to help reduce coherency traffic */
+    }
+  }
+
+  // void sleep_lock () {
+  //   while (!__sync_bool_compare_and_swap(&_l, UNLOCKED, LOCKED)) {
+  //     cpu_relax();
+  //   }
+  // }
+
+  INLINE void unlock() { _l = UNLOCKED; }
+
+  /**
+   * Try to take lock.  Do not block.
+   *
+   *
+   * @return
+   */
+  INLINE bool try_lock() {
+    return __sync_bool_compare_and_swap(&_l, UNLOCKED, LOCKED);
+  }
+
+} __attribute__((packed));
+
+
+/**
+ * Basic spinlock.  This lock is not fair or truly scalable.
+ *
+ *
+ * @return
+ */
+class Spin_lock_padded {
+ private:
   /* pad to x2 cache line size */
   byte _padding0[2 * CACHE_LINE_SIZE];
   volatile atomic_t _l alignas(sizeof(atomic_t));
@@ -147,7 +211,11 @@ class Spin_lock {
   };
 
  public:
-  Spin_lock() : _l(UNLOCKED) {}
+  Spin_lock_padded() : _l(UNLOCKED)
+  {
+    (void)_padding0; // unused
+    (void)_padding1; // unused
+  }
 
   /**
    * Take lock
@@ -243,6 +311,6 @@ typedef Reentrant_lock_tmpl<Spin_lock> Reentrant_spin_lock;
 typedef Lock_guard_tmpl<Reentrant_spin_lock> Reentrant_lock_guard;
 typedef Lock_guard_tmpl<Spin_lock> Spin_lock_guard;
 typedef Lock_guard_tmpl<Ticket_lock> Ticket_lock_guard;
-}  // namespace Common
+}  // namespace common
 
 #endif  // __COMMON_SPIN_LOCKS_H__

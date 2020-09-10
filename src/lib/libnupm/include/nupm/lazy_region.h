@@ -34,7 +34,7 @@
 #include <common/types.h>
 #include <common/utils.h>
 
-namespace Core
+namespace core
 {
 namespace Slab
 {

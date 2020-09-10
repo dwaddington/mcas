@@ -48,5 +48,9 @@ try
 }
 catch ( const std::exception &e )
 {
-  std::cerr << __func__ << " exception " << e.what() << "\n";
+  try
+  {
+    std::cerr << __func__ << " exception " << e.what() << "\n";
+  }
+  catch ( const std::exception & ) {}
 }

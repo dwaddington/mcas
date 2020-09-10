@@ -17,7 +17,7 @@
 #include "server_connection.h"
 #include <cstddef> /* size_t */
 
-namespace Component
+namespace component
 {
   class IFabric_server_factory;
 }
@@ -27,7 +27,7 @@ struct client_state
   server_connection sc;
   cnxn_state st;
   explicit client_state(
-    Component::IFabric_server_factory &factory
+    component::IFabric_server_factory &factory
     , unsigned iteration_count
     , std::size_t msg_size
   );

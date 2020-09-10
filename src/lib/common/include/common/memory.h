@@ -29,10 +29,12 @@
 #ifndef __COMMON_MEMORY_H__
 #define __COMMON_MEMORY_H__
 
+#include <common/common.h>
 #include <assert.h>
 #include <common/logging.h>
 #include <common/exceptions.h>
 #include <common/types.h>
+#include <common/memory.h>
 
 #if defined(__linux__)
 #include <malloc.h>
@@ -43,7 +45,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-namespace Common
+namespace common
 {
 /**
  * Allocate memory at a specific region.  Mainly for debugging purposes.
@@ -276,5 +278,5 @@ class Std_allocator : public Base_memory_allocator {
 
   void *realloc(void *ptr, size_t size) { return ::realloc(ptr, size); }
 };
-}  // namespace Common
+}  // namespace common
 #endif

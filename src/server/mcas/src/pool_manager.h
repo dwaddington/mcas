@@ -15,6 +15,7 @@
 
 #include <api/kvstore_itf.h>
 
+#include <cassert>
 #include <map>
 
 #include "fabric_connection_base.h"
@@ -25,18 +26,15 @@ namespace mcas
    Pool_manager tracks open pool handles on a per-shard basis
  */
 class Pool_manager {
+ public:
+  using pool_t = component::IKVStore::pool_t;
  private:
-  const unsigned option_DEBUG = mcas::Global::debug_level;
+  static unsigned debug_level() { return mcas::Global::debug_level; }
+  const void *to_ptr(component::IKVStore::pool_t p) { return reinterpret_cast<const void *>(p); }
 
  public:
-  using pool_t = Component::IKVStore::pool_t;
 
-  Pool_manager()
-    : _map_n2p{},
-      _map_p2n{},
-      _open_pools{},
-      _pool_info{}
-  {}
+  Pool_manager() : _map_n2p{}, _map_p2n{}, _open_pools{}, _pool_info{} {}
 
   /**
    * Determine if pool is open and valid
@@ -49,7 +47,7 @@ class Pool_manager {
   {
     auto i = _map_n2p.find(pool_name);
     if (i == _map_n2p.end()) {
-      if (option_DEBUG) PLOG("check_for_open_pool (%s) false", pool_name.c_str());
+      CPLOG(0, "check_for_open_pool (%s) false", pool_name.c_str());
       out_pool = 0;
       return false;
     }
@@ -57,11 +55,11 @@ class Pool_manager {
     auto j = _open_pools.find(i->second);
     if (j != _open_pools.end()) {
       out_pool = i->second;
-      if (option_DEBUG) PLOG("check_for_open_pool (%s) true", pool_name.c_str());
+      CPLOG(0, "check_for_open_pool (%s) true", pool_name.c_str());
       return true;
     }
     out_pool = 0;
-    if (option_DEBUG) PLOG("check_for_open_pool (%s) false", pool_name.c_str());
+    CPLOG(0, "check_for_open_pool (%s) false", pool_name.c_str());
     return false;
   }
 
@@ -84,8 +82,8 @@ class Pool_manager {
     _map_p2n[pool]      = pool_name;
     _pool_info[pool]    = {expected_obj_count, size, flags};
 
-    if (option_DEBUG)
-      PLOG("(+) registered pool (%p) ref:%u pm=%p", reinterpret_cast<void*>(pool), _open_pools[pool], static_cast<void*>(this));
+    CPLOG(0, "(+) registered pool (%p) ref:%u pm=%p", to_ptr(pool), _open_pools[pool],
+          static_cast<void*>(this));
   }
 
   /**
@@ -116,7 +114,7 @@ class Pool_manager {
     if (_open_pools.find(pool) == _open_pools.end()) throw Logic_exception("add reference to pool that is not open");
 
     _open_pools[pool] += 1;
-    if (option_DEBUG) PLOG("(+) inc pool (%p) ref:%u", reinterpret_cast<void*>(pool), _open_pools[pool]);
+    CPLOG(0, "(+) inc pool (%p) ref:%u", to_ptr(pool), _open_pools[pool]);
   }
 
   /**
@@ -133,7 +131,7 @@ class Pool_manager {
 
     i->second -= 1;  // _open_pools[pool]
 
-    if (option_DEBUG) PLOG("(-) release pool (%p) ref:%u", reinterpret_cast<void*>(pool), _open_pools[pool]);
+    CPLOG(0, "(-) release pool (%p) ref:%u", to_ptr(pool), _open_pools[pool]);
 
     if (i->second == 0) {
       /* zero reference count; erase entries */

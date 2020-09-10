@@ -36,6 +36,7 @@
 #ifndef __CYCLES_H__
 #define __CYCLES_H__
 
+#include <common/common.h>
 #include <stdlib.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -146,7 +147,7 @@ INLINE cpu_time_t rdtsc() {
 #error Platform not supported.
 #endif
 
-namespace Common
+namespace common
 {
 /**
  * Get RDTSC frequency in MHz.
@@ -156,16 +157,16 @@ namespace Common
  */
 float get_rdtsc_frequency_mhz();
 
-/** 
+/**
  * Convert cycles to usecs
- * 
+ *
  * @param time Duration in usecs
- * 
- * @return 
+ *
+ * @return
  */
 float cycles_to_usec(cpu_time_t time);
 
-}  // namespace Core
+}  // namespace common
 
 #undef INLINE
 

@@ -2,16 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
 
-if(DEFINED SKIP_KERNEL_MODULES)
-  ExternalProject_Add(xpmem-kernel-module
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/src/kernel/modules/xpmem
-    BUILD_IN_SOURCE 1
-    CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/autogen.sh
-    COMMAND ./configure --disable-kernel-module --prefix=${CMAKE_INSTALL_PREFIX}
-    BUILD_COMMAND make
-    INSTALL_COMMAND make install
-    )
-else(DEFINED SKIP_KERNEL_MODULES)
+if(BUILD_KERNEL_SUPPORT)
   ExternalProject_Add(xpmem-kernel-module
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/src/kernel/modules/xpmem
     BUILD_IN_SOURCE 1
@@ -20,5 +11,13 @@ else(DEFINED SKIP_KERNEL_MODULES)
     BUILD_COMMAND make
     INSTALL_COMMAND make install
     )
-endif(DEFINED SKIP_KERNEL_MODULES)
-
+else(BUILD_KERNEL_SUPPORT)
+    ExternalProject_Add(xpmem-kernel-module
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/src/kernel/modules/xpmem
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/autogen.sh
+    COMMAND ./configure --disable-kernel-module --prefix=${CMAKE_INSTALL_PREFIX}
+    BUILD_COMMAND make
+    INSTALL_COMMAND make install
+    )
+endif(BUILD_KERNEL_SUPPORT)

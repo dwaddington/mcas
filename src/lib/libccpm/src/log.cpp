@@ -14,7 +14,9 @@
 #include <ccpm/log.h>
 
 #include <libpmem.h>
+#include <cstring>
 #include <iostream>
+#include <new> // bad_alloc
 
 void ccpm::persist(
 	const void *a
@@ -23,6 +25,17 @@ void ccpm::persist(
 {
 	::pmem_persist(a, sizeof len);
 }
+
+struct bad_alloc_log
+	: public std::bad_alloc
+{
+	bad_alloc_log()
+	{}
+	const char *what() const noexcept override
+	{
+		return "bad log allocate";
+	}
+};
 
 struct element
 {
@@ -99,7 +112,7 @@ public:
 		/* saved data */
 		report("log");
 	}
-	void commit(ccpm::IHeapGrowable *heap_)
+	void commit(ccpm::IHeap_expandable *heap_)
 	{
 		report("commit");
 		switch ( _tag )
@@ -113,7 +126,7 @@ public:
 			break;
 		}
 	}
-	void rollback(ccpm::IHeapGrowable *heap_)
+	void rollback(ccpm::IHeap_expandable *heap_)
 	{
 		report("rollback");
 		switch ( _tag )
@@ -132,8 +145,9 @@ public:
 
 namespace ccpm
 {
-	class block_header
+	struct block_header
 	{
+	private:
 		/* A block_header is followed by "block space". A variable number of "elements"
 		 * grow up from the end of the block header, and "data space" (for saved bytes
 		 * to be used in a rollback) grow down from the end of the block header.
@@ -175,6 +189,7 @@ namespace ccpm
 		element *element_back() {
 			return element_last() - 1;
 		}
+
 	public:
 		explicit block_header(block_header *ptr, std::size_t free_size)
 			: _previous(std::move(ptr))
@@ -190,9 +205,9 @@ namespace ccpm
 		}
 		std::size_t size() const
 		{
-			return _data_space_end - static_cast<const char *>(static_cast<const void *>(this));
+			return std::size_t(_data_space_end - static_cast<const char *>(static_cast<const void *>(this)));
 		}
-		void rollback(IHeapGrowable *heap_)
+		void rollback(IHeap_expandable *heap_)
 		{
 			while ( _element_count != 0 )
 			{
@@ -201,7 +216,7 @@ namespace ccpm
 				persist(*this);
 			}
 		}
-		void commit(IHeapGrowable *heap_)
+		void commit(IHeap_expandable *heap_)
 		{
 			while ( _element_count != 0 )
 			{
@@ -288,7 +303,7 @@ namespace ccpm
 		_mr->free(r, s);
 	}
 
-	log::log(IHeapGrowable *mr_)
+	log::log(IHeap_expandable *mr_)
 		: _mr(mr_)
 		, _root(nullptr)
 	{
@@ -299,6 +314,21 @@ namespace ccpm
 		commit();
 	}
 
+	constexpr std::size_t log::min_log_extend; //  = std::max(sizeof(block_header), std::size_t(65536U));
+
+	void log::extend(std::size_t size)
+	{
+		const auto min_log_extend_safe = std::max(sizeof(block_header), std::size_t(65536U));
+		void *p = nullptr;
+		auto block_size = std::max(sizeof(element) + size, min_log_extend_safe - sizeof(block_header)); /* the bare minumum: one element + space for the data */
+		_mr->allocate(p, sizeof(block_header) + block_size, sizeof(void *));
+		if ( ! p )
+		{
+			throw bad_alloc_log();
+		}
+		_root = new (p) block_header(_root, block_size);
+	}
+
 	/*
 	 * Add a region to the log.
 	 */
@@ -306,10 +336,7 @@ namespace ccpm
 	{
 		if ( ! _root || ! _root->fits_data(size) )
 		{
-			void *p = nullptr;
-			auto block_size = sizeof(element) + size; /* the bare minumum: one element + space for the data */
-			_mr->allocate(p, sizeof(block_header) + block_size, sizeof(void *));
-			_root = new (p) block_header(_root, block_size);
+			extend(size);
 		}
 
 		_root->add(static_cast<char *>(begin), size);
@@ -322,10 +349,7 @@ namespace ccpm
 	{
 		if ( ! _root || ! _root->fits_alloc() )
 		{
-			void *p = nullptr;
-			auto block_size = sizeof(element) + size; /* the bare minumum: one element + space for the data */
-			_mr->allocate(p, sizeof(block_header) + block_size, sizeof(void *));
-			_root = new (p) block_header(_root, block_size);
+			extend(size);
 		}
 
 		_root->allocated(pl, size);
@@ -338,10 +362,7 @@ namespace ccpm
 	{
 		if ( ! _root || ! _root->fits_alloc() )
 		{
-			void *p = nullptr;
-			auto block_size = sizeof(element) + size; /* the bare minumum: one element + space for the data */
-			_mr->allocate(p, sizeof(block_header) + block_size, sizeof(void *));
-			_root = new (p) block_header(_root, block_size);
+			extend(size);
 		}
 
 		_root->freed(pl, size);

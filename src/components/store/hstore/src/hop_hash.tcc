@@ -40,12 +40,13 @@ template <
 	, typename Allocator, typename SharedMutex
 >
 	impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::hop_hash_base(
+		AK_ACTUAL
 		persist_data_t *pc_
 		, construction_mode mode_
 		, const Allocator &av_
 	)
 		: hop_hash_allocator<Allocator>{av_}
-		, persist_controller_t(av_, pc_, mode_)
+		, persist_controller_t(AK_REF av_, pc_, mode_)
 		, _hasher{}
 		, _auto_resize{true}
 		, _locate_key_call(0)
@@ -626,6 +627,7 @@ template <
 >
 	template <typename ... Args>
 		auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::emplace(
+			AK_ACTUAL
 			Args && ... args
 		) -> std::pair<iterator, bool>
 		try
@@ -721,7 +723,7 @@ template <
 
 					if ( segment_count() < _segment_capacity )
 					{
-						resize();
+						resize(AK_REF0);
 						hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, "2. after resize\n", dump<HSTORE_TRACE_MANY>::make_hop_hash_dump(*this));
 						goto RETRY;
 					}
@@ -754,7 +756,7 @@ template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
 >
-	void impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::resize()
+	void impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::resize(AK_ACTUAL0)
 	{
 		hop_hash_log<HSTORE_TRACE_RESIZE>::write(LOG_LOCATION
 			, " capacity ", bucket_count()
@@ -764,7 +766,7 @@ template <
 #if 0
 			monitor_extend<Allocator> m{bucket_allocator_t(av)};
 #endif
-			_bc[segment_count()]._buckets = this->persist_controller_t::resize_prolog();
+			_bc[segment_count()]._buckets = this->persist_controller_t::resize_prolog(AK_REF0);
 		}
 		_bc[segment_count()]._next = &_bc[0];
 		_bc[segment_count()]._prev = &_bc[segment_count()-1];

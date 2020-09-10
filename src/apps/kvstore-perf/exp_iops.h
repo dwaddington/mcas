@@ -16,7 +16,7 @@ public:
   Experiment_IOPS(ProgramOptions options)
   {
     assert(options.factory);
-    _store = options.factory->create(options.debug_level, options.owner, options.server_address, options.device_name);    
+    _store.reset(options.factory->create(options.debug_level, options.owner, options.server_address, options.device_name));
   }
   
   void initialize(unsigned core) override
@@ -88,11 +88,11 @@ public:
   void cleanup(unsigned core)  
   {
     _end_time = std::chrono::high_resolution_clock::now();
-    _store->release_ref();
+    _store.reset(nullptr);
   }
   
 private:
-  Component::IKVStore * _store;
+  Component::Itf_ref<Component::IKVStore> _store;
   std::chrono::high_resolution_clock::time_point _start_time,_end_time;
 };
 

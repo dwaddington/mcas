@@ -25,31 +25,28 @@
 #include <cstddef> /* size_t, ptrdiff_t */
 
 template <typename T, typename Persister>
-	class allocator_cc;
+	struct allocator_cc;
 
 template <>
-	class allocator_cc<void, persister>
+	struct allocator_cc<void, persister>
 		: public deallocator_cc<void, persister>
 	{
-	public:
 		using deallocator_type = deallocator_cc<void, persister>;
 		using typename deallocator_type::value_type;
 	};
 
 template <typename Persister>
-	class allocator_cc<void, Persister>
+	struct allocator_cc<void, Persister>
 		: public deallocator_cc<void, Persister>
 	{
-	public:
 		using deallocator_type = deallocator_cc<void, Persister>;
 		using typename deallocator_type::value_type;
-};
+	};
 
 template <typename T, typename Persister = persister>
-	class allocator_cc
+	struct allocator_cc
 		: public deallocator_cc<T, Persister>
 	{
-	public:
 		using deallocator_type = deallocator_cc<T, Persister>;
 		using typename deallocator_type::size_type;
 		using typename deallocator_type::value_type;
@@ -78,6 +75,7 @@ template <typename T, typename Persister = persister>
 		}
 
 		void allocate(
+			AK_ACTUAL
 			pointer_type & p_
 			, size_type s_
 			, size_type alignment_
@@ -89,7 +87,7 @@ template <typename T, typename Persister = persister>
 			 */
 			if ( p_ == 0 )
 			{
-				throw bad_alloc_cc(s_, sizeof(T), alignment_);
+				throw bad_alloc_cc(AK_REF s_, sizeof(T), alignment_);
 			}
 		}
 	};

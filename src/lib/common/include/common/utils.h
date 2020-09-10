@@ -121,8 +121,8 @@ extern "C"
 
 #define KB(X) (X << 10)
 #define MB(X) (X << 20)
-#define GB(X) ((boost::numeric_cast<uint64_t>(X)) << 30)
-#define TB(X) ((boost::numeric_cast<uint64_t>(X)) << 40)
+#define GB(X) ((1ULL << 30) * X)
+#define TB(X) ((1ULL << 40) * X)
 
 #define REDUCE_KiB(X) (X >> 10)
 #define REDUCE_MiB(X) (X >> 20)
@@ -201,19 +201,6 @@ INLINE static void *forward_align_pointer(void *p, unsigned long alignment) {
 }
 
 /**
- * Check pointer alignment
- *
- * @param p Pointer to check
- * @param alignment Alignment in bytes
- *
- * @return
- */
-INLINE static bool check_aligned(const void *p, unsigned long alignment) {
-  if(alignment == 0) throw std::invalid_argument("invalid parameter");
-  return (reinterpret_cast<unsigned long>(p) % alignment == 0);
-}
-
-/**
  * Check alignment
  *
  * @param p Unsigned long to check
@@ -221,8 +208,21 @@ INLINE static bool check_aligned(const void *p, unsigned long alignment) {
  *
  * @return
  */
-INLINE static bool check_aligned(unsigned long p, unsigned long alignment) {
+INLINE static bool check_aligned(uintptr_t p, size_t alignment) {
+  if(alignment == 0) throw std::invalid_argument("invalid parameter");
   return (p % alignment == 0);
+}
+
+/**
+ * Check pointer alignment
+ *
+ * @param p Pointer to check
+ * @param alignment Alignment in bytes
+ *
+ * @return
+ */
+INLINE static bool check_aligned(const void *p, size_t alignment) {
+  return check_aligned(reinterpret_cast<uintptr_t>(p), alignment);
 }
 
 /**
@@ -239,7 +239,7 @@ INLINE static bool is_power_of_two(unsigned long x) {
  *
  * @return
  */
-INLINE static unsigned log_base2(uint64_t val) { return __builtin_ctzl(val); }
+INLINE static unsigned log_base2(uint64_t val) { return unsigned(__builtin_ctzl(val)); }
 
 /**
  * Round up to nearest 4MB aligned
@@ -303,7 +303,7 @@ INLINE void *round_down_cacheline(void *a) {
  *
  */
 INLINE addr_t round_up_log2(addr_t a) {
-  int clzl = __builtin_clzl(a);
+  auto clzl = unsigned(__builtin_clzl(a));
   int fsmsb = int(((sizeof(addr_t) * 8) - clzl));
   if ((addr_t(1) << (fsmsb - 1)) == a) fsmsb--;
 
@@ -449,14 +449,26 @@ template<typename DstT, typename SrcT> DstT safe_downsize(SrcT src) {
 }
 #endif
 
-#include <time.h>
+#pragma GCC diagnostic pop
 
-INLINE static epoch_time_t epoch_now() {
-  time_t t;
-  time(&t);
-  return t;
+#if defined(__cplusplus)
+template <typename T, typename U>
+  T div_round_up(T t, U u)
+  {
+    return (t + (T(u) - T(1)))/T(u);
+  }
+
+template <typename T, typename U>
+  T round_up_t(T t, U u)
+  {
+    return div_round_up(t, u) * T(u);
+  }
+#endif
+
+namespace common
+{
+std::string get_DRAM_usage();
 }
 
-#pragma GCC diagnostic pop
 
 #endif

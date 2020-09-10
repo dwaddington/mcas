@@ -3,7 +3,9 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 project(nupm CXX C)
 
 set(CMAKE_CXX_STANDARD 14)
-add_compile_options(-Wall)
+
+add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
+add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
 include(../../../mk/clang-dev-tools.cmake)
 
@@ -32,6 +34,7 @@ file(GLOB SOURCES src/*.c*)
 add_library(nupm SHARED ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
+target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0> -fopenmp)
 target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem gcov)
 

@@ -35,9 +35,11 @@
 #ifndef __COMP_TYPES_H__
 #define __COMP_TYPES_H__
 
+#include <common/common.h>
 #include <stdint.h>
 #include <cstddef>
 #include <sys/uio.h>
+#include <time.h>
 
 typedef int status_t;
 
@@ -57,15 +59,12 @@ typedef void *handle_t;
 typedef uint32_t core_id_t;
 typedef uint64_t atomic_t;
 typedef uint64_t cpu_time_t; /* timestamp counter time */
-typedef uint64_t epoch_time_t;
-typedef cpu_time_t tsc_time_t;
-
 typedef int numa_node_t;
 typedef uint64_t offset_t;
 
 #ifdef __cplusplus
 #if __x86_64__
-namespace Common /* avoid conflict with EASTL definition of uint128_t */
+namespace common /* avoid conflict with EASTL definition of uint128_t */
 {
 typedef __uint128_t uint128_t;
 }

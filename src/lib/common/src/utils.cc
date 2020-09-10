@@ -2,6 +2,7 @@
    eXokernel Development Kit (XDK)
 
    Samsung Research America Copyright (C) 2013
+   IBM Corporation (C) 2020
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -28,12 +29,15 @@
 
 /*
   Authors:
-  Copyright (C) 2014, Daniel G. Waddington <daniel.waddington@acm.org>
+  Daniel G. Waddington <daniel.waddington@acm.org>
 */
 
 #include <common/assert.h>
 #include <common/logging.h>
 #include <common/utils.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 #include <numa.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -166,5 +170,41 @@ bool check_ptr_valid(void *pointer, size_t len) {
   }
   return true;
 }
+
+
+namespace common
+{
+
+std::string get_DRAM_usage()
+{
+  using namespace std;
+
+  ifstream stat_stream("/proc/self/stat",ios_base::in);
+
+  string pid, comm, state, ppid, pgrp, session, tty_nr;
+  string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+  string utime, stime, cutime, cstime, priority, nice, threads;
+  string O, itrealvalue, starttime;
+
+  unsigned long vsize;
+  long rss;
+
+  stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
+              >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
+              >> utime >> stime >> cutime >> cstime >> priority >> nice
+              >> threads >> itrealvalue >> starttime >> vsize >> rss;
+
+  stat_stream.close();
+
+  long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
+  auto resident_set = rss * page_size_kb;
+
+  std::stringstream result;
+  result << "RSS:" << resident_set/1024 << "MiB, VM:" << REDUCE_MiB(vsize) << "MiB";
+  return result.str();
+}
+
+}
+
 
 #endif  // __linux__

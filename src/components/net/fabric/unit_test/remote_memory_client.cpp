@@ -57,7 +57,7 @@ void remote_memory_client::do_quit()
 }
 
 remote_memory_client::remote_memory_client(
-  Component::IFabric &fabric_
+  component::IFabric &fabric_
   , const std::string &fabric_spec_
   , const std::string ip_address_
   , std::uint16_t port_
@@ -99,7 +99,7 @@ catch ( std::exception &e )
   throw;
 }
 
-void remote_memory_client::send_disconnect(Component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)
+void remote_memory_client::send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)
 {
   send_msg(cnxn_, rm_, &quit_flag_, sizeof quit_flag_);
 }

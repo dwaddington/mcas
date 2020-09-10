@@ -22,13 +22,17 @@
 #include <cerrno>
 
 Fd_pair::Fd_pair()
-  : _pair{}
+  : _read{}
+  , _write{}
 {
-  if ( -1 == ::pipe(_pair) )
+  int pair[2];
+  if ( -1 == ::pipe(pair) )
   {
     auto e = errno;
     system_fail(e, "creating Fd_pair");
   }
+  _read = common::Fd_open(pair[0]);
+  _write = common::Fd_open(pair[1]);
 }
 
 #if 0
@@ -61,10 +65,4 @@ std::size_t Fd_pair::write(const void *b, std::size_t sz) const
     system_fail(errno, std::string(__func__) + " fd=" + std::to_string(fd_write()));
   }
   return std::size_t(ct);
-}
-
-Fd_pair::~Fd_pair()
-{
-  ::close(fd_read());
-  ::close(fd_write());
 }

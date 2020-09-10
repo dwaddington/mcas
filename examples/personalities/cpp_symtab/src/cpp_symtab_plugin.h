@@ -26,7 +26,7 @@
 #include <cpp_symtab_proto_generated.h>
 #include <ccpm/interfaces.h>
 
-class ADO_symtab_plugin : public Component::IADO_plugin
+class ADO_symtab_plugin : public component::IADO_plugin
 {  
 private:
   static constexpr bool option_DEBUG = true;
@@ -53,9 +53,9 @@ public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x59564581,0x9e1b,0x4811,0xbdb2,0x19,0x57,0xa0,0xa6,0x84,0x57);
   
-  void * query_interface(Component::uuid_t& itf_uuid) override {
-    if(itf_uuid == Component::IADO_plugin::iid()) {
-      return (void *) static_cast<Component::IADO_plugin*>(this);
+  void * query_interface(component::uuid_t& itf_uuid) override {
+    if(itf_uuid == component::IADO_plugin::iid()) {
+      return (void *) static_cast<component::IADO_plugin*>(this);
     }
     else return NULL; // we don't support this interface
   }
@@ -85,7 +85,9 @@ public:
                     const std::string& pool_name,
                     const size_t pool_size,
                     const unsigned int pool_flags,
-                    const size_t expected_obj_count) override;
+                    const unsigned int memory_type,
+                    const size_t expected_obj_count,
+                    const std::vector<std::string>& params) override;
 
   status_t shutdown() override;
 

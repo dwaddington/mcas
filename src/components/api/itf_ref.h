@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,22 +13,30 @@
 #ifndef __ITF_REF_H__
 #define __ITF_REF_H__
 
-namespace Component
+#include <memory>
+
+namespace component
 {
+/* How to delete component references */
+template <typename T>
+  struct ref_delete
+  {
+    constexpr ref_delete() noexcept = default;
+    void operator() (T *t) const
+    {
+      t->release_ref();
+    }
+  };
+
+/* despite the name, acts like a pointer, not like a reference */
 template <class I>
-class Itf_ref {
- public:
-  Itf_ref(I* obj) : _obj(obj) { assert(obj); }
+  using Itf_ref = std::unique_ptr<I, ref_delete<I>>;
 
-  ~Itf_ref() { _obj->release_ref(); }
+template <typename Obj>
+  Itf_ref<Obj> make_itf_ref(Obj *obj_)
+  {
+    return Itf_ref<Obj>(obj_);
+  }
 
-  I* get() { return _obj; }
-
-  I* operator->() { return _obj; }
-
- private:
-  I* _obj;
-};
-
-}  // namespace Component
+}  // namespace component
 #endif

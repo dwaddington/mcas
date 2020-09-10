@@ -41,7 +41,7 @@ bool ExperimentErase::do_work(unsigned core)
   }
 
   // end experiment if we've reached the total number of components
-  if ( _i == pool_num_objects() )
+  if ( std::size_t(_i) == pool_num_objects() )
   {
     PINF("[%u] %s: reached total number of components. Exiting.", core, test_name().c_str());
     return false;
@@ -49,7 +49,7 @@ bool ExperimentErase::do_work(unsigned core)
 
   const char *op = "erase";
   // generate a new random value with the same value length to use
-  auto new_val = Common::random_string(g_data->value_len());
+  auto new_val = common::random_string(g_data->value_len());
 
   // check time it takes to complete a single erase operation
   try
@@ -80,7 +80,7 @@ bool ExperimentErase::do_work(unsigned core)
   double lap_time = timer.get_lap_time_in_seconds();
   double time_since_start = timer.get_time_in_seconds();
 
-  _update_data_process_amount(core, _i);
+  _update_data_process_amount(core, std::size_t(_i));
 
   // store the information for later use
   _start_time.push_back(time_since_start);
@@ -117,13 +117,14 @@ try {
   if ( is_verbose() )
   {
     std::stringstream stats_info;
-    stats_info << "creating time_stats with " << bin_count() << " bins: [" << _start_time.front() << " - " << _start_time.at(_i-1) << "]. _i = " << _i << std::endl;
+    auto i = std::size_t(_i);
+    stats_info << "creating time_stats with " << bin_count() << " bins: [" << _start_time.front() << " - " << _start_time.at(i-1) << "]. _i = " << i << std::endl;
     _debug_print(core, stats_info.str());
   }
 
   double run_time = timer.get_time_in_seconds();
   double iops = double(_i) / run_time;
-  PINF("[%u] %s: IOPS--> %u (%lu operations over %2g seconds)", core, test_name().c_str(), unsigned(iops), _i, run_time);
+  PINF("[%u] %s: IOPS--> %2g (%lu operations over %2g seconds)", core, test_name().c_str(), iops, _i, run_time);
   _update_aggregate_iops(iops);
 
   double throughput = _calculate_current_throughput();
@@ -133,8 +134,9 @@ try {
   {
 
   // compute _start_time_stats pre-lock
-  BinStatistics start_time_stats = _compute_bin_statistics_from_vectors(_latencies, _start_time, bin_count(), _start_time.front(), _start_time.at(_i-1), _i);
-  _debug_print(core, "time_stats created");
+    auto i = std::size_t(_i);
+    BinStatistics start_time_stats = _compute_bin_statistics_from_vectors(_latencies, _start_time, bin_count(), _start_time.front(), _start_time.at(i-1), i);
+    _debug_print(core, "time_stats created");
 
     // save everything
     std::lock_guard<std::mutex> g(g_write_lock);

@@ -17,14 +17,14 @@
 #include <exception>
 #include <iostream> /* cerr */
 
-Component::IFabric_server_grouped *server_grouped_connection::get_connection(Component::IFabric_server_grouped_factory &ep_)
+component::IFabric_server_grouped *server_grouped_connection::get_connection(component::IFabric_server_grouped_factory &ep_)
 {
-  Component::IFabric_server_grouped *cnxn = nullptr;
+  component::IFabric_server_grouped *cnxn = nullptr;
   while ( ! ( cnxn = ep_.get_new_connection() ) ) {}
   return cnxn;
 }
 
-server_grouped_connection::server_grouped_connection(Component::IFabric_server_grouped_factory &ep_)
+server_grouped_connection::server_grouped_connection(component::IFabric_server_grouped_factory &ep_)
   : _ep(ep_)
   , _cnxn(get_connection(_ep))
   , _comm(_cnxn->allocate_group())
@@ -41,7 +41,7 @@ catch ( std::exception &e )
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
 }
 
-Component::IFabric_communicator *server_grouped_connection::allocate_group() const
+component::IFabric_communicator *server_grouped_connection::allocate_group() const
 {
   return cnxn().allocate_group();
 }

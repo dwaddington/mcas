@@ -47,8 +47,8 @@ int set_cpu_affinity_mask(cpu_mask_t& mask) {
 /**
  * Convert comma separated list to cpu mask
  *
- * @param def
- * @param mask
+ * @param def String definition
+ * @param mask [out] CPU mask
  *
  * @return
  */
@@ -58,7 +58,7 @@ status_t string_to_mask(std::string def, cpu_mask_t &mask) {
 
   if (def.find(",") == std::string::npos) {
     try {
-      mask.add_core(stoi(def));
+      mask.add_core(unsigned(stoi(def)));
       return S_OK;
     } catch (const std::invalid_argument &) {
       return E_INVAL;
@@ -72,7 +72,7 @@ status_t string_to_mask(std::string def, cpu_mask_t &mask) {
   try {
     for_each(tok.begin(), tok.end(), [&](const string &s) {
       try {
-        mask.add_core(stoi(s));
+        mask.add_core(unsigned(stoi(s)));
       } catch (const std::invalid_argument &) {
         PWRN("invalid token in cpu mask string version.");
       }

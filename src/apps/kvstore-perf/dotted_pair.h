@@ -78,7 +78,7 @@ template <typename T>
 template <typename T>
   dotted_pair<T> operator+(dotted_pair<T> p_, T t_)
   {
-     return p_ += t_;
+    return p_ += t_;
   }
 
 #endif

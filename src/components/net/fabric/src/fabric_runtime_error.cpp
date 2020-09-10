@@ -23,7 +23,7 @@
 
 #include <string>
 
-Component::IFabric_runtime_error::IFabric_runtime_error(const std::string &what_)
+component::IFabric_runtime_error::IFabric_runtime_error(const std::string &what_)
   : std::runtime_error(what_)
 {
 }
@@ -33,14 +33,14 @@ Component::IFabric_runtime_error::IFabric_runtime_error(const std::string &what_
  */
 
 fabric_runtime_error::fabric_runtime_error(unsigned i_, const char *file_, int line_)
-  : Component::IFabric_runtime_error{std::string{"fabric_runtime_error \""} + ::fi_strerror(int(i_)) + "\" at " + file_ + ":" + std::to_string(line_)}
+  : component::IFabric_runtime_error{std::string{"fabric_runtime_error \""} + ::fi_strerror(int(i_)) + "\" at " + file_ + ":" + std::to_string(line_)}
   , _i(i_)
   , _file(file_)
   , _line(line_)
 {}
 
 fabric_runtime_error::fabric_runtime_error(unsigned i_, const char *file_, int line_, const std::string &desc_)
-  : Component::IFabric_runtime_error{std::string{"fabric_runtime_error ("} + std::to_string(i_) + ") \"" + ::fi_strerror(int(i_)) + "\" at " + file_ + ":" + std::to_string(line_) + " " + desc_}
+  : component::IFabric_runtime_error{std::string{"fabric_runtime_error ("} + std::to_string(i_) + ") \"" + ::fi_strerror(int(i_)) + "\" at " + file_ + ":" + std::to_string(line_) + " " + desc_}
   , _i(i_)
   , _file(file_)
   , _line(line_)

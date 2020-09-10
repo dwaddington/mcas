@@ -26,11 +26,12 @@ namespace impl
 {
 	/* Client-side persistent allocation state when using the crash-consistent
 	 * allocator in an emplace operation */
-	class allocation_state_emplace
+	struct allocation_state_emplace
 	{
+	private:
 		/* Allocation pointers stored here are tentative, and will be
 		 * disclaimed upon restart *unless* (*pmask & mask) != 0, which
-		 * indicates that the map ownershi mask at pmask acknowledges
+		 * indicates that the map ownership mask at pmask acknowledges
 		 * ownership of the pointers.
 		 * An emplace operation allocate up to two values: key string
 		 * and value string.
@@ -41,8 +42,9 @@ namespace impl
 
 		/* expect at most key, value allocations */
 		static constexpr unsigned max_expected_allocations = 2;
-		class controls
+		struct controls
 		{
+		private:
 			persistent_t<bool> _armed;
 			persistent_t<unsigned> _index;
 			std::array<persistent_t<void *const *>, 4> _ptr;
@@ -65,12 +67,18 @@ namespace impl
 				 *  (1) creation,
 				 *  (2) recovery, or
 				 *  (3) disarm (end of the previous operation)
-				 * should have left the controls in reset state, but a crash durin
+				 * should have left the controls in reset state, but a crash during
 				 * recovery might have left _pmask or _index not cleared.
 				 */
 				assert( ! _armed );
-				if ( _pmask ) { hop_hash_log<true>::write(LOG_LOCATION, "non-null initial _pmask ", _pmask); }
-				if ( _index ) { hop_hash_log<true>::write(LOG_LOCATION, "non-zero initial _index ", _index); }
+				if ( _pmask )
+				{
+					hop_hash_log<true>::write(LOG_LOCATION, "non-null initial _pmask ", static_cast<const void *>(_pmask));
+				}
+				if ( _index )
+				{
+					hop_hash_log<true>::write(LOG_LOCATION, "non-zero initial _index ", _index);
+				}
 				_index = 0;
 				_pmask = nullptr;
 				/* 2. state set to "active" (caller must persist) */

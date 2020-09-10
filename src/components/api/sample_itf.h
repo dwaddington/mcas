@@ -23,7 +23,7 @@
 #include <api/components.h>
 #include <common/types.h>
 
-namespace Component
+namespace component
 {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -52,6 +52,6 @@ class ISample_factory : public Component::IBase {
 };
 #pragma GCC diagnostic pop
 
-}  // namespace Component
+}  // namespace component
 
 #endif

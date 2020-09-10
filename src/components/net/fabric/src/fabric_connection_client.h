@@ -22,7 +22,7 @@
 
 struct fi_info;
 
-class event_producer;
+struct event_producer;
 class Fabric;
 
 class Fabric_connection_client

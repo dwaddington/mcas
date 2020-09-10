@@ -23,12 +23,11 @@
 
 #include <api/kvstore_itf.h>
 
-class Map_store : public Component::IKVStore /* generic Key-Value store interface */
+class Map_store : public component::IKVStore /* generic Key-Value store interface */
 {
-private:
+public:
   static constexpr unsigned _debug_level = 0;
 
-public:
   /**
    * Constructor
    *
@@ -51,9 +50,9 @@ public:
   DECLARE_COMPONENT_UUID(0x8a120985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75,
                          0x21, 0xa1, 0x21);
 
-  void *query_interface(Component::uuid_t &itf_uuid) override {
-    if (itf_uuid == Component::IKVStore::iid()) {
-      return static_cast<Component::IKVStore *>(this);
+  void *query_interface(component::uuid_t &itf_uuid) override {
+    if (itf_uuid == component::IKVStore::iid()) {
+      return static_cast<component::IKVStore *>(this);
     }
     else {
       return NULL;  // we don't support this interface
@@ -64,9 +63,9 @@ public:
 
 public:
   /* IKVStore */
-  virtual int thread_safety() const { return THREAD_MODEL_RWLOCK_PER_POOL; }
+  virtual int thread_safety() const override { return THREAD_MODEL_RWLOCK_PER_POOL; }
 
-  virtual int get_capability(Capability cap) const;
+  virtual int get_capability(Capability cap) const override;
 
   virtual pool_t create_pool(const std::string &name, const size_t size,
                              unsigned int flags = 0,
@@ -88,7 +87,7 @@ public:
 
   virtual status_t get_direct(const pool_t pool, const std::string &key, void *out_value,
                               size_t &out_value_len,
-                              Component::IKVStore::memory_handle_t handle) override;
+                              IKVStore::memory_handle_t handle) override;
 
   virtual status_t put_direct(const pool_t pool, const std::string &key,
                               const void *value, const size_t value_len,
@@ -113,7 +112,9 @@ public:
                         IKVStore::key_t &out_key,
                         const char ** out_key_ptr) override;
 
-  virtual status_t unlock(const pool_t pool, key_t key) override;
+  virtual status_t unlock(const pool_t pool,
+                          key_t key,
+                          IKVStore::unlock_flags_t flags) override;
 
   virtual status_t erase(const pool_t pool, const std::string &key) override;
 
@@ -132,9 +133,9 @@ public:
                                          const size_t key_len,
                                          const void* value,
                                          const size_t value_len,
-                                         const tsc_time_t timestamp)> function,
-                       const epoch_time_t t_begin,
-                       const epoch_time_t t_end) override;
+                                         const common::tsc_time_t timestamp)> function,
+                       const common::epoch_time_t t_begin,
+                       const common::epoch_time_t t_end) override;
 
   virtual status_t map_keys(const pool_t pool,
                             std::function<int(const std::string &key)> function) override;
@@ -158,8 +159,8 @@ public:
 
   virtual status_t deref_pool_iterator(const pool_t pool,
                                        pool_iterator_t iter,
-                                       const epoch_time_t t_begin,
-                                       const epoch_time_t t_end,
+                                       const common::epoch_time_t t_begin,
+                                       const common::epoch_time_t t_end,
                                        pool_reference_t& ref,
                                        bool& time_match,
                                        bool increment = true) override;
@@ -168,7 +169,7 @@ public:
                                        pool_iterator_t iter) override;
 };
 
-class Map_store_factory : public Component::IKVStore_factory {
+class Map_store_factory : public component::IKVStore_factory {
 public:
   /**
    * Component/interface management
@@ -178,19 +179,26 @@ public:
   DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75,
                          0x21, 0xa1, 0x21);
 
-  void *query_interface(Component::uuid_t &itf_uuid) override {
-    if (itf_uuid == Component::IKVStore_factory::iid()) {
-      return static_cast<Component::IKVStore_factory *>(this);
+  void *query_interface(component::uuid_t &itf_uuid) override {
+    if (itf_uuid == component::IKVStore_factory::iid()) {
+      return static_cast<component::IKVStore_factory *>(this);
     } else
       return NULL;  // we don't support this interface
   }
 
   void unload() override { delete this; }
 
-  virtual Component::IKVStore *create(const std::string &owner,
-                                      const std::string &name) override {
-    Component::IKVStore *obj =
-      static_cast<Component::IKVStore *>(new Map_store(owner, name));
+  virtual component::IKVStore *create(unsigned,
+    const IKVStore_factory::map_create &mc) override {
+    auto owner_it = mc.find(+component::IKVStore_factory::k_owner);
+    auto name_it = mc.find(+component::IKVStore_factory::k_name);
+    component::IKVStore *obj =
+      static_cast<component::IKVStore *>(
+        new Map_store(
+          owner_it == mc.end() ? "owner" : owner_it->second
+          , name_it == mc.end() ? "name" : name_it->second
+        )
+    );
     assert(obj);
     obj->add_ref();
     return obj;

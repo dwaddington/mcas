@@ -16,6 +16,7 @@
 
 #include "avl_malloc.h"
 #include "slab.h"
+#include <boost/numeric/conversion/cast.hpp>
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <numa.h>
@@ -31,20 +32,20 @@ int max_numa_node;
 __attribute__((constructor)) static void init_Rca()
 {
   Rca::max_numa_node = numa_max_node();
-};
+}
 
 class Rca_AVL_internal {
   static constexpr unsigned _debug_level = 1;
 
  public:
   Rca_AVL_internal() : _slab()
+    , _allocators(boost::numeric_cast<unsigned>(Rca::max_numa_node + 1), nullptr)
   {
-    _allocators.resize(Rca::max_numa_node + 1, 0);
-    for (int i = 0; i <= Rca::max_numa_node; i++) _allocators[i] = 0;
   }
 
   ~Rca_AVL_internal()
   {
+    /* EXCEPTION UNSAFE */
     for (auto &i : _allocators) {
       if (i != nullptr) delete i;
     }
@@ -52,52 +53,57 @@ class Rca_AVL_internal {
 
   void add_managed_region(void * region_base,
                           size_t region_length,
-                          int    numa_node)
+                          const int numa_node)
   {
+    const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     assert(region_base);
     assert(region_length > 0);
 
-    if (_allocators[numa_node] == nullptr) {
-      _allocators[numa_node] = new Core::AVL_range_allocator(
+    if (_allocators[numa_node_u] == nullptr) {
+      _allocators[numa_node_u] = new core::AVL_range_allocator(
           _slab, reinterpret_cast<addr_t>(region_base), region_length);
     }
     else {
-      _allocators[numa_node]->add_new_region(
+      _allocators[numa_node_u]->add_new_region(
           reinterpret_cast<addr_t>(region_base), region_length);
     }
   }
 
-  void inject_allocation(void *ptr, size_t size, int numa_node)
+  void inject_allocation(void *ptr, size_t size, const int numa_node)
   {
+    const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     assert(ptr);
-    assert(_allocators[numa_node]);
+    assert(_allocators[numa_node_u]);
 
-    auto mrp = _allocators[numa_node]->alloc_at(reinterpret_cast<addr_t>(ptr), size);
+    auto mrp = _allocators[unsigned(numa_node)]->alloc_at(reinterpret_cast<addr_t>(ptr), size);
     if (mrp == nullptr)
       throw General_exception("alloc_at on AVL range allocator failed unexpectedly");
   }
 
   void *alloc(size_t size, int numa_node, size_t alignment)
   {
+    const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     try {
-      auto mr = _allocators[numa_node]->alloc(size, alignment);
+      auto mr = _allocators[numa_node_u]->alloc(size, alignment);
       if (_debug_level > 1) PLOG("AVL allocated: 0x%lx size=%lu", mr->addr(), size);
 
       assert(mr);
       return mr->paddr();
     }
     catch(...) {
-      throw General_exception("region allocation out-of-space");
+      PWRN("%s:%d region allocation out-of-space (requested %lu MiB)", __FILE__, __LINE__, REDUCE_MiB(size));
+      throw std::bad_alloc();
     }
     return nullptr;
   }
 
   void free(void *ptr, int numa_node)
   {
+    const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     if (ptr == nullptr)
       throw API_exception("pointer argument to free cannot be null");
 
-    _allocators[numa_node]->free(reinterpret_cast<addr_t>(ptr));
+    _allocators[numa_node_u]->free(reinterpret_cast<addr_t>(ptr));
   }
 
   void debug_dump(std::string *out_str)
@@ -111,13 +117,13 @@ class Rca_AVL_internal {
 
  private:
 
-  Core::Slab::CRuntime<Core::Memory_region> _slab; /* use C runtime for slab? */
-  std::vector<Core::AVL_range_allocator *>  _allocators;
+  core::Slab::CRuntime<core::Memory_region> _slab; /* use C runtime for slab? */
+  std::vector<core::AVL_range_allocator *>  _allocators;
 };
 
 Rca_AVL::Rca_AVL() : _rca(new Rca_AVL_internal()) {}
 
-Rca_AVL::~Rca_AVL() { delete _rca; }
+Rca_AVL::~Rca_AVL() { }
 
 void Rca_AVL::add_managed_region(void * region_base,
                                  size_t region_length,
@@ -126,7 +132,6 @@ void Rca_AVL::add_managed_region(void * region_base,
   if (numa_node > Rca::max_numa_node)
     throw std::invalid_argument("numa node out of range");
 
-  assert(_rca);
   _rca->add_managed_region(region_base, region_length, numa_node);
 }
 
@@ -149,7 +154,8 @@ void *Rca_AVL::alloc(size_t size, int numa_node, size_t alignment)
   return _rca->alloc(size, numa_node, alignment);
 }
 
-void Rca_AVL::free(void *ptr, int numa_node, size_t size)
+void Rca_AVL::free(void *ptr, int numa_node, size_t // size unused
+)
 {
   _rca->free(ptr, numa_node);
 }

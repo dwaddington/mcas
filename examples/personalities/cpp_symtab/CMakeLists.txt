@@ -4,7 +4,7 @@ project(personality-cpp-symtab CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin")
+find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
 
 if (NOT FLATC)
   message(FATAL_ERROR ": Flatc compiler not found")
@@ -53,11 +53,14 @@ install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 #install(TARGETS ${PROJECT_NAME}-client LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-test RUNTIME DESTINATION bin)
 
-configure_file(cpp-symtab.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/cpp-symtab.conf)
+configure_file(cpp-symtab.conf.in ${CMAKE_CURRENT_BINARY_DIR}/cpp-symtab.conf)
 
-install(DIRECTORY ./
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/
   DESTINATION conf
-  FILES_MATCHING PATTERN "*.conf"
+  FILES_MATCHING
+  PATTERN "*.conf"
+  PATTERN CMakeFiles EXCLUDE
+  PATTERN generated EXCLUDE
   PERMISSIONS OWNER_READ GROUP_READ WORLD_READ OWNER_WRITE GROUP_WRITE WORLD_WRITE)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/data/google-10000-english.txt

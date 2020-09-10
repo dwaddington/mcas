@@ -8,12 +8,14 @@
 #include <nupm/mcas_mod.h>
 #include <boost/program_options.hpp>
 
-using namespace Component;
-using namespace Common;
+using namespace component;
+using namespace common;
 using namespace std;
 
-unsigned token = 1099;
+#define PAGE_COUNT 1024 // 4MB of 4K pages
 
+unsigned token = 1099;
+  
 int main(int argc, char **argv)
 {
   
@@ -26,7 +28,7 @@ int main(int argc, char **argv)
     po::options_description desc("Options");
 
     desc.add_options()("help", "Show help")
-      ("size", po::value<unsigned>()->default_value(4096), "Size of memory in bytes")
+      ("size", po::value<unsigned>()->default_value(4096*PAGE_COUNT), "Size of memory in bytes")
       ;
 
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -48,26 +50,80 @@ int main(int argc, char **argv)
   
   nupm::revoke_memory(token);
 
-  char *addr = reinterpret_cast<char *>(ddm.create_region(1234, 0, size));
-  memset(addr, 0xB, size);
-  PLOG("touched memory.");
+  uint64_t *addr = reinterpret_cast<uint64_t *>
+    (ddm.create_region(1234 /* uuid */, 0, size)); //size*8));
 
-  for(unsigned i=0;i<size;i++) {
-    if(addr[i] != 0xB)
-      throw General_exception("invalid memory");
+  auto count = size / sizeof(uint64_t);
+  auto count_per_page = PAGE_SIZE /sizeof(uint64_t);
+
+  /* write data */
+  for(uint64_t i=0;i<count;i++) {
+    if(i % count_per_page == 0) {
+      if(i==0) addr[i] = 0;
+      else addr[i] = i / count_per_page;
+    }
+    else {
+      addr[i] = 0xAAAABBBBCCCCDDDD;
+    }
   }
-  
+
+  /* read back and check */
+  for(uint64_t i=0;i<count;i++) {
+    if(i % count_per_page == 0) {
+      if(i==0) {
+	if(addr[i] != 0) {
+	  PERR("marker error: addr[%lu]=%lu", i, addr[i]);
+	  throw General_exception("bad data");
+	}	       
+      }
+      else {
+	if(addr[i] != (i / count_per_page)) {
+	  PERR("marker error: addr[%lu]=%lu", i, addr[i]);
+	  throw General_exception("bad data");
+	}
+      }
+    }
+    else {
+      if(addr[i] != 0xAAAABBBBCCCCDDDD) {
+	PERR("data error: addr[%lu]=%lx", i, addr[i]);
+	throw General_exception("bad data");
+      }
+    }
+  }
+
   status_t rc = nupm::expose_memory(token, addr, size);
   if(rc != S_OK) PLOG("Exposed memory rc=%d", rc);
 
   PLOG("Press return to continue...");
   getchar();
 
-  PLOG("Starting check for 0xC...");
-  for(unsigned i=0;i<size;i++) {
-    if(addr[i] != 0xC)
-      throw General_exception("invalid memory");
+  PLOG("Starting check for changes...");
+
+  /* read back and check */
+  for(uint64_t i=0;i<count;i++) {
+    if(i % count_per_page == 0) {
+      if(i==0) {
+	if(addr[i] != 0) {
+	  PERR("marker error: addr[%lu]=%lx", i, addr[i]);
+	  throw General_exception("bad data");
+	}	       
+      }
+      else {
+	if(addr[i] != (i / count_per_page)) {
+	  PERR("marker error: addr[%lu]=%lx", i, addr[i]);
+	  throw General_exception("bad data");
+	}
+      }
+    }
+    else {
+      if(addr[i] != 0x1111222233334444) {
+	PERR("data error: addr[%lu]=%lx", i, addr[i]);
+	throw General_exception("bad data");
+      }
+    }
   }
 
   PMAJOR("Verified OK!");
 }
+
+

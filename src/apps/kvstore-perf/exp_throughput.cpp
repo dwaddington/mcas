@@ -38,12 +38,15 @@ ExperimentThroughput::ExperimentThroughput(const ProgramOptions &options)
   , _report_interval(std::chrono::seconds(options.report_interval))
   , _rand_engine()
   , _rand_pct(0, 99)
+  , _ga_pct(options.get_attr_pct)
   , _rd_pct(options.read_pct)
   , _ie_pct(options.insert_erase_pct)
+  , _op_count_ga{"get_attr", 0, 0}
   , _op_count_rd{"read", 0, 0}
   , _op_count_in{"insert", 0, 0}
   , _op_count_up{"update", 0, 0}
   , _op_count_er{"erase", 0, 0}
+  , _sw_ga()
   , _sw_rd()
   , _sw_wr()
   , _continuous(options.continuous)
@@ -64,6 +67,13 @@ void ExperimentThroughput::initialize_custom(unsigned /* core */)
   std::signal(SIGINT, handler);
 }
 
+/*
+ * A unit of work is one of three operations:
+ *  - a "get MEMORY_TYPE" operation. This is about as close to a no-op a we can come.
+ *  - a get operation
+ *  - an insert or erase, depending on whether the element exists
+ *  - an insert or update, depending on whether the elements exists
+ */
 bool ExperimentThroughput::do_work(unsigned core)
 {
   // handle first time setup
@@ -75,7 +85,11 @@ bool ExperimentThroughput::do_work(unsigned core)
 
     wait_for_delayed_start(core);
 
-    PLOG("[%u] Starting Throughput experiment (value len:%lu)...", core, g_data->value_len());
+    PLOG("[%u] Starting Throughput experiment (get_attr_pct %u rd_pct %u value len:%lu)..."
+      , core
+      , _ga_pct
+      , _rd_pct
+      , g_data->value_len());
     _first_iter = false;
 
     /* DAX initialization is serialized by thread (due to libpmempool behavior).
@@ -96,7 +110,22 @@ bool ExperimentThroughput::do_work(unsigned core)
   /* If fully populated and the randomly chosen operation is "read" */
   try
   {
-    if ( rnd_pct < _rd_pct )
+    if ( rnd_pct < _ga_pct )
+    {
+      std::vector<std::uint64_t> memory_type{0};
+      {
+        StopwatchInterval si(_sw_ga);
+        auto rc = store()->get_attribute(pool(),
+                                         component::IKVStore::MEMORY_TYPE,
+                                         memory_type);
+        assert(rc == S_OK);
+      }
+#if 0
+        PLOG("%s in %zu key %s", ct->name, _i_rd, data.key.c_str());
+#endif
+      ++*ct;
+    }
+    if ( rnd_pct < _ga_pct + _rd_pct )
     {
       auto p = std::find(_populated.begin() + _i_rd, _populated.end(), true);
       if ( p == _populated.end() )
@@ -122,10 +151,10 @@ bool ExperimentThroughput::do_work(unsigned core)
       }
       ++_i_rd;
     }
-    else if ( rnd_pct < _rd_pct + _ie_pct )
+    else if ( rnd_pct < _ga_pct + _rd_pct + _ie_pct )
     {
       /* random operation is "insert or erase" */
-      std::uniform_int_distribution<std::size_t> pos_rnd(pool_element_start(), pool_element_end() - 1);
+      std::uniform_int_distribution<std::size_t> pos_rnd(std::size_t(pool_element_start()), std::size_t(pool_element_end() - 1));
       auto pos = pos_rnd(_rnd);
       const KV_pair &data = g_data->_data[pos];
 
@@ -139,7 +168,7 @@ bool ExperimentThroughput::do_work(unsigned core)
       }
 #endif
       ct = _populated[pos] ? &_op_count_er : &_op_count_in;
-      auto new_val = Common::random_string(g_data->value_len());
+      auto new_val = common::random_string(g_data->value_len());
       StopwatchInterval si(timer);
       auto rc =
         _populated[pos]
@@ -161,8 +190,8 @@ bool ExperimentThroughput::do_work(unsigned core)
     }
     else
     {
-      ct = _populated[_i_wr] ? &_op_count_up : &_op_count_in;
-      const KV_pair &data = g_data->_data[_i_wr];
+      ct = _populated[std::size_t(_i_wr)] ? &_op_count_up : &_op_count_in;
+      const KV_pair &data = g_data->_data[std::size_t(_i_wr)];
       {
         StopwatchInterval si(_sw_wr);
         auto rc = store()->put(pool(), data.key, data.value, data.value_len);
@@ -171,7 +200,7 @@ bool ExperimentThroughput::do_work(unsigned core)
 #if 0
       PLOG("%s in %zu key %s", ct->name, _i_wr, data.key.c_str());
 #endif
-      _populated[_i_wr] = true;
+      _populated[std::size_t(_i_wr)] = true;
       ++*ct;
       ++_i_wr;
     }
@@ -210,7 +239,7 @@ bool ExperimentThroughput::do_work(unsigned core)
       , iops_er
     );
 #else
-    const unsigned long iops = static_cast<unsigned long>(double(_op_count_rd.interval + _op_count_in.interval + _op_count_up.interval + _op_count_er.interval) / secs);
+    const unsigned long iops = static_cast<unsigned long>(double(_op_count_ga.interval + _op_count_rd.interval + _op_count_in.interval + _op_count_up.interval + _op_count_er.interval) / secs);
     PLOG(
       "time %s %s core %u IOps %lu"
       , ptime_str.c_str()
@@ -220,6 +249,7 @@ bool ExperimentThroughput::do_work(unsigned core)
     );
 #endif
     _report_time += _report_interval;
+    _op_count_ga.interval = 0;
     _op_count_rd.interval = 0;
     _op_count_in.interval = 0;
     _op_count_up.interval = 0;
@@ -235,7 +265,7 @@ bool ExperimentThroughput::do_work(unsigned core)
   auto do_more =
     ( _end_time_directed
       ? std::chrono::high_resolution_clock::now() < *_end_time_directed
-      : _i_wr != pool_num_objects()
+      : std::size_t(_i_wr) != pool_num_objects()
     ) && ! _stop
     ;
 
@@ -261,15 +291,16 @@ void ExperimentThroughput::cleanup_custom(unsigned core)
 {
   std::signal(SIGINT, SIG_DFL);
   auto duration = elapsed(std::chrono::high_resolution_clock::now());
+  _sw_ga.stop();
   _sw_rd.stop();
   _sw_wr.stop();
 
-  PLOG("stopwatch : %g secs", _sw_rd.get_time_in_seconds() + _sw_wr.get_time_in_seconds());
+  PLOG("stopwatch : %g secs", _sw_ga.get_time_in_seconds() + _sw_rd.get_time_in_seconds() + _sw_wr.get_time_in_seconds());
   double secs = to_seconds(duration);
   PLOG("wall clock: %g secs", secs);
-  PLOG("op count : rd %lu wr %lu er %lu", _op_count_rd.total, _op_count_in.total + _op_count_up.total, _op_count_er.total);
+  PLOG("op count : ga %lu rd %lu wr %lu er %lu", _op_count_ga.total, _op_count_rd.total, _op_count_in.total + _op_count_up.total, _op_count_er.total);
 
-  unsigned long iops = static_cast<unsigned long>(double(_op_count_rd.total + _op_count_in.total + _op_count_up.total + _op_count_er.total) / secs);
+  unsigned long iops = static_cast<unsigned long>(double(_op_count_ga.total + _op_count_rd.total + _op_count_in.total + _op_count_up.total + _op_count_er.total) / secs);
   PLOG("core %u IOps %lu", core, iops);
 
   {

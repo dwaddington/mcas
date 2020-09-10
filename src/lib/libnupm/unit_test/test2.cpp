@@ -70,7 +70,7 @@ TEST_F(Libnupm_test, RegionModifications)
   sz = nupm::region_tracker_get_region(5, v);
   EXPECT_EQ(0, sz);
   /* before first element: also nothing */
-  sz = nupm::region_tracker_get_region(-1, v);
+  sz = nupm::region_tracker_get_region(offset_t(-1), v);
   EXPECT_EQ(0, sz);
   nupm::region_tracker_coalesce_across_TLS();
   sz = nupm::region_tracker_get_region(1, v);
@@ -83,11 +83,11 @@ TEST_F(Libnupm_test, RegionModifications)
 
 TEST_F(Libnupm_test, AVL_allocator)
 {
-  auto size = 1000000;
+  auto size = 1000000U;
   void *v = malloc(size);
   ASSERT_NE(nullptr, v);
   /* AVL_range_allocator requires an addr_t, defined in comanche common/types.h */
-  Core::AVL_range_allocator ra(reinterpret_cast<addr_t>(v), size);
+  core::AVL_range_allocator ra(reinterpret_cast<addr_t>(v), size);
   auto a = nupm::allocator_ra<char>(ra);
   const std::size_t ITERATIONS = 100;
   PLOG("AVL_allocator running... %zu allocations", ITERATIONS);

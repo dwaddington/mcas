@@ -15,7 +15,7 @@
 #ifndef _FABRIC_CQ_GENERIC_GROUPED_H_
 #define _FABRIC_CQ_GENERIC_GROUPED_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric_active_endpoint_grouped */
+#include <api/fabric_itf.h> /* component::IFabric_active_endpoint_grouped */
 
 #include "fabric_types.h" /* addr_ep_t */
 #include "fabric_op_control.h" /* fi_cq_entry_t */
@@ -47,7 +47,7 @@ class Fabric_cq_generic_grouped
   std::mutex _m_comm_cq_set;
   std::set<Fabric_cq_grouped *> _comm_cq_set;
 
-  std::ptrdiff_t cq_read_locked(void *buf, std::size_t count) noexcept;
+  std::ptrdiff_t cq_read_locked(Fabric_cq::fi_cq_entry_t *buf, std::size_t count) noexcept;
 
 public:
   explicit Fabric_cq_generic_grouped(
@@ -61,37 +61,37 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_old &callback);
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &callback);
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_definite &callback);
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &callback);
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &completion_callback);
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback);
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_param_definite &callback, void *callback_param);
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &callback, void *callback_param);
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param);
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param);
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(Component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param);
+  std::size_t poll_completions(component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param);
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param);
+  std::size_t poll_completions_tentative(component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param);
 
   std::size_t stalled_completion_count();
 
@@ -102,7 +102,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_cq_readerr fail
    */
   ::fi_cq_err_entry get_cq_comp_err();
-  std::ptrdiff_t cq_read(void *buf, std::size_t count) noexcept;
+  std::ptrdiff_t cq_read(Fabric_cq::fi_cq_entry_t *buf, std::size_t count) noexcept;
   std::ptrdiff_t cq_readerr(::fi_cq_err_entry *buf, std::uint64_t flags) noexcept;
   void queue_completion(Fabric_cq_grouped *cq, ::status_t status, const Fabric_cq::fi_cq_entry_t &cq_entry);
 };

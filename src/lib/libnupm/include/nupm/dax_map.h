@@ -23,6 +23,10 @@
 #define __NUPM_DAX_MAP_H__
 
 #include "nd_utils.h"
+#include <common/delete_copy.h>
+#include <common/fd_open.h>
+#include <boost/icl/interval_set.hpp>
+#include <boost/icl/right_open_interval.hpp>
 #include <mutex>
 #include <string>
 #include <tuple>
@@ -41,6 +45,8 @@ class DM_region_header;
 class Devdax_manager {
  private:
   static constexpr unsigned _debug_level = 3;
+  static constexpr unsigned debug_level() { return _debug_level; }
+  static constexpr const char *_cname = "Devdax_manager";
 
  public:
 
@@ -51,15 +57,15 @@ class Devdax_manager {
     /* Through no fault of its own, config_t may begin life with no proper values */
     config_t() : path(), addr(0), region_id(0) {}
   };
-  
-  /** 
-   * Constructor e.g.  
+
+  /**
+   * Constructor e.g.
      nupm::Devdax_manager ddm({{"/dev/dax0.3", 0x9000000000, 0},
                                {"/dev/dax1.3", 0xa000000000, 1}},
-                                true); 
-   * 
+                                true);
+   *
    * @param dax_config Vector of dax-path, address, region_id tuples.
-   * @param force_reset 
+   * @param force_reset
    */
   Devdax_manager(const std::vector<config_t>& dax_config,
                  bool force_reset = false);
@@ -115,10 +121,22 @@ class Devdax_manager {
    */
   void debug_dump(unsigned region_id);
 
+  void register_range(const void *begin, std::size_t size);
+  void deregister_range(const void *begin, std::size_t size);
  private:
-  void *get_devdax_region(const char *device_path, size_t *out_length);
-  void *map_region(const char *path, addr_t base_addr);
-  void  recover_metadata(const char *device_path,
+  struct Opened_region
+  {
+    ::iovec iov;
+    common::Fd_open fd;
+    DELETE_COPY(Opened_region);
+    Opened_region(Opened_region &&) = default;
+    Opened_region &operator=(Opened_region &&) = default;
+  };
+#if 0
+  void *get_devdax_region(const std::string &device_path, size_t *out_length);
+#endif
+  Opened_region map_region(const std::string &path, addr_t base_addr);
+  void  recover_metadata(const std::string &device_path,
                          void *      p,
                          size_t      p_len,
                          bool        force_rebuild = false);
@@ -126,12 +144,15 @@ class Devdax_manager {
 
  private:
   using guard_t = std::lock_guard<std::mutex>;
+  using mapped_regions = std::map<std::string, Opened_region>;
 
   const std::vector<config_t>               _dax_configs;
   ND_control                                _nd;
-  std::map<std::string, iovec>              _mapped_regions;
+  mapped_regions                            _mapped_regions;
   std::map<std::string, DM_region_header *> _region_hdrs;
   std::mutex                                _reentrant_lock;
+  using AC = boost::icl::interval_set<const char *>;
+  AC                                        _address_coverage;
 };
 }  // namespace nupm
 

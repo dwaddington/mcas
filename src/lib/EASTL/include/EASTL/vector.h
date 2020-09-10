@@ -276,6 +276,8 @@ namespace eastl
 		const_reference back() const;
 
 		void      push_back(const value_type& value);
+		template <typename V>
+			void      push_back(const V & value);
 		reference push_back();
 		void*     push_back_uninitialized();
 		void      push_back(value_type&& value);
@@ -288,6 +290,8 @@ namespace eastl
 		reference emplace_back(Args&&... args);
 
 		iterator insert(const_iterator position, const value_type& value);
+		template <typename V>
+			iterator insert(const_iterator position, const V & value);
 		iterator insert(const_iterator position, size_type n, const value_type& value);
 		iterator insert(const_iterator position, value_type&& value);
 		iterator insert(const_iterator position, std::initializer_list<value_type> ilist);
@@ -432,7 +436,7 @@ namespace eastl
 	inline VectorBase<T, Allocator>::~VectorBase()
 	{
 		if(mpBegin)
-			EASTLFree(internalAllocator(), mpBegin+0, (internalCapacityPtr() - mpBegin) * sizeof(T));
+			EASTLFree(internalAllocator(), +mpBegin, size_type(internalCapacityPtr() - mpBegin) * sizeof(T));
 	}
 
 
@@ -525,7 +529,7 @@ namespace eastl
 	inline vector<T, Allocator>::vector(size_type n, const allocator_type& allocator)
 		: base_type(n, allocator)
 	{
-		eastl::uninitialized_default_fill_n(mpBegin+0, n);
+		eastl::uninitialized_default_fill_n(+mpBegin, n);
 		mpEnd = mpBegin + n;
 	}
 
@@ -534,7 +538,7 @@ namespace eastl
 	inline vector<T, Allocator>::vector(size_type n, const value_type& value, const allocator_type& allocator)
 		: base_type(n, allocator)
 	{
-		eastl::uninitialized_fill_n_ptr(mpBegin+0, n, value);
+		eastl::uninitialized_fill_n_ptr(+mpBegin, n, value);
 		mpEnd = mpBegin + n;
 	}
 
@@ -813,7 +817,7 @@ namespace eastl
 			DoInsertValuesEnd(n - (size_type(mpEnd - mpBegin)), value);
 		else
 		{
-			eastl::destruct(mpBegin + n, mpEnd+0);
+			eastl::destruct(mpBegin + n, +mpEnd);
 			mpEnd = mpBegin + n;
 		}
 	}
@@ -1041,6 +1045,17 @@ namespace eastl
 			DoInsertValueEnd(value);
 	}
 
+	/* For cases where the value_type includes a "normal" value_type and an allocator (for tracking):
+	 * enable a push given just the value_type, if a constructor exists which combines the value and
+	 * the tracker.
+	 */
+	template <typename T, typename Allocator>
+		template <typename V>
+		inline void vector<T, Allocator>::push_back(const V& value)
+		{
+			this->push_back(value_type(value, this->get_allocator()));
+		}
+
 
 	template <typename T, typename Allocator>
 	inline void vector<T, Allocator>::push_back(value_type&& value)
@@ -1148,8 +1163,20 @@ namespace eastl
 		return mpBegin + n;
 	}
 
+	/* For cases where the value_type includes a "normal" value_type and an allocator (for tracking):
+	 * enable an insert given just the value_type, if a constructor exists which combines the value and
+	 * the tracker.
+	 */
+	template <typename T, typename Allocator>
+		template <typename V>
+		inline typename vector<T, Allocator>::iterator
+		vector<T, Allocator>::insert(const_iterator position, const V & value)
+		{
+			return this->insert(position, value_type(value, this->get_allocator()));
+		}
 
-	template <typename T, typename Allocator>       
+
+	template <typename T, typename Allocator>
 	inline typename vector<T, Allocator>::iterator
 	vector<T, Allocator>::insert(const_iterator position, value_type&& value)
 	{
@@ -1201,7 +1228,7 @@ namespace eastl
 		iterator destPosition = const_cast<value_type*>(position);        
 
 		if((position + 1) < mpEnd)
-			eastl::move(destPosition + 1, mpEnd+0, destPosition);
+			eastl::move(destPosition + 1, +mpEnd, destPosition);
 		--mpEnd;
 		mpEnd->~value_type();
 		return destPosition;
@@ -1221,9 +1248,9 @@ namespace eastl
 		{
 			iterator const position =
 				const_cast<value_type*>(
-					eastl::move(const_cast<value_type*>(last), const_cast<value_type*>(mpEnd+0), const_cast<value_type*>(first))
+					eastl::move(const_cast<value_type*>(last), const_cast<value_type*>(+mpEnd), const_cast<value_type*>(first))
 				);
-			eastl::destruct(position, mpEnd+0);
+			eastl::destruct(position, +mpEnd);
 			mpEnd -= (last - first);
 		}
  
@@ -1458,7 +1485,7 @@ namespace eastl
 		mpEnd      = internalCapacityPtr();
 
 		typedef typename eastl::remove_const<T>::type non_const_value_type; // If T is a const type (e.g. const int) then we need to initialize it as if it were non-const.
-		eastl::uninitialized_copy_ptr(first, last, const_cast<non_const_value_type*>(static_cast<value_type*>(mpBegin+0)));
+		eastl::uninitialized_copy_ptr(first, last, const_cast<non_const_value_type*>(static_cast<value_type*>(+mpBegin)));
 	}
 
 
@@ -1490,7 +1517,7 @@ namespace eastl
 		else if(n > size_type(mpEnd - mpBegin)) // If n > size ...
 		{
 			eastl::fill(mpBegin, mpEnd, value);
-			eastl::uninitialized_fill_n_ptr(mpEnd+0, n - size_type(mpEnd - mpBegin), value);
+			eastl::uninitialized_fill_n_ptr(+mpEnd, n - size_type(mpEnd - mpBegin), value);
 			mpEnd += n - size_type(mpEnd - mpBegin);
 		}
 		else // else 0 <= n <= size
@@ -1539,7 +1566,7 @@ namespace eastl
 		else if(n <= size_type(mpEnd - mpBegin)) // If n <= size ...
 		{
 			pointer const pNewEnd = eastl::copy(first, last, mpBegin); // Since we are copying to mpBegin, we don't have to worry about needing copy_backward or a memmove-like copy (as opposed to memcpy-like copy).
-			eastl::destruct(pNewEnd, mpEnd+0);
+			eastl::destruct(pNewEnd, +mpEnd);
 			mpEnd = pNewEnd;
 		}
 		else // else size < n <= capacity
@@ -1599,7 +1626,7 @@ namespace eastl
 
 				if(n < nExtra) // If the inserted values are entirely within initialized memory (i.e. are before mpEnd)...
 				{
-					eastl::uninitialized_move_ptr(mpEnd - n, mpEnd+0, mpEnd+0);
+					eastl::uninitialized_move_ptr(mpEnd - n, +mpEnd, +mpEnd);
 					eastl::move_backward(destPosition, mpEnd - n, mpEnd); // We need move_backward because of potential overlap issues.
 					eastl::copy(first, last, destPosition);
 				}
@@ -1608,7 +1635,7 @@ namespace eastl
 					BidirectionalIterator iTemp = first;
 					eastl::advance(iTemp, nExtra);
 					eastl::uninitialized_copy_ptr(iTemp, last, mpEnd);
-					eastl::uninitialized_move_ptr(destPosition, mpEnd+0, mpEnd + n - nExtra);
+					eastl::uninitialized_move_ptr(destPosition, +mpEnd, mpEnd + n - nExtra);
 					eastl::copy_backward(first, iTemp, destPosition + nExtra);
 				}
 
@@ -1636,9 +1663,9 @@ namespace eastl
 						throw;
 					}
 				#else
-					pointer pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(mpBegin+0, destPosition, pNewData);
+					pointer pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(+mpBegin, destPosition, pNewData);
 					pNewEnd         = eastl::uninitialized_copy_ptr(first, last, pNewEnd);
-					pNewEnd         = eastl::uninitialized_move_ptr_if_noexcept(destPosition, mpEnd+0, pNewEnd);
+					pNewEnd         = eastl::uninitialized_move_ptr_if_noexcept(destPosition, +mpEnd, pNewEnd);
 				#endif
 
 				eastl::destruct(mpBegin, mpEnd);
@@ -1673,15 +1700,15 @@ namespace eastl
 
 				if(n < nExtra)
 				{
-					eastl::uninitialized_move_ptr(mpEnd - n, mpEnd+0, mpEnd+0);
+					eastl::uninitialized_move_ptr(mpEnd - n, +mpEnd, +mpEnd);
 					eastl::move_backward(destPosition, mpEnd - n, mpEnd); // We need move_backward because of potential overlap issues.
 					eastl::fill(destPosition, destPosition + n, temp);
 				}
 				else
 				{
-					eastl::uninitialized_fill_n_ptr(mpEnd+0, n - nExtra, temp);
-					eastl::uninitialized_move_ptr(destPosition, mpEnd+0, mpEnd + n - nExtra);
-					eastl::fill(destPosition, mpEnd+0, temp);
+					eastl::uninitialized_fill_n_ptr(+mpEnd, n - nExtra, temp);
+					eastl::uninitialized_move_ptr(destPosition, +mpEnd, mpEnd + n - nExtra);
+					eastl::fill(destPosition, +mpEnd, temp);
 				}
 
 				mpEnd += n;
@@ -1709,9 +1736,9 @@ namespace eastl
 					throw;
 				}
 			#else
-				pointer pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(mpBegin+0, destPosition, pNewData);
+				pointer pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(+mpBegin, destPosition, pNewData);
 				eastl::uninitialized_fill_n_ptr(pNewEnd, n, value);
-				pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(destPosition, mpEnd+0, pNewEnd + n);
+				pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(destPosition, +mpEnd, pNewEnd + n);
 			#endif
 
 			eastl::destruct(mpBegin, mpEnd);
@@ -1797,7 +1824,7 @@ namespace eastl
 		}
 		else
 		{
-			eastl::uninitialized_fill_n_ptr(mpEnd+0, n, value);
+			eastl::uninitialized_fill_n_ptr(+mpEnd, n, value);
 			mpEnd += n;
 		}
 	}
@@ -1904,8 +1931,8 @@ namespace eastl
 				}
 			#else
 				::new((void*)(pNewData + nPosSize)) value_type(eastl::forward<Args>(args)...);                  // Because the old data is potentially being moved rather than copied, we need to move 
-				pointer pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(mpBegin+0, destPosition, pNewData); // the value first, because it might possibly be a reference to the old data being moved.
-				pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(destPosition, mpEnd+0, ++pNewEnd);            // Question: with exceptions disabled, do we asssume all operations are noexcept and thus there's no need for uninitialized_move_ptr_if_noexcept?
+				pointer pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(+mpBegin, destPosition, pNewData); // the value first, because it might possibly be a reference to the old data being moved.
+				pNewEnd = eastl::uninitialized_move_ptr_if_noexcept(destPosition, +mpEnd, ++pNewEnd);            // Question: with exceptions disabled, do we asssume all operations are noexcept and thus there's no need for uninitialized_move_ptr_if_noexcept?
 			#endif
 
 			eastl::destruct(mpBegin, mpEnd);

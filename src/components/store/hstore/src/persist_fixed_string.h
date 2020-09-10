@@ -15,6 +15,7 @@
 #ifndef MCAS_HSTORE_PERSIST_FIXED_STRING_H
 #define MCAS_HSTORE_PERSIST_FIXED_STRING_H
 
+#include "alloc_key.h"
 #include "hstore_config.h"
 #include "cptr.h"
 #include "fixed_string.h"
@@ -31,7 +32,7 @@
 #include <cstring> /* memcpy */
 #include <memory> /* allocator_traits */
 
-class fixed_data_location_t {};
+struct fixed_data_location_t {};
 constexpr fixed_data_location_t fixed_data_location = fixed_data_location_t();
 
 template <typename T, std::size_t SmallLimit, typename Allocator>
@@ -54,9 +55,8 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		using ptr_t = persistent_t<typename allocator_traits_type::pointer>;
 
-		class small_t
+		struct small_t
 		{
-		public:
 			std::array<char, SmallLimit-1> value;
 		private:
 			/* _size == SmallLimit => data is stored out-of-line */
@@ -108,13 +108,13 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						, fill_len_
 						, T()
 					);
-					auto full_size = static_cast<unsigned char>(( last_ - first_ ) * sizeof(*first_));
+					auto full_size = static_cast<unsigned char>(std::size_t(last_ - first_) * sizeof(*first_));
 					assert(full_size < SmallLimit);
 					_size = full_size;
 				}
 		} small;
 
-		class large_t
+		struct large_t
 			: public allocator_char_type
 			/* Ideallly, this would be private */
 			, public cptr_t
@@ -144,6 +144,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 			template <typename IT, typename AL>
 				void assign(
+					AK_ACTUAL
 					IT first_
 					, IT last_
 					, std::size_t fill_len_
@@ -152,11 +153,12 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				)
 				{
 					auto data_size =
-						static_cast<std::size_t>(last_ - first_ + fill_len_) * sizeof(T);
+						std::size_t(last_ - first_) + fill_len_ * sizeof(T);
 					using local_allocator_char_type =
 						typename std::allocator_traits<AL>::template rebind_alloc<char>;
 					this->P = nullptr;
 					local_allocator_char_type(al_).allocate(
+						AK_REF
 						this->P
 						, element_type::front_skip_element_count(alignment_)
 							+ data_size
@@ -202,6 +204,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		template <typename IT, typename AL>
 			persist_fixed_string(
+				AK_ACTUAL
 				const fixed_data_location_t &f_
 				, IT first_
 				, IT last_
@@ -211,32 +214,35 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			)
 				: small( f_ )
 			{
-				large.assign(first_, last_, fill_len_, alignment_, al_);
+				large.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
 			}
 
 		template <typename IT, typename AL>
 			persist_fixed_string(
+				AK_ACTUAL
 				IT first_
 				, IT last_
 				, AL al_
 			)
-				: persist_fixed_string(first_, last_, 0U, default_alignment, al_)
+				: persist_fixed_string(AK_REF first_, last_, 0U, default_alignment, al_)
 			{
 			}
 
 		template <typename IT, typename AL>
 			persist_fixed_string(
+				AK_ACTUAL
 				const fixed_data_location_t &f_
 				, IT first_
 				, IT last_
 				, AL al_
 			)
-				: persist_fixed_string(f_, first_, last_, 0U, default_alignment, al_)
+				: persist_fixed_string(AK_REF f_, first_, last_, 0U, default_alignment, al_)
 			{
 			}
 
 		template <typename IT, typename AL>
 			persist_fixed_string(
+				AK_ACTUAL
 				IT first_
 				, IT last_
 				, std::size_t fill_len_
@@ -244,7 +250,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, AL al_
 			)
 				: small(
-					static_cast<std::size_t>(last_ - first_ + fill_len_) * sizeof(T)
+					static_cast<std::size_t>(std::size_t(last_ - first_) + fill_len_) * sizeof(T)
 				)
 			{
 				if ( is_inline() )
@@ -262,12 +268,13 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				else
 				{
 					auto data_size =
-						static_cast<std::size_t>(last_ - first_ + fill_len_) * sizeof(T);
+						static_cast<std::size_t>(std::size_t(last_ - first_) + fill_len_) * sizeof(T);
 					using local_allocator_char_type =
 						typename std::allocator_traits<AL>::template rebind_alloc<char>;
 					new (&large.al()) allocator_char_type(al_);
 					new (&large.P) cptr_t{nullptr};
 					local_allocator_char_type(al_).allocate(
+						AK_REF
 						large.P
 						, element_type::front_skip_element_count(alignment_)
 							+ data_size
@@ -281,6 +288,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		template <typename AL>
 			persist_fixed_string(
+				AK_ACTUAL
 				const fixed_data_location_t &f_
 				, std::size_t data_len_
 				, std::size_t alignment_
@@ -292,6 +300,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				new (&large.al()) allocator_char_type(al_);
 				new (&large.P) cptr_t{nullptr};
 				al_.allocate(
+					AK_REF
 					large.P
 					, element_type::front_skip_element_count(alignment_)
 					+ data_size
@@ -302,16 +311,36 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		/* Needed because the persist_fixed_string arguments are sometimes conveyed via
 		 * forward_as_tuple, and the string is an element of a tuple, and std::tuple
-		 * (unlike pair) does not support picecewise_construct.
+		 * (unlike pair) does not support piecewise_construct.
 		 */
 		template <typename IT, typename AL>
 			persist_fixed_string(
-				std::tuple<IT&, IT&&, AL>&& p_
+				std::tuple<AK_FORMAL IT&, IT&&, AL>&& p_
 			)
 				: persist_fixed_string(
 					std::get<0>(p_)
 					, std::get<1>(p_)
 					, std::get<2>(p_)
+#if AK_USED
+					, std::get<3>(p_)
+#endif
+				)
+			{}
+
+		/* Needed because the persist_fixed_string arguments are sometimes conveyed via
+		 * forward_as_tuple, and the string is an element of a tuple, and std::tuple
+		 * (unlike pair) does not support piecewise_construct.
+		 */
+		template <typename AL>
+			persist_fixed_string(
+				std::tuple<AK_FORMAL const std::size_t &, AL>&& p_
+			)
+				: persist_fixed_string(
+					std::get<0>(p_)
+					, std::get<1>(p_)
+#if AK_USED
+					, std::get<2>(p_)
+#endif
 				)
 			{}
 
@@ -321,42 +350,33 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		 */
 		template <typename AL>
 			persist_fixed_string(
-				std::tuple<const std::size_t &, AL>&& p_
-			)
-				: persist_fixed_string(
-					std::get<0>(p_)
-					, std::get<1>(p_)
-				)
-			{}
-
-		/* Needed because the persist_fixed_string arguments are sometimes conveyed via
-		 * forward_as_tuple, and the string is an element of a tuple, and std::tuple
-		 * (unlike pair) does not support picecewise_construct.
-		 */
-		template <typename AL>
-			persist_fixed_string(
-				std::tuple<const fixed_data_location_t &, const std::size_t &, AL>&& p_
+				std::tuple<AK_FORMAL const fixed_data_location_t &, const std::size_t &, AL>&& p_
 			)
 				: persist_fixed_string(
 					std::get<0>(p_)
 					, std::get<1>(p_)
 					, std::get<2>(p_)
+#if AK_USED
+					, std::get<3>(p_)
+#endif
 				)
 			{
 			}
 
 		template <typename AL>
 			persist_fixed_string(
+				AK_ACTUAL
 				const fixed_data_location_t &f_
 				, std::size_t data_len_
 				, AL al_
 			)
-				: persist_fixed_string(f_, data_len_, default_alignment, al_)
+				: persist_fixed_string(AK_REF f_, data_len_, default_alignment, al_)
 			{
 			}
 
 		template <typename IT, typename AL>
 			persist_fixed_string &assign(
+				AK_ACTUAL
 				IT first_
 				, IT last_
 				, std::size_t fill_len_
@@ -366,13 +386,13 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			{
 				this->clear();
 
-				if ( (last_ - first_ + fill_len_) * (sizeof *first_) < SmallLimit )
+				if ( (std::size_t(last_ - first_) + fill_len_) * (sizeof *first_) < SmallLimit )
 				{
 					small.assign(first_, last_, fill_len_);
 				}
 				else
 				{
-					large.assign(first_, last_, fill_len_, alignment_, al_);
+					large.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
 					small.set_fixed();
 				}
 				return *this;
@@ -380,12 +400,13 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		template <typename IT, typename AL>
 			persist_fixed_string & assign(
+				AK_ACTUAL
 				IT first_
 				, IT last_
 				, AL al_
 			)
 			{
-				return assign(first_, last_, 0, default_alignment, al_);
+				return assign(AK_REF first_, last_, 0, default_alignment, al_);
 			}
 
 		void clear()
@@ -670,7 +691,30 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		bool try_lock_shared() const { return lockable() && large.ptr()->try_lock_shared(); }
 		bool try_lock_exclusive() const { return lockable() && large.ptr()->try_lock_exclusive(); }
 		bool is_locked() const { return lockable() && large.ptr()->is_locked(); }
-		void unlock() const { if ( lockable() ) { large.ptr()->unlock(); } }
+		template <typename AL>
+			void flush_if_locked_exclusive(AL al_) const
+			{
+				if ( lockable() && large.ptr()->is_locked_exclusive() )
+				{
+#if 0
+					PLOG("FLUSH %p: %zu", large.ptr()->data(), large.ptr()->size());
+#endif
+					large.ptr()->persist_this(al_);
+				}
+				else
+				{
+#if 0
+					PLOG("FLUSH %p: no (shared)", large.ptr()->data());
+#endif
+				}
+			}
+		void unlock() const
+		{
+			if ( lockable() )
+			{
+				large.ptr()->unlock();
+			}
+		}
 		void reset_lock() const { if ( lockable() ) { large.ptr()->reset_lock(); } }
 		/* The "crash consistent" version resets the lock before using allocation_states to
 		 * ensure that the string is in a consistent state. Reset the lock carefully: the
@@ -694,7 +738,10 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			}
 
 		template <typename AL>
-			void pin(char *old_cptr, AL al_)
+			void pin(
+				AK_ACTUAL
+				char *old_cptr, AL al_
+			)
 			{
 				persist_fixed_string temp{};
 				/* reconstruct the original small value, which is "this" but with data bits from the original cptr */
@@ -708,7 +755,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				hop_hash_log<false>::write(LOG_LOCATION, "size to copy ", old_cptr, " old cptr was ", old_cptr, " value ", std::string(temp.data(), temp.size()));
 				auto begin = temp.data();
 				auto end = begin + temp.size();
-				large.assign(begin, end, 0, default_alignment, al_);
+				large.assign(AK_REF begin, end, 0, default_alignment, al_);
 				small.set_fixed();
 				hop_hash_log<false>::write(LOG_LOCATION, "result size ", this->size(), " value ", std::string(this->data_fixed(), this->size()));
 			}

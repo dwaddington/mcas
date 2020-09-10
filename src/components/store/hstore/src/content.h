@@ -36,9 +36,8 @@
 namespace impl
 {
 	template <typename Value>
-		class content
+		struct content
 		{
-		public:
 			using value_type = Value;
 			using key_t = typename Value::first_type;
 			static constexpr char lock_id = 'c';

@@ -17,7 +17,7 @@ class Versioned_record : protected Cow_value_pointer<Record_type>
 {
 public:
   explicit Versioned_record(void * base, size_t size)
-    : Cow_value_pointer<Record_type>(base,size)
+    : Cow_value_pointer<Record_type>(base,size,Record_type::type_id)
   {
     if(Cow_value_pointer<Record_type>::rebuilt()) {
       PLOG("Versioned record need rebuilding");

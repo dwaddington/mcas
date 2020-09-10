@@ -30,9 +30,10 @@
  * Fabric/RDMA-based network component
  */
 
-class fabric_runtime_error
-  : public Component::IFabric_runtime_error
+struct fabric_runtime_error
+  : public component::IFabric_runtime_error
 {
+private:
   unsigned _i;
   const char *_file;
   int _line;

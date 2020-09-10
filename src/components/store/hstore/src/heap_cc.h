@@ -47,25 +47,27 @@
 
 namespace impl
 {
-	class allocation_state_pin;
-	class allocation_state_extend;
+	struct allocation_state_pin;
+	struct allocation_state_extend;
 }
 
 namespace ccpm
 {
-	class IHeapGrowable;
+	class IHeap_expandable;
 	struct region_vector_t;
 }
 
 template <typename Foo, typename Persister>
-	class deallocator_cc;
+	struct deallocator_cc;
 
 template <typename T, std::size_t SmallLimit, typename Allocator>
 	union persist_fixed_string;
 
-class heap_cc_shared_ephemeral
+struct heap_cc_shared_ephemeral
 {
-	std::unique_ptr<ccpm::IHeapGrowable> _heap;
+private:
+	unsigned _debug_level;
+	std::unique_ptr<ccpm::IHeap_expandable> _heap;
 	std::vector<::iovec> _managed_regions;
 	std::size_t _capacity;
 	std::size_t _allocated;
@@ -86,11 +88,12 @@ class heap_cc_shared_ephemeral
 
 	void add_managed_region(const ::iovec &r);
 	explicit heap_cc_shared_ephemeral(
-		impl::allocation_state_emplace *ase
+		unsigned debug_level_
+		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, std::unique_ptr<ccpm::IHeapGrowable> p
+		, std::unique_ptr<ccpm::IHeap_expandable> p
 		, const ccpm::region_vector_t &rv
 	);
 	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
@@ -104,7 +107,7 @@ class heap_cc_shared_ephemeral
 				hop_hash_log<B>::write(LOG_LOCATION, "pool ", pool_.iov_base);
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
-				for ( unsigned i = std::max(0U, log_min_alignment); i != limit; ++i )
+				for ( unsigned i = log_min_alignment; i != limit; ++i )
 				{
 					const std::size_t upper_bound = 1ULL << i;
 					hop_hash_log<B>::write(LOG_LOCATION
@@ -118,32 +121,34 @@ class heap_cc_shared_ephemeral
 			}
 		}
 public:
-	friend class heap_cc_shared;
+	friend struct heap_cc_shared;
 
-#if 0
-	explicit heap_cc_shared_ephemeral();
-#endif
+	unsigned debug_level() const { return _debug_level; }
 	explicit heap_cc_shared_ephemeral(
-		impl::allocation_state_emplace *ase
+		unsigned debug_level
+		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, const ccpm::region_vector_t &rv_
 	);
 	explicit heap_cc_shared_ephemeral(
-		impl::allocation_state_emplace *ase
+		unsigned debug_level
+		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, const ccpm::region_vector_t &rv_
 		, ccpm::ownership_callback_t f
 	);
+	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
 	heap_cc_shared_ephemeral(const heap_cc_shared_ephemeral &) = delete;
 	heap_cc_shared_ephemeral& operator=(const heap_cc_shared_ephemeral &) = delete;
 };
 
-class heap_cc_shared
+struct heap_cc_shared
 {
+private:
 	::iovec _pool0;
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
@@ -151,9 +156,14 @@ class heap_cc_shared
 	std::unique_ptr<heap_cc_shared_ephemeral> _eph;
 
 public:
-	explicit heap_cc_shared(uint64_t pool0_uuid, const std::unique_ptr<Devdax_manager> &devdax_manager_);
 	explicit heap_cc_shared(
-		impl::allocation_state_emplace *ase
+		unsigned debug_level
+		, uint64_t pool0_uuid
+		, const std::unique_ptr<Devdax_manager> &devdax_manager_
+	);
+	explicit heap_cc_shared(
+		unsigned debug_level
+		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
@@ -162,7 +172,8 @@ public:
 		, unsigned numa_node
 	);
 	explicit heap_cc_shared(
-		const std::unique_ptr<Devdax_manager> &devdax_manager
+		unsigned debug_level
+		, const std::unique_ptr<Devdax_manager> &devdax_manager
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -217,8 +228,9 @@ public:
 	std::vector<::iovec> regions() const;
 };
 
-class heap_cc
+struct heap_cc
 {
+private:
 	heap_cc_shared *_heap;
 
 public:
@@ -235,7 +247,7 @@ public:
 
 	heap_cc & operator=(const heap_cc &) = default;
 
-    static constexpr std::uint64_t magic_value = 0x7c84297de2de94a3;
+	static constexpr std::uint64_t magic_value = 0x7c84297de2de94a3;
 
 	heap_cc_shared *operator->() const
 	{

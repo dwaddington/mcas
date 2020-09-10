@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -19,15 +19,18 @@
 #include <ccpm/interfaces.h>
 #include <array>
 #include <cstddef>
+#include <ios> // ios_base::fmtflags
 #include <vector>
 
 struct iovec;
 
 namespace ccpm
 {
-	class level_hints
+	struct level_hints
 	{
+	private:
 		/* Each level has a list for every possible number of contiguous free elements.
+		 * of contiguous free elements.
 		 * Since "contiguous" free elements do not span a word, that is one list
 		 * for every possible contiguous size in a word.
 		 * The list at element n locates an area_ctl with has maximal runs of exactly
@@ -38,6 +41,10 @@ namespace ccpm
 		free_ctls_t _free_ctls;
 		free_ctls_t::size_type find_free_ctl_ix(unsigned min_run_length) const;
 		free_ctls_t::size_type tier_ix_from_run_length(unsigned run_length) const;
+	public:
+		unsigned _ct_alloc_probe_success;
+		unsigned _ct_alloc_probe_failure;
+		unsigned _ct_subdivision;
 
 	public:
 		static constexpr auto size() { return alloc_states_per_word; }
@@ -71,26 +78,47 @@ namespace ccpm
 			return &_free_ctls[alloc_states_per_word];
 		}
 
+		/* Find the longest run length less than mac_run_length.
+		 * Used for tracing, when find_free_ctl_ix has failed to
+		 * find a long enough run
+		 */
+		free_ctls_t::size_type find_mac_ctl_ix(unsigned mac_run_length) const;
+
 		level_hints()
 			: _free_ctls()
+			, _ct_alloc_probe_success(0)
+			, _ct_alloc_probe_failure(0)
+			, _ct_subdivision(0)
 		{}
+
+		using level_ix_t = std::uint8_t;
+		void print(
+			std::ostream &o_
+			, level_ix_t level_
+			, std::ios_base::fmtflags // size_format_
+		) const;
 	};
 
-	class area_ctl;
+	struct area_ctl;
+
 	/*
-	 * Location of global, non-persisted items in the crash-consistent allocator.
-	 * At the moment there are none. The _bytes_free member is a good candidate.
-	 * Other candidates: links to chains of areas containing free elements of
-	 * various sizes.
+	 * Location of non-persisted items for a single "region" managed bu the crash-consistent allocator.
+	 * Persisted items are keps in an area_ctl, which is in perstnt memory.
 	 */
-	class area_top
+	struct area_top
 	{
+	private:
+		using level_ix_t = std::uint8_t;
 		area_ctl *_ctl;
 		std::size_t _bytes_free;
 		bool _all_restored;
-		std::vector<level_hints> _level;
+		unsigned _trace_level;
+		std::ostream *_o;
+		using level_hints_vec = std::vector<level_hints>;
+		level_hints_vec _level;
+		unsigned _ct_allocation;
 
-		area_top(area_ctl *ctl);
+		area_top(area_ctl *ctl, unsigned trace_level, std::ostream &o);
 		area_top(const area_top &) = delete;
 		area_top &operator=(const area_top &) = delete;
 
@@ -98,42 +126,65 @@ namespace ccpm
 			void * & ptr_
 			, std::size_t bytes
 			, std::size_t alignment
-			, unsigned level_ix
+			, level_hints_vec::iterator level_
 			, unsigned run_length
 		);
 
 		bool allocate_recovery_1();
-		bool allocate_recovery_2(unsigned level_ix);
+		bool allocate_recovery_2(level_hints_vec::iterator level);
+		bool trace_coarse() const { return 0 < _trace_level; }
+		bool trace_fine() const { return 1 < _trace_level; }
 
 	public:
-		static area_top *create(const ::iovec &iov);
-
-		static area_top *restore(const ::iovec &iov, const ownership_callback_t &resolver);
+		/* Initial area_ctl */
+		explicit area_top(
+			const ::iovec &iov
+			, unsigned trace_level
+			, std::ostream &o
+		);
+		/* Restored area_ctl */
+		explicit area_top(
+			const ::iovec &iov
+			, const ownership_callback_t &resolver
+			, unsigned trace_level
+			, std::ostream &o
+		);
+		~area_top();
 
 		bool includes(const void *addr) const;
 
 		/* Free byte count. Required by users */
 		std::size_t bytes_free() const;
 
-		void allocate(void * & ptr, std::size_t bytes, std::size_t alignment);
+		void allocate(
+			void * & ptr, std::size_t bytes
+			, std::size_t alignment
+		);
 
 		void deallocate(void * & ptr, std::size_t bytes);
 
-		void print(std::ostream &o, unsigned level) const;
-		unsigned height() const { return unsigned(_level.size()); }
+		void print(
+			std::ostream &o
+			, std::ios_base::fmtflags size_format
+		) const;
+		void print_ctls(
+			std::ostream &o_
+			, std::ios_base::fmtflags format_
+		) const;
+		level_ix_t height() const { return level_ix_t(_level.size()); }
 
 		/*
 		 * called by area_ctl to add area_ctl a, at level level_ix, with a longest
 		 * free run (consecutive free elements) of free_run, to _level, which is the
 		 * non-persistent catalog of area_ctl items.
 		 */
-		void restore_to_chain(area_ctl *a, unsigned level_ix, unsigned run_length);
+		void restore_to_chain(area_ctl *a, level_ix_t level_ix, unsigned run_length);
 
 		bool contains(const void *p) const;
 
 		bool is_in_chain(
 			const area_ctl *a
-			, unsigned level_ix
+			, level_ix_t level_ix
 			, unsigned run_length
 		) const;
 	};

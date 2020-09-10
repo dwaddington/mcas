@@ -15,20 +15,20 @@
 
 #include <cstddef> /* size_t */
 
-namespace Component
+namespace component
 {
   class IFabric_communicator;
 }
 
-class registered_memory;
+struct registered_memory;
 
-class remote_memory_accessor
+struct remote_memory_accessor
 {
 protected:
-  void send_memory_info(Component::IFabric_communicator &cnxn, registered_memory &rm);
+  void send_memory_info(component::IFabric_communicator &cnxn, registered_memory &rm);
 public:
   /* using rm as a buffer, send message */
-  void send_msg(Component::IFabric_communicator &cnxn, registered_memory &rm, const void *msg, std::size_t len);
+  void send_msg(component::IFabric_communicator &cnxn, registered_memory &rm, const void *msg, std::size_t len);
 };
 
 #endif

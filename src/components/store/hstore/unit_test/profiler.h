@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -16,15 +16,19 @@
 #if defined HAS_PROFILER
 #include <gperftools/profiler.h> /* Alas, no __has_include until C++17 */
 #else
-int ProfilerStart(const char *) {}
-void ProfilerStop() {}
+namespace
+{
+	int ProfilerStart(const char *) { return -1; }
+	void ProfilerStop() {}
+}
 #endif
 
 #include <cstdlib> /* getenv */
 #include <string>
 
-class profiler
+struct profiler
 {
+private:
 	bool _run;
 public:
 	profiler(const std::string &s)

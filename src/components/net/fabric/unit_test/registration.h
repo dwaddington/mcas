@@ -19,15 +19,16 @@
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */
 
-class registration
+struct registration
 {
-  Component::IFabric_connection &_cnxn;
-  Component::IFabric_connection::memory_region_t _region;
+private:
+  component::IFabric_connection &_cnxn;
+  component::IFabric_connection::memory_region_t _region;
   std::uint64_t _key;
   void *_desc;
   DELETE_COPY(registration);
 public:
-  explicit registration(Component::IFabric_connection &cnxn_, const void *contig_addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_);
+  explicit registration(component::IFabric_connection &cnxn_, const void *contig_addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_);
   registration(registration &&);
   registration &operator=(registration &&);
   ~registration();

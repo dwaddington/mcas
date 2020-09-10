@@ -46,6 +46,8 @@ namespace libndctl
 
 namespace fs = std::experimental::filesystem;
 
+struct stat;
+
 namespace nupm
 {
 class ND_control_exception : public Exception {
@@ -130,6 +132,8 @@ class ND_control {
 /**
  * Get size of a dax device 
  */
+size_t get_dax_device_size(const struct stat &statbuf);
+size_t get_dax_device_size(int fd);
 size_t get_dax_device_size(const std::string& dax_path);
 
 }  // namespace nupm

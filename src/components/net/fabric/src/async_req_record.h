@@ -28,8 +28,9 @@ class Fabric_cq_grouped;
  * context is embedded, and the fabric_cq pointer is added to
  * remember the fabric_cq to be used for completion.
  */
-class async_req_record
+struct async_req_record
 {
+private:
   Fabric_cq_grouped *_cq;
   void *_context;
 public:

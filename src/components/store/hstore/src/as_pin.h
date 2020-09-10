@@ -28,7 +28,7 @@
 #include <cstring>
 
 /* Note: "pin", in this context, means to move key or mapped_type data from a
- * small inline location within the persist_fixed_string class to an area
+ * small inline location within the persist_fixed_string struct to an area
  * which will not move over its lifetime.
  */
 
@@ -100,8 +100,9 @@ namespace impl
 {
 	/* Client-side persistent allocation state when using the crash-consistent
 	 * allocator in an operator which will "pin" key or value data */
-	class allocation_state_pin
+	struct allocation_state_pin
 	{
+	private:
 		using alloc_t = typename hstore_alloc_type<Persister>::alloc_t;
 		using dealloc_t = typename alloc_t::deallocator_type;
 #if 0

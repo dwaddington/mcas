@@ -20,8 +20,9 @@
 #include <atomic>
 
 template <typename T>
-	class persistent
+	struct persistent
 	{
+	private:
 		T _v;
 	public:
 		using value_type = T;
@@ -122,8 +123,9 @@ template <typename T>
 	};
 
 template <typename T>
-	class persistent_atomic
+	struct persistent_atomic
 	{
+	private:
 		std::atomic<T> _v;
 		static_assert(sizeof _v <= 8, "persistent store is too large");
 	public:

@@ -60,6 +60,7 @@
 #ifndef __MPMC_BOUNDED_QUEUE__
 #define __MPMC_BOUNDED_QUEUE__
 
+#include <common/common.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
 
@@ -74,7 +75,7 @@
 #define DCACHE1_LINESIZE 64
 #define __cacheline_aligned alignas(DCACHE1_LINESIZE)
 
-namespace Common
+namespace common
 {
 /**
  * Multi-producer, multi-consumer class based on Vyukov's algorithm.  This
@@ -137,8 +138,7 @@ public:
    *
    */
   Mpmc_bounded_lfq(size_t size, Base_memory_allocator *allocator)
-    : Mpmc_bounded_lfq(
-                       size,
+    : Mpmc_bounded_lfq(size,
                        (
                         assert(allocator),
                         allocator->alloc(sizeof(aligned_node_t) * size, -1 /*numa*/, 64)
@@ -188,7 +188,7 @@ public:
   }
 
   static void * allocate_queue_memory(size_t queue_size) {
-    return ::aligned_alloc(sizeof(T), sizeof(Common::Mpmc_bounded_lfq<T>::aligned_node_t) * queue_size);
+    return ::aligned_alloc(sizeof(T), sizeof(common::Mpmc_bounded_lfq<T>::aligned_node_t) * queue_size);
   }
 
   virtual void exit_threads() {}
@@ -327,8 +327,8 @@ public:
   }
 
   static size_t memory_footprint(size_t queue_size) {
-    return sizeof(Common::Mpmc_bounded_lfq<void *>) +
-      (sizeof(Common::Mpmc_bounded_lfq<void *>::aligned_node_t) *
+    return sizeof(common::Mpmc_bounded_lfq<void *>) +
+      (sizeof(common::Mpmc_bounded_lfq<void *>::aligned_node_t) *
        queue_size);
   }
 
@@ -453,8 +453,8 @@ public:
   inline bool empty() { return queue_.empty(); }
 
   static size_t memory_footprint(size_t queue_size) {
-    return sizeof(Common::Mpmc_bounded_lfq<void *>) +
-      (sizeof(Common::Mpmc_bounded_lfq<void *>::aligned_node_t) *
+    return sizeof(common::Mpmc_bounded_lfq<void *>) +
+      (sizeof(common::Mpmc_bounded_lfq<void *>::aligned_node_t) *
        queue_size);
   }
 };
@@ -609,12 +609,12 @@ public:
   inline bool empty() { return queue_.empty(); }
 
   static size_t memory_footprint(size_t queue_size) {
-    return sizeof(Common::Mpmc_bounded_lfq<void *>) +
-      (sizeof(Common::Mpmc_bounded_lfq<void *>::aligned_node_t) *
+    return sizeof(common::Mpmc_bounded_lfq<void *>) +
+      (sizeof(common::Mpmc_bounded_lfq<void *>::aligned_node_t) *
        queue_size);
   }
 };
-}  // namespace Common
+}  // namespace common
 
 #pragma GCC diagnostic pop
 

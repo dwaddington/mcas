@@ -18,9 +18,10 @@
 #include "hop_hash_log.h"
 #include <stdexcept>
 
-class perishable_expiry
+struct perishable_expiry
 	: public std::runtime_error
 {
+private:
 	int _line;
 	static unsigned _instance_count;
 public:

@@ -31,7 +31,7 @@
 /* The array for the state vector */
 static unsigned long long mt[NN];
 /* mti==NN+1 means mt[NN] is not initialized */
-static int mti = NN + 1;
+static unsigned int mti = NN + 1;
 
 /* initializes mt[NN] with a seed */
 void init_genrand64(unsigned long long seed) {

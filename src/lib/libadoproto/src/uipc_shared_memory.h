@@ -12,7 +12,6 @@
 */
 
 
-
 /*
  * Authors:
  *
@@ -27,17 +26,20 @@
 #include <string>
 #include <vector>
 
-namespace Core
+namespace core
 {
 namespace UIPC
 {
 class Shared_memory {
-  Shared_memory(const Shared_memory &) = delete;
-  Shared_memory& operator=(const Shared_memory &) = delete;
+  
  private:
-  static constexpr bool option_DEBUG = false;
+  static constexpr unsigned _debug_level = 2;
+  inline unsigned debug_level() const { return _debug_level; }
 
  public:
+
+  Shared_memory(const Shared_memory &) = delete;
+  Shared_memory& operator=(const Shared_memory &) = delete;
   Shared_memory(const std::string &name, size_t n_pages); /*< initiator constructor */
   Shared_memory(const std::string &name);                 /*< target constructor */
 

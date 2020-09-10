@@ -7,7 +7,7 @@ TEST(RunningStatisticsTest, Init)
 {
     RunningStatistics bin;
     
-    int count = bin.getCount();
+    auto count = bin.getCount();
     double min = bin.getMin();
     double max = bin.getMax();
     double mean = bin.getMean();
@@ -27,7 +27,7 @@ TEST(RunningStatisticsTest, SingleValue)
     double value = 2.0;
     bin.add_value(value);
     
-    int count = bin.getCount();
+    auto count = bin.getCount();
     double min = bin.getMin();
     double max = bin.getMax();
     double mean = bin.getMean();
@@ -47,7 +47,7 @@ TEST(RunningStatisticsTest, TwoValues)
     bin.add_value(2.0);
     bin.add_value(6.0);
     
-    int count = bin.getCount();
+    auto count = bin.getCount();
     double min = bin.getMin();
     double max = bin.getMax();
     double mean = bin.getMean();
@@ -69,7 +69,7 @@ TEST(RunningStatisticsTest, TenValues)
         bin.add_value(double(i));
     }
     
-    int count = bin.getCount();
+    auto count = bin.getCount();
     double min = bin.getMin();
     double max = bin.getMax();
     double mean = bin.getMean();
@@ -88,7 +88,7 @@ TEST(BinStatisticsTests, default_init)
 {
     BinStatistics stats;
 
-    int count = stats.getBin(0).getCount();
+    auto count = stats.getBin(0).getCount();
 
     ASSERT_EQ(count, 0);
 }
@@ -101,7 +101,7 @@ TEST(BinStatisticsTests, default_single)
 
     stats.update(value);
 
-    int count = stats.getBin(0).getCount();
+    auto count = stats.getBin(0).getCount();
     double mean = stats.getBin(0).getMean();
 
     ASSERT_EQ(count, 1);
@@ -118,7 +118,7 @@ TEST(BinStatisticsTests, default_two_large)
     stats.update(value_positive);
     stats.update(value_negative);
 
-    int count = stats.getBin(0).getCount();
+    auto count = stats.getBin(0).getCount();
     double max = stats.getBin(0).getMax();
     double min = stats.getBin(0).getMin();
     double mean = stats.getBin(0).getMean();
@@ -138,7 +138,7 @@ TEST(BinStatisticsTests, two_bins_one_value)
     stats.update(value);
 
     // check bin 0
-    int count_0 = stats.getBin(0).getCount();
+    auto count_0 = stats.getBin(0).getCount();
     double max_0 = stats.getBin(0).getMax();
     double min_0 = stats.getBin(0).getMin();
     double mean_0 = stats.getBin(0).getMean();
@@ -151,7 +151,7 @@ TEST(BinStatisticsTests, two_bins_one_value)
     ASSERT_NEAR(std_0, 0.0, 0.0001);
 
     // check bin 1
-    int count_1 = stats.getBin(1).getCount();
+    auto count_1 = stats.getBin(1).getCount();
     double max_1 = stats.getBin(1).getMax();
     double min_1 = stats.getBin(1).getMin();
     double mean_1 = stats.getBin(1).getMean();
@@ -175,7 +175,7 @@ TEST(BinStatisticsTests, ten_bins_two_values)
     stats.update(value_2);
 
     // check bin 3
-    int count_3 = stats.getBin(3).getCount();
+    auto count_3 = stats.getBin(3).getCount();
     double max_3 = stats.getBin(3).getMax();
     double min_3 = stats.getBin(3).getMin();
     double mean_3 = stats.getBin(3).getMean();
@@ -188,7 +188,7 @@ TEST(BinStatisticsTests, ten_bins_two_values)
     ASSERT_NEAR(std_3, 0.0, 0.0001);
 
     // check bin 9
-    int count_9 = stats.getBin(9).getCount();
+    auto count_9 = stats.getBin(9).getCount();
     double max_9 = stats.getBin(9).getMax();
     double min_9 = stats.getBin(9).getMin();
     double mean_9 = stats.getBin(9).getMean();
@@ -201,21 +201,18 @@ TEST(BinStatisticsTests, ten_bins_two_values)
     ASSERT_NEAR(std_9, 0.0, 0.0001);
 
     // check remaining bins
-    int count;
-    double max, min, mean, std;
-
-    for (int i = 0; i < 10; i++)
+    for (unsigned i = 0; i < 10; i++)
     {
         if (i == 3 || i == 9)
         {
             continue;  // these bins are populated
         }
 
-        count = stats.getBin(i).getCount();
-        max = stats.getBin(i).getMax();
-        min = stats.getBin(i).getMin();
-        mean = stats.getBin(i).getMean();
-        std = stats.getBin(i).getStd();
+        auto count = stats.getBin(i).getCount();
+        double max = stats.getBin(i).getMax();
+        double min = stats.getBin(i).getMin();
+        double mean = stats.getBin(i).getMean();
+        double std = stats.getBin(i).getStd();
 
         ASSERT_EQ(count, 0);
         ASSERT_EQ(max, 0.0);

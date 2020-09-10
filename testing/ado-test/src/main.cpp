@@ -10,12 +10,18 @@
 #include <sstream>
 #include <string>
 
+/**
+ * This test program works in collaboration with the 'testing' ADO plugin
+ *
+ */
 #define ASSERT_OK(X) ASSERT_TRUE(X == S_OK)
 
 struct Options {
   unsigned    debug_level;
+  unsigned patience;
+  boost::optional<std::string> device;
+  boost::optional<std::string> src_addr;
   std::string server;
-  std::string device;
   unsigned    port;
   bool        async;
 } g_options;
@@ -26,26 +32,26 @@ class ADO_test : public ::testing::Test {
   virtual void TearDown() {}
 };
 
-Component::IMCAS *mcas;
-Component::IMCAS *init(const std::string &server_hostname, int port);
+using namespace component;
 
-Component::IMCAS *init(const std::string &server_hostname, int port)
+Itf_ref<IMCAS> mcas;
+Itf_ref<IMCAS> init(const std::string &server_hostname, int port);
+
+Itf_ref<IMCAS> init(const std::string &server_hostname, int port)
 {
-  using namespace Component;
+  using namespace component;
 
-  IBase *comp = Component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
+  IBase *comp = load_component("libcomponent-mcasclient.so", mcas_client_factory);
 
-  auto fact = (IMCAS_factory *) comp->query_interface(IMCAS_factory::iid());
+  auto fact = make_itf_ref(static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid())));
   if (!fact) throw Logic_exception("unable to create MCAS factory");
 
   std::stringstream url;
   url << g_options.server << ":" << g_options.port;
 
-  IMCAS *mcas = fact->mcas_create(g_options.debug_level, "None", url.str(), g_options.device);
+  auto mcas = make_itf_ref(fact->mcas_create(g_options.debug_level, g_options.patience, "None", g_options.device, g_options.src_addr, url.str()));
 
   if (!mcas) throw Logic_exception("unable to create MCAS client instance");
-
-  fact->release_ref();
 
   return mcas;
 }
@@ -57,8 +63,6 @@ Component::IMCAS *init(const std::string &server_hostname, int port)
 
 TEST_F(ADO_test, BasicInvokeAdo)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "BasicInvokeAdo";
 
@@ -70,7 +74,7 @@ TEST_F(ADO_test, BasicInvokeAdo)
 
   mcas->erase(pool, testname);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   status_t                                    rc;
   rc = mcas->invoke_ado(pool, testname, "RUN!TEST-BasicInvokeAdo", IMCAS::ADO_FLAG_CREATE_ON_DEMAND, response, KB(4));
 
@@ -79,21 +83,51 @@ TEST_F(ADO_test, BasicInvokeAdo)
   ASSERT_OK(mcas->close_pool(pool));
 }
 
+
+TEST_F(ADO_test, BasicAdoResponse)
+{
+  const std::string poolname = "pool0BasicAdoResponse";
+  const std::string testname = "BasicAdoResponse";
+
+  auto pool = mcas->create_pool(poolname, MB(1), /* size */
+                                0,                 /* flags */
+                                50);              /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  mcas->erase(pool, testname);
+
+  std::vector<IMCAS::ADO_response> response;
+  status_t rc;
+  rc = mcas->invoke_ado(pool, testname, "RUN!TEST-BasicAdoResponse", IMCAS::ADO_FLAG_CREATE_ON_DEMAND, response, KB(4));
+
+  ASSERT_TRUE(rc == S_OK);
+  ASSERT_LT(0, response.size());
+
+  std::string r = response[0].str();
+  PLOG("Response: (%s)", r.c_str());
+
+  ASSERT_TRUE(r == testname);
+
+  ASSERT_OK(mcas->close_pool(pool));
+}
+
+
+
 TEST_F(ADO_test, BasicInvokePutAdo)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "BasicInvokePutAdo";
 
-  auto pool = mcas->create_pool(poolname, 64, /* size */
+  mcas->delete_pool(poolname);
+  auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,            /* flags */
                                 1000);        /* obj count */
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   mcas->erase(pool, testname);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   status_t                                    rc;
   std::string                                 cmd          = "RUN!TEST-BasicInvokePutAdo";
   std::string                                 value_to_put = "VALUE_TO_PUT";
@@ -112,20 +146,20 @@ TEST_F(ADO_test, BasicInvokePutAdo)
   ASSERT_OK(mcas->close_pool(pool));
 }
 
+
 TEST_F(ADO_test, InvokeAdoCreateOnDemand)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "InvokeAdoCreateOnDemand";
 
-  auto pool = mcas->create_pool(poolname, MB(256), /* size */
+  mcas->delete_pool(poolname);
+  auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,                 /* flags */
                                 100);              /* obj count */
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   status_t                                    rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   rc = mcas->invoke_ado(pool, testname, "RUN!TEST-InvokeAdoCreateOnDemand", IMCAS::ADO_FLAG_CREATE_ON_DEMAND, response,
                         KB(4));
 
@@ -133,14 +167,14 @@ TEST_F(ADO_test, InvokeAdoCreateOnDemand)
   ASSERT_OK(mcas->close_pool(pool));
 }
 
+
 TEST_F(ADO_test, AdoKeyReference)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "AdoKeyReference";
 
-  auto pool = mcas->create_pool(poolname, MB(256), /* size */
+  mcas->delete_pool(poolname);
+  auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,                 /* flags */
                                 500);              /* obj count */
 
@@ -148,7 +182,7 @@ TEST_F(ADO_test, AdoKeyReference)
 
   mcas->erase(pool, testname);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   status_t                                    rc;
   rc = mcas->invoke_ado(pool, testname, "RUN!TEST-AdoKeyReference", IMCAS::ADO_FLAG_CREATE_ON_DEMAND, response, KB(4));
 
@@ -157,14 +191,14 @@ TEST_F(ADO_test, AdoKeyReference)
   ASSERT_OK(mcas->close_pool(pool));
 }
 
+
 TEST_F(ADO_test, FindKeyCallback)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "FindKeyCallback";
 
-  auto pool = mcas->create_pool(poolname, 64, /* size */
+  mcas->delete_pool(poolname);
+  auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,            /* flags */
                                 100);         /* obj count */
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
@@ -175,21 +209,21 @@ TEST_F(ADO_test, FindKeyCallback)
   ASSERT_OK(mcas->put(pool, "mySpecialKey2", "Special-Value2"));
 
   status_t                                    rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   rc = mcas->invoke_ado(pool, testname, "RUN!TEST-FindKeyCallback", IMCAS::ADO_FLAG_CREATE_ON_DEMAND, response, KB(4));
   ASSERT_TRUE(rc == S_OK);
 
   ASSERT_TRUE(mcas->close_pool(pool) == S_OK);
 }
 
+
 TEST_F(ADO_test, BasicAllocatePoolMemory)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "BasicAllocatePoolMemory";
 
-  auto pool = mcas->create_pool(poolname, GB(10), /* size */
+  mcas->delete_pool(poolname);
+  auto pool = mcas->create_pool(poolname, GB(1), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
 
@@ -200,7 +234,7 @@ TEST_F(ADO_test, BasicAllocatePoolMemory)
   ASSERT_OK(mcas->put(pool, "mySpecialKey2", "Special-Value2"));
 
   status_t                                    rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   for (int i = 0; i < 100; i++) {
     rc = mcas->invoke_ado(pool, testname, "RUN!TEST-BasicAllocatePoolMemory", IMCAS::ADO_FLAG_CREATE_ON_DEMAND,
                           response, KB(4));
@@ -211,13 +245,13 @@ TEST_F(ADO_test, BasicAllocatePoolMemory)
   ASSERT_OK(mcas->close_pool(pool));
 }
 
+
 TEST_F(ADO_test, BasicDetachedMemory)
 {
-  using namespace Component;
-
   const std::string poolname = "pool0";
   const std::string testname = "BasicDetachedMemory";
 
+  mcas->delete_pool(poolname);
   auto pool = mcas->create_pool(poolname, GB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
@@ -225,7 +259,7 @@ TEST_F(ADO_test, BasicDetachedMemory)
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   status_t                                    rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
   std::string                                 key    = "BasicDetachedMemory";
   std::string                                 value1 = "THIS_IS_VALUE_1";
   std::string                                 value2 = "AND_THIS_IS_VALUE_2";
@@ -245,12 +279,13 @@ TEST_F(ADO_test, BasicDetachedMemory)
   ASSERT_OK(mcas->close_pool(pool));
 }
 
+
 TEST_F(ADO_test, GetReferenceVector)
 {
-  using namespace Component;
-
   const std::string testname = "GetReferenceVector";
   const std::string poolname = testname;
+
+  mcas->delete_pool(poolname);
 
   auto pool = mcas->create_pool(poolname, GB(1), /* size */
                                 0,               /* flags */
@@ -258,7 +293,7 @@ TEST_F(ADO_test, GetReferenceVector)
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
   status_t                                    rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
 
   ASSERT_OK(mcas->put(pool, "mySpecialKey", "Special-Value"));
   ASSERT_OK(mcas->put(pool, "mySpecialKey2", "Special-Value2"));
@@ -271,58 +306,60 @@ TEST_F(ADO_test, GetReferenceVector)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
-#ifdef REMOVE_CONDITIONAL_AFTER_DAWN_300
 
 TEST_F(ADO_test, GetReferenceVectorByTime)
 {
-  using namespace Component;
-
   const std::string testname = "GetReferenceVectorByTime";
   const std::string poolname = testname;
 
-  auto pool = mcas->create_pool(poolname, GB(1), /* size */
+  mcas->delete_pool(poolname);
+
+  auto pool = mcas->create_pool(poolname, MB(32), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
 
   for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, Common::random_string(8), Common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
-  sleep(3);
+  
+  sleep(2);
+  
   for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, Common::random_string(8), Common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
+  sleep(2);
+  
   ASSERT_OK(mcas->invoke_ado(pool, testname, "RUN!TEST-GetReferenceVectorByTime", 0, response, KB(4)));
 
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
-#endif
 
 TEST_F(ADO_test, Iterator)
 {
-  using namespace Component;
-
   const std::string testname = "Iterator";
   const std::string poolname = testname;
 
-  auto pool = mcas->create_pool(poolname, GB(1),             /* size */
+  mcas->delete_pool(testname);
+
+  auto pool = mcas->create_pool(poolname, MB(32),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
                                 100);                        /* obj count */
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
 
   for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, Common::random_string(8), Common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
   sleep(3);
   for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, Common::random_string(8), Common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
   ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test */
@@ -332,60 +369,89 @@ TEST_F(ADO_test, Iterator)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+
 TEST_F(ADO_test, IteratorTS)
 {
-  using namespace Component;
-
   const std::string testname = "IteratorTS";
   const std::string poolname = testname;
 
-  auto pool = mcas->create_pool(poolname, GB(1),             /* size */
+  mcas->delete_pool(testname);
+
+  auto pool = mcas->create_pool(poolname, MB(32),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
                                 100);                        /* obj count */
+  
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
-  std::vector<Component::IMCAS::ADO_response> response;
-  epoch_time_t                                ts1 = epoch_now();
+  std::vector<IMCAS::ADO_response> response;
+
+  common::epoch_time_t ts1 = common::epoch_now();
+   
+  ASSERT_TRUE(ts1.seconds() > 0);
+  PLOG("now epoch.seconds = %lu", ts1.seconds());
+  
   wmb();
+  sleep(3);
 
   for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, Common::random_string(8), Common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
+  wmb();
   sleep(2);
 
-  ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
-                             std::to_string(ts1), 0, response, KB(1)));
+  PLOG("now epoch.seconds = %lu ", common::epoch_now().seconds());
 
+  ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
+                             std::to_string(ts1.seconds()), 0, response, KB(1)));
+
+  ASSERT_LT(0, response.size());
+  uint64_t cnt;
+  cnt = *(response[0].cast_data<uint64_t>());
+  PLOG("Iterator TS: count (1st round) = %lu", cnt);
+  ASSERT_TRUE(cnt == 11);
+  
   sleep(3);
-  epoch_time_t ts2 = epoch_now();
-  for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, Common::random_string(8), Common::random_string(16)));
+  wmb();
+  common::epoch_time_t ts2 = common::epoch_now();
+  wmb();
+  for (unsigned i = 0; i < 10; i++) { /* put another 10 */
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
-  ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test */
-                             std::to_string(ts2), 0, response, KB(1)));
 
-  ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test */
-                             std::to_string(ts1), 0, response, KB(1)));
+  ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
+                             std::to_string(ts2.seconds()), 0, response, KB(1)));
 
+  cnt = *(response[0].cast_data<uint64_t>());
+  PLOG("Iterator TS: count (2nd round) = %lu", cnt);
+
+  /* There is a semantic different between mapstore and hstore
+     that needs fixing. I think hstore may not update the timestamp
+     on put on existing key.
+  */
+  //  ASSERT_TRUE(cnt == 10 || cnt == 11); /* IteratorTS key updated */
+  
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }
+
+
 TEST_F(ADO_test, Erase)
 {
-  using namespace Component;
   const std::string testname = "Erase";
   const std::string poolname = testname;
+
+  mcas->delete_pool(poolname);
 
   auto pool = mcas->create_pool(poolname, GB(1),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
                                 100);                        /* obj count */
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<IMCAS::ADO_response> response;
 
-  ASSERT_OK(mcas->put(pool, testname, Common::random_string(16)));
+  ASSERT_OK(mcas->put(pool, testname, common::random_string(16)));
 
   mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
                    testname, 0, response, KB(1));
@@ -399,6 +465,51 @@ TEST_F(ADO_test, Erase)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(ADO_test, BasicAsyncInvokeAdo)
+{
+  const std::string poolname = "pool0";
+
+  auto pool = mcas->create_pool(poolname, MB(1), /* size */
+                                0,                 /* flags */
+                                50);              /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  IMCAS::async_handle_t handles[4];
+  const char * keys[] = {"BasicAdoResponse-A","BasicAdoResponse-B","BasicAdoResponse-C","BasicAdoResponse-D"};
+
+  status_t rc;
+  std::vector<IMCAS::ADO_response> responses[4];
+
+  for(unsigned h=0; h<4 ; h++) {
+    rc = mcas->async_invoke_ado(pool, keys[h], "RUN!TEST-BasicAdoResponse",
+                                IMCAS::ADO_FLAG_CREATE_ON_DEMAND, responses[h], handles[h], KB(4));
+    ASSERT_OK(rc);
+  }
+
+  PLOG("Async issues made..");
+
+  for(unsigned h=0; h<4 ; h++) {
+    int attempts = 0;
+    while(mcas->check_async_completion(handles[h]) == E_BUSY) {
+      sleep(1);
+      PLOG("Waiting for async (%u) completion....", h);
+      attempts++;
+      ASSERT_FALSE(attempts > 4);
+    }
+
+    ASSERT_TRUE(responses[h].size() == 1);
+    ASSERT_TRUE(responses[h][0].str() == std::string(keys[h]));
+    PLOG("response=%s (count=%lu)", responses[h][0].str().c_str(), responses[h].size());
+  }
+
+
+  ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
+
+
+
 int main(int argc, char *argv[])
 {
   ::testing::InitGoogleTest(&argc, argv);
@@ -408,10 +519,15 @@ int main(int argc, char *argv[])
   try {
     po::options_description desc("Options");
 
-    desc.add_options()("help", "Show help")("server", po::value<std::string>(), "Server hostname")(
-        "device", po::value<std::string>()->default_value("mlx5_0"), "Device (e.g. mlnx5_0)")(
-        "port", po::value<unsigned>()->default_value(11911), "Server port")(
-        "debug", po::value<unsigned>()->default_value(0), "Debug level")("async", "Use asynchronous invocation");
+    desc.add_options()
+      ("help", "Show help")
+      ("server", po::value<std::string>(), "Server hostname")
+      ("src_addr", po::value<std::string>(), "Source IP address")
+      ("device", po::value<std::string>(), "Device (e.g. mlnx5_0)")
+      ("port", po::value<std::uint16_t>()->default_value(0), "Server port. Default 0 (mapped to 11911 for verbs, 11921 for sockets)")
+      ("debug", po::value<unsigned>()->default_value(0), "Debug level")
+      ("patience", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
+      ("async", "Use asynchronous invocation");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -427,19 +543,34 @@ int main(int argc, char *argv[])
     }
 
     g_options.server      = vm["server"].as<std::string>();
-    g_options.device      = vm["device"].as<std::string>();
-    g_options.port        = vm["port"].as<unsigned>();
+    if ( vm.count("src_addr") )
+    {
+      g_options.src_addr = vm["src_addr"].as<std::string>();
+    }
+    if ( vm.count("device") )
+    {
+      g_options.device = vm["device"].as<std::string>();
+    }
+    if ( ! g_options.src_addr && ! g_options.device )
+    {
+      g_options.device = "mlx5_0";
+    }
+    g_options.port        = vm["port"].as<std::uint16_t>();
     g_options.debug_level = vm["debug"].as<unsigned>();
+    g_options.patience = vm["patience"].as<unsigned>();
     g_options.async       = vm.count("async");
 
-    mcas = init(vm["server"].as<std::string>(), vm["port"].as<unsigned>());
+    mcas = init(g_options.server, g_options.port);
     assert(mcas);
     auto r = RUN_ALL_TESTS();
-
-    mcas->release_ref();
   }
   catch (po::error e) {
     printf("bad command line option\n");
+    return -1;
+  }
+  catch (const Exception &e) {
+    /* init() throws */
+    printf("failed: %s\n", e.cause());
     return -1;
   }
 

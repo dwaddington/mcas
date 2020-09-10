@@ -1,0 +1,3 @@
+#!/usr/bin/python3
+
+install_prefix = "${CMAKE_INSTALL_PREFIX}"

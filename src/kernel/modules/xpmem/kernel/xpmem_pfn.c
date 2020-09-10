@@ -223,7 +223,7 @@ xpmem_vaddr_to_pte_size(struct mm_struct *mm, u64 vaddr, u64 *size)
  */
 static int
 xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
-		struct mm_struct *src_mm, u64 vaddr)
+               struct mm_struct *src_mm, u64 vaddr, unsigned long *pfn)
 {
 	int ret;
 	struct page *page;
@@ -267,13 +267,14 @@ xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 	ret = get_user_pages_remote (src_task, src_mm, vaddr, 1, 1, 1, &page, NULL);
 #else
-	ret = get_user_pages (src_task, src_mm, vaddr, 1, 1, 1, &page, NULL);
+	ret = get_user_pages (src_task, src_mm, vaddr, 1, 1, &page, NULL);
 #endif
 
 	if (!cpumask_empty(&saved_mask))
 		set_cpus_allowed_ptr(current, &saved_mask);
 
 	if (ret == 1) {
+    *pfn = page_to_pfn(page);
 		atomic_inc(&tg->n_pinned);
 		atomic_inc(&xpmem_my_part->n_pinned);
 		ret = 0;
@@ -339,17 +340,17 @@ xpmem_unpin_pages(struct xpmem_segment *seg, struct mm_struct *mm,
  * Given a virtual address and XPMEM segment, pin the page.
  */
 int
-xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr)
+xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr, unsigned long * pfn)
 {
   int ret;
 	struct xpmem_thread_group *seg_tg = seg->tg;
 
 	/* the seg may have been marked for destruction while we were down() */
-        if (seg->flags & XPMEM_FLAG_DESTROYING)
+  if (seg->flags & XPMEM_FLAG_DESTROYING)
 		return -ENOENT;
 
 	/* pin PFN */
-        ret = xpmem_pin_page(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr);
+  ret = xpmem_pin_page(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr, pfn);
 
 	return ret;
 }
@@ -621,6 +622,7 @@ xpmem_unpin_procfs_open(struct inode *inode, struct file *file)
 	return single_open(file, xpmem_unpin_procfs_show, PDE_DATA(inode));
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
 struct file_operations xpmem_unpin_procfs_ops = {
 	.owner		= THIS_MODULE,
 	.llseek		= seq_lseek,
@@ -629,3 +631,12 @@ struct file_operations xpmem_unpin_procfs_ops = {
 	.open		= xpmem_unpin_procfs_open,
 	.release	= single_release,
 };
+#else
+struct proc_ops xpmem_unpin_procfs_ops = {
+	.proc_lseek   = seq_lseek,
+	.proc_read    = seq_read,
+	.proc_write   = xpmem_unpin_procfs_write,
+	.proc_open    = xpmem_unpin_procfs_open,
+	.proc_release = single_release,
+};
+#endif

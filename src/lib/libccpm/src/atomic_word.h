@@ -25,8 +25,21 @@ namespace ccpm
 	 */
 	using atomic_word = std::uint64_t;
 
+	constexpr unsigned log2(unsigned x)
+	{
+		return x <= 1 ? 0U : log2(x>>1)+1;
+	}
+
 	static constexpr unsigned alloc_states_per_word =
 		std::numeric_limits<atomic_word>::digits;
+
+	static constexpr unsigned log2_alloc_states_per_word =
+		log2(alloc_states_per_word);
+
+	/* Our atomic_words require a power of 2 number of bits, or else
+	 * we have to rewrite the area_ctl::sub_size() function.
+	 */
+	static_assert(1U << log2_alloc_states_per_word == alloc_states_per_word, "alloc_states_per_word not a power of 2");
 
 	/* in the atomic word at ix, return the index of a start of a run of n free
 	 * elements (or sub_states_per_word-n, if there is no such run)

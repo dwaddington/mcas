@@ -6,6 +6,8 @@ find_program(PYTHON NAMES "python3.7" "python3.6" "python3.5")
 
 if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
+  get_filename_component(PYTHON_FILENAME ${PYTHON} NAME)
+
   message("-- Building Python support.")
   set(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in")
   set(SETUP_PY    "${CMAKE_CURRENT_BINARY_DIR}/setup.py")

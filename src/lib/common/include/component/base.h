@@ -35,6 +35,7 @@
 #ifndef __COMPONENT_BASE_H__
 #define __COMPONENT_BASE_H__
 
+#include <common/component.h>
 #include <assert.h>
 #include <common/errors.h>
 #include <common/types.h>
@@ -48,15 +49,15 @@
 #include <vector>
 
 #define DECLARE_INTERFACE_UUID(f1, f2, f3, f4, f5, f6, f7, f8, f9, f10) \
-  static Component::uuid_t &iid() {                                     \
-    static Component::uuid_t itf_uuid = {                               \
+  static component::uuid_t &iid() {                                     \
+    static component::uuid_t itf_uuid = {                               \
         f1, f2, f3, f4, {f5, f6, f7, f8, f9, f10}};                     \
     return itf_uuid;                                                    \
   }
 
 #define DECLARE_COMPONENT_UUID(f1, f2, f3, f4, f5, f6, f7, f8, f9, f10) \
-  static Component::uuid_t &component_id() {                            \
-    static Component::uuid_t comp_uuid = {                              \
+  static component::uuid_t &component_id() {                            \
+    static component::uuid_t comp_uuid = {                              \
         f1, f2, f3, f4, {f5, f6, f7, f8, f9, f10}};                     \
     return comp_uuid;                                                   \
   }
@@ -66,12 +67,12 @@
 
 #define DECLARE_STATIC_COMPONENT_UUID(NAME, f1, f2, f3, f4, f5, f6, f7, f8, \
                                       f9, f10)                              \
-  static Component::uuid_t NAME                                             \
+  static component::uuid_t NAME                                             \
       __attribute__((unused)) = {f1, f2, f3, f4, {f5, f6, f7, f8, f9, f10}}
 
 #define DECLARE_STATIC_INTERFACE_UUID(NAME, f1, f2, f3, f4, f5, f6, f7, f8, \
                                       f9, f10)                              \
-  static Component::uuid_t NAME                                             \
+  static component::uuid_t NAME                                             \
       __attribute__((unused)) = {f1, f2, f3, f4, {f5, f6, f7, f8, f9, f10}}
 
 
@@ -82,7 +83,7 @@
   status_t shutdown() override { return E_NOT_IMPL; } \
   status_t reset() override { return E_NOT_IMPL; }
 
-namespace Component
+namespace component
 {
 /**
  * Standard UUID (Universal Unique Identifier) structure
@@ -131,7 +132,7 @@ struct uuid_t {
   }
 };
 
-bool operator==(const Component::uuid_t &lhs, const Component::uuid_t &rhs);
+bool operator==(const component::uuid_t &lhs, const component::uuid_t &rhs);
 
 /**
  * Base class. All components must inherit from this class.
@@ -155,10 +156,10 @@ class IBase {
    * components
    *
    */
-  virtual void *query_interface(Component::uuid_t &itf) = 0;
+  virtual void *query_interface(component::uuid_t &itf) = 0;
 
   /**
-   * Template function helper 
+   * Template function helper
    */
   template<class T>
   T * query_interface() {
@@ -286,11 +287,11 @@ class IBase {
  *
  * @return Pointer to IBase interface
  */
-IBase *load_component(const char *dllname, Component::uuid_t component_id, bool quiet);
-IBase *load_component(const char *dllname, Component::uuid_t component_id);
+IBase *load_component(const char *dllname, component::uuid_t component_id, bool quiet);
+IBase *load_component(const char *dllname, component::uuid_t component_id);
 
 inline IBase *load_component(std::string &dllname,
-                             Component::uuid_t component_id) {
+                             component::uuid_t component_id) {
   return load_component(dllname.c_str(), component_id);
 }
 
@@ -303,6 +304,6 @@ inline IBase *load_component(std::string &dllname,
  * @return
  */
 status_t bind(std::vector<IBase *> components);
-}  // namespace Component
+}  // namespace component
 
 #endif

@@ -21,7 +21,7 @@
 inline std::vector<std::size_t> bits_to_ints(std::uint64_t b, std::size_t offset)
 {
 	std::vector<std::size_t> v;
-	for ( int ix = 0; b != 0; b>>=1, ++ix)
+	for ( unsigned ix = 0U; b != 0; b>>=1, ++ix)
 	{
 		if ( b & 1 )
 		{

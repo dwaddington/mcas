@@ -1,29 +1,38 @@
 #!/bin/bash
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
-NODE_IP=$(ip addr | grep -Po 'inet \K10.0.0.[0-9]+' | head -1)
+
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+. "$DIR/functions.sh"
+
 TESTID=$(basename --suffix .sh -- $0)
-DESC=$TESTID
+DAXTYPE="$(choose_dax_type)"
+DESC=$TESTID-$DAXTYPE
+
+# parameters for MCAS server and client
+NODE_IP="$(node_ip)"
+DEBUG=${DEBUG:-0}
+
+# parameters for MCAS server
+SERVER_CONFIG="hsstore-$DAXTYPE-ado0-sock.conf"
 
 # launch MCAS server
-DAX_RESET=1 ./dist/bin/mcas --conf ./dist/testing/testing-ado0-sock.conf --debug 0 &> test$TESTID-server.log &
+DAX_RESET=1 ./dist/bin/mcas --config "$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP")" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
 # give time to start server
 sleep 3
 
 CLIENT_LOG="test$TESTID-client.log"
-#launch client
-./dist/bin/ado-test --port 11921 --server $NODE_IP &> $CLIENT_LOG &
+
+# launch client
+./dist/bin/ado-test --provider sockets --src_addr "$NODE_IP" --server $NODE_IP &> $CLIENT_LOG &
 CLIENT_PID=$!
 
 # arm cleanup
 trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
-# wait for client to complete
-tail --pid=$CLIENT_PID -f /dev/null
+# wait for client and server to complete
+wait $CLIENT_PID; CLIENT_RC=$?
+wait $SERVER_PID; SERVER_RC=$?
 
-if cat $CLIENT_LOG | grep -q 'FAILED TEST' ; then
-    echo -e "Test $TESTID ($DESC): \e[31mfail\e[0m"
-else
-    echo -e "Test $TESTID ($DESC): \e[32mpassed\e[0m"
-fi
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_fail $CLIENT_LOG $TESTID $DESC

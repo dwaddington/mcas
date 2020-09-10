@@ -23,17 +23,18 @@
 #include <stdexcept>
 #include <string>
 
-using namespace Component;
+using namespace component;
 
 namespace {
 
 // The fixture for testing class Foo.
 class KVStore_test : public ::testing::Test {
 
+#if 0
   static constexpr std::size_t estimated_object_count_large = 64000000;
   /* More testing of table splits, at a performance cost */
   static constexpr std::size_t estimated_object_count_small = 1;
-
+#endif
   static constexpr std::size_t many_count_target_large = 2000000;
   /* Shorter test: use when PMEM_IS_PMEM_FORCE=0 */
   static constexpr std::size_t many_count_target_small = 400;
@@ -58,7 +59,7 @@ class KVStore_test : public ::testing::Test {
   static bool pmem_simulated;
   /* persistent memory is effective (either real, indicated by no PMEM_IS_PMEM_FORCE or simulated by PMEM_IS_PMEM_FORCE 0 not 1 */
   static bool pmem_effective;
-  static Component::IKVStore * _kvstore;
+  static component::IKVStore * _kvstore;
 
   static const std::size_t estimated_object_count;
 
@@ -76,15 +77,17 @@ class KVStore_test : public ::testing::Test {
   }
 };
 
+#if 0
 constexpr std::size_t KVStore_test::estimated_object_count_small;
 constexpr std::size_t KVStore_test::estimated_object_count_large;
+#endif
 constexpr std::size_t KVStore_test::many_count_target_small;
 constexpr std::size_t KVStore_test::many_count_target_large;
 constexpr char KVStore_test::long_value[24];
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
 bool KVStore_test::pmem_effective = ! getenv("PMEM_IS_PMEM_FORCE") || getenv("PMEM_IS_PMEM_FORCE") == std::string("0");
-Component::IKVStore * KVStore_test::_kvstore;
+component::IKVStore * KVStore_test::_kvstore;
 
 const std::size_t KVStore_test::estimated_object_count =
 #if 0
@@ -110,24 +113,29 @@ TEST_F(KVStore_test, Instantiate)
   /* create object instance through factory */
   /* This test only: use hstore-pe. the version compiled with simulated injection */
   auto link_library = "libcomponent-" + store_map::impl->name + "-pe.so";
-  Component::IBase * comp = Component::load_component(link_library,
+  component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
   ASSERT_TRUE(comp);
-  auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
-  _kvstore = fact->create("owner", "name", store_map::location);
-
-  fact->release_ref();
+  _kvstore =
+    fact->create(
+      0
+      , {
+          { +component::IKVStore_factory::k_dax_config, store_map::location }
+        }
+    );
 }
 
-class pool_open
+struct pool_open
 {
-  Component::IKVStore *_kvstore;
-  Component::IKVStore::pool_t _pool;
+private:
+  component::IKVStore *_kvstore;
+  component::IKVStore::pool_t _pool;
 public:
   explicit pool_open(
-    Component::IKVStore *kvstore_
+    component::IKVStore *kvstore_
     , const std::string& name_
     , unsigned int flags = 0
   )
@@ -141,7 +149,7 @@ public:
   }
 
   explicit pool_open(
-    Component::IKVStore *kvstore_
+    component::IKVStore *kvstore_
     , const std::string& name_
     , const size_t size
     , unsigned int flags = 0
@@ -158,7 +166,7 @@ public:
     _kvstore->close_pool(_pool);
   }
 
-  Component::IKVStore::pool_t pool() const noexcept { return _pool; }
+  component::IKVStore::pool_t pool() const noexcept { return _pool; }
 };
 
 TEST_F(KVStore_test, RemoveOldPool)

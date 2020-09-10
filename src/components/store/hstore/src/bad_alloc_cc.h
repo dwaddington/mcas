@@ -15,16 +15,23 @@
 #ifndef COMANCHE_HSTORE_BAD_ALLOC_H
 #define COMANCHE_HSTORE_BAD_ALLOC_H
 
-#include <cstddef> /* size_t */
 #include <new> /* bad_alloc */
+
+/* Every function which takes an alloc_key may throw bad_alloc.
+ * Every constructor of an alloc_key must catch BAD_ALLOC and return an error, e.g. E_TOO_LARGE.
+ */
+#include "alloc_key.h"
+
+#include <cstddef> /* size_t */
 #include <string>
 
-class bad_alloc_cc
+struct bad_alloc_cc
 	: public std::bad_alloc
 {
+private:
 	std::string _what;
 public:
-	bad_alloc_cc(std::size_t pad, std::size_t count, std::size_t size)
+	bad_alloc_cc(AK_FORMAL std::size_t pad, std::size_t count, std::size_t size)
 		: _what(std::string(__func__) + ": " + std::to_string(pad) + "+" + std::to_string(count) + "*" + std::to_string(size))
 	{}
 	const char *what() const noexcept override

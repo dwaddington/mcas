@@ -19,7 +19,7 @@
 #include <vector>
 
 server_connection_and_memory::server_connection_and_memory(
-  Component::IFabric_server_factory &ep_
+  component::IFabric_server_factory &ep_
   , std::size_t memory_size_
   , std::uint64_t remote_key_
 )

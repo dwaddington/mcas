@@ -19,17 +19,18 @@
 #include <memory> /* shared_ptr */
 #include <string>
 
-namespace Component
+namespace component
 {
   class IFabric_communicator;
 }
 
-class remote_memory_client_grouped;
+struct remote_memory_client_grouped;
 
-class remote_memory_subclient
+struct remote_memory_subclient
 {
+private:
   remote_memory_client_grouped &_parent;
-  std::shared_ptr<Component::IFabric_communicator> _cnxn;
+  std::shared_ptr<component::IFabric_communicator> _cnxn;
   registered_memory _rm_out;
   registered_memory _rm_in;
 
@@ -45,7 +46,7 @@ public:
     , std::uint64_t remote_key_index
   );
 
-  Component::IFabric_communicator &cnxn() { return *_cnxn; }
+  component::IFabric_communicator &cnxn() { return *_cnxn; }
 
   void write(const std::string &msg);
   void read_verify(const std::string &msg);

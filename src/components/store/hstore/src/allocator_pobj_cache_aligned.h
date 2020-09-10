@@ -40,12 +40,13 @@ template <typename T>
 	struct type_number;
 
 template <typename T, typename Deallocator = deallocator_pobj_cache_aligned<T>>
-	class allocator_pobj_cache_aligned;
+	struct allocator_pobj_cache_aligned;
 
 template <>
-	class allocator_pobj_cache_aligned<void, deallocator_pobj_cache_aligned<void>>
+	struct allocator_pobj_cache_aligned<void, deallocator_pobj_cache_aligned<void>>
 		: public deallocator_pobj_cache_aligned<void>
 	{
+	private:
 		using deallocator_type = deallocator_pobj_cache_aligned<void>;
 	protected:
 		using deallocator_type::cache_align;
@@ -62,11 +63,10 @@ template <>
 	};
 
 template <typename T, typename Deallocator>
-	class allocator_pobj_cache_aligned
+	struct allocator_pobj_cache_aligned
 		: public Deallocator
 		, public pool_pobj
 	{
-	public:
 		using deallocator_type = Deallocator;
 	protected:
 		using deallocator_type::cache_align;

@@ -24,11 +24,12 @@
 
 #include <common/types.h> /* addr_t */
 #include <common/utils.h> /* KiB, MiB, MB, GB, round_down */
+#include <boost/icl/split_interval_map.hpp>
 #include <cstddef> /* size_t */
 
 inline static unsigned get_log2_bin(size_t a)
 {
-  unsigned fsmsb = unsigned(((sizeof(size_t) * 8) - __builtin_clzl(a)));
+  unsigned fsmsb = unsigned(((sizeof(size_t) * 8) - unsigned(__builtin_clzl(a))));
   if ((addr_t(1) << (fsmsb - 1)) == a) fsmsb--;
   return fsmsb;
 }
@@ -63,7 +64,7 @@ protected:
     /* All "large" objects are allocated in a single bucket, regardless of size.
      * Therefore, size maps to bucket index, but bucket index does not map to a size.
      */
-    return _large_object_bucket_index;
+    return boost::numeric_cast<unsigned>(_large_object_bucket_index);
   }
 
   void *base(void *addr, size_t object_size)
@@ -109,9 +110,17 @@ class Log2_bucket_mapper {
  public:
   unsigned bucket(size_t object_size) { return get_log2_bin(object_size); }
 
-  void *base(void *addr, size_t size) { return round_down(addr, GB(1)); }
+  void *base(
+    void *addr
+    , size_t // size unused
 
-  size_t region_size(size_t object_size) { return REGION_SIZE; }
+  )
+/* Magic value GB(1). Why? */
+ { return round_down(addr, GB(1)); }
+
+  size_t region_size(
+    size_t // object_size unused
+  ) { return REGION_SIZE; }
 
   size_t rounded_up_object_size(size_t size)
   {
@@ -120,7 +129,9 @@ class Log2_bucket_mapper {
     return rup;
   }
 
-  bool could_exist_in_region(size_t object_size) { return true; }
+  bool could_exist_in_region(
+    size_t // object_size unused
+  ) { return true; }
 };
 
 //using Bucket_mapper = Log2_bucket_mapper;

@@ -69,6 +69,12 @@ print(get_keys(pool, "next:"))
 print(get_keys(pool, "prefix:tre"))
 ```
 
+In find_key the offset variable is the position to start searching from, the returned out position plus one in the pair should be used to continue the search
+```python
+(k, offset) = pool.find_key("prefix:tre"), offset)
+```
+
+
 Example function to get list of keys:
 
 ```python

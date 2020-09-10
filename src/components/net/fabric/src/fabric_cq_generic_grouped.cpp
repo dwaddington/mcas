@@ -29,7 +29,7 @@
 #include <memory> /* unique_ptr */
 #include <sstream> /* ostringstream */
 
-class event_producer;
+struct event_producer;
 
 /**
  * Fabric/RDMA-based network component
@@ -76,7 +76,7 @@ std::size_t Fabric_cq_generic_grouped::stalled_completion_count()
  * @return Number of completions processed
  */
 
-std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   std::size_t ct_total = 0;
   std::size_t constexpr ct_max = 1;
@@ -136,7 +136,7 @@ std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric
   return ct_total;
 }
 
-std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   std::size_t constexpr ct_max = 1;
   std::size_t ct_total = 0;
@@ -192,7 +192,7 @@ std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric
   return ct_total;
 }
 
-std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t constexpr ct_max = 1;
   std::size_t ct_total = 0;
@@ -240,7 +240,7 @@ std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const Componen
   return ct_total;
 }
 
-std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   std::size_t constexpr ct_max = 1;
   std::size_t ct_total = 0;
@@ -296,7 +296,7 @@ std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric
   return ct_total;
 }
 
-std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t constexpr ct_max = 1;
   std::size_t ct_total = 0;
@@ -344,7 +344,7 @@ std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const Componen
   return ct_total;
 }
 
-std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t constexpr ct_max = 1;
   std::size_t ct_total = 0;
@@ -400,7 +400,7 @@ std::size_t Fabric_cq_generic_grouped::poll_completions(const Component::IFabric
   return ct_total;
 }
 
-std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq_generic_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t constexpr ct_max = 1;
   std::size_t ct_total = 0;
@@ -480,13 +480,13 @@ void Fabric_cq_generic_grouped::queue_completion(Fabric_cq_grouped *cq_, ::statu
   (*it)->queue_completion(status_, cq_entry_);
 }
 
-std::ptrdiff_t Fabric_cq_generic_grouped::cq_read(void *buf_, size_t count_) noexcept
+std::ptrdiff_t Fabric_cq_generic_grouped::cq_read(Fabric_cq::fi_cq_entry_t *buf_, size_t count_) noexcept
 {
   std::lock_guard<std::mutex> k{_m_cq};
   return cq_read_locked(buf_, count_);
 }
 
-std::ptrdiff_t Fabric_cq_generic_grouped::cq_read_locked(void *buf_, size_t count_) noexcept
+std::ptrdiff_t Fabric_cq_generic_grouped::cq_read_locked(Fabric_cq::fi_cq_entry_t *buf_, size_t count_) noexcept
 {
   return _cq.cq_read(buf_, count_);
 }

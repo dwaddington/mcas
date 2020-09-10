@@ -19,40 +19,41 @@
 #include <cstdint> /* uint16_ti, uint64_t */
 #include <string>
 #include <memory> /* shared_ptr */
-#include <thread>
+#include <future>
 
-namespace Component
+namespace component
 {
   class IFabric;
   class IFabric_server_factory;
 }
 
 /*
- * A Component::IFabric_server_factory, which will support clients until one
+ * A component::IFabric_server_factory, which will support clients until one
  * of them closes with the "quit" flag set.
  */
-class remote_memory_server
+struct remote_memory_server
   : public remote_memory_accessor
   , private boost::noncopyable
 {
-  std::shared_ptr<Component::IFabric_server_factory> _ep;
-  std::thread _th;
+private:
+  std::shared_ptr<component::IFabric_server_factory> _ep;
+  std::future<void> _th;
 
   void listener(
-    Component::IFabric_server_factory &ep
+    component::IFabric_server_factory &ep
     , std::size_t memory_size
     , std::uint64_t remote_key_index
   );
 
   void listener_counted(
-    Component::IFabric_server_factory &ep
+    component::IFabric_server_factory &ep
     , std::uint64_t remote_key_index
     , std::size_t memory_size
     , unsigned cnxn_count
   );
 public:
   remote_memory_server(
-    Component::IFabric &fabric
+    component::IFabric &fabric
     , const std::string &fabric_spec
     , std::uint16_t control_port
     , const char *
@@ -60,7 +61,7 @@ public:
     , std::uint64_t remote_key_base
   );
   remote_memory_server(
-    Component::IFabric &fabric
+    component::IFabric &fabric
     , const std::string &fabric_spec
     , std::uint16_t control_port
     , const char *

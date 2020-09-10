@@ -17,24 +17,25 @@
 
 #include "pingpong_stat.h"
 #include <cstdint> /* uint64_t */
-#include <thread>
+#include <future>
 
-namespace Component
+namespace component
 {
   class IFabric_server_factory;
 }
 
 /*
- * A Component::IFabric_server_factory
+ * A component::IFabric_server_factory
  */
-class pingpong_server
+struct pingpong_server
   : private boost::noncopyable
 {
+private:
   pingpong_stat _stat;
-  std::thread _th;
+  std::future<void> _th;
 
   void listener(
-    Component::IFabric_server_factory &factory
+    component::IFabric_server_factory &factory
     , std::size_t buffer_size
     , std::uint64_t remote_key
     , unsigned iteration_count
@@ -42,7 +43,7 @@ class pingpong_server
   );
 public:
   pingpong_server(
-    Component::IFabric_server_factory &factory
+    component::IFabric_server_factory &factory
     , std::size_t buffer_size
     , std::uint64_t remote_key_base
     , unsigned iteration_count

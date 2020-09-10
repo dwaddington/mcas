@@ -54,6 +54,7 @@ template <typename LockOwner, typename LockContent>
 			<< " )";
 	}
 
+#if 0
 template <typename TableBase>
 	auto impl::operator<<(
 		std::ostream &o_
@@ -73,6 +74,7 @@ template <typename TableBase>
 			<< b
 			<< " )";
 	}
+#endif
 
 #include "cond_print.h"
 
@@ -102,7 +104,7 @@ template <typename TableBase>
 template <typename TableBase>
 	auto impl::operator<<(
 		std::ostream &o_
-		, const dump<false>::hop_hash_dump<TableBase> &t_
+		, const dump<false>::hop_hash_dump<TableBase> & // t_
 	) -> std::ostream &
 	{
 		return o_;
@@ -161,7 +163,7 @@ template <typename TableBase>
 			{
 				{
 					boost::io::ios_flags_saver s(o_);
-					o_ << k << ": " << std::hex << v << "=" << ints_to_string(bits_to_ints(v, int(k)));
+					o_ << k << ": " << std::hex << v << "=" << ints_to_string(bits_to_ints(v, k));
 				}
 
 				for ( auto m = k; v != 0; v >>= 1, m = (m + 1) % tbl_base.bucket_count() )

@@ -27,7 +27,7 @@
 
 void pingpong_server_n::listener(
   unsigned client_count_
-  , Component::IFabric_server_factory &factory_
+  , component::IFabric_server_factory &factory_
   , std::uint64_t buffer_size_
   , std::uint64_t remote_key_base_
   , unsigned iteration_count_
@@ -91,7 +91,7 @@ catch ( std::exception &e )
 
 pingpong_server_n::pingpong_server_n(
   unsigned client_count_
-  , Component::IFabric_server_factory &factory_
+  , component::IFabric_server_factory &factory_
   , std::uint64_t buffer_size_
   , std::uint64_t remote_key_base_
   , unsigned iteration_count_
@@ -99,23 +99,26 @@ pingpong_server_n::pingpong_server_n(
 )
   : _stat()
   , _th(
-    &pingpong_server_n::listener
-    , this
-    , client_count_
-    , std::ref(factory_)
-    , buffer_size_
-    , remote_key_base_
-    , iteration_count_
-    , msg_size_
-  )
+      std::async(
+        std::launch::async
+        , &pingpong_server_n::listener
+        , this
+        , client_count_
+        , std::ref(factory_)
+        , buffer_size_
+        , remote_key_base_
+        , iteration_count_
+        , msg_size_
+      )
+    )
 {
 }
 
 pingpong_stat pingpong_server_n::time()
 {
-  if ( _th.joinable() )
+  if ( _th.valid() )
   {
-    _th.join();
+    _th.get();
   }
   return _stat;
 }
@@ -123,9 +126,9 @@ pingpong_stat pingpong_server_n::time()
 pingpong_server_n::~pingpong_server_n()
 try
 {
-  if ( _th.joinable() )
+  if ( _th.valid() )
   {
-    _th.join();
+    _th.get();
   }
 }
 catch ( std::exception &e )

@@ -33,23 +33,31 @@ struct uipc_channel
   virtual ~uipc_channel() {}
 };
 
-namespace Core
+namespace core
 {
 namespace UIPC
 {
+
 class Shared_memory;
+
 class Channel : public uipc_channel {
  private:
-  static constexpr bool option_DEBUG = false;
+
+  static const unsigned _debug_level = 0;
+
+  inline unsigned debug_level() const { return _debug_level; }
 
   /* we use the non-sleeping queue for the moment,
      with the ADO thread sleeping when the queue
-     is empty */
-  using queue_t = Common::Spsc_bounded_lfq<void*>;
+     is empty. SPSC is OK since there is one shard
+     thread and one ADO receiver thread.
+  */
+  using queue_t = common::Spsc_bounded_lfq<void*>;
+
   /* except that the _slab_ring is used by both
    * shard and mcas, making it an mpmc queue
    */
-  using mqueue_t = Common::Mpmc_bounded_lfq<void*>;
+  using mqueue_t = common::Mpmc_bounded_lfq<void*>;
 
  public:
   Channel(const Channel &) = delete;

@@ -35,7 +35,7 @@
 
 namespace impl
 {
-	class allocation_state_emplace;
+	struct allocation_state_emplace;
 
 	template <typename Bucket, typename Referent, typename Lock>
 		struct bucket_shared_lock;
@@ -48,10 +48,10 @@ namespace impl
 		using bucket_unique_ref = bucket_unique_lock<Bucket, Referent, Lock> &;
 
 	template <bool Trace>
-		class pos_trace;
+		struct pos_trace;
 
 	template <>
-		class pos_trace<true>
+		struct pos_trace<true>
 		{
 		protected:
 			std::size_t _pos;
@@ -60,17 +60,16 @@ namespace impl
 		};
 
 	template <>
-		class pos_trace<false>
+		struct pos_trace<false>
 		{
 		protected:
 			pos_trace() {}
 			void set_pos(std::size_t, unsigned) {}
 		};
 
-	class owner
+	struct owner
 		: public pos_trace<TRACED_OWNER>
 	{
-	public:
 		using index_type = unsigned;
 		static constexpr index_type size = 63U;
 		using value_type = std::uint64_t; /* sufficient for size not over 64U */
@@ -97,7 +96,7 @@ namespace impl
 		static constexpr value_type adjacent_content_in_use_mask() { return mask_from_pos(size); }
 		static index_type nearest_owned_content_offset(value_type c)
 		{
-			return __builtin_ctzll(c & ownership_bit_mask());
+			return index_type(__builtin_ctzll(c & ownership_bit_mask()));
 		}
 
 		/* ERROR: it is being a bit lazy to make PersistController as a template parameter.

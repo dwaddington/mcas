@@ -40,9 +40,12 @@
 #include <sys/select.h> /* pselect */
 
 #include <chrono> /* seconds */
+#include <cstdlib> /* getenv */
 #include <iostream> /* cerr */
 #include <system_error> /* system_error */
 #include <thread> /* sleep_for */
+#include <utility> /* tuple */
+#include <vector>
 
 /**
  * Fabric/RDMA-based network component
@@ -55,11 +58,12 @@
  * @param json_configuration Configuration string in JSON
  * form. e.g. {
  *   "caps":["FI_MSG","FI_RMA"],
- *   "fabric_attr": { "prov_name" : "verbs" },
+ *   "fabric_attr": { "name": "10.0.0.1/8", "prov_name" : "verbs" },
  *   "bootstrap_addr":"10.0.0.1:9999" }
  * @return
  *
  * caps:
+ * name: same format as fi_fabric_attr::name
  * prov_name: same format as fi_fabric_attr::prov_name
  */
 
@@ -76,6 +80,18 @@ namespace
     return attr_;
   }
 
+#if 0
+  inline void info_dump(::fi_info *f)
+  {
+    unsigned ct = 0;
+    for ( ; f; f = f->next )
+    {
+      std::cerr << "Info " << ct << " " << tostr(*f) << "\n";
+      ++ct;
+    }
+  }
+#endif
+
   std::shared_ptr<::fid_fabric> make_fid_fabric(::fi_fabric_attr &attr_, void *context_)
   try
   {
@@ -86,6 +102,7 @@ namespace
   }
   catch ( const fabric_runtime_error &e )
   {
+std::cerr << "ATTR: " << tostr(attr_) << "\n";
     throw e.add(tostr(attr_));
   }
 
@@ -113,21 +130,61 @@ namespace
 
   std::shared_ptr<::fi_info> make_fi_info(const std::string& json_configuration)
   {
-    auto h = hints(parse_info(json_configuration));
+    auto h0 = hints(parse_info(json_configuration));
+    using p_to_mr = std::tuple<std::string, int>;
+    std::vector<p_to_mr> provider_spec {
+      p_to_mr{ "verbs", FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_ALLOCATED | FI_MR_PROV_KEY }
+      /* Contrary to "man fi_domain", FI_MR_BASIC is not the same as a collection of other mode bits. */
+      , p_to_mr{ "sockets" , FI_MR_BASIC }
+    };
 
-    const auto default_provider = "verbs";
-    if ( h.prov_name() == nullptr )
+    std::exception_ptr last_exception{};
+    for ( auto &spec : provider_spec )
     {
-      h.prov_name(default_provider);
+      if ( ! h0.prov_name() || h0.prov_name() == std::get<0>(spec) )
+      {
+        auto h = hints(make_fi_infodup(h0.data(), "verbs/socket trial"));
+        try
+        {
+          char *n = &std::get<0>(spec)[0];
+          return make_fi_info(h.mode(FI_CONTEXT | FI_CONTEXT2).prov_name(n).mr_mode(std::get<1>(spec)).data());
+        }
+        catch ( fabric_runtime_error &e )
+        {
+          last_exception = std::current_exception();
+        }
+      }
     }
-
-    return
-      make_fi_info(h.mode(FI_CONTEXT | FI_CONTEXT2).data());
+    if ( last_exception )
+    {
+      try
+      {
+        std::rethrow_exception(last_exception);
+      }
+      catch ( fabric_runtime_error &e )
+      {
+        e.add(json_configuration);
+        throw;
+      }
+    }
+    throw std::domain_error("provider neither 'sockets' nor 'verbs'");
   }
 }
 
+std::ostream &operator<<(std::ostream &o_, const env_replace &e_)
+{
+	return o_ << e_.key() << "=" << e_.value();
+}
+
 Fabric::Fabric(const std::string& json_configuration_)
-  : _info(make_fi_info(json_configuration_))
+	/* libfabric 1.9.0 adds a "mr_cache_monitor" which hooks into various dl calls
+	 * concerning memory allocation, including dl_open. The hooking mechanism does
+	 * not seem to be thread-safe, meaning that dl_open calls in other threads may
+	 * fail/segfault. Disable the cache monitor.
+	 */
+  : _env_mr_cache_monitor("FI_MR_CACHE_MONITOR", "disabled")
+  , _env_use_odp("FI_VERBS_USE_ODP", ( getenv("USE_ODP") && std::stoi(getenv("USE_ODP")) ) ? "true" : "false")
+  , _info(make_fi_info(json_configuration_))
   , _fabric(make_fid_fabric(*_info->fabric_attr, this))
   , _eq_attr{}
   , _eq(make_fid_eq(eq_attr_init(_eq_attr), this))
@@ -145,7 +202,7 @@ namespace
   std::uint32_t listen_addr(std::uint16_t port_ )
   {
     auto server_addr_env = "FABRIC_SERVER_ADDR";
-    if ( auto addr_str = getenv(server_addr_env) )
+    if ( auto addr_str = std::getenv(server_addr_env) )
     {
       auto results = getaddrinfo_ptr(addr_str, port_);
       if ( auto rp = results.get() )
@@ -165,13 +222,36 @@ namespace
   }
 }
 
-Component::IFabric_server_factory * Fabric::open_server_factory(const std::string& json_configuration_, std::uint16_t control_port_)
+namespace
+{
+  const std::map<const std::string, std::uint16_t> default_port
+  {
+    { "verbs", 11911 },
+    { "sockets", 11921 },
+  };
+}
+
+std::uint16_t Fabric::choose_port(std::uint16_t port_)
+{
+  if ( port_ == 0 )
+  {
+    const auto it = default_port.find(prov_name());
+    port_ = it == default_port.end()
+      ? 11901
+      : it->second
+      ;
+  }
+  return port_;
+}
+
+component::IFabric_server_factory * Fabric::open_server_factory(const std::string& json_configuration_, std::uint16_t control_port_)
 {
   _info = parse_info(json_configuration_, _info);
+  control_port_ = choose_port(control_port_);
   return new Fabric_server_factory(*this, *this, *_info, listen_addr(control_port_), control_port_);
 }
 
-Component::IFabric_server_grouped_factory * Fabric::open_server_grouped_factory(const std::string& json_configuration_, std::uint16_t control_port_)
+component::IFabric_server_grouped_factory * Fabric::open_server_grouped_factory(const std::string& json_configuration_, std::uint16_t control_port_)
 {
   _info = parse_info(json_configuration_, _info);
   return new Fabric_server_grouped_factory(*this, *this, *_info, listen_addr(control_port_), control_port_);
@@ -188,7 +268,7 @@ void Fabric::readerr_eq()
     auto p = _eq_dispatch_pep.find(entry.fid);
     if ( p != _eq_dispatch_pep.end() )
     {
-      p->second->err(entry);
+      p->second->err(&*_eq, entry);
     }
   }
   {
@@ -196,7 +276,7 @@ void Fabric::readerr_eq()
     auto p = _eq_dispatch_aep.find(entry.fid);
     if ( p != _eq_dispatch_aep.end() )
     {
-      p->second->err(entry);
+      p->second->err(&*_eq, entry);
     }
   }
 }
@@ -361,7 +441,7 @@ namespace
   }
 }
 
-Component::IFabric_client * Fabric::open_client(const std::string& json_configuration_, const std::string &remote_, std::uint16_t control_port_)
+component::IFabric_client * Fabric::open_client(const std::string& json_configuration_, const std::string &remote_, std::uint16_t control_port_)
 try
 {
   _info = parse_info(json_configuration_, _info);
@@ -376,11 +456,11 @@ catch ( const std::system_error &e )
   throw std::system_error(e.code(), e.what() + while_in(__func__));
 }
 
-Component::IFabric_client_grouped * Fabric::open_client_grouped(const std::string& json_configuration_, const std::string& remote_, std::uint16_t control_port_)
+component::IFabric_client_grouped * Fabric::open_client_grouped(const std::string& json_configuration_, const std::string& remote_, std::uint16_t control_port_)
 try
 {
   _info = parse_info(json_configuration_, _info);
-  return static_cast<Component::IFabric_client_grouped *>(new Fabric_client_grouped(*this, *this, *_info, remote_, control_port_));
+  return static_cast<component::IFabric_client_grouped *>(new Fabric_client_grouped(*this, *this, *_info, remote_, control_port_));
 }
 catch ( const fabric_runtime_error &e )
 {
@@ -466,4 +546,9 @@ std::shared_ptr<::fid_eq> Fabric::make_fid_eq(::fi_eq_attr &attr_, void *context
   CHECK_FI_ERR(::fi_eq_open(&*_fabric, &attr_, &f, context_));
   FABRIC_TRACE_FID(f);
   return fid_ptr(f);
+}
+
+const char *Fabric::prov_name() const noexcept
+{
+  return _info && _info->fabric_attr ? _info->fabric_attr->prov_name : nullptr;
 }

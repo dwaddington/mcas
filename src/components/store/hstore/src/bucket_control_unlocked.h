@@ -26,8 +26,9 @@
 namespace impl
 {
 	template <typename Bucket>
-		class bucket_control_unlocked
+		struct bucket_control_unlocked
 		{
+		private:
 			unsigned bit_count_v(typename Bucket::owner_type::value_type v)
 			{
 				unsigned count = 0;
@@ -148,7 +149,7 @@ namespace impl
 			bucket_control_unlocked operator=(const bucket_control_unlocked &) = delete;
 
 			six_t index() const { return _index; }
-			std::size_t segment_size() const { return _buckets_end - _buckets; }
+			std::size_t segment_size() const { return std::size_t(_buckets_end - _buckets); }
 			bucket_aligned_t &deref(bix_t bi) const { return _buckets[bi]; }
 
 			template <typename Allocator>

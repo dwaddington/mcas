@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-class perishable_expiry;
+struct perishable_expiry;
 
 /* NOTE: assumes a valid map, so must be constructed *after* the map
  */
@@ -43,7 +43,7 @@ template <typename Table>
 				_persist->mod_mapped.reconstitute(allocator_type(*this));
 				if ( 0 < _persist->mod_size )
 				{
-					allocator_type(*this).reconstitute(_persist->mod_size, _persist->mod_ctl);
+					allocator_type(*this).reconstitute(std::size_t(_persist->mod_size), _persist->mod_ctl);
 				}
 				else
 				{
@@ -178,7 +178,7 @@ template <typename Table>
 template <typename Table>
 	auto impl::atomic_controller<Table>::update_finish() -> void
 	{
-		std::size_t ct = _persist->mod_size;
+		std::size_t ct = std::size_t(_persist->mod_size);
 		redo_finish();
 		allocator_type(*this).deallocate(_persist->mod_ctl, ct);
 	}
@@ -224,11 +224,12 @@ template <typename Table>
 		, const char *what_
 	)
 	{
-		this->persist(first_, static_cast<const char *>(last_) - static_cast<const char *>(first_), what_);
+		this->persist(first_, std::size_t(static_cast<const char *>(last_) - static_cast<const char *>(first_)), what_);
 	}
 
 template <typename Table>
 	void impl::atomic_controller<Table>::enter_replace(
+		AK_ACTUAL
 		typename table_t::allocator_type al_
 		, const std::string &key
 		, const char *data_
@@ -248,8 +249,8 @@ template <typename Table>
 				_persist->ase().em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);
 			}
 #endif
-			_persist->mod_key.assign(key.begin(), key.end(), al_);
-			_persist->mod_mapped.assign(data_, data_ + data_len_, zeros_extend_, alignment_, al_);
+			_persist->mod_key.assign(AK_REF key.begin(), key.end(), al_);
+			_persist->mod_mapped.assign(AK_REF data_, data_ + data_len_, zeros_extend_, alignment_, al_);
 			_persist->mod_owner = 1;
 			this->persist(&_persist->mod_owner, sizeof _persist->mod_owner);
 		}
@@ -262,10 +263,11 @@ template <typename Table>
 
 template <typename Table>
 	void impl::atomic_controller<Table>::enter_update(
+		AK_ACTUAL
 		typename table_t::allocator_type al_
 		, const std::string &key
-		, std::vector<Component::IKVStore::Operation *>::const_iterator first
-		, std::vector<Component::IKVStore::Operation *>::const_iterator last
+		, std::vector<component::IKVStore::Operation *>::const_iterator first
+		, std::vector<component::IKVStore::Operation *>::const_iterator last
 	)
 	{
 		std::vector<char> src;
@@ -274,10 +276,10 @@ template <typename Table>
 		{
 			switch ( (*first)->type() )
 			{
-			case Component::IKVStore::Op_type::WRITE:
+			case component::IKVStore::Op_type::WRITE:
 				{
-					const Component::IKVStore::Operation_write &wr =
-						*static_cast<Component::IKVStore::Operation_write *>(
+					const component::IKVStore::Operation_write &wr =
+						*static_cast<component::IKVStore::Operation_write *>(
 							*first
 						);
 					auto src_offset = src.size();
@@ -294,13 +296,14 @@ template <typename Table>
 		}
 
 		/* leaky */
-		_persist->mod_key.assign(key.begin(), key.end(), al_);
-		_persist->mod_mapped.assign(src.begin(), src.end(), al_);
+		_persist->mod_key.assign(AK_REF key.begin(), key.end(), al_);
+		_persist->mod_mapped.assign(AK_REF src.begin(), src.end(), al_);
 
 		{
 			/* leaky ERROR: local pointer can leak */
 			persistent_t<typename std::allocator_traits<allocator_type>::pointer> ptr = nullptr;
 			allocator_type(*this).allocate(
+				AK_REF
 				ptr
 				, mods.size()
 				, alignof(mod_control)
@@ -316,7 +319,7 @@ template <typename Table>
 			, "mod control"
 		);
 		/* 8-byte atomic write */
-		_persist->mod_size = mods.size();
+		_persist->mod_size = std::ptrdiff_t(mods.size());
 		this->persist(&_persist->mod_size, sizeof _persist->mod_size);
 		redo();
 	}

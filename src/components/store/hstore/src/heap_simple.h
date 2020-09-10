@@ -25,8 +25,9 @@
 #include <sstream> /* ostringstream */
 #include <string>
 
-class sbrk_alloc
+struct sbrk_alloc
 {
+private:
 	struct bound
 	{
 		char *_end;
@@ -97,10 +98,9 @@ public:
 	void *area() const { return _state; }
 };
 
-class heap_simple
+struct heap_simple
 	: public sbrk_alloc
 {
-public:
 	explicit heap_simple(void *area, std::size_t sz)
 		: sbrk_alloc(area, sz)
 	{}

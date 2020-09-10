@@ -20,22 +20,25 @@ class ExperimentThroughput : public Experiment
     unsigned long interval;
     op_count &operator++() { ++total; ++interval; return *this; }
   };
-  unsigned long _i_rd;
-  unsigned long _i_wr;
+  pool_entry_offset_t _i_rd;
+  pool_entry_offset_t _i_wr;
   std::vector<bool> _populated;
   std::chrono::high_resolution_clock::time_point _start_time;
   std::chrono::high_resolution_clock::time_point _report_time;
   std::chrono::high_resolution_clock::duration _report_interval;
   std::default_random_engine _rand_engine;
   std::uniform_int_distribution<unsigned> _rand_pct;
+  unsigned _ga_pct;
   unsigned _rd_pct;
   unsigned _ie_pct;
+  op_count _op_count_ga;
   op_count _op_count_rd;
   op_count _op_count_in;
   op_count _op_count_up;
   op_count _op_count_er;
   static unsigned long _iops;
   static std::mutex _iops_lock;
+  Stopwatch _sw_ga;
   Stopwatch _sw_rd;
   Stopwatch _sw_wr;
   bool _continuous;

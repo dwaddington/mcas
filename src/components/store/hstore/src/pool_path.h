@@ -17,8 +17,9 @@
 
 #include <string>
 
-class pool_path
+struct pool_path
 {
+private:
   std::string _name;
 
 public:

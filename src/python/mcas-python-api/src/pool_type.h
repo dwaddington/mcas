@@ -6,8 +6,8 @@
 
 typedef struct {
   PyObject_HEAD
-  Component::IMCAS *          _mcas;
-  Component::IKVStore::pool_t _pool;
+  component::IMCAS *          _mcas;
+  component::IKVStore::pool_t _pool;
 } Pool;
 
 Pool * Pool_new();

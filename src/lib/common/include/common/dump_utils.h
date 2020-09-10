@@ -35,8 +35,26 @@
 #define __DUMP_UTILS_H__
 
 #include <cstddef>
+#include <stdio.h>
+#include <stdlib.h>
+#include <execinfo.h>
 
 void hexdump(const void *data, const size_t len);
 void asciidump(const void *data, const size_t len);
+void dump_backtrace();
+
+// stacktrace.h (c) 2008, Timo Bingmann from http://idlebox.net/
+// published under the WTFPL v2.0
+
+extern "C" {
+#include "stack_trace.h"
+}
+
+inline void dump_backtrace_cpp()
+{
+  return print_stacktrace();
+}
+
+
 
 #endif

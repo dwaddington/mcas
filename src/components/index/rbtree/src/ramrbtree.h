@@ -3,20 +3,13 @@
  *
  */
 
-/*
- * Authors:
- *
- * Luna Xu
- * Daniel Waddington
- */
-
 #ifndef __RAMRBTREE_COMPONENT_H__
 #define __RAMRBTREE_COMPONENT_H__
 
 #include <set>
 #include <api/kvindex_itf.h>
 
-class RamRBTree : public Component::IKVIndex {
+class RamRBTree : public component::IKVIndex {
  public:
   RamRBTree(const std::string& owner, const std::string& name);
   RamRBTree();
@@ -25,10 +18,10 @@ class RamRBTree : public Component::IKVIndex {
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x8a120985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x29); //
   
-  void* query_interface(Component::uuid_t& itf_uuid) override
+  void* query_interface(component::uuid_t& itf_uuid) override
   {
-    if (itf_uuid == Component::IKVIndex::iid()) {
-      return static_cast<Component::IKVIndex*>(this);
+    if (itf_uuid == component::IKVIndex::iid()) {
+      return static_cast<component::IKVIndex*>(this);
     }
     else
       return NULL;  // we don't support this interface
@@ -52,15 +45,15 @@ private:
   std::set<std::string> _index;
 };
 
-class RamRBTree_factory : public Component::IKVIndex_factory {
+class RamRBTree_factory : public component::IKVIndex_factory {
  public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x29); //
 
-  void* query_interface(Component::uuid_t& itf_uuid) override
+  void* query_interface(component::uuid_t& itf_uuid) override
   {
-    if (itf_uuid == Component::IKVIndex_factory::iid()) {
-      return static_cast<Component::IKVIndex_factory*>(this);
+    if (itf_uuid == component::IKVIndex_factory::iid()) {
+      return static_cast<component::IKVIndex_factory*>(this);
     }
     else
       return NULL;  // we don't support this interface
@@ -68,11 +61,11 @@ class RamRBTree_factory : public Component::IKVIndex_factory {
 
   void unload() override { delete this; }
 
-  virtual Component::IKVIndex* create(const std::string& owner,
+  virtual component::IKVIndex* create(const std::string& owner,
                                       const std::string& name) override
   {
-    Component::IKVIndex* obj =
-        static_cast<Component::IKVIndex*>(new RamRBTree(owner, name));
+    component::IKVIndex* obj =
+        static_cast<component::IKVIndex*>(new RamRBTree(owner, name));
     assert(obj);
     obj->add_ref();
     return obj;

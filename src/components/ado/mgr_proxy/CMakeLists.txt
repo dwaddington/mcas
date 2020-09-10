@@ -8,11 +8,10 @@ add_subdirectory(unit_test)
 
 add_definitions(-DCONFIG_DEBUG)
 
-include_directories(../../../lib/common/include)
-include_directories(../../../lib/libadoproto/include)
-include_directories(../../../components/)
-include_directories(../../)
-include_directories(../../../lib/libthreadipc/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/components)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/libthreadipc/include)
+include_directories(${CMAKE_INSTALL_PREFIX}/include) # TBB
 
 file(GLOB SOURCES src/*.c*)
 

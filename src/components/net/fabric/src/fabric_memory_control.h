@@ -15,7 +15,7 @@
 #ifndef _FABRIC_MEMORY_CONTROL_H_
 #define _FABRIC_MEMORY_CONTROL_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric_connection */
+#include <api/fabric_itf.h> /* component::IFabric_connection */
 
 #include <cstdint> /* uint64_t */
 #include <map>
@@ -30,8 +30,18 @@ class Fabric;
 
 struct mr_and_address;
 
+struct ru_flt_counter
+{
+private:
+  bool _report;
+  long _ru_flt_start;
+public:
+  ru_flt_counter(bool report);
+  ~ru_flt_counter();
+};
+
 class Fabric_memory_control
-  : public Component::IFabric_connection
+  : public component::IFabric_connection
 {
   Fabric &_fabric;
   std::shared_ptr<::fi_info> _domain_info;
@@ -44,6 +54,8 @@ class Fabric_memory_control
    */
   using map_addr_to_mra = std::multimap<const void *, std::unique_ptr<mr_and_address>>;
   map_addr_to_mra _mr_addr_to_mra;
+  bool _paging_test;
+  ru_flt_counter _fault_counter;
 
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_mr_reg fail
@@ -74,7 +86,7 @@ public:
   ::fi_info &domain_info() const { return *_domain_info; }
   ::fid_domain &domain() const { return *_domain; }
 
-  /* BEGIN Component::IFabric_connection */
+  /* BEGIN component::IFabric_connection */
   /**
    * @contig_addr - the address of memory to be registered for RDMA. Restrictions
    * in "man fi_verbs" apply: the memory must be page aligned. The ibverbs layer
@@ -93,7 +105,7 @@ public:
   void deregister_memory(const memory_region_t memory_region) override;
   std::uint64_t get_memory_remote_key(const memory_region_t memory_region) const noexcept override;
   void *get_memory_descriptor(const memory_region_t memory_region) const noexcept override;
-  /* END Component::IFabric_connection */
+  /* END component::IFabric_connection */
 
   std::vector<void *> populated_desc(const std::vector<::iovec> & buffers);
   std::vector<void *> populated_desc(const ::iovec *first, const ::iovec *last);

@@ -29,7 +29,7 @@ enum class test_type
  * returns: number of polls (including the successful poll)
  */
 unsigned wait_poll(
-  Component::IFabric_communicator &comm
+  component::IFabric_communicator &comm
   , std::function<void(
     void *context
     , ::status_t

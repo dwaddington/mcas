@@ -20,9 +20,10 @@
 #include <cstddef> /* size_t */
 #include <string> /* to_string */
 
-class bad_dest_addr_alloc
+struct bad_dest_addr_alloc
   : public std::bad_alloc
 {
+private:
   std::string _what;
 public:
   explicit bad_dest_addr_alloc(std::size_t sz)

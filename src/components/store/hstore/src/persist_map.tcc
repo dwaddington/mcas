@@ -21,8 +21,9 @@
 #endif
 
 template <typename Allocator>
-	class monitor_extend
+	struct monitor_extend
 	{
+	private:
 		Allocator _a;
 	public:
 		monitor_extend(const Allocator &a_)
@@ -48,6 +49,7 @@ template <typename Allocator>
 
 template <typename Allocator>
 	impl::persist_map<Allocator>::persist_map(
+		AK_ACTUAL
 		std::size_t n, Allocator av_
 		, allocation_state_emplace *ase_
 		, allocation_state_pin *aspd_
@@ -69,16 +71,18 @@ template <typename Allocator>
 	{
 		/* do_initial_allocation now requires a persist_controller, to interpret the
 		 * allocation_state_combined field. Construct a temporary one here.
-		 * The permanent persist_controller will be constructted later.
+		 * The permanent persist_controller will be constructed later.
 		 * ERROR: See if we can use a single persist_controller, constructed at an
-		 * appripriate time.
+		 * appropriate time.
 		 */
-		persist_controller<Allocator> pc(av_, this, construction_mode::create);
-		do_initial_allocation(&pc);
+		persist_controller<Allocator> pc(AK_REF av_, this, construction_mode::create);
+		do_initial_allocation(AK_REF &pc);
 	}
 
 template <typename Allocator>
-	void impl::persist_map<Allocator>::do_initial_allocation(persist_controller<Allocator> *pc_)
+	void impl::persist_map<Allocator>::do_initial_allocation(
+		AK_ACTUAL
+		persist_controller<Allocator> *pc_)
 	{
 		auto &av = static_cast<Allocator &>(*pc_);
 		if ( _segment_count.actual().is_stable() )
@@ -86,7 +90,7 @@ template <typename Allocator>
 			if ( _segment_count.actual().value() == 0 )
 			{
 #if USE_CC_HEAP == 4
-                /*
+				/*
 				 * (1) save enough information to know when the allocated pointer is hardened. In this case, the address and new value of the length of the segment table
 				 *
 				 * inlcudes setting of doubt type to emplace
@@ -101,6 +105,7 @@ template <typename Allocator>
 				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
 				/* Run the allocation */
 				bucket_allocator_t(av).allocate(
+					AK_REF
 					_sc[0].bp
 					, base_segment_size
 					, segment_align
@@ -129,6 +134,7 @@ template <typename Allocator>
 				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
 #endif
 				bucket_allocator_t(av).allocate(
+					AK_REF
 					_sc[ix].bp
 					, segment_size
 					, segment_align

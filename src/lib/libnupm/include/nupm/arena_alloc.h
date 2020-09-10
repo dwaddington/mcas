@@ -41,6 +41,13 @@ class Arena_allocator_volatile : private ND_control {
  public:
   Arena_allocator_volatile(size_t granularity = GB(1))
       : _granularity(granularity)
+      , _std_allocator()
+      , _vmr_bases()
+      , _vmr_ends()
+      , _free_pages()
+      , _used_pages()
+      , _free_pages_lock()
+      , _used_pages_lock()
   {
     if (granularity % 4096 > 0)
       throw Constructor_exception("invalid granularity");
@@ -49,30 +56,30 @@ class Arena_allocator_volatile : private ND_control {
 
     /* determine contiguous regions */
     for (unsigned s = 0; s < _n_sockets; s++) {
-      unsigned long region_start = 0;
-      unsigned long region_end   = 0;
+      char *region_start = nullptr;
+      char *region_end   = nullptr;
 
-      for (auto &m : _mappings[s]) {
-        if (region_start == 0) {
-          region_start  = ((unsigned long) m.first);
+      for (auto &m : _mappings[int(s)]) {
+        if (region_start == nullptr) {
+          region_start  = static_cast<char *>(m.first);
           region_end    = region_start + m.second;
-          _vmr_bases[s] = region_start;
+          _vmr_bases[s] = reinterpret_cast<std::uintptr_t>(region_start);
         }
-        else if (region_end == ((unsigned long) m.first)) {
+        else if (region_end == m.first) {
           region_end += m.second;
         }
         else
           throw Logic_exception("unexpected condition");
 
         regions[s] =
-            std::make_pair((void *) region_start, region_end - region_start);
+            std::make_pair(region_start, region_end - region_start);
       }
 
       _vmr_ends[s] = _vmr_bases[s] + regions[s].second;
 
       /* create free page list */
       size_t num_pages = (regions[s].second / _granularity) + 1;
-      byte * page      = (byte *) regions[s].first;
+      byte * page      = static_cast<byte *>(regions[s].first);
       PLOG("num_pages:%lu numa-zone:%u", num_pages, s);
       for (size_t p = 0; p < num_pages; p++) {
         _free_pages[s].insert(&page[p * _granularity]);
@@ -91,7 +98,7 @@ class Arena_allocator_volatile : private ND_control {
   {
     if (numa_node < 0) numa_node = 0;
 
-    if (((unsigned) numa_node) > _n_sockets)
+    if (unsigned(numa_node) > _n_sockets)
       throw API_exception("numa_node out of bounds");
 
     void *result = nullptr;
@@ -118,7 +125,7 @@ class Arena_allocator_volatile : private ND_control {
    */
   void free(void *ptr)
   {
-    unsigned long p = ((unsigned long) ptr);
+    auto p = reinterpret_cast<std::uintptr_t>(ptr);
     unsigned      numa_node;
     bool          found = false;
     for (numa_node = 0; numa_node < _n_sockets; numa_node++) {
@@ -157,9 +164,9 @@ class Arena_allocator_volatile : private ND_control {
 
  private:
   size_t                _granularity;
-  Common::Std_allocator _std_allocator;
-  unsigned long         _vmr_bases[MAX_NUMA_SOCKETS];
-  unsigned long         _vmr_ends[MAX_NUMA_SOCKETS];
+  common::Std_allocator _std_allocator;
+  std::uintptr_t        _vmr_bases[MAX_NUMA_SOCKETS];
+  std::uintptr_t        _vmr_ends[MAX_NUMA_SOCKETS];
 
   std::set<void *> _free_pages[MAX_NUMA_SOCKETS];
   std::set<void *> _used_pages[MAX_NUMA_SOCKETS];

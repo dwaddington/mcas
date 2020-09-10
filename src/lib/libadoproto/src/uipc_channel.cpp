@@ -43,12 +43,13 @@
 #include <cassert>
 #include <string>
 
-namespace Core
+namespace core
 {
 namespace UIPC
 {
+
 #if 0
-typedef Common::Spsc_bounded_lfq_sleeping<
+typedef common::Spsc_bounded_lfq_sleeping<
   Dataplane::Command_t, 32 /* queue size */
 > command_queue_t;
 #endif
@@ -71,8 +72,7 @@ Channel::Channel(const std::string &name, size_t message_size, size_t queue_size
                                queue_size));  // queue len is a power of 2
   assert(message_size % 8 == 0);
 
-  if(option_DEBUG)
-    PLOG("pages per FIFO queue: %zu", pages_per_queue);
+  CPLOG(1, "pages per FIFO queue: %zu", pages_per_queue);
 
   /* Buffer usage:
    * Primary use of the buffers is in two queues: m2s and s2m.
@@ -87,19 +87,16 @@ Channel::Channel(const std::string &name, size_t message_size, size_t queue_size
   const size_t slab_queue_pages =
       round_up(mqueue_t::memory_footprint(queue_size * slab_multiplier), PAGE_SIZE) / PAGE_SIZE;
 
-  if(option_DEBUG)
-    PLOG("slab_queue_pages: %ld", slab_queue_pages);
+  CPLOG(1, "slab_queue_pages: %ld", slab_queue_pages);
 
   const size_t slab_pages =
       round_up(message_size * queue_size * slab_multiplier, PAGE_SIZE) / PAGE_SIZE;
 
-  if(option_DEBUG)
-    PLOG("slab_pages: %ld", slab_pages);
+  CPLOG(1, "slab_pages: %ld", slab_pages);
 
   const size_t total_pages = ((pages_per_queue * 2) + slab_queue_pages + slab_pages);
 
-  if(option_DEBUG)
-    PLOG("total_pages: %ld", total_pages);
+  CPLOG(1, "total_pages: %ld", total_pages);
 
   _shmem_fifo_m2s = std::make_unique<Shared_memory>(name + "-m2s", pages_per_queue);
   _shmem_fifo_s2m = std::make_unique<Shared_memory>(name + "-s2m", pages_per_queue);
@@ -117,12 +114,11 @@ Channel::Channel(const std::string &name, size_t message_size, size_t queue_size
       slab_slots, (static_cast<char*>(_shmem_slab_ring->get_addr())) + sizeof(mqueue_t));
   byte* slot_addr = static_cast<byte*>(_shmem_slab->get_addr());
 
-  if(option_DEBUG)
-    PLOG("buffers for %s", name.c_str());
+  CPLOG(1, "buffers for %s", name.c_str());
   
   for (size_t i = 0; i < slab_slots; i++) {
-    if(option_DEBUG)
-      PLOG("  at %p", static_cast<const void*>(slot_addr));
+    CPLOG(1, "  at %p", static_cast<const void*>(slot_addr));
+    
     if ( ! _slab_ring->enqueue(slot_addr) )
     {
       throw std::runtime_error("failed to populate slab_ring");
@@ -143,28 +139,25 @@ Channel::Channel(const std::string &name)
   , _out_queue(reinterpret_cast<queue_t*>(_shmem_fifo_s2m->get_addr()))
   , _slab_ring(reinterpret_cast<mqueue_t*>(_shmem_slab_ring->get_addr())) {
 
-  if(option_DEBUG) {
-    PMAJOR("got fifo (m2s) @ %p - %lu bytes", _shmem_fifo_m2s->get_addr(),
-           _shmem_fifo_m2s->get_size());
+  CPLOG(1, "got fifo (m2s) @ %p - %lu bytes", _shmem_fifo_m2s->get_addr(),
+        _shmem_fifo_m2s->get_size());
+  
+  CPLOG(1, "got fifo (s2m) @ %p - %lu bytes", _shmem_fifo_s2m->get_addr(),
+        _shmem_fifo_s2m->get_size());
+  
+  CPLOG(1, "got slab ring @ %p - %lu bytes", _shmem_slab_ring->get_addr(),
+        _shmem_slab_ring->get_size());
+  
+  CPLOG(1, "got slab @ %p - %lu bytes", _shmem_slab->get_addr(),
+        _shmem_slab->get_size());
 
-    PMAJOR("got fifo (s2m) @ %p - %lu bytes", _shmem_fifo_s2m->get_addr(),
-           _shmem_fifo_s2m->get_size());
-
-    PMAJOR("got slab ring @ %p - %lu bytes", _shmem_slab_ring->get_addr(),
-           _shmem_slab_ring->get_size());
-
-    PMAJOR("got slab @ %p - %lu bytes", _shmem_slab->get_addr(),
-           _shmem_slab->get_size());
-  }
-
-  ::usleep(500000); /* hack to let master get ready - could improve with state in
-                     shared memory */
+  ::usleep(500000); /* TODO hack to let master get ready - could improve with state in
+                       shared memory */
 }
 
 Channel::~Channel() {
   /* don't delete queues since they were constructed on shared memory */
-
-  PLOG("Channel %s/%s slab_ring net %ld", _name.c_str(), _master ? "master" : "slave", _slab_ring_net);
+  CPLOG(1, "Channel %s/%s slab_ring net %ld", _name.c_str(), _master ? "master" : "slave", _slab_ring_net);
 }
 
 status_t Channel::send(void* msg) {

@@ -4,11 +4,11 @@ project(component-mapstore CXX)
 
 set (CMAKE_CXX_STANDARD 14)
 
-# -O2 probably unnecessary
-add_compile_options("-O2")
 # for serious debugging
-add_compile_options("$<$<CONFIG:Debug>:-O0>")
+#add_compile_options("$<$<CONFIG:Debug>:-O0>")
+
 add_definitions(-DCONFIG_DEBUG)
+add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
 add_subdirectory(./unit_test)
 

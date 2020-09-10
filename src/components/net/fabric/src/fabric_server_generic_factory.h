@@ -17,25 +17,25 @@
 
 #include "event_consumer.h"
 
-#include "delete_copy.h"
 #include "event_registration.h"
 #include "fabric_types.h"
 #include "fd_pair.h"
 #include "fd_socket.h"
 #include "pending_cnxns.h"
 #include "open_cnxns.h"
+#include <common/delete_copy.h>
 
 #include <cstdint> /* uint16_t */
+#include <future>
 #include <memory> /* shared_ptr */
 #include <mutex> /* mutex */
-#include <thread>
 
 struct fi_info;
 struct fid_pep;
 
 class Fabric;
 class Fabric_memory_control;
-class event_producer;
+struct event_producer;
 
 class Fabric_server_generic_factory
   : public event_consumer
@@ -54,7 +54,8 @@ class Fabric_server_generic_factory
   Fd_pair _end;
 
   event_producer &_eq;
-  std::thread _th;
+  std::exception_ptr _listen_exception;
+  std::future<void> _listener;
 
   /*
    * @throw std::logic_error : socket initialized with a negative value (from ::socket)
@@ -119,7 +120,7 @@ public:
    * @throw fabric_bad_alloc : std::bad_alloc - libfabric out of memory
    */
   void cb(std::uint32_t event, ::fi_eq_cm_entry &entry) noexcept override;
-  void err(::fi_eq_err_entry &entry) noexcept override;
+  void err(::fid_eq *eq, ::fi_eq_err_entry &entry) noexcept override;
 };
 
 #endif

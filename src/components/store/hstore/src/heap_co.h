@@ -18,15 +18,19 @@
 #include "hop_hash_log.h"
 #include "persister_cc.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <libpmemobj.h> /* PMEMoid */
+#pragma GCC diagnostic pop
 
 #include <array>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <sstream> /* ostringstream */
 #include <string>
 
-class sbrk_offset_heap
+struct sbrk_offset_heap
 {
+private:
 	struct bound
 	{
 		std::size_t _end;
@@ -58,6 +62,8 @@ class sbrk_offset_heap
 		assert(_sw < _bounds.size());
 	}
 public:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
 	explicit sbrk_offset_heap(PMEMoid oid_, std::size_t sz_, std::size_t start_)
 		: _oid{_oid}
 		, _sw{_sw}
@@ -96,6 +102,7 @@ public:
 		restore(oid_);
 		hop_hash_log<false>::write(LOG_LOCATION, " Restore ", this, ".", _sw, " start ", _start, " size ", _size, " limit ", limit(), " end ", current()._end);
 	}
+#pragma GCC diagnostic pop
 
 	PMEMoid malloc(std::size_t sz)
 	{
@@ -117,10 +124,9 @@ public:
 	void free(PMEMoid, std::size_t) {}
 };
 
-class heap_co
+struct heap_co
 	: public sbrk_offset_heap
 {
-public:
 	explicit heap_co(PMEMoid oid_, std::size_t sz_, std::size_t start_)
 		: sbrk_offset_heap(oid_, sz_, start_)
 	{}

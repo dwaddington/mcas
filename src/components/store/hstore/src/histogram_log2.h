@@ -47,9 +47,8 @@ namespace util
 	}
 
 template <typename clz_arg_t>
-	class histogram_log2
+	struct histogram_log2
 	{
-	public:
 		static auto constexpr array_size = std::numeric_limits<clz_arg_t>::digits;
 		using array_t = std::array<unsigned, array_size>;
 	private:
@@ -60,11 +59,11 @@ template <typename clz_arg_t>
 		{}
 
 		void enter(clz_arg_t v) {
-			++_hist[ v ? array_size - clz(v) : 0];
+			++_hist[unsigned(v ? array_size - clz(v) : 0)];
 		}
 
 		void remove(clz_arg_t v) {
-			--_hist[ v ? array_size - clz(v) : 0];
+			--_hist[unsigned(v ? array_size - clz(v) : 0)];
 		}
 
 		const array_t &data() const { return _hist; }

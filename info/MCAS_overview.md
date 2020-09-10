@@ -43,3 +43,10 @@ Operation | Description
 ```unregister_direct_memory``` | Unregister memory from RDMA subsystem
 ```free_memory``` | Free memory returned by a get call
 
+
+### Active Data Objects (Rev 2.0)
+
+Although MCAS can readily operate as a key-value store, its main differentiating feature is to allow custom operations to be performed on the value space.  This requires "overlaying" data structures on the memory space. 
+
+![MCAS Architecture](./figures/mcas-02.svg)
+

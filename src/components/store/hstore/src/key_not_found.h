@@ -19,10 +19,9 @@
 
 namespace impl
 {
-	class key_not_found
+	struct key_not_found
 		: public std::out_of_range
 	{
-	public:
 		key_not_found()
 			: std::out_of_range("key not found")
 		{}

@@ -39,19 +39,21 @@
 #include <sys/uio.h> /* iovec */
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <memory>
 
 namespace impl
 {
-	class allocation_state_combined;
+	struct allocation_state_combined;
 }
 
 #include <new> /* std::bad_alloc */
 
-class heap_rc_shared_ephemeral
+struct heap_rc_shared_ephemeral
 {
+private:
 	nupm::Rca_LB _heap;
 	std::vector<::iovec> _managed_regions;
 	std::size_t _allocated;
@@ -73,7 +75,7 @@ class heap_rc_shared_ephemeral
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
 public:
-	explicit heap_rc_shared_ephemeral();
+	explicit heap_rc_shared_ephemeral(unsigned debug_level);
 
 	void add_managed_region(const ::iovec &r, unsigned numa_node);
 	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
@@ -87,7 +89,7 @@ public:
 				hop_hash_log<B>::write(LOG_LOCATION, "pool ", pool_.iov_base);
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
-				for ( unsigned i = std::max(0U, log_min_alignment); i != limit; ++i )
+				for ( unsigned i = log_min_alignment; i != limit; ++i )
 				{
 					const std::size_t upper_bound = 1ULL << i;
 					hop_hash_log<B>::write(LOG_LOCATION
@@ -101,7 +103,7 @@ public:
 			}
 		}
 
-	std::size_t allocated() const { return _allocated; }
+	std::size_t allocated() const {  return _allocated; }
 	std::size_t capacity() const { return _capacity; };
 	void inject_allocation(void *p, std::size_t sz, unsigned numa_node);
 	void *allocate(std::size_t sz, unsigned numa_node, std::size_t alignment);
@@ -109,23 +111,20 @@ public:
 	bool is_reconstituted(const void *p) const;
 };
 
-class heap_rc_shared
+struct heap_rc_shared
 {
+private:
 	::iovec _pool0;
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
 	std::unique_ptr<heap_rc_shared_ephemeral> _eph;
-
-	static void *best_aligned(void *a, std::size_t sz_);
-	static ::iovec align(void *pool_, std::size_t sz_);
-
 public:
-	explicit heap_rc_shared(void *pool_, std::size_t sz_, unsigned numa_node_);
-	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager_);
+	explicit heap_rc_shared(unsigned debug_level, void *pool_, std::size_t sz_, unsigned numa_node_);
+	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<Devdax_manager> &devdax_manager_);
 	/* allocation_state_combined offered, but not used */
-	explicit heap_rc_shared(const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_combined *)
-		: heap_rc_shared(devdax_manager)
+	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_combined *)
+		: heap_rc_shared(debug_level, devdax_manager)
 	{
 	}
 
@@ -152,7 +151,9 @@ public:
 
 	void free(void *p_, std::size_t sz_, std::size_t alignment_);
 
-	unsigned percent_used() const { return _eph->capacity() == 0 ? 0U : unsigned(_eph->allocated() * 100U / _eph->capacity()); }
+	unsigned percent_used() const {
+    return _eph->capacity() == 0 ? 0xFFFFU : unsigned(_eph->allocated() * 100U / _eph->capacity());
+  }
 
 	bool is_reconstituted(const void * p_) const;
 
@@ -165,8 +166,9 @@ public:
 	std::vector<::iovec> regions() const;
 };
 
-class heap_rc
+struct heap_rc
 {
+private:
 	heap_rc_shared *_heap;
 
 public:

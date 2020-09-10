@@ -17,14 +17,14 @@
 #include <exception>
 #include <iostream> /* cerr */
 
-Component::IFabric_server *server_connection::get_connection(Component::IFabric_server_factory &ep_)
+component::IFabric_server *server_connection::get_connection(component::IFabric_server_factory &ep_)
 {
-  Component::IFabric_server *cnxn = nullptr;
+  component::IFabric_server *cnxn = nullptr;
   while ( ! ( cnxn = ep_.get_new_connection() ) ) {}
   return cnxn;
 }
 
-server_connection::server_connection(Component::IFabric_server_factory &ep_)
+server_connection::server_connection(component::IFabric_server_factory &ep_)
   : _ep(&ep_)
   , _cnxn(get_connection(*_ep))
 {

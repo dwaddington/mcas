@@ -28,7 +28,7 @@
 #include <functional>
 #include <vector>
 
-namespace Core
+namespace core
 {
 /** Comparison types. */
 enum cmp_t {
@@ -479,7 +479,7 @@ class AVL_tree {
    * @param node
    * @param level
    */
-  static void dump(AVL_node<T> *node, int level = 0) {
+  static void dump(AVL_node<T> *node, unsigned level = 0) {
     if (node == nullptr) {
       printf("***EMPTY TREE***\n");
     }
@@ -500,15 +500,15 @@ class AVL_tree {
   AVL_node<T> **_root; /**< Root of the tree.*/
 
  private:
-  static void indent(int len) {
-    for (int i = 0; i < len; i++) {
+  static void indent(unsigned len) {
+    for (unsigned i = 0; i < len; i++) {
       printf("  ");
     }
   }
 
-  static void dump(traversal_order_t order, AVL_node<T> *node, int level = 0) {
+  static void dump(traversal_order_t order, AVL_node<T> *node, unsigned level = 0) {
     int verbose = 1;
-    unsigned len = (level * 5) + 1;
+    unsigned len = (level * 5) + 1U;
 
     if ((order == LTREE) && (node->subtree[LEFT] == nullptr)) {
       indent(len);

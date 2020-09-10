@@ -23,7 +23,7 @@
 #include <functional>
 #include <vector>
 
-namespace Component
+namespace component
 {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -31,7 +31,7 @@ namespace Component
 /**
  * Key-value index.  Index is ordered.
  */
-class IKVIndex : public Component::IBase {
+class IKVIndex : public component::IBase {
  public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xadb5c747,0x0f5b,0x44a6,0x982b,0x36,0x54,0x1a,0x62,0x64,0xfc);
@@ -112,7 +112,7 @@ class IKVIndex : public Component::IBase {
                         unsigned           max_comparisons = 0) = 0;
 };
 
-class IKVIndex_factory : public Component::IBase {
+class IKVIndex_factory : public component::IBase {
  public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xfac5c747,0x0f5b,0x44a6,0x982b,0x36,0x54,0x1a,0x62,0x64,0xfc);
@@ -139,6 +139,6 @@ class IKVIndex_factory : public Component::IBase {
 
 #pragma GCC diagnostic pop
 
-}  // namespace Component
+}  // namespace component
 
 #endif

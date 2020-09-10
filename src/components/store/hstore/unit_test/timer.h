@@ -16,9 +16,8 @@
 #include <chrono>
 #include <functional> /* function */
 
-class timer
+struct timer
 {
-public:
 	using clock_t = std::chrono::steady_clock;
 	using duration_t = typename clock_t::duration;
 private:

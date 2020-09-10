@@ -15,17 +15,17 @@
 
 #include "uipc.h"
 
-void channel_wrap::open(const std::string &s)
+void Channel_wrap::open(const std::string &s)
 {
   _ch = ::uipc_connect_channel(s.c_str());
 }
 
-void channel_wrap::create(const std::string &s, size_t message_size, size_t queue_size)
+void Channel_wrap::create(const std::string &s, size_t message_size, size_t queue_size)
 {
   _ch = ::uipc_create_channel(s.c_str(), message_size, queue_size);
 }
 
-void channel_wrap::close()
+void Channel_wrap::close()
 {
   if ( _ch )
   {

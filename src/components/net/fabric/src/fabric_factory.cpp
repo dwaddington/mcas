@@ -30,12 +30,12 @@ Fabric_factory::Fabric_factory()
 {
 }
 
-auto Fabric_factory::make_fabric(const std::string & json_configuration) -> Component::IFabric *
+auto Fabric_factory::make_fabric(const std::string & json_configuration) -> component::IFabric *
 {
   return new Fabric(json_configuration);
 }
 
-void *Fabric_factory::query_interface(Component::uuid_t& itf_uuid) {
+void *Fabric_factory::query_interface(component::uuid_t& itf_uuid) {
   return itf_uuid == IFabric_factory::iid() ? this : nullptr;
 }
 
@@ -43,7 +43,7 @@ void *Fabric_factory::query_interface(Component::uuid_t& itf_uuid) {
  * Factory entry point
  *
  */
-extern "C" void * factory_createInstance(Component::uuid_t component_id)
+extern "C" void * factory_createInstance(component::uuid_t component_id)
 {
   return component_id == Fabric_factory::component_id() ? new Fabric_factory() : nullptr;
 }

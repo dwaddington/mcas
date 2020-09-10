@@ -25,14 +25,15 @@
 namespace impl
 {
 	template <typename T, unsigned N>
-		class value_unstable;
+		struct value_unstable;
 
 	template <typename T, unsigned N>
 		bool operator==(const value_unstable<T, N> &a, const value_unstable<T, N> &b);
 
 	template <typename T, unsigned N>
-		class value_unstable
+		struct value_unstable
 		{
+		private:
 			/* unstable == 0 implies that value and all content "state" fields are valid and persisted
 			 * if unstable != 0, restart must individually count the contents and refresh the content "state" fields
 			 *

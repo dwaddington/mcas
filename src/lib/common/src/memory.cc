@@ -28,7 +28,7 @@
 #include <common/memory.h>
 #include <boost/numeric/conversion/cast.hpp>
 
-namespace Common
+namespace common
 {
 /**
  * Allocate memory at a specific region.  Mainly for debugging purposes.
@@ -60,4 +60,4 @@ void free_at(void *ptr) {
   void *base = reinterpret_cast<void *>(((reinterpret_cast<addr_t>(ptr)) - sizeof(uint32_t)));
   ::munmap(base, *(reinterpret_cast<uint32_t *>(ptr)));
 }
-}  // namespace Common
+}  // namespace common

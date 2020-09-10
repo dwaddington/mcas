@@ -80,7 +80,7 @@ public:
     , lap_time()
     , start_time()
     , running(false)
-    , cycles_per_second(Common::get_rdtsc_frequency_mhz() * 1000000.0)
+    , cycles_per_second(common::get_rdtsc_frequency_mhz() * 1000000.0)
   {}
 
 private:

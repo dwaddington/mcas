@@ -1,6 +1,6 @@
 // FlatBuffers IDL file
 
-namespace Structured_ADO_protocol;
+namespace structured_ADO_protocol;
 
 table PutVariable
 {

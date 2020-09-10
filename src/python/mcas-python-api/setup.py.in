@@ -10,7 +10,7 @@ import distutils.sysconfig
 # remove the pesky -Wstrict-prototypes flag!
 #
 cfg_vars = distutils.sysconfig.get_config_vars()
-include_dir = '/usr/include/python3.6'
+include_dir = '/usr/include/${PYTHON_FILENAME}'
 
 for key, value in cfg_vars.items():
     if(key == 'OPT'):
@@ -19,23 +19,27 @@ for key, value in cfg_vars.items():
         cfg_vars[key] += " -Wno-write-strings"  # add option to disable write strings warning
     elif(key == 'Py_DEBUG'):
         if(value == 1):
-            include_dir = '/usr/include/python3.6dm'
-
+            include_dir = '/usr/include/${PYTHON_FILENAME}'
 
 module_core = Extension('mcas',
                         define_macros = [('MAJOR_VERSION', '1'),
                                          ('CXX',''),
                                          ('MINOR_VERSION', '0')],
                         include_dirs = [include_dir,
-                                        '/usr/local/lib/python3.6/dist-packages/numpy/core/include',
+                                        '/usr/local/lib/${PYTHON_FILENAME}/dist-packages/numpy/core/include',
+                                        '/usr/lib64/${PYTHON_FILENAME}/site-packages/numpy/core/include',
                                         '${CMAKE_CURRENT_SOURCE_DIR}/../../../src/components',
                                         '${CMAKE_CURRENT_SOURCE_DIR}/../../../src/lib/common/include',
+                                        '${CMAKE_CURRENT_SOURCE_DIR}/../../../src/lib64/common/include',
                                         '${CMAKE_CURRENT_SOURCE_DIR}/../../../src/lib/core/include',
+                                        '${CMAKE_CURRENT_SOURCE_DIR}/../../../src/lib64/core/include',
                                         '${CMAKE_CURRENT_BINARY_DIR}/src'
                         ],
-                        library_dirs = ['/usr/lib/python3.6m/',
+                        library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
                                         '${CMAKE_CURRENT_BINARY_DIR}/../../lib/common',
                                         '${CMAKE_CURRENT_BINARY_DIR}/../../lib/core',
+                                        '${CMAKE_CURRENT_BINARY_DIR}/../../lib64/common',
+                                        '${CMAKE_CURRENT_BINARY_DIR}/../../lib64/core',
                                         '${CMAKE_INSTALL_PREFIX}/lib',
                                         '${CMAKE_INSTALL_PREFIX}/lib64',
                                         '/usr/local/lib',
@@ -49,7 +53,7 @@ module_core = Extension('mcas',
                                    '${CMAKE_CURRENT_SOURCE_DIR}/src/pool_type.cc',
                         ],
                         extra_compile_args = ['-fPIC','-std=c++11','-DCONFIG_DEBUG','-g','-O2'],
-                        runtime_library_dirs = ['/usr/lib/python3.6m/',
+                        runtime_library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
                                                 '${CMAKE_INSTALL_PREFIX}/lib',
                                                 '${CMAKE_INSTALL_PREFIX}/lib64',
                                                 '/usr/local/lib',

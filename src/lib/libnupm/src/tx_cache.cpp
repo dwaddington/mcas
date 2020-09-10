@@ -32,6 +32,8 @@
 
 using namespace boost::icl;
 
+static auto constexpr MAP_HUGE_2MB = 21U << MAP_HUGE_SHIFT;
+
 struct alloc_info_t {
   size_t n_pages;
   size_t page_size;
@@ -41,13 +43,13 @@ typedef boost::icl::split_interval_set<addr_t> interval_set_t;
 typedef interval_set_t::interval_type          ival_t;
 
 static struct {
-  Common::Ticket_lock            spin_lock;
+  common::Ticket_lock            spin_lock;
   struct sigaction               default_sa;
   unsigned                       debug_level;
   interval_set_t                 intervals;
   std::map<void *, alloc_info_t> allocations;
   size_t                         mapped_page_count;
-} tx_cache;
+} tx_cache {};
 
 class Cache_state_guard {
  public:
@@ -80,7 +82,7 @@ static void __segv_handler_trampoline(int sig, siginfo_t *si, void *context)
     auto i = tx_cache.intervals.find(fault_addr);
     if (i != tx_cache.intervals.end()) {
       /* map in a single page */
-      void *range_start = (void *) i->lower();
+      void *range_start = reinterpret_cast<void *>(i->lower());
 
       auto page_size = tx_cache.allocations[range_start].page_size;
       assert(page_size == KiB(4) || page_size == MiB(2));
@@ -147,7 +149,7 @@ void *allocate_virtual_pages(size_t n_pages, size_t page_size, uint64_t hint)
                  0); /* offset */
   if (p == nullptr) throw Logic_exception("mmap failed unexpectedly");
 
-  addr_t paddr = (addr_t) p;
+  addr_t paddr = reinterpret_cast<addr_t>(p);
   {
     Cache_state_guard g;
     const auto ival = ival_t::closed(paddr, paddr + (n_pages * page_size));
@@ -174,7 +176,7 @@ int free_virtual_pages(void *p)
   assert(page_size > 0);
   assert(n_pages > 0);
 
-  addr_t paddr = (addr_t) p;
+  addr_t paddr = reinterpret_cast<addr_t>(p);
   auto   ival  = ival_t::closed(paddr, paddr + (n_pages * page_size));
   tx_cache.intervals.erase(ival);
 

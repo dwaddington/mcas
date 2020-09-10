@@ -13,118 +13,170 @@
 #include "mcas_client.h"
 
 #include <api/fabric_itf.h>
+#include <common/json.h>
 #include <city.h>
-
-#include <regex>
 
 #include "connection.h"
 #include "protocol.h"
+#include "registered_direct_memory.h"
 
-#pragma GCC diagnostic ignored "-Wconversion"
+#include <regex>
+#include <vector>
 
-using namespace Component;
+using namespace component;
 
 namespace mcas
 {
-namespace Global
+namespace global
 {
-unsigned debug_level = 0;
+unsigned debug_level = 3;
 }
+namespace Global = global;
 }  // namespace mcas
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++" // uninitialized: _fabric, _transport, _connection
-MCAS_client::MCAS_client(const unsigned     debug_level,
-                         const std::string &owner,
-                         const std::string &addr_port_str,
-                         const std::string &device)
+MCAS_client::MCAS_client(const unsigned                      debug_level,
+                         const boost::optional<std::string> &src_device,
+                         const boost::optional<std::string> &src_addr,
+                         const boost::optional<std::string> &provider,
+                         const std::string &                 dest_addr,
+                         std::uint16_t                       port,
+                         const unsigned                      patience_)
+    : _debug(debug_level, this, dest_addr, port),
+      _factory(load_factory()),
+      _fabric(make_fabric(*_factory, src_addr, src_device, provider)),
+      _transport(_fabric->open_client(common::json::serializer<common::json::dummy_writer>::object{}.str(), dest_addr, port)),
+      _connection(std::make_unique<mcas::client::Connection_handler>(debug_level, _transport.get(), patience_)),
+      _open_connection(*_connection)
 {
-  using namespace std;
+}
 
+Mcas_client_debug::Mcas_client_debug(const unsigned     debug_level,
+                                     const void *       ths,
+                                     const std::string &ip_addr,
+                                     std::uint16_t      port)
+{
   mcas::Global::debug_level = debug_level;
-
-  smatch m;
-
-  try {
-    /* e.g. 10.0.0.21:11911 (verbs)
-       9.1.75.6:11911:sockets (sockets)
-    */
-    regex r("([[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+)[:]([[:"
-            "digit:]]+)(?:[:]([[:alnum:]]+))?");
-    regex_search(addr_port_str, m, r);
+  if (debug_level > 1) {
+    PLOG("%s: protocol session: %p (%s) (%d)", __func__, ths, ip_addr.c_str(), port);
   }
-  catch (...) {
-    throw API_exception("invalid parameter");
-  }
-
-  const std::string ip_addr = m[1].str();
-  char *            end;
-  const int         port     = int(strtoul(m[2].str().c_str(), &end, 10));
-  const std::string provider = m[3].matched ? m[3].str() : "verbs"; /* default provider */
-
-  PMAJOR("mcas-client protocol session: %p (%s) (%d) (%s)", static_cast<const void *>(this), ip_addr.c_str(), port,
-         provider.c_str());
-
-  open_transport(device, ip_addr, port, provider);
-}
-#pragma GCC diagnostic pop
-
-MCAS_client::~MCAS_client() { close_transport(); }
-
-void MCAS_client::open_transport(const std::string &device,
-                                 const std::string &ip_addr,
-                                 const int          port,
-                                 const std::string &provider)
-{
-  {
-    IBase *comp = load_component("libcomponent-fabric.so", net_fabric_factory);
-
-    if (!comp) throw General_exception("Fabric component not found");
-
-    _factory = static_cast<IFabric_factory *>(comp->query_interface(IFabric_factory::iid()));
-    assert(_factory);
-
-    /* The libfabric 1.6 sockets provider requires a "BASIC" specfication, which
-     * is supposedly obsolete after libfabric 1.4.
-     */
-    const std::string mr_mode = provider == "sockets" ? "[ \"FI_MR_BASIC\" ]"
-                                                      : "[ \"FI_MR_LOCAL\", \"FI_MR_VIRT_ADDR\", "
-                                                        "\"FI_MR_ALLOCATED\", \"FI_MR_PROV_KEY\" ]";
-
-    const std::string fabric_spec{"{ \"fabric_attr\" : { \"prov_name\" : \"" + provider +
-                                  "\" },"
-                                  " \"domain_attr\" : "
-                                  "{ \"mr_mode\" : " +
-                                  mr_mode + " , \"name\" : \"" + device +
-                                  "\" }"
-                                  ","
-                                  " \"ep_attr\" : { \"type\" : \"FI_EP_MSG\" }"
-                                  "}"};
-
-    _fabric = _factory->make_fabric(fabric_spec);
-    const std::string client_spec{"{}"};
-    _transport = _fabric->open_client(client_spec, ip_addr, port);
-    assert(_transport);
-  }
-
-  assert(_transport);
-  _connection = new mcas::Client::Connection_handler(_transport);
-  _connection->bootstrap();
 }
 
-void MCAS_client::close_transport()
+Mcas_client_debug::~Mcas_client_debug() { PLOG("%s: closed fabric transport.", __func__); }
+
+Open_connection::Open_connection(mcas::client::Connection_handler &_connection)
+    : _open_cnxn((_connection.bootstrap(), &_connection))
 {
-  PLOG("MCAS_client: closing fabric transport (%p)", static_cast<const void *>(this));
+  PLOG("%s %p", __func__, static_cast<void *>(this));
+}
 
-  if (_connection) {
-    _connection->shutdown();
+Open_connection::~Open_connection()
+{
+  if (_open_cnxn) {
+    _open_cnxn->shutdown();
   }
+  PLOG("%s %p", __func__, static_cast<void *>(this));
+}
 
-  delete _connection;
-  delete _transport;
-  delete _fabric;
-  _factory->release_ref();
-  PLOG("MCAS_client: closed fabric transport.");
+auto MCAS_client::load_factory() -> IFabric_factory *
+{
+  IBase *comp = load_component("libcomponent-fabric.so", net_fabric_factory);
+
+  if (!comp) throw General_exception("Fabric component not found");
+
+  auto factory = static_cast<IFabric_factory *>(comp->query_interface(IFabric_factory::iid()));
+  assert(factory);
+  return factory;
+}
+
+auto MCAS_client::make_fabric(component::IFabric_factory &        factory_,
+                              const boost::optional<std::string> &src_addr_,
+                              const boost::optional<std::string> &domain_name_,
+                              const boost::optional<std::string> &fabric_prov_name_) -> IFabric *
+{
+  namespace c_json = common::json;
+  using json = c_json::serializer<c_json::dummy_writer>;
+  auto fabric_spec =
+    json::object(
+      json::member("ep_attr", json::object(json::member("type", "FI_EP_MSG")))
+    );
+
+    if ( fabric_prov_name_ )
+    {
+      fabric_spec
+        .append(
+          json::member("fabric_attr", json::object(json::member("prov_name", *fabric_prov_name_)))
+        )
+        ;
+    }
+
+    if ( src_addr_ )
+    {
+      fabric_spec
+        .append(
+          json::member("addr_format", "FI_ADDR_STR")
+        )
+        .append(
+          json::member("src_addr", "fi_sockaddr_in://" + *src_addr_ + ":0")
+        )
+        ;
+    }
+
+    if ( domain_name_ )
+    {
+      fabric_spec
+        .append(
+          json::member(
+            "domain_attr"
+            , json::object(
+                json::member("name", *domain_name_)
+                , json::member("threading", "FI_THREAD_SAFE")
+            )
+          )
+        )
+        ;
+    }
+
+  return factory_.make_fabric(fabric_spec.str());
+}
+
+auto MCAS_client::make_fabric(component::IFabric_factory &factory_,
+                              const std::string &  // ip_addr
+                              ,
+                              const std::string &provider,
+                              const std::string &device) -> IFabric *
+{
+  namespace c_json = common::json;
+  using json = c_json::serializer<c_json::dummy_writer>;
+  auto mr_mode =
+    json::array(
+      provider == "sockets"
+      ? json::array(
+        "FI_MR_VIRT_ADDR"
+        , "FI_MR_ALLOCATED"
+        , "FI_MR_PROV_KEY"
+      )
+      : json::array(
+          "FI_MR_LOCAL"
+        , "FI_MR_VIRT_ADDR"
+        , "FI_MR_ALLOCATED"
+        , "FI_MR_PROV_KEY"
+      )
+    )
+    ;
+
+  auto fabric_spec =
+    json::object(
+      json::member("fabric_attr", json::object(json::member("prov_name", provider)))
+      , json::member(
+          "domain_attr"
+          , json::object(
+              json::member("mr_mode", std::move(mr_mode))
+              , json::member("name", device)
+            )
+        )
+      , json::member("ep_attr", json::object(json::member("type", "FI_EP_MSG")))
+    );
+  return factory_.make_fabric(fabric_spec.str());
 }
 
 int MCAS_client::thread_safety() const { return IKVStore::THREAD_MODEL_SINGLE_PER_POOL; }
@@ -188,7 +240,7 @@ status_t MCAS_client::put_direct(const pool_t           pool,
                                  IMCAS::memory_handle_t handle,
                                  uint32_t               flags)
 {
-  return _connection->put_direct(pool, key, value, value_len, handle, flags);
+  return _connection->put_direct(pool, key.data(), key.size(), value, value_len, this, handle, flags);
 }
 
 status_t MCAS_client::async_put(IKVStore::pool_t   pool,
@@ -199,6 +251,27 @@ status_t MCAS_client::async_put(IKVStore::pool_t   pool,
                                 unsigned int       flags)
 {
   return _connection->async_put(pool, key.data(), key.size(), value, value_len, out_handle, flags);
+}
+
+status_t MCAS_client::async_put_direct(const IKVStore::pool_t          pool,
+                                       const std::string &             key,
+                                       const void *                    value,
+                                       const size_t                    value_len,
+                                       async_handle_t &                out_handle,
+                                       const IKVStore::memory_handle_t handle,
+                                       const unsigned int              flags)
+{
+  return _connection->async_put_direct(pool, key.data(), key.size(), value, value_len, out_handle, this, handle, flags);
+}
+
+status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
+                                       const std::string &       key,
+                                       void *                    value,
+                                       size_t &                  value_len,
+                                       async_handle_t &          out_handle,
+                                       IKVStore::memory_handle_t handle)
+{
+  return _connection->async_get_direct(pool, key.data(), key.size(), value, value_len, out_handle, this, handle);
 }
 
 status_t MCAS_client::check_async_completion(async_handle_t &handle)
@@ -220,14 +293,58 @@ status_t MCAS_client::get_direct(const pool_t           pool,
                                  size_t &               out_value_len,
                                  IMCAS::memory_handle_t handle)
 {
-  return _connection->get_direct(pool, key, out_value, out_value_len, handle);
+  return _connection->get_direct(pool, key.data(), key.size(), out_value, out_value_len, this, handle);
 }
 
-Component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(void *vaddr, const size_t len)
+status_t MCAS_client::get_direct_offset(const IMCAS::pool_t          pool,
+                                        const offset_t               offset,
+                                        size_t &                     length,
+                                        void *const                  out_buffer,
+                                        const IMCAS::memory_handle_t handle)
 {
+  return _connection->get_direct_offset(pool, offset, length, out_buffer, this, handle);
+}
+
+status_t MCAS_client::async_get_direct_offset(const IMCAS::pool_t          pool,
+                                              const offset_t               offset,
+                                              size_t &                     length,
+                                              void *const                  out_buffer,
+                                              async_handle_t &             out_handle,
+                                              const IMCAS::memory_handle_t handle)
+{
+  return _connection->async_get_direct_offset(pool, offset, length, out_buffer, out_handle, this, handle);
+}
+
+status_t MCAS_client::put_direct_offset(const IMCAS::pool_t          pool,
+                                        const offset_t               offset,
+                                        size_t &                     length,
+                                        const void *const            out_buffer,
+                                        const IMCAS::memory_handle_t handle)
+{
+  return _connection->put_direct_offset(pool, offset, length, out_buffer, this, handle);
+}
+
+status_t MCAS_client::async_put_direct_offset(const IMCAS::pool_t          pool,
+                                              const offset_t               offset,
+                                              size_t &                     length,
+                                              const void *const            out_buffer,
+                                              async_handle_t &             out_handle,
+                                              const IMCAS::memory_handle_t handle)
+{
+  return _connection->async_put_direct_offset(pool, offset, length, out_buffer, out_handle, this, handle);
+}
+
+component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(void *vaddr, const size_t len)
+{
+  /* register_direct_memory is exposed at the interface. A failure of madvise
+   * might well be expected if the parameters passed in at the interface are
+   * incompatible with madvise, e.g. vaddr is not page-aligned. That might be
+   * fixed by using On Demand Paging (ODP), which should remove the need for
+   * madvise.
+   */
   if (madvise(vaddr, len, MADV_DONTFORK) != 0) {
-    PWRN("MCAS_client::register_direct_memory:: madvise 'don't fork' failed unexpectedly (%p %lu) %s", vaddr, len,
-         strerror(errno));
+    PWRN("MCAS_client::%s: madvise MADV_DONTFORK failed (%p %lu) %s", __func__, vaddr, len, strerror(errno));
+    assert(false);
   }
 
   return _connection->register_direct_memory(vaddr, len);
@@ -266,7 +383,14 @@ status_t MCAS_client::free_memory(void *p)
   return S_OK;
 }
 
-void MCAS_client::debug(const IKVStore::pool_t pool, unsigned cmd, uint64_t arg) {}
+void MCAS_client::debug(const IKVStore::pool_t  // pool
+                        ,
+                        unsigned  // cmd
+                        ,
+                        uint64_t  // arg
+)
+{
+}
 
 status_t MCAS_client::find(const IKVStore::pool_t pool,
                            const std::string &    key_expression,
@@ -288,6 +412,19 @@ status_t MCAS_client::invoke_ado(const IKVStore::pool_t            pool,
   return _connection->invoke_ado(pool, key, request, request_len, flags, out_response, value_size);
 }
 
+status_t MCAS_client::async_invoke_ado(const IMCAS::pool_t        pool,
+                                       const std::string &        key,
+                                       const void *               request,
+                                       const size_t               request_len,
+                                       const ado_flags_t          flags,
+                                       std::vector<ADO_response> &out_response,
+                                       async_handle_t &           out_async_handle,
+                                       const size_t               value_size)
+{
+  return _connection->invoke_ado_async(pool, key, request, request_len, flags, out_response, out_async_handle,
+                                       value_size);
+}
+
 status_t MCAS_client::invoke_put_ado(const IKVStore::pool_t            pool,
                                      const std::string &               key,
                                      const void *                      request,
@@ -305,18 +442,15 @@ status_t MCAS_client::invoke_put_ado(const IKVStore::pool_t            pool,
  * Factory entry point
  *
  */
-extern "C" void *factory_createInstance(Component::uuid_t component_id)
+extern "C" void *factory_createInstance(component::uuid_t component_id)
 {
   if (component_id == MCAS_client_factory::component_id()) {
-    PMAJOR("Creating MCAS_client_factory ...");
     auto fact = new MCAS_client_factory();
     fact->add_ref();
     return static_cast<void *>(fact);
   }
   else {
-    PWRN("request for bad factory type");
+    PWRN("%s: request for bad factory type", __func__);
     return NULL;
   }
 }
-
-#undef RESET_STATE

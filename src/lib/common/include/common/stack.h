@@ -34,10 +34,11 @@
 #ifndef __COMMON_STACK_H__
 #define __COMMON_STACK_H__
 
+#include <common/common.h>
 #include <common/exceptions.h>
 #include <stdlib.h>
 
-namespace Common
+namespace common
 {
 template <typename T, size_t STACK_SIZE = 10000000>
 class Fixed_stack {
@@ -83,6 +84,6 @@ class Fixed_stack {
 
   bool empty() const { return _base == _top; }
 };
-}  // namespace Common
+}  // namespace common
 
 #endif  // _COMMON_STACK_H__

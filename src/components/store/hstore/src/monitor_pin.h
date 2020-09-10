@@ -19,8 +19,9 @@
 #include "logging.h"
 
 template <typename Pool>
-	class monitor_pin_data
+	struct monitor_pin_data
 	{
+	private:
 		Pool _p;
 #if USE_CC_HEAP == 4
 #else
@@ -63,7 +64,7 @@ template <typename Pool>
 	};
 
 template <typename Pool>
-	class monitor_pin_key
+	struct monitor_pin_key
 	{
 		Pool _p;
 #if USE_CC_HEAP == 4

@@ -24,18 +24,20 @@ struct {
   std::string addr;
   std::string device;
   unsigned    debug_level;
+  unsigned    patience;
 } Options;
 
 
 int main(int argc, char* argv[])
 {
-  using namespace Component;
+  using namespace component;
 
   try {
     namespace po = boost::program_options;
     po::options_description desc("Options");
     desc.add_options()("help", "Show help")
       ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")
+      ("patiencd", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
       ("server-addr", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")
       ;
@@ -50,6 +52,7 @@ int main(int argc, char* argv[])
 
     Options.addr        = vm["server-addr"].as<std::string>();
     Options.debug_level = vm["debug"].as<unsigned>();
+    Options.patience    = vm["patience"].as<unsigned>();
     Options.device      = vm["device"].as<std::string>();
   }
   catch (...) {
@@ -65,6 +68,7 @@ int main(int argc, char* argv[])
   
   /* create instance of MCAS client session */
   auto mcas = factory->mcas_create(1 /* debug level, 0=off */,
+                                   Options.patience,
                                    getlogin(),
                                    Options.addr, /* MCAS server endpoint */
                                    Options.device); /* see mcas_client.h */
@@ -82,8 +86,8 @@ int main(int argc, char* argv[])
   }
   assert(pool != IKVStore::POOL_ERROR);
 
-  auto key = Common::random_string(8);
-  std::string value = "This is my value " + Common::random_string(8);
+  auto key = common::random_string(8);
+  std::string value = "This is my value " + common::random_string(8);
   
   /* add new item to pool */
   if(mcas->put(pool,

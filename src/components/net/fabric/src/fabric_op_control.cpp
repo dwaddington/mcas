@@ -32,7 +32,7 @@
 #include "system_fail.h"
 
 #include <rdma/fi_errno.h> /* fi_strerror */
-#include <rdma/fi_rma.h> /* fi_{read,recv,send,write}v, fj_inject, fi_sendmsg */
+#include "rdma-fi_rma.h" /* fi_{read,recv,send,write}v, fj_inject, fi_sendmsg */
 
 #include <sys/select.h> /* pselect */
 #include <sys/uio.h> /* iovec */
@@ -74,9 +74,9 @@ Fabric_op_control::Fabric_op_control(
   , _m_fd_unblock_set{}
   , _fd_unblock_set{}
 #if CAN_USE_WAIT_SETS
-  , _cq_attr{100, 0U, Fabric_cq::fi_cq_format, FI_WAIT_SET, 0U, FI_CQ_COND_NONE, &*_wait_set}
+  , _cq_attr{4096, 0U, Fabric_cq::fi_cq_format, FI_WAIT_SET, 0U, FI_CQ_COND_NONE, &*_wait_set}
 #else
-  , _cq_attr{100, 0U, Fabric_cq::fi_cq_format, FI_WAIT_FD, 0U, FI_CQ_COND_NONE, nullptr}
+  , _cq_attr{4096, 0U, Fabric_cq::fi_cq_format, FI_WAIT_FD, 0U, FI_CQ_COND_NONE, nullptr}
 #endif
   , _rxcq(make_fid_cq(_cq_attr, this), "rx")
   , _txcq(make_fid_cq(_cq_attr, this), "tx")
@@ -339,7 +339,7 @@ void Fabric_op_control::inject_send(const void *buf_, std::size_t len_)
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
 
-std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_op_control::poll_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   std::size_t ct_total = 0;
 
@@ -353,7 +353,7 @@ std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_op_control::poll_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   std::size_t ct_total = 0;
 
@@ -367,7 +367,7 @@ std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_op_control::poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_op_control::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t ct_total = 0;
 
@@ -381,7 +381,7 @@ std::size_t Fabric_op_control::poll_completions_tentative(const Component::IFabr
   return ct_total;
 }
 
-std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_op_control::poll_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -395,7 +395,7 @@ std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_op_control::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_op_control::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -409,7 +409,7 @@ std::size_t Fabric_op_control::poll_completions_tentative(const Component::IFabr
   return ct_total;
 }
 
-std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_op_control::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -423,7 +423,7 @@ std::size_t Fabric_op_control::poll_completions(const Component::IFabric_op_comp
   return ct_total;
 }
 
-std::size_t Fabric_op_control::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_op_control::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -594,26 +594,30 @@ catch ( const std::exception &e )
   std::cerr << __func__ << " (Fabric_op_control) " << e.what() << "\n";
 }
 
-void Fabric_op_control::err(::fi_eq_err_entry &e_) noexcept
+void Fabric_op_control::err(::fid_eq *eq_, ::fi_eq_err_entry &e_) noexcept
 try
 {
+  char pe_buffer[512];
+  auto pe = ::fi_eq_strerror(eq_, e_.prov_errno, e_.err_data, pe_buffer, sizeof pe_buffer);
   /* An error event; not what we were expecting */
-  std::cerr << "Fabric error event "
+  std::cerr << "Fabric error event:"
     << " fid " << e_.fid
-    << "context " << e_.context
+    << " context " << e_.context
     << " data " << e_.data
     << " err " << e_.err
     << " prov_errno " << e_.prov_errno
+    << " \"" << pe << "/" << pe_buffer << "\""
     << " err_data ";
-    boost::io::ios_base_all_saver sv(std::cerr);
-    for ( auto i = static_cast<uint8_t *>(e_.err_data)
-      ; i != static_cast<uint8_t *>(e_.err_data) + e_.err_data_size
-      ; ++i
-    )
-    {
-      std::cerr << std::setfill('0') << std::setw(2) << std::hex << *i;
-    }
-    std::cerr << std::endl;
+
+  boost::io::ios_base_all_saver sv(std::cerr);
+  for ( auto i = static_cast<uint8_t *>(e_.err_data)
+    ; i != static_cast<uint8_t *>(e_.err_data) + e_.err_data_size
+    ; ++i
+  )
+  {
+    std::cerr << std::setfill('0') << std::setw(2) << std::hex << *i;
+  }
+  std::cerr << std::endl;
 
   std::uint32_t event = FI_NOTIFY;
   _event_pipe.write(&event, sizeof event);

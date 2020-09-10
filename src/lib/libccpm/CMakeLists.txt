@@ -30,9 +30,9 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-add_definitions(-DCONFIG_DEBUG)
+add_definitions(-DCONFIG_DEBUG) # P{LOG,DEG,INF,WRN,ERR} control
 
-set(CCPM_SOURCES src/area_ctl.cpp src/area_top.cpp src/atomic_word.cpp src/cca.cpp src/ccpm.cpp src/doubt.cpp src/log.cpp)
+set(CCPM_SOURCES src/area_ctl.cpp src/area_top.cpp src/atomic_word.cpp src/cca.cpp src/ccpm.cpp src/doubt.cpp src/log.cpp src/tracker_log.cpp src/value_tracked.cpp src/container_cc.cpp)
 add_library(ccpm SHARED ${CCPM_SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")

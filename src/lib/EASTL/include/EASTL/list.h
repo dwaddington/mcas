@@ -378,11 +378,15 @@ namespace eastl
 		void emplace_back(Args&&... args);
 
 		void      push_front(const value_type& value);
+		template <typename V>
+			void push_front(const V & value);
 		void      push_front(value_type&& x);
 		reference push_front();
 		void*     push_front_uninitialized();
 
 		void      push_back(const value_type& value);
+		template <typename V>
+			void      push_back(const V & value);
 		void      push_back(value_type&& x);
 		reference push_back();
 		void*     push_back_uninitialized();
@@ -395,6 +399,8 @@ namespace eastl
 
 		iterator insert(const_iterator position);
 		iterator insert(const_iterator position, const value_type& value);
+		template <typename V>
+			iterator insert(const_iterator position, const V & value);
 		iterator insert(const_iterator position, value_type&& x);
 		iterator insert(const_iterator position, std::initializer_list<value_type> ilist);
 		iterator insert(const_iterator position, size_type n, const value_type& value);
@@ -1267,6 +1273,17 @@ namespace eastl
 		DoInsertValue((ListNodeBase<tracker_type>*)mNode.mpNext, value);
 	}
 
+	/* For cases where the value_type includes a "normal" value_type and an allocator (for tracking):
+	 * enable a push given just the value_type, if a constructor exists which combines the value and
+	 * the tracker.
+	 */
+	template <typename T, typename Allocator>
+		template <typename V>
+		inline void list<T, Allocator>::push_front(const V & value)
+		{
+			this->push_front(value_type(value, get_allocator()));
+		}
+
 
 	template <typename T, typename Allocator>
 	inline void list<T, Allocator>::push_front(value_type&& value)
@@ -1317,6 +1334,17 @@ namespace eastl
 	{
 		DoInsertValue((ListNodeBase<tracker_type>*)&mNode, value);
 	}
+
+	/* For cases where the value_type includes a "normal" value_type and an allocator (for tracking):
+	 * enable a push given just the value_type, if a constructor exists which combines the value and
+	 * the tracker.
+	 */
+	template <typename T, typename Allocator>
+		template <typename V>
+		inline void list<T, Allocator>::push_back(const V & value)
+		{
+			this->push_back(value_type(value, get_allocator()));
+		}
 
 
 	template <typename T, typename Allocator>
@@ -1385,7 +1413,18 @@ namespace eastl
 		return (ListNodeBase<tracker_type>*)pNode;
 	}
 
-	
+	/* For cases where the value_type includes a "normal" value_type and an allocator (for tracking):
+	 * enable an insert given just the value_type, if a constructor exists which combines the value and
+	 * the tracker.
+	 */
+	template <typename T, typename Allocator>
+		template <typename V>
+		inline typename list<T, Allocator>::iterator
+		list<T, Allocator>::insert(const_iterator position, const V & value)
+		{
+			return this->insert(position, value_type(value, get_allocator()));
+		}
+
 	template <typename T, typename Allocator>
 	inline typename list<T, Allocator>::iterator
 	list<T, Allocator>::insert(const_iterator position, const value_type& value)

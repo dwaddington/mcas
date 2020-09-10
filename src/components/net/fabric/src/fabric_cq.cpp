@@ -19,13 +19,14 @@
 
 #include "fabric_cq.h"
 
-#include <api/fabric_itf.h> /* Component::IFabric_op_completer::cb_acceptance */
+#include <api/fabric_itf.h> /* component::IFabric_op_completer::cb_acceptance */
 #include "fabric_check.h" /* CHECK_FI_ERR */
 #include "fabric_runtime_error.h"
 #include <boost/io/ios_state.hpp>
 #include <iostream> /* cerr */
 #include <tuple> /* get */
 #include <utility> /* move, swap */
+
 
 Fabric_cq::Fabric_cq(fid_unique_ptr<::fid_cq> &&cq_, const char *type_)
   : _cq(std::move(cq_))
@@ -41,7 +42,12 @@ Fabric_cq::~Fabric_cq()
   /* Note: completions left on transmission CQs should usually be 0. */
   if ( std::getenv("FABRIC_STATS") )
   {
-    std::cerr << __func__ << " " << _type << " completions left " << _inflight << "\n";
+    try
+    {
+      std::cerr << __func__ << " " << _type << " completions left " << _inflight << "\n";
+    }
+    catch ( std::exception & )
+    {}
   }
 }
 
@@ -49,7 +55,12 @@ Fabric_cq::stats::~stats()
 {
   if ( std::getenv("FABRIC_STATS") )
   {
-    std::cerr << "Fabric_cq(" << this << ") ct " << ct_total << " defer " << defer_total << "\n";
+    try
+    {
+      std::cerr << "Fabric_cq(" << this << ") ct " << ct_total << " defer " << defer_total << "\n";
+    }
+    catch ( std::exception & )
+    {}
   }
 }
 
@@ -67,6 +78,10 @@ namespace
   CHECK_FI_ERR(cq_readerr(&err, 0));
 
   boost::io::ios_base_all_saver sv(std::cerr);
+
+  char pe_buffer[512];
+  auto pe = ::fi_cq_strerror(&*_cq, err.prov_errno, err.err_data, pe_buffer, sizeof pe_buffer);
+
   std::cerr << __func__ << " : "
                   << " op_context " << err.op_context
                   << std::hex
@@ -78,16 +93,17 @@ namespace
                   << " tag " << err.tag
                   << " olen " << err.olen
                   << " err " << err.err
-                  << " (text) " << ::fi_strerror(err.err)
+                  << " \"" << ::fi_strerror(err.err) << "\""
                   << " prov_errno " << err.prov_errno
+                  << " \"" << ::fi_strerror(err.prov_errno) << "\""
                   << " err_data " << err.err_data
                   << " err_data_size " << err.err_data_size
-                  << " (text) " << ::fi_cq_strerror(&*_cq, err.prov_errno, err.err_data, nullptr, 0U)
+                  << " (text) " << pe << "/" << pe_buffer
         << std::endl;
   return err;
 }
 
-std::ptrdiff_t Fabric_cq::cq_read(void *buf, size_t count) noexcept
+std::ptrdiff_t Fabric_cq::cq_read(fi_cq_entry_t *buf, size_t count) noexcept
 {
   /* Note: It would seem resonable to skip the CQ read if there are
    * no outstanding (inflight) operations. But at one time, the
@@ -134,10 +150,10 @@ void Fabric_cq::queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, ::st
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
 
-std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_tentative &cb_, ::status_t status_)
+std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_tentative &cb_, ::status_t status_)
 {
   std::size_t ct_total = 0U;
-  if ( cb_(cq_entry_.op_context, status_, cq_entry_.flags, cq_entry_.len, nullptr) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+  if ( cb_(cq_entry_.op_context, status_, cq_entry_.flags, cq_entry_.len, nullptr) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
   {
     ++ct_total;
   }
@@ -150,10 +166,10 @@ std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_
   return ct_total;
 }
 
-std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_param_tentative &cb_, ::status_t status_, void *cb_param_)
+std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_param_tentative &cb_, ::status_t status_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
-  if ( cb_(cq_entry_.op_context, status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+  if ( cb_(cq_entry_.op_context, status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
   {
     ++ct_total;
   }
@@ -166,10 +182,10 @@ std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_
   return ct_total;
 }
 
-std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, ::status_t status_, void *cb_param_)
+std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_t &cq_entry_, const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, ::status_t status_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
-  if ( cb_(cq_entry_.op_context, status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+  if ( cb_(cq_entry_.op_context, status_, cq_entry_.flags, cq_entry_.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
   {
     ++ct_total;
   }
@@ -182,49 +198,49 @@ std::size_t Fabric_cq::process_or_queue_completion(const Fabric_cq::fi_cq_entry_
   return ct_total;
 }
 
-std::size_t Fabric_cq::process_cq_comp_err(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq::process_cq_comp_err(const component::IFabric_op_completer::complete_old &cb_)
 {
   const auto cq_entry = get_cq_comp_err();
   cb_(cq_entry.op_context, E_FAIL);
   return 1U;
 }
 
-std::size_t Fabric_cq::process_cq_comp_err(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq::process_cq_comp_err(const component::IFabric_op_completer::complete_definite &cb_)
 {
   const auto cq_entry = get_cq_comp_err();
   cb_(cq_entry.op_context, E_FAIL, cq_entry.flags, cq_entry.len, nullptr);
   return 1U;
 }
 
-std::size_t Fabric_cq::process_or_queue_cq_comp_err(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq::process_or_queue_cq_comp_err(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   const auto e = get_cq_comp_err();
   const Fabric_cq::fi_cq_entry_t err_entry{e.op_context, e.flags, e.len, e.buf, e.data};
   return process_or_queue_completion(err_entry, cb_, E_FAIL);
 }
 
-std::size_t Fabric_cq::process_cq_comp_err(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq::process_cq_comp_err(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   const auto cq_entry = get_cq_comp_err();
   cb_(cq_entry.op_context, E_FAIL, cq_entry.flags, cq_entry.len, nullptr, cb_param_);
   return 1U;
 }
 
-std::size_t Fabric_cq::process_cq_comp_err(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq::process_cq_comp_err(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   const auto cq_entry = get_cq_comp_err();
   cb_(cq_entry.op_context, E_FAIL, cq_entry.flags, cq_entry.len, nullptr, cb_param_);
   return 1U;
 }
 
-std::size_t Fabric_cq::process_or_queue_cq_comp_err(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq::process_or_queue_cq_comp_err(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   const auto e = get_cq_comp_err();
   const Fabric_cq::fi_cq_entry_t err_entry{e.op_context, e.flags, e.len, e.buf, e.data};
   return process_or_queue_completion(err_entry, cb_, E_FAIL, cb_param_);
 }
 
-std::size_t Fabric_cq::process_or_queue_cq_comp_err(Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq::process_or_queue_cq_comp_err(component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   const auto e = get_cq_comp_err();
   const Fabric_cq::fi_cq_entry_t err_entry{e.op_context, e.flags, e.len, e.buf, e.data};
@@ -239,7 +255,7 @@ std::size_t Fabric_cq::process_or_queue_cq_comp_err(Component::IFabric_op_comple
  * @return Number of completions processed
  */
 
-std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq::poll_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -281,7 +297,7 @@ std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::c
   return ct_total;
 }
 
-std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq::poll_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -322,7 +338,7 @@ std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::c
   return ct_total;
 }
 
-std::size_t Fabric_cq::poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -362,7 +378,7 @@ std::size_t Fabric_cq::poll_completions_tentative(const Component::IFabric_op_co
   return ct_total;
 }
 
-std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq::poll_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -403,7 +419,7 @@ std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::c
   return ct_total;
 }
 
-std::size_t Fabric_cq::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -443,7 +459,7 @@ std::size_t Fabric_cq::poll_completions_tentative(const Component::IFabric_op_co
   return ct_total;
 }
 
-std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -484,7 +500,7 @@ std::size_t Fabric_cq::poll_completions(const Component::IFabric_op_completer::c
   return ct_total;
 }
 
-std::size_t Fabric_cq::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
   std::array<Fabric_cq::fi_cq_entry_t, ct_max> cq_entry;
@@ -524,7 +540,7 @@ std::size_t Fabric_cq::poll_completions_tentative(const Component::IFabric_op_co
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   std::size_t ct_total = 0U;
   while ( ! _completions.empty() )
@@ -538,7 +554,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   std::size_t ct_total = 0U;
   while ( ! _completions.empty() )
@@ -552,7 +568,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t ct_total = 0U;
   if ( ! _completions.empty() )
@@ -564,7 +580,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
       auto c = _completions.front();
       _completions.pop();
       const auto &cq_entry = std::get<1>(c);
-      if ( cb_(cq_entry.op_context, std::get<0>(c), cq_entry.flags, cq_entry.len, nullptr) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+      if ( cb_(cq_entry.op_context, std::get<0>(c), cq_entry.flags, cq_entry.len, nullptr) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
       {
         ++ct_total;
       }
@@ -580,7 +596,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   while ( ! _completions.empty() )
@@ -594,7 +610,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   if ( ! _completions.empty() )
@@ -606,7 +622,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
       auto c = _completions.front();
       _completions.pop();
       const auto &cq_entry = std::get<1>(c);
-      if ( cb_(cq_entry.op_context, std::get<0>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+      if ( cb_(cq_entry.op_context, std::get<0>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
       {
         ++ct_total;
       }
@@ -622,7 +638,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   while ( ! _completions.empty() )
@@ -636,7 +652,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
   return ct_total;
 }
 
-std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_cq::drain_old_completions(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0U;
   if ( ! _completions.empty() )
@@ -648,7 +664,7 @@ std::size_t Fabric_cq::drain_old_completions(const Component::IFabric_op_complet
       auto c = _completions.front();
       _completions.pop();
       const auto &cq_entry = std::get<1>(c);
-      if ( cb_(cq_entry.op_context, std::get<0>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == Component::IFabric_op_completer::cb_acceptance::ACCEPT )
+      if ( cb_(cq_entry.op_context, std::get<0>(c), cq_entry.flags, cq_entry.len, nullptr, cb_param_) == component::IFabric_op_completer::cb_acceptance::ACCEPT )
       {
         ++ct_total;
       }

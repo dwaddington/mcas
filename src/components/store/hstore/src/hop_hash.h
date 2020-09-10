@@ -53,15 +53,14 @@ template <
 	, typename Allocator
 	, typename SharedMutex
 >
-	class hop_hash;
+	struct hop_hash;
 #endif
 
 namespace impl
 {
-	class no_near_empty_bucket
+	struct no_near_empty_bucket
 		: public std::range_error
 	{
-	public:
 		using bix_t = std::size_t;
 	private:
 		bix_t _bi;
@@ -70,36 +69,33 @@ namespace impl
 		bix_t bi() const { return _bi; }
 	};
 
-	class move_stuck
+	struct move_stuck
 		: public no_near_empty_bucket
 	{
-	public:
 		move_stuck(bix_t bi, std::size_t size);
 	};
 
-	class hop_hash_full
+	struct hop_hash_full
 		: public no_near_empty_bucket
 	{
-	public:
 		hop_hash_full(bix_t bi, std::size_t size);
 	};
 
 	template <typename HopHash>
-		class hop_hash_iterator;
+		struct hop_hash_iterator;
 
 	template <typename HopHash>
-		class hop_hash_const_iterator;
+		struct hop_hash_const_iterator;
 
 	template <typename HopHash>
-		class hop_hash_local_iterator;
+		struct hop_hash_local_iterator;
 
 	template <typename HopHash>
-		class hop_hash_const_local_iterator;
+		struct hop_hash_const_local_iterator;
 
 	template <typename Bucket, typename Referent>
-		class bucket_ref
+		struct bucket_ref
 		{
-		public:
 			using segment_and_bucket_t = segment_and_bucket<Bucket>;
 		private:
 			Referent *_ref;
@@ -234,20 +230,19 @@ namespace impl
 		};
 
 	template <typename Allocator>
-		class hop_hash_allocator
+		struct hop_hash_allocator
 			: public Allocator
 		{
-		public:
 			explicit hop_hash_allocator(const Allocator &av_)
 				: Allocator(av_)
 			{}
 		};
 
 	template <typename HopHash>
-		class hop_hash_local_iterator_impl;
+		struct hop_hash_local_iterator_impl;
 
 	template <typename HopHash>
-		class hop_hash_iterator_impl;
+		struct hop_hash_iterator_impl;
 
 	template <
 		typename Key
@@ -257,7 +252,7 @@ namespace impl
 		, typename Allocator
 		, typename SharedMutex
 	>
-		class hop_hash_base
+		struct hop_hash_base
 			: private hop_hash_allocator<Allocator>
 			, private segment_layout
 			, private
@@ -267,6 +262,7 @@ namespace impl
 					>
 				>
 		{
+		private:
 			using allocator_traits_type = std::allocator_traits<Allocator>;
 		public:
 #if HSTORE_TRACE_RESIZE
@@ -387,7 +383,7 @@ namespace impl
 					, const K &k
 				) const -> std::tuple<bucket_t *, segment_and_bucket_t>;
 
-			void resize();
+			void resize(AK_FORMAL0);
 			void resize_pass1();
 			void resize_pass2();
 			bool resize_pass2_adjust_owner(
@@ -465,6 +461,7 @@ namespace impl
 
 		public:
 			explicit hop_hash_base(
+				AK_FORMAL
 				persist_data_t *pc
 				, construction_mode mode
 				, const Allocator &av = Allocator()
@@ -480,7 +477,10 @@ namespace impl
 			}
 
 			template <typename ... Args>
-				auto emplace(Args && ... args) -> std::pair<iterator, bool>;
+				auto emplace(
+					AK_FORMAL
+					Args && ... args
+				) -> std::pair<iterator, bool>;
 			auto insert(const value_type &value) -> std::pair<iterator, bool>;
 
 			template <typename K>
@@ -625,17 +625,17 @@ namespace impl
 				) -> std::ostream &;
 #endif
 			template <typename HopHash>
-				friend class impl::hop_hash_local_iterator_impl;
+				friend struct impl::hop_hash_local_iterator_impl;
 			template <typename HopHash>
-				friend class impl::hop_hash_iterator_impl;
+				friend struct impl::hop_hash_iterator_impl;
 			template <typename HopHash>
-				friend class impl::hop_hash_local_iterator;
+				friend struct impl::hop_hash_local_iterator;
 			template <typename HopHash>
-				friend class impl::hop_hash_const_local_iterator;
+				friend struct impl::hop_hash_const_local_iterator;
 			template <typename HopHash>
-				friend class impl::hop_hash_iterator;
+				friend struct impl::hop_hash_iterator;
 			template <typename HopHash>
-				friend class impl::hop_hash_const_iterator;
+				friend struct impl::hop_hash_const_iterator;
 		};
 }
 
@@ -647,10 +647,9 @@ template <
 	, typename Allocator = std::allocator<std::pair<const Key, T>>
 	, typename SharedMutex = std::shared_timed_mutex
 >
-	class hop_hash
+	struct hop_hash
 		: private impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>
 	{
-	public:
 		using base = impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>;
 		using size_type      = std::size_t;
 		using key_type       = Key;
@@ -664,11 +663,12 @@ template <
 
 		/* contruct/destroy/copy */
 		explicit hop_hash(
+			AK_ACTUAL
 			persist_data_t *pc_
 			, construction_mode mode_
 			, const Allocator &av_ = Allocator()
 		)
-			: base(pc_, mode_, av_)
+			: base(AK_REF pc_, mode_, av_)
 		{}
 
 		using base::get_allocator;
@@ -708,10 +708,10 @@ template <
 		using base::at;
 
 		template <typename HopHash>
-			friend class impl::hop_hash_local_iterator_impl;
+			friend struct impl::hop_hash_local_iterator_impl;
 
 		template <typename HopHash>
-			friend class impl::hop_hash_iterator_impl;
+			friend struct impl::hop_hash_iterator_impl;
 	};
 
 namespace impl
@@ -741,13 +741,14 @@ namespace impl
 		);
 
 	template <typename HopHash>
-		class hop_hash_local_iterator_impl
+		struct hop_hash_local_iterator_impl
 			: public std::iterator
 				<
 					std::forward_iterator_tag
 					, typename HopHash::value_type
 				>
 		{
+		private:
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			segment_and_bucket_t _sb_owner;
 			owner::index_type _content_index;
@@ -808,13 +809,14 @@ namespace impl
 		};
 
 	template <typename HopHash>
-		class hop_hash_iterator_impl
+		struct hop_hash_iterator_impl
 			: public std::iterator
 				<
 					std::forward_iterator_tag
 					, typename HopHash::value_type
 				>
 		{
+		private:
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			/* ERROR: iterator runs through non-empty content.
 			 * It should run through owners, indexing the content within each owner
@@ -884,17 +886,22 @@ namespace impl
 			{
 				advance_to_in_use();
 			}
-			friend class impl::hop_hash_iterator<HopHash>;
+			friend struct impl::hop_hash_iterator<HopHash>;
 		};
 
 	template <typename HopHash>
-		class hop_hash_local_iterator
+		struct hop_hash_local_iterator
 			: public hop_hash_local_iterator_impl<HopHash>
 		{
+		private:
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			using typename hop_hash_local_iterator_impl<HopHash>::base;
 		public:
-			hop_hash_local_iterator(const HopHash &t_, const segment_and_bucket_t & sb_, owner::value_type mask_)
+			hop_hash_local_iterator(
+				const HopHash & // t_
+				, const segment_and_bucket_t & sb_
+				, owner::value_type mask_
+			)
 				: hop_hash_local_iterator_impl<HopHash>(sb_, mask_)
 			{}
 			/* HopHash 106 (Iterator) */
@@ -923,9 +930,10 @@ namespace impl
 		};
 
 	template <typename HopHash>
-		class hop_hash_const_local_iterator
+		struct hop_hash_const_local_iterator
 			: public hop_hash_local_iterator_impl<HopHash>
 		{
+		private:
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			using typename hop_hash_local_iterator_impl<HopHash>::base;
 		public:
@@ -958,9 +966,10 @@ namespace impl
 		};
 
 	template <typename HopHash>
-		class hop_hash_iterator
+		struct hop_hash_iterator
 			: public hop_hash_iterator_impl<HopHash>
 		{
+		private:
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			using typename hop_hash_iterator_impl<HopHash>::base;
 			const auto &sb_owner() const { return this->_sb_owner; }
@@ -1001,13 +1010,14 @@ namespace impl
 				, typename Allocator
 				, typename SharedMutex
 			>
-				friend class hop_hash_base;
+				friend struct hop_hash_base;
 		};
 
 	template <typename HopHash>
-		class hop_hash_const_iterator
+		struct hop_hash_const_iterator
 			: public hop_hash_iterator_impl<HopHash>
 		{
+		private:
 			using segment_and_bucket_t = typename HopHash::segment_and_bucket_t;
 			using typename hop_hash_iterator_impl<HopHash>::base;
 		public:

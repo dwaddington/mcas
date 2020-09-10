@@ -21,24 +21,27 @@
 
 #include <api/kvstore_itf.h>
 #include <common/utils.h> /* epoch_now */
+#include <common/time.h>
 #include <tuple>
 
 namespace impl
 {
-	inline tsc_time_t epoch_to_tsc(epoch_time_t e)
-	{
-		return e;
-	}
 
-	inline epoch_time_t tsc_to_epoch(tsc_time_t t)
-	{
-		return t;
-	}
+inline common::tsc_time_t epoch_to_tsc(common::epoch_time_t e)
+{
+  return e;
+}
 
-	inline tsc_time_t tsc_now()
-	{
-		return epoch_to_tsc(epoch_now());
-	}
+inline common::epoch_time_t tsc_to_epoch(common::tsc_time_t t)
+{
+  return t.to_epoch();
+}
+
+inline common::tsc_time_t tsc_now()
+{
+  return epoch_to_tsc(common::epoch_now());
+}
+
 }
 
 template <typename Deallocator>
@@ -50,7 +53,7 @@ template <typename Deallocator>
 			std::tuple<
 				persist_fixed_string<char, 24, dealloc_t>
 #if ENABLE_TIMESTAMPS
-				, tsc_time_t
+				, common::tsc_time_t
 #endif
 			>;
 	};

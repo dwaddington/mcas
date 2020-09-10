@@ -21,36 +21,35 @@
 #include <cstddef> /* size_t, ptrdiff_t */
 
 template <typename T, typename Persister>
-	class deallocator_rc;
+	struct deallocator_rc;
 
 template <>
-	class deallocator_rc<void, persister>
+	struct deallocator_rc<void, persister>
 	{
-	public:
 		using value_type = void;
 	};
 
 template <typename Persister>
-	class deallocator_rc<void, Persister>
+	struct deallocator_rc<void, Persister>
 	{
-	public:
 		using value_type = void;
 	};
 
 template <typename T, typename Persister = persister>
-	class deallocator_rc
+	struct deallocator_rc
 		: public Persister
 	{
+	private:
 		heap_rc _pool;
 	public:
 		using value_type = T;
 		using size_type = std::size_t;
-
+#if 0
 		explicit deallocator_rc(void *area_, Persister p_ = Persister())
 			: Persister(p_)
 			, _pool(area_)
 		{}
-
+#endif
 		explicit deallocator_rc(const heap_rc &pool_, Persister p_ = Persister()) noexcept
 			: Persister(p_)
 			, _pool(pool_)

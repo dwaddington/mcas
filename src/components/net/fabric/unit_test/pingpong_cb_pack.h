@@ -16,7 +16,7 @@
 #include "delete_copy.h"
 #include "pingpong_cb_ctxt.h"
 
-namespace Component
+namespace component
 {
   class IFabric_connection;
 }
@@ -28,7 +28,7 @@ struct cb_pack
   cb_ctxt _rx1_ctxt;
   explicit cb_pack(
     cnxn_state &state_
-    , Component::IFabric_connection &cnxn_
+    , component::IFabric_connection &cnxn_
     , cb_ctxt::cb_t send_cb
     , cb_ctxt::cb_t recv_cb
     , std::uint64_t buffer_size_

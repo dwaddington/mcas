@@ -30,8 +30,9 @@ struct fi_info;
  *
  */
 
-class hints
+struct hints
 {
+private:
   std::shared_ptr<fi_info> _info;
 public:
   explicit hints();

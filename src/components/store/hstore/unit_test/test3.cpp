@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -46,7 +46,7 @@
  * (this table obsoleted, or at least made harder to generate, but use of multiple key and data sizes)
  */
 
-using namespace Component;
+using namespace component;
 
 namespace {
 
@@ -81,8 +81,8 @@ class KVStore_test
 
   /* persistent memory if enabled at all, is simulated and not real */
   static bool pmem_simulated;
-  static Component::IKVStore * _kvstore;
-  static Component::IKVStore::pool_t pool;
+  static component::IKVStore * _kvstore;
+  static component::IKVStore::pool_t pool;
 
   static constexpr unsigned many_key_length_short = 16;
   static constexpr unsigned many_key_length_long = 32;
@@ -121,8 +121,8 @@ constexpr std::size_t KVStore_test::many_count_target_large;
 constexpr std::size_t KVStore_test::many_count_target_small;
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
-Component::IKVStore *KVStore_test::_kvstore;
-Component::IKVStore::pool_t KVStore_test::pool;
+component::IKVStore *KVStore_test::_kvstore;
+component::IKVStore::pool_t KVStore_test::pool;
 
 constexpr unsigned KVStore_test::many_key_length_short;
 constexpr unsigned KVStore_test::many_key_length_long;
@@ -140,15 +140,19 @@ TEST_F(KVStore_test, Instantiate)
 {
   /* create object instance through factory */
   auto link_library = "libcomponent-" + store_map::impl->name + ".so";
-  Component::IBase * comp = Component::load_component(link_library,
+  component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
   ASSERT_TRUE(comp);
-  auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = component::make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
-  _kvstore = fact->create("owner", "name", store_map::location);
-
-  fact->release_ref();
+  _kvstore =
+    fact->create(
+      0
+      , {
+          { +component::IKVStore_factory::k_dax_config, store_map::location }
+        }
+    );
 }
 
 TEST_F(KVStore_test, RemoveOldPool)
@@ -211,7 +215,7 @@ long unsigned KVStore_test::put_many(const kvv_t &kvv, const std::string &descr)
     timer t(
       [&count, &descr] (timer::duration_t d) {
         auto seconds = std::chrono::duration<double>(d).count();
-        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+        auto microseconds = static_cast<long unsigned>(std::chrono::duration_cast<std::chrono::microseconds>(d).count());
         std::cout << descr << " " << count << " in " << seconds << " seconds -> " << microseconds / count << " us -> " << double(count) / seconds << " per second\n";
       }
     );
@@ -291,7 +295,7 @@ void KVStore_test::get_many(const kvv_t &kvv, const std::string &descr)
     timer t(
       [&descr,count] (timer::duration_t d) {
         auto seconds = std::chrono::duration<double>(d).count();
-        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+        auto microseconds = static_cast<long unsigned>(std::chrono::duration_cast<std::chrono::microseconds>(d).count());
         std::cout << descr << " " << count << " in " << seconds << " seconds -> " << microseconds / count << " us -> " << double(count) / seconds << " per second\n";
       }
     );

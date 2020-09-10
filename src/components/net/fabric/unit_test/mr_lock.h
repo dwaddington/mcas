@@ -16,8 +16,9 @@
 #include "delete_copy.h"
 #include <cstddef> /* size_t */
 
-class mr_lock
+struct mr_lock
 {
+private:
   const void *_addr;
   std::size_t _len;
   DELETE_COPY(mr_lock);

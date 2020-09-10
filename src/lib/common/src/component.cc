@@ -31,6 +31,7 @@
   Copyright (C) 2014, Daniel G. Waddington <daniel.waddington@acm.org>
 */
 
+#include <common/component.h>
 #include <assert.h>
 #include <dlfcn.h>
 #include <stdint.h>
@@ -39,17 +40,18 @@
 
 #include <common/errors.h>
 #include <common/logging.h>
+#include <common/exceptions.h>
 #include <component/base.h>
 #include <config.h>
 
 
-namespace Component
+namespace component
 {
-bool operator==(const Component::uuid_t &lhs, const Component::uuid_t &rhs) {
-  return memcmp(&lhs, &rhs, sizeof(Component::uuid_t)) == 0;
+bool operator==(const component::uuid_t& lhs, const component::uuid_t& rhs) {
+  return memcmp(&lhs, &rhs, sizeof(component::uuid_t)) == 0;
 }
 
-IBase *load_component(const char *dllname, Component::uuid_t component_id) {
+IBase *load_component(const char *dllname, component::uuid_t component_id) {
   return load_component(dllname, component_id, false);
 }
 
@@ -57,7 +59,7 @@ IBase *load_component(const char *dllname, Component::uuid_t component_id) {
  * Called by the client to load the component from a DLL file
  *
  */
-IBase *load_component(const char *dllname, Component::uuid_t component_id, bool quiet) {
+IBase *load_component(const char *dllname, component::uuid_t component_id, bool quiet) {
 
   void *dll = dlopen(dllname, RTLD_NOW);
 
@@ -74,7 +76,7 @@ IBase *load_component(const char *dllname, Component::uuid_t component_id, bool 
     }
   }
 
-  const auto factory_createInstance = reinterpret_cast<void *(*)(Component::uuid_t)>(dlsym(dll, "factory_createInstance"));
+  const auto factory_createInstance = reinterpret_cast<void *(*)(component::uuid_t)>(dlsym(dll, "factory_createInstance"));
 
   char *error;
   if ((error = dlerror()) != nullptr) {
@@ -85,23 +87,19 @@ IBase *load_component(const char *dllname, Component::uuid_t component_id, bool 
   IBase *comp = static_cast<IBase *>(factory_createInstance(component_id));
 
   if (comp == nullptr) {
-    PERR("Factory create instance returned nullptr (%s). Possible component ID "
-         "mismatch.",
-         dllname);
-    return nullptr;
+    throw General_exception("Factory create instance returned nullptr (%s). Possible component ID mismatch.", dllname);
   }
 
   comp->set_dll_handle(dll); /* record so we can call dlclose() */
   comp->add_ref();
 
-  PLOG("Loaded component: %s", dllname);
   return comp;
 }
 
 void IBase::release_ref() {
-  int val = _ref_count.fetch_sub(1) - 1;
-  assert(val >= 0);
-  if (val == 0) {
+  auto val = _ref_count.fetch_sub(1);
+  assert(val != 0);
+  if (val == 1) {
     this->unload(); /* call virtual unload function */
   }
 }
@@ -128,4 +126,4 @@ status_t bind(std::vector<IBase *> components) {
 
   return S_OK;
 }
-}  // namespace Component
+}  // namespace component

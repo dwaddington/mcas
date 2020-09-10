@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -24,19 +24,20 @@
 #include <sstream>
 #include <string>
 
-using namespace Component;
+using namespace component;
 
 namespace {
 
-class memo_lock
+struct memo_lock
 {
-  Component::IKVStore * _kvstore;
-  Component::IKVStore::pool_t *_pool;
+private:
+  component::IKVStore * _kvstore;
+  component::IKVStore::pool_t *_pool;
 public:
   IKVStore::key_t k;
   memo_lock(
-    Component::IKVStore *kvstore_
-    , Component::IKVStore::pool_t *pool_
+    component::IKVStore *kvstore_
+    , component::IKVStore::pool_t *pool_
   )
     : _kvstore(kvstore_)
     , _pool(pool_)
@@ -54,27 +55,25 @@ public:
   }
 };
 
-class shared_lock
+struct shared_lock
   : private memo_lock
 {
-public:
   using memo_lock::k;
   shared_lock(
-    Component::IKVStore *kvstore_
-    , Component::IKVStore::pool_t *pool_
+    component::IKVStore *kvstore_
+    , component::IKVStore::pool_t *pool_
   )
     : memo_lock(kvstore_, pool_)
   {}
 };
 
-class exclusive_lock
+struct exclusive_lock
   : private memo_lock
 {
-public:
   using memo_lock::k;
   exclusive_lock(
-    Component::IKVStore *kvstore_
-    , Component::IKVStore::pool_t *pool_
+    component::IKVStore *kvstore_
+    , component::IKVStore::pool_t *pool_
   )
     : memo_lock(kvstore_, pool_)
   {}
@@ -114,8 +113,8 @@ class KVStore_test : public ::testing::Test {
   static bool pmem_simulated;
   /* persistent memory is effective (either real, indicated by no PMEM_IS_PMEM_FORCE or simulated by PMEM_IS_PMEM_FORCE 0 not 1 */
   static bool pmem_effective;
-  static Component::IKVStore * _kvstore;
-  static Component::IKVStore::pool_t pool;
+  static component::IKVStore * _kvstore;
+  static component::IKVStore::pool_t pool;
 
   static const std::size_t estimated_object_count;
 
@@ -156,8 +155,8 @@ constexpr std::size_t KVStore_test::many_count_target_large;
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
 bool KVStore_test::pmem_effective = ! getenv("PMEM_IS_PMEM_FORCE") || getenv("PMEM_IS_PMEM_FORCE") == std::string("0");
-Component::IKVStore * KVStore_test::_kvstore;
-Component::IKVStore::pool_t KVStore_test::pool;
+component::IKVStore * KVStore_test::_kvstore;
+component::IKVStore::pool_t KVStore_test::pool;
 
 const std::size_t KVStore_test::estimated_object_count = pmem_simulated ? estimated_object_count_small : estimated_object_count_large;
 
@@ -186,15 +185,20 @@ TEST_F(KVStore_test, Instantiate)
 {
   /* create object instance through factory */
   auto link_library = "libcomponent-" + store_map::impl->name + ".so";
-  Component::IBase * comp = Component::load_component(link_library,
+  component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
   ASSERT_TRUE(comp);
-  auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = component::make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
   /* numa node 0 */
-  _kvstore = fact->create("owner", "numa0", store_map::location);
-
-  fact->release_ref();
+  _kvstore =
+    fact->create(
+      0
+      , {
+          { +component::IKVStore_factory::k_name, "numa0"}
+          , { +component::IKVStore_factory::k_dax_config, store_map::location }
+        }
+    );
 }
 
 TEST_F(KVStore_test, RemoveOldPool)
@@ -222,10 +226,6 @@ TEST_F(KVStore_test, CreatePool)
    *  - by 8U to account for current AVL_LB allocator alignment requirements
    */
   pool = _kvstore->create_pool(pool_name(), ( many_count_target * 64U * 3U * 2U + 4 * single_value_size ) * 8U, 0, estimated_object_count);
-  if ( 0 == int64_t(pool) )
-  {
-    ASSERT_EQ("Pool not create, USE_DRAM was ", std::getenv("USE_DRAM") ? std::getenv("USE_DRAM") : " not set");
-  }
   ASSERT_LT(0, int64_t(pool));
 }
 
@@ -316,7 +316,7 @@ TEST_F(KVStore_test, BasicPutLocked)
     }
   }
 
-  auto small_size = 16; /* Small, but large enough to preserve all characters in "Hello world!" */
+  std::size_t small_size = 16; /* Small, but large enough to preserve all characters in "Hello world!" */
 
   /* resize to an inline size. */
   {
@@ -656,7 +656,7 @@ TEST_F(KVStore_test, BasicGetAttribute)
         EXPECT_EQ(attr[0], single_value_updated_different_size.length());
       }
     }
-    r = _kvstore->get_attribute(pool, Component::IKVStore::Attribute(0), attr, &single_key);
+    r = _kvstore->get_attribute(pool, component::IKVStore::Attribute(0), attr, &single_key);
     EXPECT_EQ(E_NOT_SUPPORTED, r);
     r = _kvstore->get_attribute(pool, IKVStore::VALUE_LEN, attr, nullptr);
     EXPECT_EQ(E_BAD_PARAM, r);
@@ -839,7 +839,7 @@ TEST_F(KVStore_test, LockMany)
   for ( const auto &kv : kvm )
   {
 #if __cplusplus < 201703
-    static constexpr auto KEY_NONE = IKVStore::KEY_NONE+0;
+    static constexpr auto KEY_NONE = +IKVStore::KEY_NONE;
 #else
     static constexpr auto KEY_NONE = IKVStore::KEY_NONE;
 #endif
@@ -1060,10 +1060,10 @@ TEST_F(KVStore_test, AllocDealloc)
 #if 0
   /* alignment is now a "hint", so 0 alignment is no longer an error */
   auto r = _kvstore->allocate_pool_memory(pool, 100, 0, v);
-  EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* zero aligmnent */
+  EXPECT_EQ(component::IKVStore::E_BAD_ALIGNMENT, r); /* zero aligmnent */
 #endif
   auto r = _kvstore->allocate_pool_memory(pool, 100, 1, v);
-  EXPECT_EQ(Component::IKVStore::E_BAD_ALIGNMENT, r); /* alignment less than sizeof(void *) */
+  EXPECT_EQ(component::IKVStore::E_BAD_ALIGNMENT, r); /* alignment less than sizeof(void *) */
 
   /* allocate various sizes */
   void *v128 = nullptr;

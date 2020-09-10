@@ -29,7 +29,7 @@
 #include <vector>
 
 void remote_memory_server_grouped::listener(
-  Component::IFabric_server_grouped_factory &ep_
+  component::IFabric_server_grouped_factory &ep_
   , std::size_t memory_size_
   , std::uint64_t remote_key_index_
 )
@@ -75,20 +75,29 @@ void remote_memory_server_grouped::listener(
 }
 
 remote_memory_server_grouped::remote_memory_server_grouped(
-  Component::IFabric &fabric_
+  component::IFabric &fabric_
   , const std::string &fabric_spec_
   , std::uint16_t control_port_
   , std::size_t memory_size_
   , std::uint64_t remote_key_base_
 )
   : _ep(fabric_.open_server_grouped_factory(fabric_spec_, control_port_))
-  , _th(&remote_memory_server_grouped::listener, this, std::ref(*_ep), memory_size_, remote_key_base_)
+  , _th(
+    std::async(
+      std::launch::async
+      , &remote_memory_server_grouped::listener
+      , this
+      , std::ref(*_ep)
+      , memory_size_
+      , remote_key_base_
+    )
+  )
 {}
 
 remote_memory_server_grouped::~remote_memory_server_grouped()
 try
 {
-  _th.join();
+  _th.get();
 }
 catch ( std::exception &e )
 {

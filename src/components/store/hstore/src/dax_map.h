@@ -22,9 +22,12 @@
 class Devdax_manager
 	: public nupm::Devdax_manager
 {
+	unsigned _debug_level;
+	unsigned debug_level() const { return _debug_level; }
 public:
 	Devdax_manager(
-		const std::string &dax_map
+		unsigned debug_level_
+		, const std::string &dax_map
 		, bool force_reset = false
 	);
 };

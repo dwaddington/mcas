@@ -232,5 +232,54 @@ inline void PMAJOR(const char * format, ...)
 #endif
 }
 
+void PLOG2(const char *color, const char * format, ...) __attribute__((format(printf, 2, 3)));
+inline void PLOG2(const char * color, const char * format, ...)
+{
+#ifdef CONFIG_DEBUG
+  static constexpr size_t m_max_buffer = 512;
+  va_list args;
+  va_start(args, format);
+  char buffer[m_max_buffer];
+  vsnprintf(buffer, m_max_buffer, format, args);
+  va_end(args);
+  fprintf(stderr, "%s[+] %s %s\n", color, buffer, ESC_END);
+#else
+  (void) format;
+  (void) color;
+#endif
+}
+
+/* one-line conditional PLOG */
+
+// clang-format off
+
+#define GET_MACRO(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,NAME,...) NAME
+
+#define CPLOG_10(level,format,p0,p1,p2,p3,p4,p5,p6,p7) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1,p2,p3,p4,p5,p6,p7); }
+#define CPLOG_9(level,format,p0,p1,p2,p3,p4,p5,p6) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1,p2,p3,p4,p5,p6); }
+#define CPLOG_8(level,format,p0,p1,p2,p3,p4,p5) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1,p2,p3,p4,p5); }
+#define CPLOG_7(level,format,p0,p1,p2,p3,p4) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1,p2,p3,p4); }
+#define CPLOG_6(level,format,p0,p1,p2,p3) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1,p2,p3); }
+#define CPLOG_5(level,format,p0,p1,p2) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1,p2); }
+#define CPLOG_4(level,format,p0,p1) if ( (level) < this->debug_level() ) { PLOG(format,p0,p1); }
+#define CPLOG_3(level,format,p0) if ( (level) < this->debug_level() ) { PLOG(format,p0); }
+#define CPLOG_2(level,msg) if ( (level) < this->debug_level() ) { PLOG(msg); }
+#define CPLOG_1(level)
+#define CPLOG(...) GET_MACRO(__VA_ARGS__,CPLOG_10,CPLOG_9,CPLOG_8,CPLOG_7,CPLOG_6,CPLOG_5,CPLOG_4,CPLOG_3,CPLOG_2,CPLOG_1,CPLOG_0)(__VA_ARGS__)
+
+#define CPINF_10(level,format,p0,p1,p2,p3,p4,p5,p6,p7) if ( (level) < this->debug_level() ) { PINF(format,p0,p1,p2,p3,p4,p5,p6,p7); }
+#define CPINF_9(level,format,p0,p1,p2,p3,p4,p5,p6) if ( (level) < this->debug_level() ) { PINF(format,p0,p1,p2,p3,p4,p5,p6); }
+#define CPINF_8(level,format,p0,p1,p2,p3,p4,p5) if ( (level) < this->debug_level() ) { PINF(format,p0,p1,p2,p3,p4,p5); }
+#define CPINF_7(level,format,p0,p1,p2,p3,p4) if ( (level) < this->debug_level() ) { PINF(format,p0,p1,p2,p3,p4); }
+#define CPINF_6(level,format,p0,p1,p2,p3) if ( (level) < this->debug_level() ) { PINF(format,p0,p1,p2,p3); }
+#define CPINF_5(level,format,p0,p1,p2) if ( (level) < this->debug_level() ) { PINF(format,p0,p1,p2); }
+#define CPINF_4(level,format,p0,p1) if ( (level) < this->debug_level() ) { PINF(format,p0,p1); }
+#define CPINF_3(level,format,p0) if ( (level) < this->debug_level() ) { PINF(format,p0); }
+#define CPINF_2(level,msg) if ( (level) < this->debug_level() ) { PINF(msg); }
+#define CPINF_1(level)
+#define CPINF(...) GET_MACRO(__VA_ARGS__,CPINF_10,CPINF_9,CPINF_8,CPINF_7,CPINF_6,CPINF_5,CPINF_4,CPINF_3,CPINF_2,CPINF_1,CPINF_0)(__VA_ARGS__)
+
+// clang-format on
+
 
 #endif  // __COMMON_LOGGING_H__

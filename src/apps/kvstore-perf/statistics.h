@@ -151,14 +151,14 @@ public:
 
     void update(double value)
     {
-        int bin = find_bin_from_value(value);
+        auto bin = find_bin_from_value(value);
 
         _bins[bin].add_value(value);
     }
 
     void update_value_for_bin(double value, double bin_calc_value)
     {
-        int bin = find_bin_from_value(bin_calc_value);
+        auto bin = find_bin_from_value(bin_calc_value);
 
         _bins[bin].add_value(value);
     }

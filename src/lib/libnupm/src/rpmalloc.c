@@ -18,7 +18,7 @@
 /// Build time configurable limits
 #ifndef HEAP_ARRAY_SIZE
 //! Size of heap hashmap
-#define HEAP_ARRAY_SIZE           47
+#define HEAP_ARRAY_SIZE           47U
 #endif
 #ifndef ENABLE_THREAD_CACHE
 //! Enable per-thread cache
@@ -50,7 +50,7 @@
 #endif
 #ifndef DEFAULT_SPAN_MAP_COUNT
 //! Default number of spans to map in call to map more virtual memory
-#define DEFAULT_SPAN_MAP_COUNT    32
+#define DEFAULT_SPAN_MAP_COUNT    32U
 #endif
 
 #if ENABLE_THREAD_CACHE
@@ -64,7 +64,7 @@
 #endif
 #if !ENABLE_UNLIMITED_THREAD_CACHE
 //! Multiplier for thread cache (cache limit will be span release count multiplied by this value)
-#define THREAD_CACHE_MULTIPLIER 16
+#define THREAD_CACHE_MULTIPLIER 16U
 #endif
 #endif
 
@@ -75,7 +75,7 @@
 #endif
 #if !ENABLE_UNLIMITED_GLOBAL_CACHE
 //! Multiplier for global cache (cache limit will be span release count multiplied by this value)
-#define GLOBAL_CACHE_MULTIPLIER 64
+#define GLOBAL_CACHE_MULTIPLIER 64U
 #endif
 #else
 #  undef ENABLE_GLOBAL_CACHE
@@ -184,29 +184,29 @@ static FORCEINLINE int     atomic_cas_ptr(atomicptr_t* dst, void* val, void* ref
 
 /// Preconfigured limits and sizes
 //! Granularity of a small allocation block
-#define SMALL_GRANULARITY         32
+#define SMALL_GRANULARITY         32U
 //! Small granularity shift count
-#define SMALL_GRANULARITY_SHIFT   5
+#define SMALL_GRANULARITY_SHIFT   5U
 //! Number of small block size classes
-#define SMALL_CLASS_COUNT         63
+#define SMALL_CLASS_COUNT         63U
 //! Maximum size of a small block
 #define SMALL_SIZE_LIMIT          (SMALL_GRANULARITY * SMALL_CLASS_COUNT)
 //! Granularity of a medium allocation block
-#define MEDIUM_GRANULARITY        512
+#define MEDIUM_GRANULARITY        512U
 //! Medium granularity shift count
-#define MEDIUM_GRANULARITY_SHIFT  9
+#define MEDIUM_GRANULARITY_SHIFT  9U
 //! Number of medium block size classes
-#define MEDIUM_CLASS_COUNT        63
+#define MEDIUM_CLASS_COUNT        63U
 //! Total number of small + medium size classes
 #define SIZE_CLASS_COUNT          (SMALL_CLASS_COUNT + MEDIUM_CLASS_COUNT)
 //! Number of large block size classes
-#define LARGE_CLASS_COUNT         32
+#define LARGE_CLASS_COUNT         32U
 //! Maximum size of a medium block
 #define MEDIUM_SIZE_LIMIT         (SMALL_SIZE_LIMIT + (MEDIUM_GRANULARITY * MEDIUM_CLASS_COUNT))
 //! Maximum size of a large block
 #define LARGE_SIZE_LIMIT          ((LARGE_CLASS_COUNT * _memory_span_size) - SPAN_HEADER_SIZE)
 //! Size of a span header
-#define SPAN_HEADER_SIZE          64
+#define SPAN_HEADER_SIZE          64U
 
 #define pointer_offset(ptr, ofs) (void*)((char*)(ptr) + (ptrdiff_t)(ofs))
 #define pointer_diff(first, second) (ptrdiff_t)((const char*)(first) - (const char*)(second))
@@ -459,7 +459,7 @@ _memory_deallocate_deferred(heap_t* heap);
 //! Lookup a memory heap from heap ID
 static heap_t*
 _memory_heap_lookup(int32_t id) {
-	uint32_t list_idx = id % HEAP_ARRAY_SIZE;
+	uint32_t list_idx = ((uint32_t)id) % HEAP_ARRAY_SIZE;
 	heap_t* heap = atomic_load_ptr(&_memory_heaps[list_idx]);
 	while (heap && (heap->id != id))
 		heap = heap->next_heap;
@@ -1048,7 +1048,7 @@ _memory_allocate_heap(void) {
 		} while (!heap->id);
 
 		//Link in heap in heap ID map
-		size_t list_idx = heap->id % HEAP_ARRAY_SIZE;
+		size_t list_idx = ((uint32_t)heap->id) % HEAP_ARRAY_SIZE;
 		do {
 			next_heap = atomic_load_ptr(&_memory_heaps[list_idx]);
 			heap->next_heap = next_heap;
@@ -1296,7 +1296,7 @@ _memory_usable_size(void* p) {
 		if (span->size_class < SIZE_CLASS_COUNT) {
 			size_class_t* size_class = _memory_size_class + span->size_class;
 			void* blocks_start = pointer_offset(span, SPAN_HEADER_SIZE);
-			return size_class->size - (pointer_diff(p, blocks_start) % size_class->size);
+			return size_class->size - ((size_t)pointer_diff(p, blocks_start) % size_class->size);
 		}
 
 		//Large block

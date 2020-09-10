@@ -1,6 +1,6 @@
 // FlatBuffers IDL file
 
-namespace Symtab_ADO_protocol;
+namespace symtab_ADO_protocol;
 
 table PutRequest
 {

@@ -18,3 +18,10 @@ They can also be run individually. For example,
 
 
 NOTE: Be careful not to interept tests and leave processes hanging.
+
+
+Manual Runs Examples
+--------------------
+
+gdb --args ./dist/bin/mcas --config '{"shards": [{"core": 0, "addr": "10.0.0.101", "port": 11911, "net": "mlx5_0", "default_backend": "mapstore"}]}' --forced-exit --debug 0
+gdb --args ./dist/bin/kvstore-perf --cores 14 --src_addr 10.0.0.101 --server 10.0.0.101 --test put --component mcas --elements 2000000 --size 400000000 --skip_json_reporting --key_length 8 --value_length 8 --debug_level 0

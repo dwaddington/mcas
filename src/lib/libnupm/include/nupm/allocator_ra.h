@@ -127,6 +127,6 @@ public:
 };
 
 template <typename T>
-using allocator_ra = allocator_adaptor<T, Core::AVL_range_allocator>;
+using allocator_ra = allocator_adaptor<T, core::AVL_range_allocator>;
 } // namespace nupm
 #endif

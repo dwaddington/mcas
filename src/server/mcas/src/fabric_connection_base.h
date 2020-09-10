@@ -13,38 +13,93 @@
 #ifndef __FABRIC_CONNECTION_BASE_H__
 #define __FABRIC_CONNECTION_BASE_H__
 
-#include <list>
-
 #include "mcas_config.h"
+
+#include "buffer_manager.h" /* Buffer_manager */
+
+#include <api/fabric_itf.h> /* IFabric_memory_region, IFabric_server */
+#include <gsl/pointers>
+#include <algorithm>
+#include <list>
+#include <queue>
 
 namespace mcas
 {
-class Fabric_connection_base {
-  friend class Connection;
-  friend class Shard;
 
- private:
+struct open_connection_construct_key;
+
+struct open_connection
+{
+private:
+  gsl::not_null<component::IFabric_server_factory *>_factory;
+  gsl::not_null<component::IFabric_server *>        _transport;
+public:
+  open_connection(
+    gsl::not_null<component::IFabric_server_factory *> factory_
+    , gsl::not_null<component::IFabric_server *> transport_
+    , const open_connection_construct_key &
+    )
+    : _factory(factory_)
+    , _transport(transport_)
+  {}
+
+  open_connection(const open_connection &) = delete;
+  open_connection &operator=(const open_connection &) = delete;
+
+  auto transport() const { return _transport; }
+
+  ~open_connection()
+  {
+    /* close connection */
+    _factory->close_connection(_transport);
+  }
+};
+
+class Fabric_connection_base {
   unsigned option_DEBUG = mcas::Global::debug_level;
 
  public:
-  using memory_region_t = Component::IFabric_memory_region *;
+  friend class Connection;
+  friend class Shard;
+  using memory_region_t = component::IFabric_memory_region *;
 
  protected:
-  using buffer_t = Buffer_manager<Component::IFabric_server>::buffer_t;
-  using pool_t   = Component::IKVStore::pool_t;
+  using buffer_t = Buffer_manager<component::IFabric_server>::buffer_t;
+  using pool_t   = component::IKVStore::pool_t;
 
   /* deferred actions */
-  typedef struct {
+  struct action_t {
     int   op;
     void *parm;
-  } action_t;
+  };
 
   enum class Completion_state {
-    ADDED_DEFERRED_LOCK,
-    NO_DEFER,
+    COMPLETIONS,
     CLIENT_DISCONNECT,
     NONE,
   };
+
+ private:
+  open_connection _oc;
+  Buffer_manager<component::IFabric_server> _bm;
+ protected:
+  size_t                             _max_message_size;
+
+  /* Filled by base class     check_for_posted_value_complete
+   * Drained by derived class check_network_completions
+   */
+  std::queue<void *> _deferred_unlock;
+
+  /* xx_buffer_outstanding is the signal for completion,
+     xx_buffer is the buffer pointer that needs to be freed (and set to null)
+  */
+  unsigned              _recv_buffer_posted_count;
+  std::list<buffer_t *> _completed_recv_buffers;
+  unsigned              _send_buffer_posted_count;
+
+  /* values for two-phase get
+   */
+  unsigned _send_value_posted_count;
 
   /**
    * Ctor
@@ -52,123 +107,70 @@ class Fabric_connection_base {
    * @param factory
    * @param fabric_connection
    */
-  Fabric_connection_base(Component::IFabric_server_factory *factory, Component::IFabric_server *fabric_connection)
-      : _bm(fabric_connection), _factory(factory),
-        _transport(fabric_connection),
-        _max_message_size((assert(_transport),
-        _transport->max_message_size())),
-        _registered_regions{},
-        _completed_recv_buffers{}
-  {
-  }
+  explicit Fabric_connection_base( //
+    unsigned                           debug_level_,
+    gsl::not_null<component::IFabric_server_factory *>factory,
+    gsl::not_null<component::IFabric_server *>        fabric_connection);
 
   Fabric_connection_base(const Fabric_connection_base &) = delete;
   Fabric_connection_base &operator=(const Fabric_connection_base &) = delete;
 
-  /**
-   * Dtor
-   *
-   */
-  ~Fabric_connection_base()
-  {
-    for (auto r : _registered_regions) {
-      _transport->deregister_memory(r);
-    }
+  ~Fabric_connection_base();
 
-    /* ERROR: RDMA and FABRIC disagree on the name (disconnect vs.
-     * close_connection). Maybe RDMA's choice (disconnect) is better. One less
-     * word and one less syllable. ERROR: in fabric, you cannot do anything with
-     * a connection after you close it. In particular, you cannot deregister
-     * memory. So close_connection is the *last" operation on "_transport."
-     */
-    // See BUG mcas-134
-    //    _factory->close_connection(_transport);
+  static void static_send_callback(void *cnxn, buffer_t *iob) noexcept
+  {
+    static_cast<Fabric_connection_base *>(cnxn)->send_callback(iob);
+  }
+
+  void send_callback(buffer_t *iob) noexcept
+  {
+    --_send_buffer_posted_count;
+    posted_count_log();
+    if (option_DEBUG > 2) {
+      PLOG("Completed send (%p)", static_cast<const void *>(iob));
+    }
+    free_buffer(iob);
+  }
+
+  static void static_recv_callback(void *cnxn, buffer_t *iob) noexcept
+  {
+    static_cast<Fabric_connection_base *>(cnxn)->recv_callback(iob);
+  }
+  
+  void recv_callback(buffer_t *iob) noexcept
+  {
+    --_recv_buffer_posted_count;
+    posted_count_log();
+    _completed_recv_buffers.push_front(iob);
+    if (option_DEBUG > 2) {
+      PLOG("Completed recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
+    }
   }
 
   static void completion_callback(void *   context,
                                   status_t st,
                                   std::uint64_t,  // completion_flags,
-                                  std::size_t len,    //   len,
-                                  void *error_data,
-                                  void *param) noexcept
+                                  std::size_t len,
+                                  void *      error_data,
+                                  void *      cnxn) noexcept
   {
-    Fabric_connection_base *pThis = static_cast<Fabric_connection_base *>(param);
-
-    /* set callback debugging here */
-    static constexpr bool option_DEBUG = false;
-
-    if (UNLIKELY(st != S_OK)) {
-      PERR("Fabric_connection_base: fabric operation failed st != S_OK (st=%d, context=%p, len=%lu)", st, context, len);
+    if (LIKELY(st == S_OK)) {
+      auto iob = static_cast<buffer_t *>(context);
+      iob->completion_cb(cnxn, iob);
+    }
+    else {
+      PERR("Fabric_connection_base: fabric operation failed st != S_OK (st=%d, "
+           "context=%p, len=%lu)",
+           st, context, len);
       PERR("Error: %s", static_cast<char *>(error_data));
-      return;
     }
-
-    //     if (context == pThis->_posted_recv_buffer) {
-    //   assert(pThis->_posted_recv_buffer_outstanding);
-    //   assert(pThis->_posted_recv_buffer);
-    //   if (option_DEBUG) PLOG("Posted recv complete (%p).", context);
-    //   pThis->_posted_recv_buffer_outstanding = false; /* signal recv completion */
-    //   return;
-    // }
-
-    if (context == pThis->_posted_send_buffer) {
-      assert(pThis->_posted_send_buffer_outstanding);
-      if (option_DEBUG) PLOG("Posted send complete (%p).", context);
-      pThis->_posted_send_buffer_outstanding = false; /* signal send completion */
-      return;
-    }
-    else if (context == pThis->_posted_value_buffer) {
-      assert(pThis->_posted_value_buffer_outstanding);
-      char *p = static_cast<char *>(pThis->_posted_value_buffer->base());
-      if (option_DEBUG) {
-        PLOG("Posted value complete (%p) [%x %x %x...]", context, 0xff & int(p[0]), 0xff & int(p[1]),
-             0xff & int(p[2]));
-      }
-      pThis->_posted_value_buffer_outstanding = false; /* signal value completion */
-    }
-    else { /* must be recv completion */
-      pThis->_completed_recv_buffers.push_front(reinterpret_cast<buffer_t *>(context));
-      pThis->_posted_recv_buffer_count--;
-    }
-
-    // else {
-    //   throw Program_exception("unknown completion context (%p)", context);
-    // }
-  }
-
-  bool check_for_posted_send_complete()
-  {
-    if (_posted_send_buffer_outstanding) return false;
-
-    if (_posted_send_buffer) {
-      if (option_DEBUG > 2) PLOG("Fabric_connection_base::freeing buffer (%p)", static_cast<const void *>(_posted_send_buffer));
-
-      free_buffer(_posted_send_buffer);
-      _posted_send_buffer = nullptr;
-    }
-
-    return true;
   }
 
   bool check_for_posted_recv_complete()
   {
     /* don't free buffer (such as above); it will be used for response */
-    //    return _posted_recv_buffer_outstanding == false;
+    //    return _recv_buffer_posted_outstanding == false;
     return _completed_recv_buffers.size() > 0;
-  }
-
-  bool check_for_posted_value_complete(bool *added_deferred_unlock = nullptr)
-  {
-    if (_posted_value_buffer_outstanding) return false;
-
-    if (_posted_value_buffer) { /* release 'value buffer' from get_direct */
-      assert(_deferred_unlock == nullptr);
-      _deferred_unlock = _posted_value_buffer->base();
-      if (added_deferred_unlock) *added_deferred_unlock = true;
-      _posted_value_buffer = nullptr;
-    }
-
-    return true;
   }
 
   void free_recv_buffer()
@@ -181,166 +183,142 @@ class Fabric_connection_base {
 
   void post_recv_buffer(buffer_t *buffer)
   {
-    // assert(buffer);
-    // assert(_posted_recv_buffer_outstanding == false);
-    // _posted_recv_buffer             = buffer;
-    // _posted_recv_buffer_outstanding = true;
-
-    // TODO add to posted vector
-    _transport->post_recv(buffer->iov, buffer->iov + 1, &buffer->desc, buffer);
-    _posted_recv_buffer_count++;
+    transport()->post_recv(buffer->iov, buffer->iov + 1, &buffer->desc, buffer);
+    ++_recv_buffer_posted_count;
+    posted_count_log();
+    if (2 < option_DEBUG) {
+      PLOG("Posted recv (%p) (complete %zu)", static_cast<const void *>(buffer), _completed_recv_buffers.size());
+    }
   }
 
-  void post_send_buffer(buffer_t *buffer, buffer_t *val_buffer = nullptr)
+  void post_send_buffer(gsl::not_null<buffer_t *> buffer)
   {
-    assert(buffer);
-    assert(_posted_send_buffer_outstanding == false);
     const auto iov = buffer->iov;
 
-    if (!val_buffer) {
-      /* if packet is small enough use inject */
-      if (iov->iov_len <= _transport->max_inject_size()) {
-        if (option_DEBUG > 2) PLOG("Fabric_connection_base: posting send with inject (%p,len=%lu)", iov->iov_base, iov->iov_len);
+    /* if packet is small enough use inject */
+    if (iov->iov_len <= transport()->max_inject_size()) {
+      if (option_DEBUG > 2)
+        PLOG("Fabric_connection_base: posting send with inject (iob %p %p,len=%lu)",
+             static_cast<const void *>(buffer), iov->iov_base, iov->iov_len);
 
-        _transport->inject_send(iov->iov_base, iov->iov_len);
-        free_buffer(buffer); /* buffer can be immediately released; see fi_inject */
+      transport()->inject_send(iov->iov_base, iov->iov_len);
+      if (option_DEBUG > 2) {
+        PLOG("%s: buffer %p", __func__, static_cast<const void *>(buffer));
       }
-      else {
-        _posted_send_buffer             = buffer;
-        _posted_send_buffer_outstanding = true;
-
-        if (option_DEBUG > 2) PLOG("Fabric_connection_base: posting send (%p, %p)", static_cast<const void *>(buffer), iov->iov_base);
-
-        _transport->post_send(iov, iov + 1, &_posted_send_buffer->desc, _posted_send_buffer);
-      }
+      free_buffer(buffer); /* buffer is immediately complete fi_inject */
     }
     else {
-      _posted_send_buffer             = buffer;
-      _posted_send_buffer_outstanding = true;
+      if (option_DEBUG > 2)
+        PLOG("Fabric_connection_base: posting send (%p, %p)", static_cast<const void *>(buffer), iov->iov_base);
 
-      iovec v[2]   = {*buffer->iov, *val_buffer->iov};
-      void *desc[] = {buffer->desc, val_buffer->desc};
-
-      if (option_DEBUG)
-        PLOG("posting .... value (%.*s) (len=%lu,ptr=%p)", int(val_buffer->iov->iov_len),
-             static_cast<char *>(val_buffer->iov->iov_base), val_buffer->iov->iov_len, val_buffer->iov->iov_base);
-
-      _transport->post_send(&v[0], &v[2], desc, buffer);
+      transport()->post_send(iov, iov + 1, &buffer->desc, buffer);
+      ++_send_buffer_posted_count;
+      posted_count_log();
+      if (0 < option_DEBUG) {
+        PLOG("%s buffer (%p)", __func__, static_cast<const void *>(buffer));
+      }
     }
   }
 
-  void post_send_value_buffer(buffer_t *buffer)
+  void post_send_buffer2(gsl::not_null<buffer_t *> buffer, const ::iovec &val_iov, void *val_desc)
   {
-    if (buffer) {
-      assert(!_posted_value_buffer);
-      _posted_value_buffer = buffer;
-    }
-    else {
-    } /* buffer already set up */
-    assert(_posted_value_buffer);
-    _posted_value_buffer_outstanding = true;
-    _transport->post_send(_posted_value_buffer->iov, _posted_value_buffer->iov + 1, &_posted_value_buffer->desc,
-                          _posted_value_buffer);
+    iovec v[]    = {*buffer->iov, val_iov};
+    void *desc[] = {buffer->desc, val_desc};
 
-    if (option_DEBUG)
-      PLOG("posting send value buffer (%p)(base=%p,len=%lu,desc=%p)", static_cast<const void *>(buffer), _posted_value_buffer->iov->iov_base,
-           _posted_value_buffer->iov->iov_len, _posted_value_buffer->desc);
+    ++_send_buffer_posted_count;
+    posted_count_log();
+    if (0 < option_DEBUG) {
+      PLOG("Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", static_cast<const void *>(buffer),
+           int(val_iov.iov_len), static_cast<char *>(val_iov.iov_base), val_iov.iov_len, val_iov.iov_base);
+    }
+
+    transport()->post_send(std::begin(v), std::end(v), desc, buffer);
   }
 
-  void post_recv_value_buffer(buffer_t *buffer)
+  void post_send_value_buffer(gsl::not_null<buffer_t *> posted_value_buffer)
   {
-    assert(buffer);
-    _posted_value_buffer = buffer;
+    transport()->post_send(posted_value_buffer->iov, posted_value_buffer->iov + 1, &posted_value_buffer->desc,
+                          posted_value_buffer);
 
-    _posted_value_buffer_outstanding = true;
-    _transport->post_recv(_posted_value_buffer->iov, _posted_value_buffer->iov + 1, &_posted_value_buffer->desc,
-                          _posted_value_buffer);
+    ++_send_value_posted_count;
+    posted_count_log();
 
     if (option_DEBUG)
-      PLOG("posted recv value buffer (%p)(base=%p,len=%lu,desc=%p)", static_cast<const void *>(buffer),
-           _posted_value_buffer->iov->iov_base,
-           _posted_value_buffer->iov->iov_len, _posted_value_buffer->desc);
+      PLOG("posting send value buffer (%p)(base=%p,len=%lu,desc=%p)", static_cast<const void *>(posted_value_buffer),
+           posted_value_buffer->iov->iov_base, posted_value_buffer->iov->iov_len, posted_value_buffer->desc);
   }
 
   buffer_t *posted_recv()
   {
     if (_completed_recv_buffers.size() == 0) return nullptr;
-    auto rb = _completed_recv_buffers.back();
+
+    auto iob = _completed_recv_buffers.back();
     _completed_recv_buffers.pop_back();
-    return rb;
+    if (2 < option_DEBUG) {
+      PLOG("Presented recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
+    }
+    return iob;
   }
 
-  inline buffer_t *posted_send() const { return _posted_send_buffer; }
+  void posted_count_log() const
+  {
+    if (1 < option_DEBUG) {
+      PLOG("POSTs recv %u send %u value %u", _recv_buffer_posted_count, _send_buffer_posted_count,
+           _send_value_posted_count);
+    }
+  }
 
   Completion_state poll_completions()
   {
-    if (_posted_recv_buffer_count > 0 || _posted_send_buffer_outstanding || _posted_value_buffer_outstanding) {
-      bool added_deferred_unlock = false;
+    if (_recv_buffer_posted_count != 0 || _send_buffer_posted_count != 0 || _send_value_posted_count != 0) {
+#if 0
+      PLOG("%s posted_recv %u posted_send %u posted_value %u", __func__, _recv_buffer_posted_count, _send_buffer_posted_count, _send_value_posted_count);
+#endif
       try {
-        _transport->poll_completions(&Fabric_connection_base::completion_callback, this);
-        /* Note: this test may be in error, as the function of
-         * check_for_posted_send_complete is not to complete the
-         * send but to free the buffer after the send completes. */
-        //          if(_posted_send_buffer_outstanding)
-        check_for_posted_send_complete();
-
-        //          if(_posted_value_buffer_outstanding)
-        check_for_posted_value_complete(&added_deferred_unlock);
+        transport()->poll_completions(&Fabric_connection_base::completion_callback, this);
+        return Completion_state::COMPLETIONS;
       }
-      catch (std::logic_error &e) {
+      catch (const std::logic_error &e) {
         return Completion_state::CLIENT_DISCONNECT;
       }
-
-      return added_deferred_unlock ? Completion_state::ADDED_DEFERRED_LOCK : Completion_state::NO_DEFER;
     }
     return Completion_state::NONE;
   }
 
   /**
-   * Forwarders that allow us to avoid exposing _transport and _bm
+   * Forwarders that allow us to avoid exposing transport() and _bm
    *
    */
-  inline auto register_memory(const void *base, size_t len)
+ public:
+  inline auto register_memory(const void *base, size_t len, std::uint64_t key, std::uint64_t flags)
   {
-    return _transport->register_memory(base, len, 0, 0); /* flags not supported for verbs */
+    return transport()->register_memory(base, len, key, flags); /* flags not supported for verbs */
   }
 
-  inline void deregister_memory(memory_region_t region) { return _transport->deregister_memory(region); }
+  inline void deregister_memory(memory_region_t region) { return transport()->deregister_memory(region); }
 
-  inline void *get_memory_descriptor(memory_region_t region) { return _transport->get_memory_descriptor(region); }
+  inline void *get_memory_descriptor(memory_region_t region) { return transport()->get_memory_descriptor(region); }
 
-  inline auto allocate() { return _bm.allocate(); }
+  inline uint64_t get_memory_remote_key(memory_region_t region) { return transport()->get_memory_remote_key(region); }
+
+ protected:
+  inline auto allocate(buffer_t::completion_t c) { return _bm.allocate(c); }
 
   inline void free_buffer(buffer_t *buffer) { _bm.free(buffer); }
 
-  inline size_t IO_buffer_size() const { return Buffer_manager<Component::IFabric_server>::BUFFER_LEN; }
+  inline size_t IO_buffer_size() const { return Buffer_manager<component::IFabric_server>::BUFFER_LEN; }
 
-  auto transport() const { return _transport; }
+  gsl::not_null<component::IFabric_server *> transport() const { return _oc.transport(); }
 
- private:
-  Buffer_manager<Component::IFabric_server> _bm;
+  inline std::string get_local_addr() { return transport()->get_local_addr(); }
+};
 
- protected:
-  Component::IFabric_server_factory *_factory;
-  Component::IFabric_server *        _transport;
-  size_t                             _max_message_size;
-  std::vector<memory_region_t>       _registered_regions;
-  void *                             _deferred_unlock = nullptr;
-
-  /* xx_buffer_outstanding is the signal for completion,
-     xx_buffer is the buffer pointer that needs to be freed (and set to null)
-  */
-  std::list<buffer_t *> _completed_recv_buffers;
-  unsigned              _posted_recv_buffer_count = 0;
-
-  buffer_t *_posted_send_buffer             = nullptr;
-  bool      _posted_send_buffer_outstanding = false;
-
-  /* value for two-phase get & put - assumes get and put don't happen
-     at the same time for the same FSM
-   */
-  buffer_t *_posted_value_buffer             = nullptr;
-  bool      _posted_value_buffer_outstanding = false;
+struct open_connection_construct_key
+{
+private:
+  open_connection_construct_key() {};
+public:
+  friend class Fabric_connection_base;
 };
 
 }  // namespace mcas

@@ -17,16 +17,17 @@
 
 #include <cstdint> /* uint32_t */
 
+struct fid_eq;
 struct fi_eq_cm_entry;
 struct fi_eq_err_entry;
 
-class event_consumer
+struct event_consumer
 {
 protected:
   ~event_consumer() {}
 public:
-  virtual void cb(std::uint32_t event, fi_eq_cm_entry &entry) noexcept = 0;
-  virtual void err(fi_eq_err_entry &entry) noexcept = 0;
+  virtual void cb(std::uint32_t event, ::fi_eq_cm_entry &entry) noexcept = 0;
+  virtual void err(::fid_eq *eq, ::fi_eq_err_entry &entry) noexcept = 0;
 };
 
 #endif

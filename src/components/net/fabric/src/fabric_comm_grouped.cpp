@@ -195,37 +195,37 @@ void Fabric_comm_grouped::inject_send(const void *buf_, const std::size_t len_)
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
 
-std::size_t Fabric_comm_grouped::poll_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_comm_grouped::poll_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   return _rx.poll_completions(cb_) + _tx.poll_completions(cb_);
 }
 
-std::size_t Fabric_comm_grouped::poll_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_comm_grouped::poll_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   return _rx.poll_completions(cb_) + _tx.poll_completions(cb_);
 }
 
-std::size_t Fabric_comm_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_comm_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   return _rx.poll_completions_tentative(cb_) + _tx.poll_completions_tentative(cb_);
 }
 
-std::size_t Fabric_comm_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_comm_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   return _rx.poll_completions(cb_, cb_param_) + _tx.poll_completions(cb_, cb_param_);
 }
 
-std::size_t Fabric_comm_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_comm_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   return _rx.poll_completions_tentative(cb_, cb_param_) + _tx.poll_completions_tentative(cb_, cb_param_);
 }
 
-std::size_t Fabric_comm_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_comm_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   return _rx.poll_completions(cb_, cb_param_) + _tx.poll_completions(cb_, cb_param_);
 }
 
-std::size_t Fabric_comm_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_comm_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   return _rx.poll_completions_tentative(cb_, cb_param_) + _tx.poll_completions_tentative(cb_, cb_param_);
 }

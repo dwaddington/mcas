@@ -24,9 +24,10 @@
 
 namespace
 {
-  class gai_error_category
+  struct gai_error_category
     : public std::error_category
   {
+  private:
     const char *name() const noexcept override { return "getaddrinfo"; }
     std::string message(int condition) const override
     {

@@ -15,19 +15,21 @@
 #ifndef _FD_PAIR_H_
 #define _FD_PAIR_H_
 
+#include <common/fd_open.h>
 #include <cstddef> /* size_t */
 
 class Fd_pair
 {
-  int _pair[2];
+  common::Fd_open _read;
+  common::Fd_open _write;
 public:
   /*
    * @throw std::system_error - creating fd pair
    */
   Fd_pair();
   explicit Fd_pair(int read_flags);
-  int fd_read() const { return _pair[0]; }
-  int fd_write() const { return _pair[1]; }
+  int fd_read() const { return _read.fd(); }
+  int fd_write() const { return _write.fd(); }
   /*
    * @throw std::system_error - reading fd of pair
    */
@@ -36,7 +38,6 @@ public:
    * @throw std::system_error - writing fd of pair
    */
   std::size_t write(const void *, std::size_t) const;
-  ~Fd_pair();
 };
 
 #endif

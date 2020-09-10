@@ -16,7 +16,7 @@
 #include "pingpong_buffer_state.h"
 
 cnxn_state::cnxn_state(
-  Component::IFabric_active_endpoint_comm &comm_
+  component::IFabric_active_endpoint_comm &comm_
   , unsigned iteration_count_
   , std::size_t msg_size_
 )

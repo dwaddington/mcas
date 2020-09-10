@@ -32,8 +32,9 @@ namespace impl
 	/* Size change state as an object. Not for RIAA strictness, but to move a memory
 	 * fetch which appears to stall the pipeline following a call to pmem_persist.
 	 */
-	class size_change
+	struct size_change
 	{
+	public:
 		size_control *_size_control;
 		size_change(const size_change &) = delete;
 		size_change& operator=(const size_change &) = delete;
@@ -48,30 +49,27 @@ namespace impl
 		virtual void change() const = 0;
 	};
 
-	class size_incr
+	struct size_incr
 		: public size_change
 	{
-	public:
 		size_incr(size_control &ctl)
 			: size_change(ctl)
 		{}
 		void change() const { get_size_control().incr(); }
 	};
 
-	class size_decr
+	struct size_decr
 		: public size_change
 	{
-	public:
 		size_decr(size_control &ctl)
 			: size_change(ctl)
 		{}
 		void change() const { get_size_control().decr(); }
 	};
 
-	class size_no_change
+	struct size_no_change
 		: public size_change
 	{
-	public:
 		size_no_change(size_control &ctl)
 			: size_change(ctl)
 		{}

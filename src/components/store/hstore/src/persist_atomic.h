@@ -29,15 +29,16 @@
 namespace impl
 {
 	/* Until we get friendship sorted out.
-	 * The atomic_controller needs a class specialized by allocator only
+	 * The atomic_controller needs a struct specialized by allocator only
 	 * to be friends with persist_atomic
 	 */
 	template <typename Table>
-		class atomic_controller;
+		struct atomic_controller;
 
 	template <typename Value>
-		class persist_atomic
+		struct persist_atomic
 		{
+		private:
 			using allocator_type = typename Value::first_type::allocator_type;
 			using allocator_traits_type = std::allocator_traits<allocator_type>;
 			using mod_ctl_allocator_type = typename allocator_traits_type::template rebind_alloc<mod_control>;
@@ -91,7 +92,7 @@ namespace impl
 			persist_atomic& operator=(const persist_atomic &) = delete;
 			allocation_state_emplace &ase() { return *_ase; }
 			template <typename Table>
-				friend class impl::atomic_controller;
+				friend struct impl::atomic_controller;
 		};
 }
 

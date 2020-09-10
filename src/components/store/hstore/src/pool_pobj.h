@@ -25,8 +25,9 @@
 
 #include <cstdint> /* uint64_t */
 
-class pool_pobj
+struct pool_pobj
 {
+private:
 	PMEMobjpool * _pool;
 
 public:

@@ -29,11 +29,13 @@
 #include <memory>
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
-	class hstore_nupm;
+	struct hstore_nupm;
 
+#if 0
 template <typename Store, typename Region>
-	class region_closer
+	struct region_closer
 	{
+	private:
 		std::shared_ptr<Store> _mgr;
 	public:
 		region_closer(std::shared_ptr<Store> mgr_)
@@ -50,6 +52,7 @@ template <typename Store, typename Region>
 #endif
 		}
 	};
+#endif
 
 using Persister = persister_nupm;
 #endif

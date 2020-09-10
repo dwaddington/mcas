@@ -6,11 +6,12 @@
 
 namespace example_fb
 {
-using pool_t = Component::IKVStore::pool_t;
+using pool_t = component::IKVStore::pool_t;
 
 class Client {
 public:
   Client(const unsigned debug_level,
+         unsigned patience,
          const std::string& addr_with_port,
          const std::string& nic_device);
 
@@ -35,7 +36,7 @@ public:
                std::string& out_value);
 
 private:
-  Component::IMCAS * _mcas;
+  component::IMCAS * _mcas;
 };
 
 }

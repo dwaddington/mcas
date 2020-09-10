@@ -15,10 +15,10 @@
 #ifndef _FABRIC_SERVER_GROUPED_FACTORY_H_
 #define _FABRIC_SERVER_GROUPED_FACTORY_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric_server_grouped_factory */
+#include <api/fabric_itf.h> /* component::IFabric_server_grouped_factory */
 #include "fabric_server_generic_factory.h"
 
-#include "delete_copy.h"
+#include <common/delete_copy.h>
 
 #include <cstdint> /* uint16_t */
 #include <memory> /* shared_ptr */
@@ -27,10 +27,10 @@
 struct fi_info;
 
 class Fabric;
-class event_producer;
+struct event_producer;
 
 class Fabric_server_grouped_factory
-  : public Component::IFabric_server_grouped_factory
+  : public component::IFabric_server_grouped_factory
   , public Fabric_server_generic_factory
 {
 public:
@@ -54,11 +54,11 @@ public:
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : read error on event pipe
    */
-  Component::IFabric_server_grouped * get_new_connection() override;
+  component::IFabric_server_grouped * get_new_connection() override;
 
-  void close_connection(Component::IFabric_server_grouped * connection) override;
+  void close_connection(component::IFabric_server_grouped * connection) override;
 
-  std::vector<Component::IFabric_server_grouped *> connections() override;
+  std::vector<component::IFabric_server_grouped *> connections() override;
 
   /**
    * @throw std::bad_alloc : fabric_bad_alloc - libfabric out of memory
@@ -67,7 +67,7 @@ public:
   std::size_t max_message_size() const noexcept override { return Fabric_server_generic_factory::max_message_size(); }
   std::string get_provider_name() const override { return Fabric_server_generic_factory::get_provider_name(); }
   void cb(std::uint32_t event, ::fi_eq_cm_entry &entry) noexcept override { return Fabric_server_generic_factory::cb(event, entry); }
-  void err(::fi_eq_err_entry &entry) noexcept override { return Fabric_server_generic_factory::err(entry); }
+  void err(::fid_eq *eq, ::fi_eq_err_entry &entry) noexcept override { return Fabric_server_generic_factory::err(eq, entry); }
 };
 
 #endif

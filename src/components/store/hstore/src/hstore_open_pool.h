@@ -15,13 +15,29 @@
 #ifndef COMANCHE_HSTORE_OPEN_POOL_H
 #define COMANCHE_HSTORE_OPEN_POOL_H
 
-#include <utility> /* move */
+#include <utility> /* forward */
+
+/* A struct which resembles unique_ptr or shared_ptr, but for non-owing uses */
+template <typename T>
+	struct non_owner
+	{
+	private:
+		T *_p;
+	public:
+		explicit non_owner() : non_owner(nullptr) {}
+		explicit non_owner(T *p_) : _p(p_) {}
+		non_owner(const non_owner &other) = default;
+		non_owner &operator=(const non_owner &other) = default;
+		auto get() const { return _p; }
+		operator bool() const { return bool(_p); }
+		auto operator->() const { return _p; }
+		auto operator*() const { return *_p; }
+	};
 
 template <typename Handle>
-	class open_pool
-		: Handle
+	struct open_pool
+		: private Handle
 	{
-	public:
 		using handle_type = Handle;
 
 		template <typename ... Args>

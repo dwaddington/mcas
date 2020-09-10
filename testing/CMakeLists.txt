@@ -7,4 +7,9 @@ add_subdirectory(regression)
 add_subdirectory(ado-test)
 add_subdirectory(kv-test)
 add_subdirectory(eastl-test)
+
+if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mcas-testing")
+  add_subdirectory(mcas-testing)
+endif()
+
 endif(BOOTSTRAP_DEPS)

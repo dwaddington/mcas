@@ -33,12 +33,12 @@ status_t ADO_structured_plugin::register_mapped_memory(void *shard_vaddr,
   return S_OK;
 }
 
-using namespace Structured_ADO_protocol;
+using namespace structured_ADO_protocol;
 using namespace ccpm;
 
 
 status_t
-ADO_structured_plugin::process_putvar_command(const Structured_ADO_protocol::PutVariable * command,
+ADO_structured_plugin::process_putvar_command(const structured_ADO_protocol::PutVariable * command,
                                               const ccpm::region_vector_t& regions)
 {
   /* just check the integrity? */
@@ -53,7 +53,7 @@ ADO_structured_plugin::process_putvar_command(const Structured_ADO_protocol::Put
   return S_OK;
 }
 
-status_t ADO_structured_plugin::process_invoke_command(const Structured_ADO_protocol::Invoke * command,
+status_t ADO_structured_plugin::process_invoke_command(const structured_ADO_protocol::Invoke * command,
                                                        const ccpm::region_vector_t& regions,
                                                        void*& out_work_response,
                                                        size_t& out_work_response_len)
@@ -96,7 +96,7 @@ status_t ADO_structured_plugin::do_work(const uint64_t work_request_id,
                                         response_buffer_vector_t& response_buffers)
 {
   using namespace flatbuffers;
-  using namespace Structured_ADO_protocol;
+  using namespace structured_ADO_protocol;
 
   auto value = values[0].ptr;
   auto value_len = values[0].len;
@@ -134,7 +134,7 @@ status_t ADO_structured_plugin::shutdown() {
  * Factory-less entry point
  *
  */
-extern "C" void *factory_createInstance(Component::uuid_t &interface_iid) {
+extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
   PLOG("instantiating ADO_structured_plugin");
   if (interface_iid == Interface::ado_plugin)
     return static_cast<void *>(new ADO_structured_plugin());

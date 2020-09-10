@@ -44,11 +44,10 @@ class Libnupm_test : public ::testing::Test {
 
 void receiver()
 {
-  Threadipc::message *x;
+  threadipc::Message *x;
   for (unsigned i = 0; i < COUNT; i++) {
     x = NULL;
-    while (!Threadipc::Thread_ipc::instance()->get_next_ado(x))
-      ;  // if queue is empty, pop will fail
+    threadipc::Thread_ipc::instance()->get_next_ado(x);
     PINF("Receiver got: %s", x->cores.c_str());
     std::cout << "receive: " << x->cores << std::endl;
   }
@@ -65,8 +64,7 @@ TEST_F(Libnupm_test, mpmc_queue_test)
     //   message msg{i, Operation::kill, "", 1.0, "", i};
     std::string abc("abc");
     abc.append(std::to_string(i));
-    while (!Threadipc::Thread_ipc::instance()->schedule_to_ado(i, abc, 1.0, 0))
-      ;  // if queue is full, push will fail
+    threadipc::Thread_ipc::instance()->schedule_to_ado(i, abc, 1.0, 0);
     PINF("Sent %s", abc.c_str());
     std::cout << "sent: " << abc << std::endl;
   }
@@ -79,7 +77,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
 
   if (argc > 1) {
-    Options.uuid = atol(argv[1]);
+    Options.uuid = std::stoull(argv[1]);
   }
   auto r = RUN_ALL_TESTS();
 

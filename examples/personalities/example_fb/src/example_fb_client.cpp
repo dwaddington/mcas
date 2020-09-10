@@ -1,3 +1,6 @@
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+
 #include "example_fb_proto_generated.h"
 #include "example_fb_client.h"
 #include <api/mcas_itf.h>
@@ -5,7 +8,7 @@
 #include <common/dump_utils.h>
 
 using namespace flatbuffers;
-using namespace Example_fb_protocol;
+using namespace example_fb_protocol;
 
 static unsigned long g_transaction_id = 0;
 
@@ -13,15 +16,15 @@ namespace example_fb
 {
 
 Client::Client(const unsigned debug_level,
+               unsigned patience,
                const std::string& addr_with_port,
                const std::string& nic_device)
 {
-  using namespace Component;
+  using namespace component;
   
   auto dll = load_component("libcomponent-mcasclient.so", mcas_client_factory);
-  //  auto factory = static_cast<IMCAS_factory*>(dll->query_interface(IMCAS_factory::iid()));
   auto factory = dll->query_interface<IMCAS_factory>();
-  _mcas = factory->mcas_create(debug_level, getlogin(), addr_with_port, nic_device);
+  _mcas = factory->mcas_create(debug_level, patience, getlogin(), addr_with_port, nic_device);
   factory->release_ref();
 }
 
@@ -37,7 +40,7 @@ pool_t Client::open_pool(const std::string& pool_name,
                          bool read_only)
 {
   assert(_mcas);
-  return _mcas->open_pool(pool_name, read_only ? Component::IKVStore::FLAGS_READ_ONLY : 0);
+  return _mcas->open_pool(pool_name, read_only ? component::IKVStore::FLAGS_READ_ONLY : 0);
 }
 
 status_t Client::close_pool(const pool_t pool)
@@ -63,16 +66,16 @@ status_t Client::put(const pool_t pool,
   auto msg = CreateMessage(fbb, g_transaction_id++, Element_PutRequest, req.Union());
   fbb.Finish(msg);
   
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<component::IMCAS::ADO_response> response;
   
   s = _mcas->invoke_put_ado(pool,
                             key,
                             fbb.GetBufferPointer(),
                             fbb.GetSize(),
                             value.data(),
-                            value.length(),
-                            128, //root length TODO
-                            Component::IMCAS::ADO_FLAG_DETACHED,
+                            value.length() + 1, // include null terminator
+                            128, //root value length
+                            component::IMCAS::ADO_FLAG_DETACHED,
                             response);
 
   return s;
@@ -84,7 +87,7 @@ status_t Client::get(const pool_t pool,
                      std::string& out_value)
 {
   assert(_mcas);
-  using namespace Example_fb_protocol;
+  using namespace example_fb_protocol;
   
   status_t s;
   FlatBufferBuilder fbb;
@@ -92,7 +95,7 @@ status_t Client::get(const pool_t pool,
   auto msg = CreateMessage(fbb, g_transaction_id++, Element_GetRequest, req.Union());
   fbb.Finish(msg);
 
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<component::IMCAS::ADO_response> response;
 
   s = _mcas->invoke_ado(pool,
                         key,
@@ -121,3 +124,4 @@ status_t Client::get(const pool_t pool,
 
 }
 
+#pragma GCC diagnostic pop

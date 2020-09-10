@@ -16,19 +16,19 @@
 
 #include "dax_map.h"
 
+#include <common/json.h>
 #include <common/utils.h>
-//#include <rapidjson/schema.h>
 
 #include <cstdlib> /* getenv */
 #include <string>
 
-using IKVStore = Component::IKVStore;
+using IKVStore = component::IKVStore;
 
 /**
  * Factory entry point
  *
  */
-extern "C" void * factory_createInstance(Component::uuid_t component_id)
+extern "C" void * factory_createInstance(component::uuid_t component_id)
 {
   return
     component_id == hstore_factory::component_id()
@@ -37,10 +37,10 @@ extern "C" void * factory_createInstance(Component::uuid_t component_id)
     ;
 }
 
-void * hstore_factory::query_interface(Component::uuid_t& itf_uuid)
+void * hstore_factory::query_interface(component::uuid_t& itf_uuid)
 {
-  return itf_uuid == Component::IKVStore_factory::iid()
-     ? static_cast<Component::IKVStore_factory *>(this)
+  return itf_uuid == component::IKVStore_factory::iid()
+     ? static_cast<component::IKVStore_factory *>(this)
      : nullptr
      ;
 }
@@ -50,34 +50,29 @@ void hstore_factory::unload()
   delete this;
 }
 
-auto hstore_factory::create(
-  const std::string &owner
-  , const std::string &name
-) -> Component::IKVStore *
-{
-  return create(owner, name, "{[]}");
-}
-
 /*
  * See dax_map.cpp for the schema for the JSON "dax_map" parameter.
  */
 auto hstore_factory::create(
-  const std::string &owner
-  , const std::string &name
-  , const std::string &dax_map
-) -> Component::IKVStore *
-{
-  Component::IKVStore *obj = new hstore(owner, name, std::make_unique<Devdax_manager>(dax_map, bool(std::getenv("DAX_RESET"))));
-  obj->add_ref();
-  return obj;
-}
-
-auto hstore_factory::create(
   unsigned
-  , const std::string &owner
-  , const std::string &name
-  , const std::string &dax_map
-  ) -> Component::IKVStore *
+  , const IKVStore_factory::map_create & mc
+) -> component::IKVStore *
 {
-  return create(owner, name, dax_map);
+  auto debug_it = mc.find(+k_debug);
+  auto owner_it = mc.find(+k_owner);
+  auto name_it = mc.find(+k_name);
+  auto dax_config_it = mc.find(+k_dax_config);
+
+  namespace c_json = common::json;
+  using json = c_json::serializer<c_json::dummy_writer>;
+  unsigned debug_level = unsigned(debug_it == mc.end() ? 0 : std::stoul(debug_it->second));
+  component::IKVStore *obj =
+    new hstore(
+      owner_it == mc.end() ? "owner" : owner_it->second
+      , name_it == mc.end() ? "name" : name_it->second
+      , std::make_unique<Devdax_manager>(debug_level, dax_config_it == mc.end() ? json::array().str() : dax_config_it->second, bool(std::getenv("DAX_RESET")))
+    );
+  obj->add_ref();
+
+  return obj;
 }

@@ -52,9 +52,8 @@ template <typename T>
   }
 
 template <typename T>
-  class fid_delete
+  struct fid_delete
   {
-  public:
     void operator()(T *f) { fid_close(f); }
   };
 

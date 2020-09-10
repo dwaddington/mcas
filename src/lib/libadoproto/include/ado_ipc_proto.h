@@ -25,7 +25,7 @@
 // #pragma GCC diagnostic ignored "-Weffc++"
 // #pragma GCC diagnostic ignored "-Wpedantic"
 
-// #define DEBUG_ADO_IPC
+//#define DEBUG_ADO_IPC
 
 namespace mcas
 {
@@ -50,6 +50,8 @@ enum {
   MSG_TYPE_ITERATE_REQUEST = 15,
   MSG_TYPE_ITERATE_RESPONSE = 16,
   MSG_TYPE_UNLOCK_REQUEST = 17,
+  MSG_TYPE_CONFIGURE_REQUEST = 18,
+  MSG_TYPE_CLUSTER_EVENT = 19,
 };
 
 typedef enum {
@@ -60,6 +62,7 @@ typedef enum {
   PANIC,
   POOL_INFO_REQUEST,
   UNLOCK_RESPONSE,
+  CONFIGURE_RESPONSE,
 } chirp_t;
 
 static constexpr uint16_t MAGIC = 0xDEAF;
@@ -81,18 +84,18 @@ struct Message {
   }
 
   inline static bool is_valid(const void * buffer) {
-    if(buffer == nullptr) throw std::invalid_argument("pointer is null");
+    if(buffer == nullptr) throw std::invalid_argument(__FILE__ " Message::is_valid - pointer is null");
     return *(reinterpret_cast<const uint16_t*>(buffer)) == MAGIC;
   }
 
   inline static uint16_t type(const void * buffer) {
-    if(buffer == nullptr) throw std::invalid_argument("pointer is null");
+    if(buffer == nullptr) throw std::invalid_argument(__FILE__ " Message::type - pointer is null");
     return (reinterpret_cast<const Message*>(buffer))->type_id;
   }
-  
+
   uint16_t  magic;
   uint16_t  type_id;  // message type id
-} __attribute__((packed));
+};
 
 //-------------
 
@@ -109,7 +112,7 @@ struct Chirp : public Message {
   union {
     status_t status;
   };
-} __attribute__((packed));
+};
 
 //-------------
 
@@ -117,12 +120,12 @@ struct Op_event : public Message {
   static constexpr uint8_t id = MSG_TYPE_OP_EVENT;
   static constexpr const char *description = "mcas::ipc::Op_event";
 
-  Op_event(Component::ADO_op _op) : Message(id), op(_op)
+  Op_event(component::ADO_op _op) : Message(id), op(_op)
   {
   }
 
-  Component::ADO_op op;
-} __attribute__((packed));
+  component::ADO_op op;
+};
 
 //-------------
 
@@ -130,12 +133,49 @@ struct Op_event_response : public Message {
   static constexpr uint8_t id = MSG_TYPE_OP_EVENT_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Op_event_response";
 
-  Op_event_response(Component::ADO_op _op) : Message(id), op(_op)
+  Op_event_response(component::ADO_op _op) : Message(id), op(_op)
   {
   }
 
-  Component::ADO_op op;
-} __attribute__((packed));
+  component::ADO_op op;
+};
+
+//-------------
+
+struct Cluster_event : public Message {
+  static constexpr uint8_t id = MSG_TYPE_CLUSTER_EVENT;
+  static constexpr const char *description = "mcas::ipc::Cluster_event";
+
+  Cluster_event(size_t buffer_size,
+		const std::string& sender,
+		const std::string& type,
+		const std::string& message)
+    : Message(id),
+      sender_strlen(boost::numeric_cast<uint16_t>(sender.size())),
+      type_strlen(boost::numeric_cast<uint16_t>(type.size()))
+  {
+    if((sizeof(Cluster_event) + sender.size() + type.size() + message.size() + 3)
+       > buffer_size)
+      throw std::length_error(description);
+    char * ptr = data;
+    strncpy(ptr, sender.c_str(), sender.size() + 1);
+    ptr += sender.size() + 1;
+    strncpy(ptr, type.c_str(), type.size() + 1);
+    ptr += type.size() + 1;
+    strncpy(ptr, message.c_str(), message.size() + 1);
+  }
+
+  inline const char * sender() const { return data; }
+  inline const char * type() const { return &data[sender_strlen + 1]; }
+  inline const char * message() const { return &data[sender_strlen + type_strlen + 2]; }
+
+  uint16_t sender_strlen;
+  uint16_t type_strlen;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+  char     data[]; /* strings are null-terminated */
+#pragma GCC diagnostic pop
+};
 
 //-------------
 
@@ -148,6 +188,7 @@ struct Bootstrap_request : public Message {
                     const std::string& _pool_name,
                     const size_t _pool_size,
                     const unsigned int _pool_flags,
+                    const unsigned int _memory_type,
                     const uint64_t _expected_obj_count,
                     const bool _open_existing)
     : Message(id),
@@ -156,6 +197,7 @@ struct Bootstrap_request : public Message {
       expected_obj_count(_expected_obj_count),
       pool_name_len(_pool_name.size()),
       pool_flags(_pool_flags),
+      memory_type(_memory_type),
       open_existing(_open_existing)
   {
     if((sizeof(Bootstrap_request) + _pool_name.size() + 1) > buffer_size)
@@ -170,13 +212,14 @@ struct Bootstrap_request : public Message {
   uint64_t     expected_obj_count;
   size_t       pool_name_len;
   unsigned int pool_flags;
+  unsigned int memory_type;
   bool         open_existing;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // zero-size array (replace with variable-length region following the class)
   char         pool_name[];
 #pragma GCC diagnostic pop
 
-} __attribute__((packed));
+};
 
 //-------------
 
@@ -198,7 +241,7 @@ struct Map_memory : public Message {
   size_t   size;
   void *   shard_addr;
 
-} __attribute__((packed));
+};
 
 //-------------
 
@@ -241,7 +284,7 @@ struct Work_request : public Message {
   inline size_t get_key_len() const { return key_len; }
   inline const char * get_key() const { return reinterpret_cast<const char*>(key_addr); }
   inline size_t get_invocation_data_len() const { return invocation_data_len; }
-  inline const char * get_invocation_data() const { return reinterpret_cast<const char*>(&data[0]); }
+  inline const char * get_invocation_data() const { return static_cast<const char*>(static_cast<const void *>(&data[0])); }
   inline void * get_value_addr() const { return reinterpret_cast<void *>(value_addr); }
   inline void * get_detached_value_addr() const { return reinterpret_cast<void *>(detached_value_addr); }
 
@@ -260,7 +303,7 @@ struct Work_request : public Message {
   char     data[];
 #pragma GCC diagnostic pop
 
-} __attribute__((packed));
+};
 
 
 
@@ -273,11 +316,12 @@ struct Work_response : public Message {
   Work_response(size_t buffer_size,
                 const uint64_t _work_key,
                 const status_t _status,
-                const Component::IADO_plugin::response_buffer_vector_t& response_buffers)
+                const component::IADO_plugin::response_buffer_vector_t& response_buffers)
     : Message(id), work_key(_work_key), status(_status),
       count(0),
       response_len(0)
   {
+    using namespace component;
     assert(buffer_size > 0);
 
     char * data_ptr = data;
@@ -286,25 +330,24 @@ struct Work_response : public Message {
     /* first copy over response buffers */
 
     for(auto i=response_buffers.begin(); i!=response_buffers.end(); i++) {
-      const Component::IADO_plugin::response_buffer_t& b = *i;
+      const IADO_plugin::response_buffer_t& b = *i;
 
       /* copy over response buffer record */
-      auto record = reinterpret_cast<Component::IADO_plugin::response_buffer_t*>(data_ptr);
+      auto record = reinterpret_cast<IADO_plugin::response_buffer_t*>(data_ptr);
       record->len = b.len;
       record->layer_id = b.layer_id;
-      record->pool_ref = b.pool_ref;
+      record->alloc_type = b.alloc_type;
       assert(b.ptr);
-      assert(b.len);
 
-      data_ptr += sizeof(Component::IADO_plugin::response_buffer_t);
-      response_len += sizeof(Component::IADO_plugin::response_buffer_t);
+      data_ptr += sizeof(IADO_plugin::response_buffer_t);
+      response_len += sizeof(IADO_plugin::response_buffer_t);
 
 #ifdef DEBUG_ADO_IPC
-      PLOG("Work_response: adding to IPC response (pool=%s) %p : %lu",
-           b.pool_ref ? "y":"n", b.ptr, b.len);
-      hexdump(b.ptr, b.len);
+      PLOG("Work_response: adding to IPC response (pool=%s) %p : %lu type=%d",
+           b.is_pool() ? "y":"n", b.ptr, b.len, b.alloc_type);
+      //if(b.len > 0) hexdump(b.ptr, b.len);
 #endif
-      if(b.pool_ref == false) { /* if its not a pool reference we have to copy */
+      if(!b.is_pool() && !b.is_inline()) { /* if its not a pool reference we have to copy */
         ::memcpy(data_ptr, b.ptr, b.len);
         record->ptr = nullptr;
         data_ptr += b.len;
@@ -316,29 +359,38 @@ struct Work_response : public Message {
 
       count++;
     }
-    if((response_len + sizeof(Work_response)) > buffer_size) // late corruption has occurred
-      throw std::length_error(description);
+
+    /* if this happens, corruption already occurred */
+    if((response_len + sizeof(Work_response)) > buffer_size)
+      throw Logic_exception("IPC response too large");
   }
 
   size_t get_message_size() const { return sizeof(Work_response) + response_len; }
 
-  void copy_responses(Component::IADO_plugin::response_buffer_vector_t& out_vector) const {
+  void copy_responses(component::IADO_plugin::response_buffer_vector_t& out_vector) const {
 
     auto data_ptr = data;
 
     for(uint32_t i=0; i<count; i++) {
-      auto record = reinterpret_cast<const Component::IADO_plugin::response_buffer_t*>(data_ptr);
-      if(record->pool_ref == true) {
-        out_vector.push_back({record->ptr,record->len,true});
+      auto record = reinterpret_cast<const component::IADO_plugin::response_buffer_t*>(data_ptr);
+      if(record->is_pool()) {
+        out_vector.emplace_back(record->ptr,record->len,record->alloc_type);
+      }
+      else if(record->is_inline()) {
+        out_vector.emplace_back(record->addr);
       }
       else {
         assert(record->ptr == nullptr);
-        void * p = malloc(record->len);
+        void * p = ::malloc(record->len);
+        if ( p == nullptr )
+        {
+          throw std::bad_alloc();
+        }
         ::memcpy(p, &record[1], record->len);
-        out_vector.push_back({p, record->len, false});
         data_ptr += record->len;
+        out_vector.emplace_back(p, record->len, component::IADO_plugin::response_buffer_t::ALLOC_TYPE_MALLOC);
       }
-      data_ptr += sizeof(Component::IADO_plugin::response_buffer_t);
+      data_ptr += sizeof(component::IADO_plugin::response_buffer_t);
     }
   }
 
@@ -350,7 +402,7 @@ struct Work_response : public Message {
 #pragma GCC diagnostic ignored "-Wpedantic" // zero-size array
   char     data[]; /* pool buffer vector, followed by response data */
 #pragma GCC diagnostic pop
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -365,7 +417,7 @@ struct Table_request : public Message {
                 uint64_t _value_len,
                 uint64_t _addr,
                 uint64_t _align_or_flags,
-                Component::ADO_op _op)
+                component::ADO_op _op)
     : Message(id), work_key(_work_key),value_len(_value_len),
       key_len(_key.length()), addr(_addr),
       align_or_flags(_align_or_flags), op(_op)
@@ -380,7 +432,7 @@ struct Table_request : public Message {
                 uint64_t _value_len,
                 uint64_t _addr,
                 uint64_t _align_or_flags,
-                Component::ADO_op _op)
+                component::ADO_op _op)
     : Message(id), work_key(_work_key),value_len(_value_len),
       key_len(0), addr(_addr),
       align_or_flags(_align_or_flags), op(_op)
@@ -394,13 +446,13 @@ struct Table_request : public Message {
   uint64_t          key_len;
   uint64_t          addr;
   uint64_t          align_or_flags;
-  Component::ADO_op op;
+  component::ADO_op op;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // zero-size array
   char              key[];
 #pragma GCC diagnostic pop
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -432,7 +484,7 @@ struct Table_response : public Message {
   uint64_t key_handle;
   status_t status;
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -452,7 +504,7 @@ private:
 public:
   Index_request(size_t buffer_size,
                 uint64_t _begin_pos,
-                Component::IKVIndex::find_t _find_type,
+                component::IKVIndex::find_t _find_type,
                 const std::string& _expr)
     : Message(id), begin_pos(_begin_pos),
       expr_len(checked_expr_len(_expr, buffer_size)),
@@ -463,13 +515,13 @@ public:
 
   uint64_t begin_pos;
   uint64_t expr_len;
-  Component::IKVIndex::find_t find_type;
+  component::IKVIndex::find_t find_type;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // zero-size array
   char expr[];
 #pragma GCC diagnostic pop
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -499,7 +551,7 @@ struct Index_response : public Message {
   char matched_key[];
 #pragma GCC diagnostic pop
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -508,16 +560,16 @@ struct Vector_request : public Message {
   static constexpr uint8_t id = MSG_TYPE_VECTOR_REQUEST;
   static constexpr const char *description = "mcas::ipc::Vector_request";
 
-  Vector_request(const epoch_time_t _t_begin,
-                 const epoch_time_t _t_end)
+  Vector_request(const common::epoch_time_t _t_begin,
+                 const common::epoch_time_t _t_end)
     : Message(id), t_begin(_t_begin), t_end(_t_end)
   {
   }
 
-  epoch_time_t t_begin;
-  epoch_time_t t_end;
+  common::epoch_time_t t_begin;
+  common::epoch_time_t t_end;
 
-} __attribute__((packed));
+};
 
 //-------------
 
@@ -526,15 +578,15 @@ struct Vector_response : public Message {
   static constexpr const char *description = "mcas::ipc::Vector_request";
 
   Vector_response(status_t _status,
-                  const Component::IADO_plugin::Reference_vector& _refs)
+                  const component::IADO_plugin::Reference_vector& _refs)
     : Message(id), status(_status), refs(_refs)
   {
   }
 
   status_t                                 status;
-  Component::IADO_plugin::Reference_vector refs;
+  component::IADO_plugin::Reference_vector refs;
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -565,7 +617,7 @@ struct Pool_info_response : public Message {
   char     result[];
 #pragma GCC diagnostic pop
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -574,18 +626,18 @@ struct Iterate_request : public Message {
   static constexpr uint8_t id = MSG_TYPE_ITERATE_REQUEST;
   static constexpr const char *description = "mcas::ipc::Iterate_request";
 
-  Iterate_request(const epoch_time_t _t_begin,
-                  const epoch_time_t _t_end,
-                  Component::IKVStore::pool_iterator_t _iterator)
+  Iterate_request(const common::epoch_time_t _t_begin,
+                  const common::epoch_time_t _t_end,
+                  component::IKVStore::pool_iterator_t _iterator)
     : Message(id), t_begin(_t_begin), t_end(_t_end), iterator(_iterator)
   {
   }
 
-  const epoch_time_t t_begin;
-  const epoch_time_t t_end;
-  Component::IKVStore::pool_iterator_t iterator;
+  const common::epoch_time_t t_begin;
+  const common::epoch_time_t t_end;
+  component::IKVStore::pool_iterator_t iterator;
 
-} __attribute__((packed));
+};
 
 
 struct Iterate_response : public Message {
@@ -593,17 +645,17 @@ struct Iterate_response : public Message {
   static constexpr const char *description = "mcas::ipc::Iterate_response";
 
   Iterate_response(status_t _status,
-                   const Component::IKVStore::pool_iterator_t _iterator,
-                   const Component::IKVStore::pool_reference_t& _reference)
+                   const component::IKVStore::pool_iterator_t _iterator,
+                   const component::IKVStore::pool_reference_t& _reference)
     : Message(id), status(_status), iterator(_iterator), reference(_reference)
   {
   }
 
   status_t                              status;
-  Component::IKVStore::pool_iterator_t  iterator;
-  Component::IKVStore::pool_reference_t reference;
+  component::IKVStore::pool_iterator_t  iterator;
+  component::IKVStore::pool_reference_t reference;
 
-} __attribute__((packed));
+};
 
 
 //-------------
@@ -613,7 +665,7 @@ struct Unlock_request : public Message {
   static constexpr const char *description = "mcas::ipc::Unlock_request";
 
   Unlock_request(const uint64_t _work_id,
-                 const Component::IKVStore::key_t _key_handle)
+                 const component::IKVStore::key_t _key_handle)
     : Message(id), work_id(_work_id), key_handle(_key_handle)
   {
     assert(work_id);
@@ -621,10 +673,24 @@ struct Unlock_request : public Message {
   }
 
   const uint64_t                   work_id;
-  const Component::IKVStore::key_t key_handle;
+  const component::IKVStore::key_t key_handle;
 
-} __attribute__((packed));
+};
 
+//---------------
+struct Configure_request : public Message {
+  static constexpr uint8_t id = MSG_TYPE_CONFIGURE_REQUEST;
+  static constexpr const char *description = "mcas::ipc::Configure_request";
+
+  Configure_request(const uint64_t _options)
+    : Message(id), options(_options)
+  {
+    assert(options);
+  }
+
+  const uint64_t                   options;
+
+};
 
 
 } // ipc

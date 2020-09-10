@@ -18,17 +18,18 @@
 #include <api/kvstore_itf.h>
 #include <common/cpu.h>
 #include <common/str_utils.h>
-#include <core/task.h>
+#include <common/task.h>
 #include <gtest/gtest.h>
 #include <sys/mman.h>
 
 #include <boost/program_options.hpp>
+#include <boost/optional.hpp>
 #include <chrono> /* milliseconds */
 #include <iostream>
 #include <thread> /* this_thread::sleep_for */
 
 //#define TEST_PERF_SMALL_PUT
-//#define TEST_PERF_SMALL_GET_IRECT
+//#define TEST_PERF_SMALL_GET_DIRECT
 #define TEST_PERF_LARGE_PUT_DIRECT
 #define TEST_PERF_LARGE_GET_DIRECT
 
@@ -37,22 +38,33 @@
 // #define TEST_PERF_SMALL_PUT_DIRECT
 
 struct {
-  std::string addr;
-  std::string pool;
-  std::string device;
-  unsigned    debug_level;
-  unsigned    base_core;
-  size_t      value_size;
-} Options {};
+  std::string                  addr;
+  std::string                  pool;
+  boost::optional<std::string> device;
+  boost::optional<std::string> src_addr;
+  boost::optional<std::string> provider;
+  unsigned                     debug_level;
+  unsigned                     base_core;
+  size_t                       value_size;
+} Options{};
 
-Component::IKVStore_factory *fact;
+namespace
+{
+template <typename T>
+boost::optional<T> optional_option(const boost::program_options::variables_map &vm_, const std::string &key_)
+{
+  return 0 < vm_.count(key_) ? vm_[key_].as<T>() : boost::optional<T>();
+}
+}  // namespace
 
-using namespace Component;
+component::IKVStore_factory *fact;
+
+using namespace component;
 
 namespace
 {
 // The fixture for testing class Foo.
-class mcas_client_test : public ::testing::Test {
+struct mcas_client_test : public ::testing::Test {
  protected:
   // If the constructor and destructor are not enough for setting up
   // and cleaning up each test, you can define the following methods:
@@ -70,10 +82,10 @@ class mcas_client_test : public ::testing::Test {
   }
 
   // Objects declared here can be used by all tests in the test case
-  static Component::IKVStore *_mcas;
+  static component::Itf_ref<component::IKVStore> _mcas;
 };
 
-Component::IKVStore *mcas_client_test::_mcas;
+component::Itf_ref<component::IKVStore> mcas_client_test::_mcas;
 
 DECLARE_STATIC_COMPONENT_UUID(mcas_client, 0x2f666078, 0xcb8a, 0x4724, 0xa454, 0xd1, 0xd8, 0x8d, 0xe2, 0xdb, 0x87);
 DECLARE_STATIC_COMPONENT_UUID(mcas_client_factory,
@@ -100,7 +112,7 @@ void basic_test(IKVStore *kv, unsigned shard)
 
   void *pv;
   for (unsigned i = 0; i < 10; i++) {
-    std::string key = Common::random_string(8);
+    std::string key = common::random_string(8);
     rc              = kv->put(pool, key.c_str(), value.c_str(), value.length());
     ASSERT_TRUE(rc == S_OK || rc == -2);
 
@@ -118,49 +130,74 @@ void basic_test(IKVStore *kv, unsigned shard)
 
 TEST_F(mcas_client_test, SessionControl)
 {
+  IKVStore_factory::map_create mc{{+IKVStore_factory::k_dest_addr, Options.addr},
+                                  {+IKVStore_factory::k_dest_port, 0},
+                                  {+IKVStore_factory::k_owner, "dwaddington"}};
+  if (Options.src_addr) {
+    mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_src_addr, *Options.src_addr));
+  }
+  if (Options.device) {
+    mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_interface, *Options.device));
+  }
+  if (Options.provider) {
+    mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_provider, *Options.provider));
+  }
+
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
+  component::IBase *comp = component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
 
   ASSERT_TRUE(comp);
-  fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
-  auto mcas = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
-  ASSERT_TRUE(mcas);
-  mcas->release_ref();
+  {
+    // auto mcas = make_itf_ref(fact->create(Options.debug_level, "dwaddington",
+    // mc));
+    auto mcas = make_itf_ref(fact->create(Options.debug_level, mc));
+    ASSERT_TRUE(mcas.get());
+  }
 
-  auto mcas2 = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
-  ASSERT_TRUE(mcas2);
-  auto mcas3 = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
-  ASSERT_TRUE(mcas3);
+  {
+    auto mcas2 = fact->create(Options.debug_level, mc);
+    ASSERT_TRUE(mcas2);
+    auto mcas3 = fact->create(Options.debug_level, mc);
+    ASSERT_TRUE(mcas3);
 
-  basic_test(mcas2, 0);
-  basic_test(mcas3, 1);
-
-  mcas2->release_ref();
-  mcas3->release_ref();
-
-  fact->release_ref();
+    basic_test(mcas2, 0);
+    basic_test(mcas3, 1);
+  }
 }
 
 TEST_F(mcas_client_test, Instantiate)
 {
   PMAJOR("Running Instantiate...");
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
+  component::IBase *comp = component::load_component("libcomponent-mcasclient.so", mcas_client_factory);
 
   ASSERT_TRUE(comp);
-  fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
-  _mcas = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
-  ASSERT_TRUE(_mcas);
-
-  fact->release_ref();
+  {
+    IKVStore_factory::map_create mc{{+IKVStore_factory::k_dest_addr, Options.addr},
+                                    {+IKVStore_factory::k_dest_port, 0},
+                                    {+IKVStore_factory::k_owner, "dwaddington"}};
+    if (Options.src_addr) {
+      mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_src_addr, *Options.src_addr));
+    }
+    if (Options.device) {
+      mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_interface, *Options.device));
+    }
+    if (Options.provider) {
+      mc.insert(IKVStore_factory::map_create::value_type(+IKVStore_factory::k_provider, *Options.provider));
+    }
+    _mcas.reset(fact->create(Options.debug_level, mc));
+  }
+  ASSERT_TRUE(_mcas.get());
 }
 
 TEST_F(mcas_client_test, OpenCloseDelete)
 {
   PMAJOR("Running OpenCloseDelete...");
-  using namespace Component;
+  using namespace component;
   IKVStore::pool_t pool, pool2, pool3;
 
   const std::string poolname = Options.pool + "/OpenCloseDelete";
@@ -205,7 +242,7 @@ TEST_F(mcas_client_test, GetNotExist)
 
   auto pool = _mcas->open_pool(poolname, 0);
 
-  if (pool == Component::IKVStore::POOL_ERROR) {
+  if (pool == component::IKVStore::POOL_ERROR) {
     /* ok, try to create pool instead */
     pool = _mcas->create_pool(poolname, GB(1));
   }
@@ -227,7 +264,7 @@ TEST_F(mcas_client_test, GetNotExist)
 TEST_F(mcas_client_test, BasicPutAndGet)
 {
   PMAJOR("Running BasicPutGet...");
-  ASSERT_TRUE(_mcas);
+  ASSERT_TRUE(_mcas.get());
   int rc;
 
   auto pool = _mcas->create_pool(Options.pool, MB(8));
@@ -263,7 +300,7 @@ struct record_t {
 std::mutex    _iops_lock;
 static double _iops = 0.0;
 
-class IOPS_task : public Core::Tasklet {
+class IOPS_task : public common::Tasklet {
  public:
   static constexpr unsigned long ITERATIONS = 1000000;
   static constexpr unsigned long VALUE_SIZE = 32;
@@ -273,7 +310,7 @@ class IOPS_task : public Core::Tasklet {
 
   virtual void initialize(unsigned core) override
   {
-    _store = fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device);
+    _store.reset(fact->create(Options.debug_level, "dwaddington", Options.addr, Options.device));
 
     char poolname[64];
     sprintf(poolname, "/dev/dax0.%u", core);
@@ -287,8 +324,8 @@ class IOPS_task : public Core::Tasklet {
 
     /* set up data */
     for (unsigned long i = 0; i < ITERATIONS; i++) {
-      auto val     = Common::random_string(VALUE_SIZE);
-      _data[i].key = Common::random_string(KEY_SIZE);
+      auto val     = common::random_string(VALUE_SIZE);
+      _data[i].key = common::random_string(KEY_SIZE);
       memcpy(_data[i].value, val.c_str(), VALUE_SIZE);
     }
 
@@ -325,7 +362,7 @@ class IOPS_task : public Core::Tasklet {
     _iops += iops;
     _iops_lock.unlock();
     _store->close_pool(_pool);
-    _store->release_ref();
+    _store->reset(nullptr);
   }
 
   virtual bool ready() override { return _ready_flag; }
@@ -334,9 +371,9 @@ class IOPS_task : public Core::Tasklet {
   std::chrono::high_resolution_clock::time_point _start_time, _end_time;
   bool                                           _ready_flag = false;
   unsigned long                                  _iterations = 0;
-  Component::IKVStore *                          _store;
+  component::Itf_ref<component::IKVStore>        _store;
   record_t *                                     _data;
-  Component::IKVStore::pool_t                    _pool;
+  component::IKVStore::pool_t                    _pool;
 };
 
 TEST_F(mcas_client_test, PerfScaleIops)
@@ -346,7 +383,7 @@ TEST_F(mcas_client_test, PerfScaleIops)
   cpu_mask_t                mask;
   for (unsigned c = 0; c < NUM_CORES; c++) mask.add_core(c + Options.base_core);
   {
-    Core::Per_core_tasking<IOPS_task, unsigned> t(mask, 11911);
+    common::Per_core_tasking<IOPS_task, unsigned> t(mask, 11911);
     t.wait_for_all();
   }
   PMAJOR("Aggregate IOPS: %2g", _iops);
@@ -377,8 +414,8 @@ TEST_F(mcas_client_test, PerfSmallPut)
 
   /* set up data */
   for (unsigned long i = 0; i < ITERATIONS; i++) {
-    auto val    = Common::random_string(VALUE_SIZE);
-    data[i].key = Common::random_string(KEY_SIZE);
+    auto val    = common::random_string(VALUE_SIZE);
+    data[i].key = common::random_string(KEY_SIZE);
     memcpy(data[i].value, val.c_str(), VALUE_SIZE);
   }
 
@@ -407,9 +444,9 @@ TEST_F(mcas_client_test, PerfSmallPutDirect)
   int rc;
 
   /* open or create pool */
-  Component::IKVStore::pool_t pool = _mcas->open_pool(std::string("/mnt/pmem0/mcas") + Options.pool, 0);
+  component::IKVStore::pool_t pool = _mcas->open_pool(std::string("/mnt/pmem0/mcas") + Options.pool, 0);
 
-  if (pool == Component::IKVStore::POOL_ERROR) {
+  if (pool == component::IKVStore::POOL_ERROR) {
     /* ok, try to create pool instead */
     pool = _mcas->create_pool(std::string("/mnt/pmem0/mcas") + Options.pool, GB(1));
   }
@@ -425,6 +462,7 @@ TEST_F(mcas_client_test, PerfSmallPutDirect)
 
   size_t    data_size = sizeof(record_t) * ITERATIONS;
   record_t *data      = (record_t *) aligned_alloc(MiB(2), data_size);
+  ASSERT_NE(nullptr, data);
   madvise(data, data_size, MADV_HUGEPAGE);
 
   ASSERT_FALSE(data == nullptr);
@@ -432,8 +470,8 @@ TEST_F(mcas_client_test, PerfSmallPutDirect)
 
   /* set up data */
   for (unsigned long i = 0; i < ITERATIONS; i++) {
-    auto val    = Common::random_string(VALUE_SIZE);
-    data[i].key = Common::random_string(KEY_SIZE);
+    auto val    = common::random_string(VALUE_SIZE);
+    data[i].key = common::random_string(KEY_SIZE);
     memcpy(data[i].value, val.c_str(), VALUE_SIZE);
   }
 
@@ -463,7 +501,7 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
   PMAJOR("Running LargePutDirect...");
 
   int rc;
-  ASSERT_TRUE(_mcas);
+  ASSERT_TRUE(_mcas.get());
 
   const std::string poolname = Options.pool + "/PerfLargePutDirect";
 
@@ -485,6 +523,7 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
   PLOG("Allocating buffer with test data ...");
   size_t    data_size = sizeof(record_t) * PER_ITERATION;
   record_t *data      = static_cast<record_t *>(aligned_alloc(MiB(2), data_size));
+  ASSERT_NE(nullptr, data);
   madvise(data, data_size, MADV_HUGEPAGE | MADV_DONTFORK);
 
   ASSERT_FALSE(data == nullptr);
@@ -493,7 +532,7 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
   PLOG("Filling data...");
   /* set up data */
   for (unsigned long i = 0; i < PER_ITERATION; i++) {
-    auto l = Common::random_string(KEY_SIZE);
+    auto l = common::random_string(KEY_SIZE);
     memcpy(data[i].key, l.c_str(), KEY_SIZE);
     //    memcpy(data[i].value, val.c_str(), VALUE_SIZE);
   }
@@ -540,6 +579,7 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
   PLOG("Allocating buffer with test data ...");
   size_t data_size = VALUE_SIZE * PER_ITERATION;
   char * data      = static_cast<char *>(aligned_alloc(MiB(2), data_size));
+  ASSERT_NE(nullptr, data);
   madvise(data, data_size, MADV_HUGEPAGE | MADV_DONTFORK);
   memset(data, 0, data_size);
 
@@ -554,7 +594,7 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
     // memcpy(p, val.c_str(), VALUE_SIZE);
     // p+=val.length();
     auto s = new std::string;
-    *s     = Common::random_string(KEY_SIZE);
+    *s     = common::random_string(KEY_SIZE);
     keys.push_back(s);
   }
   PLOG("Using put_direct to fill for get_direct operation...");
@@ -623,6 +663,7 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
   PLOG("Allocating buffer with test data ...");
   size_t    data_size = sizeof(record_t) * PER_ITERATION;
   record_t *data      = (record_t *) aligned_alloc(MiB(2), data_size);
+  ASSERT_NE(nullptr, data);
   madvise(data, data_size, MADV_HUGEPAGE);
 
   ASSERT_FALSE(data == nullptr);
@@ -631,8 +672,8 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
   PLOG("Filling data...");
   /* set up data */
   for (unsigned long i = 0; i < PER_ITERATION; i++) {
-    auto val    = Common::random_string(VALUE_SIZE);
-    data[i].key = Common::random_string(KEY_SIZE);
+    auto val    = common::random_string(VALUE_SIZE);
+    data[i].key = common::random_string(KEY_SIZE);
     memcpy(data[i].value, val.c_str(), VALUE_SIZE);
   }
   PLOG("Starting PUT operation...");
@@ -677,7 +718,7 @@ TEST_F(mcas_client_test, Release)
   PLOG("Releasing instance...");
 
   /* release instance */
-  _mcas->release_ref();
+  _mcas.reset(nullptr);
 }
 
 }  // namespace
@@ -691,8 +732,8 @@ int main(int argc, char **argv)
     po::options_description desc("Options");
     desc.add_options()("help", "Show help")("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")(
         "server-addr", po::value<std::string>()->default_value("10.0.0.21:11911:verbs"),
-        "Server address IP:PORT[:PROVIDER]")("device", po::value<std::string>()->default_value("mlx5_0"),
-                                             "Network device (e.g., mlx5_0)")(
+        "Server address IP:PORT[:PROVIDER]")("device", po::value<std::string>(), "Network device (e.g., mlx5_0)")(
+        "source-addr", po::value<std::string>(), "iLocal network address, e.g. 1.0.0.20")(
         "pool", po::value<std::string>()->default_value("myPool"), "Pool name")(
         "value_size", po::value<std::size_t>()->default_value(0), "Value size")(
         "base", po::value<unsigned>()->default_value(0), "Base core.");
@@ -708,7 +749,9 @@ int main(int argc, char **argv)
     Options.addr        = vm["server-addr"].as<std::string>();
     Options.debug_level = vm["debug"].as<unsigned>();
     Options.pool        = vm["pool"].as<std::string>();
-    Options.device      = vm["device"].as<std::string>();
+    Options.device      = optional_option<std::string>(vm, "device");
+    Options.src_addr    = optional_option<std::string>(vm, "source-addr");
+    Options.provider    = optional_option<std::string>(vm, "provider");
     Options.base_core   = vm["base"].as<unsigned>();
     Options.value_size  = vm["value_size"].as<std::size_t>();
 

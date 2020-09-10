@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD 14)
 
 find_library(GTEST_LIB NAMES GTEST PATHS /usr/local/lib,/usr/lib)
 
+find_library(PROFILER_LIB NAMES profiler PATHS /usr/local/lib,/usr/local/lib64,/usr/lib,/usr/lib64)
+if ("${PROFILER_LIB}" STREQUAL "PROFILER_LIB-NOTFOUND")
+set(PROFILER "")
+else()
+set(PROFILER "profiler")
+add_definitions(-DHAS_PROFILER=1)
+endif()
+
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libccpm/include)
@@ -20,11 +28,14 @@ link_directories(${GTEST_LIB})
 add_executable(libccpm-test1 test1.cpp)
 add_executable(libccpm-test2 test2.cpp)
 add_executable(libccpm-test5 test5.cpp store_map.cpp)
+add_executable(libccpm-test6 test6.cpp store_map.cpp)
 
 target_compile_options(libccpm-test1 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test2 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test5 PUBLIC "$<$<CONFIG:Debug>:-O0>")
+target_compile_options(libccpm-test6 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 
 target_link_libraries(libccpm-test1 ${ASAN_LIB} gtest nupm gcov) # add profiler for google profiler
 target_link_libraries(libccpm-test2 ${ASAN_LIB} gtest ccpm gcov) # add profiler for google profiler
 target_link_libraries(libccpm-test5 ${ASAN_LIB} gtest ccpm gcov)
+target_link_libraries(libccpm-test6 ${ASAN_LIB} gtest ccpm gcov profiler)

@@ -28,9 +28,10 @@
  * Fabric/RDMA-based network component
  */
 
-class fabric_bad_alloc
+struct fabric_bad_alloc
   : public std::bad_alloc
 {
+private:
   std::string _what;
 public:
   fabric_bad_alloc(const std::string &what);

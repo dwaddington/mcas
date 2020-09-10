@@ -1,6 +1,7 @@
 #ifndef __COMMON_RWLOCK_H__
 #define __COMMON_RWLOCK_H__
 
+#include <common/common.h>
 #define _MULTI_THREADED
 #include <common/exceptions.h>
 #include <pthread.h>
@@ -8,7 +9,7 @@
 
 //#define DEBUG_LOCKING
 
-namespace Common
+namespace common
 {
 class RWLock {
  public:
@@ -31,7 +32,7 @@ class RWLock {
   }
 
   int unlock() {
-#ifdef DEBUG_LOCKING    
+#ifdef DEBUG_LOCKING
     PLOG("unlock (%p)", this);
 #endif
     return pthread_rwlock_unlock(&_lock);
@@ -65,12 +66,17 @@ class RWLock_guard {
 
   ~RWLock_guard() noexcept(false) {
     if (_lock.unlock() != 0)
-      throw General_exception("failed to release lock in guard");
+    {
+      PLOG("%s: failed to release lock %p", __func__, static_cast<const void *>(this));
+#ifdef DEBUG_LOCKING
+      abort();
+#endif
+    }
   }
 
  private:
   RWLock &_lock;
 };
-}  // namespace Common
+}  // namespace common
 
 #endif  // __COMMON_RWLOCK_H__

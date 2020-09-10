@@ -1,10 +1,24 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(kernel-module-mcas)
+project(mcas-kernel-module)
 
-configure_file(Makefile.in ${CMAKE_CURRENT_SOURCE_DIR}/Makefile)
+if(BUILD_KERNEL_SUPPORT)
 
-add_subdirectory(unit_test)
+  add_custom_target(mcasmod.ko ALL
+    COMMENT "Building MCAS kernel module..."
+    )
+
+  add_custom_command(TARGET mcasmod.ko
+    COMMAND make clean COMMAND make COMMAND make PREFIX=${CMAKE_INSTALL_PREFIX} install
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+    )
+
+endif(BUILD_KERNEL_SUPPORT)
+
+
+
+
+
 
 
 

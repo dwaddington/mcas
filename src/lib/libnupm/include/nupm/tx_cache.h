@@ -16,9 +16,6 @@
 #include <common/types.h>
 #include <sys/mman.h>
 
-#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
-#define MAP_HUGE_1GB (30 << MAP_HUGE_SHIFT)
-
 namespace nupm
 {
 void *allocate_virtual_pages(size_t n_pages, size_t page_size, addr_t hint = 0);

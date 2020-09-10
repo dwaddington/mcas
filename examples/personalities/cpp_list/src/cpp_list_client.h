@@ -14,13 +14,13 @@
 namespace cpp_list_personality
 {
 using namespace flatbuffers;
-using namespace Component;
-using namespace Structured_ADO_protocol;
+using namespace component;
+using namespace structured_ADO_protocol;
 
 
 // forward decls
-status_t execute_invoke_noargs(Component::IMCAS * i_mcas,
-                               const Component::IMCAS::pool_t pool,
+status_t execute_invoke_noargs(component::IMCAS * i_mcas,
+                               const component::IMCAS::pool_t pool,
                                const std::string& key_name,
                                const std::string& method_name);
 
@@ -51,8 +51,8 @@ int free_at(void * p, size_t length);
 class Durable_object_memory
 {
 public:
-  Durable_object_memory(Component::IMCAS * mcas,
-                        const Component::IMCAS::pool_t pool,
+  Durable_object_memory(component::IMCAS * mcas,
+                        const component::IMCAS::pool_t pool,
                         std::string name,
                         size_t size)
     : _name(name), _mcas(mcas), _pool(pool), _size(size)
@@ -60,13 +60,13 @@ public:
     if(mcas == nullptr) throw std::invalid_argument("bad parameter");
 
     /* reserve space for data structure on MCAS server */
-    std::vector<Component::IMCAS::ADO_response> response;
+    std::vector<component::IMCAS::ADO_response> response;
     
     status_t rc = mcas->invoke_ado(pool,
                                    name,
                                    nullptr,
                                    0,
-                                   Component::IMCAS::ADO_FLAG_CREATE_ONLY,
+                                   component::IMCAS::ADO_FLAG_CREATE_ONLY,
                                    response,
                                    size);
     if(rc != S_OK)
@@ -95,17 +95,17 @@ public:
 
   ccpm::region_vector_t& regions() { return _regions; }
 
-  inline Component::IMCAS::pool_t pool() const { return _pool; }
-  inline Component::IMCAS * mcas() const { return _mcas; }
+  inline component::IMCAS::pool_t pool() const { return _pool; }
+  inline component::IMCAS * mcas() const { return _mcas; }
   inline const std::string& name() const { return _name; }
   
 protected:
   const std::string                    _name;
-  Component::IMCAS *                   _mcas;
-  const Component::IMCAS::pool_t       _pool;
+  component::IMCAS *                   _mcas;
+  const component::IMCAS::pool_t       _pool;
   size_t                               _size;
   ccpm::region_vector_t                _regions;
-  Component::IKVStore::memory_handle_t _memory_handle;
+  component::IKVStore::memory_handle_t _memory_handle;
 };
 
 
@@ -117,8 +117,8 @@ class Durable_list : private Durable_object_memory,
                      public ccpm::Immutable_list<T>
 {
 public:
-  Durable_list(Component::IMCAS * mcas,
-               const Component::IMCAS::pool_t pool,
+  Durable_list(component::IMCAS * mcas,
+               const component::IMCAS::pool_t pool,
                const std::string name,
                const size_t size);
 
@@ -130,8 +130,8 @@ public:
 };
 
 template <typename T>
-Durable_list<T>::Durable_list(Component::IMCAS * mcas,
-                              const Component::IMCAS::pool_t pool,
+Durable_list<T>::Durable_list(component::IMCAS * mcas,
+                              const component::IMCAS::pool_t pool,
                               const std::string name,
                               const size_t size)
   : Durable_object_memory(mcas, pool, name, size),
@@ -180,7 +180,7 @@ status_t Durable_list<T>::remote_push_front(const T& element)
 
   /* invoke */
   status_t rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<component::IMCAS::ADO_response> response;
   
   rc = _mcas->invoke_ado(_pool,
                          _name,
@@ -209,7 +209,7 @@ void push_front(Durable_object_memory& obj,
 
   /* invoke */
   status_t rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<component::IMCAS::ADO_response> response;
   
   assert(response.size() == 1);
   

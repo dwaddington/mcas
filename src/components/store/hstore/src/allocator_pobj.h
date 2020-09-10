@@ -37,10 +37,10 @@
 #include <cstdint> /* uint64_t */
 
 template <typename T, typename Deallocator = deallocator_pobj<T>>
-	class allocator_pobj;
+	struct allocator_pobj;
 
 template <>
-	class allocator_pobj<void>
+	struct allocator_pobj<void>
 	{
 	public:
 		using pointer = pointer_pobj<void, 0U>;
@@ -54,10 +54,11 @@ template <>
 	};
 
 template <typename T, typename Deallocator>
-	class allocator_pobj
+	struct allocator_pobj
 		: public Deallocator
 		, public pool_pobj
 	{
+	private:
 		using deallocator_type = Deallocator;
 	public:
 		using typename deallocator_type::size_type;

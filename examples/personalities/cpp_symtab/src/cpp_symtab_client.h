@@ -15,21 +15,21 @@
 namespace cpp_symtab_personality
 {
 using namespace flatbuffers;
-using namespace Component;
-using namespace Symtab_ADO_protocol;
+using namespace component;
+using namespace symtab_ADO_protocol;
 
 class Symbol_table
 {
 public:
-  Symbol_table(Component::IMCAS * mcas,
-               const Component::IMCAS::pool_t pool,
+  Symbol_table(component::IMCAS * mcas,
+               const component::IMCAS::pool_t pool,
                std::string table_name)
     : _mcas(mcas), _pool(pool),  _table_name(table_name)
   {
     if(mcas == nullptr) throw std::invalid_argument("bad parameter");
 
     /* initialize */
-    std::vector<Component::IMCAS::ADO_response> response;
+    std::vector<component::IMCAS::ADO_response> response;
     
     status_t rc = _mcas->invoke_ado(_pool,
                                     _table_name,
@@ -49,7 +49,7 @@ public:
     auto msg = CreateMessage(fbb, Command_PutRequest, cmd.Union());
     fbb.Finish(msg);
     
-    std::vector<Component::IMCAS::ADO_response> response;
+    std::vector<component::IMCAS::ADO_response> response;
     
     status_t rc = _mcas->invoke_ado(_pool,
                                     _table_name,
@@ -67,7 +67,7 @@ public:
     auto msg = CreateMessage(fbb, Command_BuildIndex, cmd.Union());
     fbb.Finish(msg);
     
-    std::vector<Component::IMCAS::ADO_response> response;
+    std::vector<component::IMCAS::ADO_response> response;
     
     status_t rc = _mcas->invoke_ado(_pool,
                                     _table_name,
@@ -87,7 +87,7 @@ public:
     auto msg = CreateMessage(fbb, Command_GetString, cmd.Union());
     fbb.Finish(msg);
     
-    std::vector<Component::IMCAS::ADO_response> response;
+    std::vector<component::IMCAS::ADO_response> response;
     
     status_t rc = _mcas->invoke_ado(_pool,
                                     _table_name,
@@ -110,7 +110,7 @@ public:
     auto msg = CreateMessage(fbb, Command_GetSymbol, cmd.Union());
     fbb.Finish(msg);
     
-    std::vector<Component::IMCAS::ADO_response> response;
+    std::vector<component::IMCAS::ADO_response> response;
     
     status_t rc = _mcas->invoke_ado(_pool,
                                     _table_name,
@@ -124,8 +124,8 @@ public:
   }
 
 private:
-  Component::IMCAS *             _mcas;
-  const Component::IMCAS::pool_t _pool;
+  component::IMCAS *             _mcas;
+  const component::IMCAS::pool_t _pool;
   const std::string              _table_name;
 };
   

@@ -22,7 +22,7 @@
 #include "avl_malloc.h"
 #include <memory>
 
-namespace Core
+namespace core
 {
 
 template <class T=void>
@@ -35,9 +35,9 @@ class Heap_allocator : public std::allocator<T>
                  size_t region_size,
                  const std::string label)
       :
-      _slab_size(Core::Slab::Allocator<>::determine_size(MAX_SLAB_SLOTS)),
+      _slab_size(core::Slab::Allocator<>::determine_size(MAX_SLAB_SLOTS)),
       _slab(region, _slab_size, label, false),
-      _arena_start(reinterpret_cast<void *>(((addr_t)region) + _slab_size)),
+      _arena_start(static_cast<char *>(region) + _slab_size),
       _arena_size(region_size = _slab_size),
       _arena(_slab, _arena_start, _arena_size)
   {
@@ -46,15 +46,15 @@ class Heap_allocator : public std::allocator<T>
   }
 
   T * allocate(size_t s) {
-    return (T *) _arena.alloc(s);
+    return static_cast<T *>(_arena.alloc(s));
   }
 
  private:
   const size_t                         _slab_size;
-  Core::Slab::Allocator<Memory_region> _slab; /*< slab allocator */
+  core::Slab::Allocator<Memory_region> _slab; /*< slab allocator */
   const void *                         _arena_start; /*< managed arena */
   const size_t                         _arena_size;
-  Core::Arena_allocator                _arena; /*< arena manager */
+  core::Arena_allocator                _arena; /*< arena manager */
 };
 
 }

@@ -30,13 +30,12 @@
 #include <cstdlib> /* size_t, ptrdiff_t */
 
 template <typename T, typename Persister = persister_pmem>
-	class deallocator_pobj;
+	struct deallocator_pobj;
 
 template <>
-	class deallocator_pobj<void, persister_pmem>
+	struct deallocator_pobj<void, persister_pmem>
 		: public persister_pmem
 	{
-	public:
 		using size_type = std::size_t;
 		using difference_type = std::ptrdiff_t;
 		using pointer = pointer_pobj<void, 0U>;
@@ -50,10 +49,9 @@ template <>
 	};
 
 template <typename T, typename Persister>
-	class deallocator_pobj
+	struct deallocator_pobj
 		: public Persister
 	{
-	public:
 		using size_type = std::size_t;
 		using difference_type = std::ptrdiff_t;
 		using pointer = pointer_pobj<T, 0U>;

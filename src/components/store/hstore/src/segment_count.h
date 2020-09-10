@@ -28,8 +28,9 @@ namespace impl
 {
 	using segment_count_actual_t = value_unstable<segment_layout::six_t, 1>;
 
-	class segment_count
+	struct segment_count
 	{
+	private:
 		/* current segment count */
 		segment_count_actual_t _actual;
 		/* desired segment count */

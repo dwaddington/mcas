@@ -4,7 +4,7 @@ language: minimal
 branches:
   only:
     - master
-    - unstable
+    - dw
 
 sudo: required
 
@@ -28,12 +28,13 @@ env:
       DOCKERIMG="fedora:27"
       BOOTSTRAP_FILE="./install-yum-fc27.sh"
 #      HOSTMODULE="-v /lib/modules:/lib/modules:ro -v /usr/src:/usr/src:ro"
-    - CONTAINER_NAME="mcas-build-ubuntu1604"
-      DOCKERIMG="ubuntu:16.04"
-      BOOTSTRAP_FILE="./install-apts-ubuntu-16.sh"
+    - CONTAINER_NAME="mcas-build-fedora30"
+      DOCKERIMG="fedora:30"
+      BOOTSTRAP_FILE="./install-yum-fc30.sh"
     - CONTAINER_NAME="mcas-build-ubuntu1804"
       DOCKERIMG="ubuntu:18.04"
       BOOTSTRAP_FILE="./install-apts-ubuntu-18.sh"
+      
 
 # for local building testing, remember to run git submodule init/update
 # https://stackoverflow.com/questions/33013539/docker-loading-kernel-modules
@@ -51,10 +52,11 @@ before_install:
 
 script:
   - docker exec -t ${CONTAINER_NAME} bash -c "
-    cd /travis ;
-    mkdir build;
-    cd build;
-    cmake -DSKIP_KERNEL_MODULES=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist -DTBB_CI_BUILD=ON .. &&
+    cd /travis &&
+    ./tools/check_contents.sh ./src &&
+    mkdir build &&
+    cd build &&
+    cmake -DBUILD_KERNEL_SUPPORT=OFF -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist -DTBB_CI_BUILD=ON .. &&
     make bootstrap &&
     make &&
     make install"

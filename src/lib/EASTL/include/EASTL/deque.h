@@ -2233,7 +2233,7 @@ namespace eastl
 				eastl::uninitialized_copy(
 					non_const_iterator_type(first)
 					, non_const_iterator_type(last)
-					, const_cast<non_const_value_type*>(mItEnd.mpBegin+0)
+					, const_cast<non_const_value_type*>(+mItEnd.mpBegin)
 				);
 		#if EASTL_EXCEPTIONS_ENABLED
 			}

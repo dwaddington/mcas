@@ -14,7 +14,9 @@
 #define __mcas_REGION_MANAGER_H__
 
 #include <api/fabric_itf.h>
+#include <common/logging.h>
 #include <common/utils.h>
+#include <gsl/pointers>
 
 #include <set>
 
@@ -24,17 +26,29 @@
 namespace mcas
 {
 class Region_manager {
- public:
-  Region_manager(Connection* conn) : _conn(conn), _reg{} { assert(conn); }
+  unsigned _debug_level;
 
-  Region_manager(const Region_manager &) = delete;
-  Region_manager &operator=(const Region_manager &) = delete;
+ public:
+  Region_manager(unsigned debug_level_, gsl::not_null<Connection *> conn) : _debug_level(debug_level_), _conn(conn), _reg{}
+  {
+  }
+
+  Region_manager(const Region_manager&) = delete;
+  Region_manager& operator=(const Region_manager&) = delete;
 
   ~Region_manager()
   {
+    /* EXCEPTION UNSAFE */
     /* deregister memory regions */
     for (auto& r : _reg) {
-      _conn->deregister_memory(r);
+      /* Note: _reg contains memory regions, and _conn contains a connection. No
+       * object memorializes the registration */
+      try {
+        _conn->deregister_memory(r);
+      }
+      catch (const std::exception& e) {
+        PLOG("deregister_mememory failed: %s", e.what());
+      }
     }
   }
 
@@ -51,12 +65,15 @@ class Region_manager {
     /* transport will now take care of repeat registrations */
     auto mr = _conn->register_memory(target, target_len, 0, 0);
     _reg.insert(mr);
+    if (2 < _debug_level) {
+      PLOG("%s registered %p 0x%zx (total %zu)", __func__, target, target_len, _reg.size());
+    }
     return mr;
   }
 
  private:
-  Connection*               _conn;
-  std::set<memory_region_t> _reg;
+  Connection*                    _conn;
+  std::multiset<memory_region_t> _reg;
 };
 }  // namespace mcas
 

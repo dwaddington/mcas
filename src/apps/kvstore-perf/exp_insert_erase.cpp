@@ -145,7 +145,7 @@ try {
 
   double run_time = timer.get_time_in_seconds();
   double iops = double(_i) / run_time;
-  PINF("[%u] %s: IOPS--> %u (%lu operations over %2g seconds)", core, test_name().c_str(), unsigned(iops), _i, run_time);
+  PINF("[%u] %s: IOPS--> %2g (%lu operations over %2g seconds)", core, test_name().c_str(), iops, _i, run_time);
   _update_aggregate_iops(iops);
 
   double throughput = _calculate_current_throughput();

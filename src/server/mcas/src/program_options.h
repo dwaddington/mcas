@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,11 +13,15 @@
 #ifndef __MCAS_PROGRAM_OPTIONS_H__
 #define __MCAS_PROGRAM_OPTIONS_H__
 
+#include <string>
+
 struct Program_options {
-  std::string config_file;
+  std::string config;
   std::string device;
   unsigned    debug_level;
   bool        forced_exit;
+  std::string profile_file_main;
+  bool        triggered_profile;
 };
 
 #endif  // __mcas_PROGRAM_OPTIONS_H__

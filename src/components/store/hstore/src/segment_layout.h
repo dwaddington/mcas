@@ -23,9 +23,8 @@
 
 namespace impl
 {
-	class segment_layout
+	struct segment_layout
 	{
-	public:
 		/* all bucket indexes */
 		using bix_t = std::size_t;
 		/* segment indexes (but uint8_t woud do) */

@@ -6,9 +6,9 @@ namespace mcas
 class Shard_task {
  public:
   Shard_task(Connection_handler* handler) : _handler(handler) {}
-  Shard_task(const Shard_task &) = delete;
-  Shard_task &operator=(const Shard_task &) = delete;
-  virtual ~Shard_task() = default;
+  Shard_task(const Shard_task&) = delete;
+  Shard_task& operator=(const Shard_task&)      = delete;
+  virtual ~Shard_task()                         = default;
   virtual status_t    do_work()                 = 0;
   virtual const void* get_result() const        = 0;
   virtual size_t      get_result_length() const = 0;

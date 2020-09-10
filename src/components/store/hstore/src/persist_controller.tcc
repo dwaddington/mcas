@@ -32,6 +32,7 @@
 
 template <typename Allocator>
 	impl::persist_controller<Allocator>::persist_controller(
+        AK_ACTUAL
 		const Allocator &av_
 		, persist_data_t *persist_
 		, construction_mode
@@ -49,7 +50,7 @@ template <typename Allocator>
 		/* Persisted data needs at least one segment. */
 		if ( _persist->_segment_count.actual().is_stable() && _persist->_segment_count.actual().value() == 0 )
 		{
-			_persist->do_initial_allocation(this);
+			_persist->do_initial_allocation(AK_REF this);
 		}
 #if USE_CC_HEAP == 3
 		if ( mode_ == construction_mode::reconstitute )
@@ -104,7 +105,7 @@ template <typename Allocator>
 		, const char * // what_
 	)
 	{
-		this->Allocator::persist(first_, static_cast<const char *>(last_) - static_cast<const char *>(first_));
+		this->Allocator::persist(first_, std::size_t(static_cast<const char *>(last_) - static_cast<const char *>(first_)));
 	}
 
 template <typename Allocator>
@@ -190,6 +191,7 @@ template <typename Allocator>
 
 template <typename Allocator>
 	auto impl::persist_controller<Allocator>::resize_prolog(
+		AK_ACTUAL0
 	) -> bucket_aligned_t *
 	{
 		persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
@@ -199,6 +201,7 @@ template <typename Allocator>
 			monitor_extend<Allocator> m(bucket_allocator_t{*this});
 #endif
 			bucket_allocator_t(*this).allocate(
+				AK_REF
 				ptr
 				, bucket_count()
 				, alignof(bucket_aligned_t)

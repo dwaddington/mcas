@@ -31,7 +31,7 @@ template <typename Value>
 		, _owner(owner_undefined)
 #endif
 	{
-#if i0 && ENABLE_TIMESTAMPS
+#if 0 && ENABLE_TIMESTAMPS
 		std::get<1>(_value.second).set_free();
 #endif
 	}

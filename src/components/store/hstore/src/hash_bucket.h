@@ -26,11 +26,10 @@
 namespace impl
 {
 	template <typename Value>
-		class hash_bucket
+		struct hash_bucket
 			: public owner
 			, public content<Value>
 		{
-		public:
 			using owner_type = owner;
 			using content_type = content<Value>;
 			explicit hash_bucket(owner owner_)

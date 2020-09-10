@@ -17,17 +17,17 @@ Example MCA configuration file:
             "port" : 11911,
             "net"  : "mlx5_0",
             "default_backend" : "hstore",
-            "default_ado_path" : "/home/mcas/build/dist/bin/ado",            
+            "default_ado_path" : "/opt/mcas/build/dist/bin/ado",
             "default_ado_plugin" : "libcomponent-adoplugin-graph.so"
-            "dax_config" : [{ "region_id": 0, "path": "/dev/dax0.0", "addr": "0x9000000000" }] 
+            "dax_config" : [{ "region_id": 0, "path": "/dev/dax0.0", "addr": "0x9000000000" }]
         }
     ],
     "net_providers" : "verbs",
     "resources":
-    { 
+    {
             "ado_cores":"6-8",
             "ado_manager_core": 1
-    } 
+    }
 }
 ```
 
@@ -37,7 +37,7 @@ Example MCA configuration file:
 | shards | core | Core number (counting from 0) to bind to | 0 |
 | | port | TCP/IP port to listen on (includes RDMA bootstrap). Should be unique for each shard. | 11911 |
 | | net | Network device | "mlx5_0", "mlx5_1", "eth0" |
-| | default_backend | Backend key-value engine component | "hstore", "mapstore", "filestore" |
+| | default_backend | Backend key-value engine component | "hstore", "mapstore" |
 | (*ADO only*)| default\_ado\_path | Path for ADO plugin components | "/install_dir/bin/ado" |
 | (*ADO only*)| default\_ado\_plugin | Name of default plugin | "libcomponent-adoplugin-graph.so" |
 | (*hstore only*) | dax_config | DAX region assignment  |

@@ -16,6 +16,7 @@
 
 #include <ccpm/interfaces.h>
 #include <cstring>
+#include <cstddef>
 
 namespace ccpm
 {
@@ -32,21 +33,26 @@ namespace ccpm
 			persist(&p, sizeof p);
 		}
 
-	class block_header;
+	struct block_header;
 
-	class log
+	struct log
 		: public ILog
 	{
+	private:
 		/*
 		 * The log needs to be stored persistently, and to use persistent storage.
 		 * Use IHeap for the latter.
 		 */
-		IHeapGrowable *_mr; // not owned
+		IHeap_expandable *_mr; // not owned
 		/* The log needs a root */
 		block_header *_root; // owned
 		void clear_top();
+
+		static constexpr size_t min_log_extend = std::size_t(65536U);
+
+		void extend(std::size_t size);
 	public:
-		explicit log(IHeapGrowable *mr_);
+		explicit log(IHeap_expandable *mr_);
 
 		log(const log &) = delete;
 		log &operator=(const log &) = delete;

@@ -16,17 +16,20 @@
 #define __NUPM_DAX_DATA_H__
 
 #include <libpmem.h>
-#include <stdexcept>
 #include <common/types.h>
 #include <common/utils.h>
-
-#define DM_REGION_MAGIC 0xC0070000
-#define DM_REGION_NAME_MAX_LEN 1024
-#define DM_REGION_VERSION 2
+#include <boost/icl/split_interval_map.hpp>
+#include <algorithm>
+#include <stdexcept>
 
 namespace nupm
 {
-struct DM_undo_log {
+static std::uint32_t constexpr DM_REGION_MAGIC = 0xC0070000;
+static unsigned constexpr DM_REGION_NAME_MAX_LEN = 1024;
+static std::uint32_t constexpr DM_REGION_VERSION = 3;
+static unsigned constexpr dm_region_log_grain_size = DM_REGION_LOG_GRAIN_SIZE; // log2 granularity (CMake default is 25, i.e. 32 MiB)
+
+class DM_undo_log {
   static constexpr unsigned MAX_LOG_COUNT = 4;
   static constexpr unsigned MAX_LOG_SIZE  = 64;
   struct log_entry_t {
@@ -42,7 +45,7 @@ struct DM_undo_log {
     assert(ptr);
 
     if (length > MAX_LOG_SIZE)
-      throw API_exception("log length exceeds max. space");
+      throw std::invalid_argument("log length exceeds max. space");
 
     for (unsigned i = 0; i < MAX_LOG_COUNT; i++) {
       if (_log[i].length == 0) {
@@ -82,24 +85,31 @@ struct DM_undo_log {
   log_entry_t _log[MAX_LOG_COUNT];
 } __attribute__((packed));
 
-struct DM_region {
- public:
-  uint32_t offset_GB;
-  uint32_t length_GB;
+class DM_region {
+public:
+  using grain_offset_t = uint32_t;
+  grain_offset_t offset_grain;
+  grain_offset_t length_grain;
   uint64_t region_id;
 
  public:
   /* re-zeroing constructor */
-  DM_region() : length_GB(0), region_id(0) { assert(check_aligned(this, 8)); }
+  DM_region() : offset_grain(0), length_grain(0), region_id(0) { assert(check_aligned(this, 8)); }
 
-  void initialize(size_t space_size)
+  void initialize(size_t space_size, std::size_t grain_size)
   {
-    offset_GB = 0;
-    length_GB = space_size / GB(1);
+    offset_grain = 0;
+    length_grain = boost::numeric_cast<uint32_t>(space_size / grain_size);
     region_id = 0; /* zero indicates free */
   }
+
+  friend class DM_region_header;
 } __attribute__((packed));
 
+/* Note: "region" has at least two meanings:
+ *  1. The space which begins with a DM_region_header
+ *  2. The space described by a DM_region
+ */
 class DM_region_header {
  private:
   static constexpr uint16_t DEFAULT_MAX_REGIONS = 1024;
@@ -108,21 +118,29 @@ class DM_region_header {
   uint32_t    _version;       // 8
   uint64_t    _device_size;   // 16
   uint32_t    _region_count;  // 20
-  uint32_t    _resvd;         // 24
+  uint16_t    _log_grain_size; // 22
+  uint16_t    _resvd;         // 24
   uint8_t     _padding[40];   // 64
   DM_undo_log _undo_log;
-  DM_region   _regions[];
 
  public:
+  auto grain_size() const { return std::size_t(1) << _log_grain_size; }
+
   /* Rebuilding constructor */
   DM_region_header(size_t device_size)
+    : _magic(DM_REGION_MAGIC)
+    , _version(DM_REGION_VERSION)
+    , _device_size(device_size)
+    , _region_count( (::pmem_flush(this, sizeof(DM_region_header)), DEFAULT_MAX_REGIONS) )
+    , _log_grain_size(dm_region_log_grain_size)
+    , _resvd()
+    , _undo_log()
   {
-    reset_header(device_size);
-
-    _region_count       = DEFAULT_MAX_REGIONS;
+    (void)_resvd; // unused
+    (void)_padding; // unused
     DM_region *region_p = region_table_base();
     /* initialize first region with all capacity */
-    region_p->initialize(device_size - GB(1));
+    region_p->initialize(device_size - grain_size(), grain_size());
     _undo_log.clear_log();
     region_p++;
 
@@ -145,34 +163,34 @@ class DM_region_header {
     PINF(
         " magic [0x%8x]\n version [%u]\n device_size [%lu]\n region_count [%u]",
         _magic, _version, _device_size, _region_count);
-    PINF(" base [%p]", this);
+    PINF(" base [%p]", static_cast<void *>(this));
 
     for (uint16_t r = 0; r < _region_count; r++) {
-      auto reg = _regions[r];
+      auto reg = region_table_base()[r];
       if (reg.region_id > 0) {
         PINF(" - USED: %lu (%lx-%lx)", reg.region_id,
-             GB_to_bytes(reg.offset_GB),
-             GB_to_bytes(reg.offset_GB + reg.length_GB) - 1);
-        assert(reg.length_GB > 0);
+             grain_to_bytes(reg.offset_grain),
+             grain_to_bytes(reg.offset_grain + reg.length_grain) - 1);
+        assert(reg.length_grain > 0);
       }
-      else if (reg.length_GB > 0) {
+      else if (reg.length_grain > 0) {
         PINF(" - FREE: %lu (%lx-%lx)", reg.region_id,
-             GB_to_bytes(reg.offset_GB),
-             GB_to_bytes(reg.offset_GB + reg.length_GB) - 1);
+             grain_to_bytes(reg.offset_grain),
+             grain_to_bytes(reg.offset_grain + reg.length_grain) - 1);
       }
     }
   }
 
   void *get_region(uint64_t region_id, size_t *out_size)
   {
-    if (region_id == 0) throw API_exception("invalid region_id");
+    if (region_id == 0) throw std::invalid_argument("invalid region_id");
 
     for (uint16_t r = 0; r < _region_count; r++) {
-      auto reg = _regions[r];
+      auto reg = region_table_base()[r];
       if (reg.region_id == region_id) {
         PLOG("found matching region (%lx)", region_id);
-        if (out_size) *out_size = (((uintptr_t) reg.length_GB) << 30);
-        return (((uintptr_t) reg.offset_GB) << 30) + arena_base();
+        if (out_size) *out_size = grain_to_bytes(reg.length_grain);
+        return arena_base() + grain_to_bytes(reg.offset_grain);
       }
     }
     return nullptr; /* not found */
@@ -180,56 +198,54 @@ class DM_region_header {
 
   void erase_region(uint64_t region_id)
   {
-    if (region_id == 0) throw API_exception("invalid region_id");
+    if (region_id == 0) throw std::invalid_argument("invalid region_id");
 
     for (uint16_t r = 0; r < _region_count; r++) {
-      DM_region *reg = &_regions[r];
+      DM_region *reg = &region_table_base()[r];
       if (reg->region_id == region_id) {
         reg->region_id = 0; /* power-fail atomic */
         pmem_flush(&reg->region_id, sizeof(reg->region_id));
         return;
       }
     }
-    throw API_exception("region (%lu) not found", region_id);
+    throw std::domain_error("region not found");
   }
 
-  void *allocate_region(uint64_t region_id, unsigned size_in_GB)
+  void *allocate_region(uint64_t region_id, DM_region::grain_offset_t size_in_grain)
   {
-    if (region_id == 0) throw API_exception("invalid region_id");
+    if (region_id == 0) throw std::invalid_argument("invalid region_id");
 
     for (uint16_t r = 0; r < _region_count; r++) {
-      auto reg = _regions[r];
+      auto reg = region_table_base()[r];
       if (reg.region_id == region_id)
         throw std::bad_alloc();
     }
 
     uint32_t new_offset;
     bool     found = false;
-    for (uint16_t r = 0; r < _region_count; r++) {
-      DM_region *reg = &_regions[r];
-      if (reg->region_id == 0 && reg->length_GB >= size_in_GB) {
-        if (reg->length_GB == size_in_GB) {
+    for (uint16_t r0 = 0; r0 < _region_count; ++r0) {
+      DM_region *reg = &region_table_base()[r0];
+      if (reg->region_id == 0 && reg->length_grain >= size_in_grain) {
+        if (reg->length_grain == size_in_grain) {
           /* exact match */
-          void *rp =
-              (void *) ((((uintptr_t) reg->offset_GB) << 30) + arena_base());
+          void *rp = arena_base() + grain_to_bytes(reg->offset_grain);
           // zero region
           tx_atomic_write(reg, region_id);
           return rp;
         }
         else {
           /* cut out */
-          new_offset = reg->offset_GB;
+          new_offset = reg->offset_grain;
 
-          uint16_t changed_length = reg->length_GB - size_in_GB;
-          uint16_t changed_offset = reg->offset_GB + size_in_GB;
+          auto changed_length = reg->length_grain - size_in_grain;
+          auto changed_offset = reg->offset_grain + size_in_grain;
 
-          for (uint16_t r = 0; r < _region_count; r++) {
-            DM_region *reg_n = &_regions[r];
-            if (reg_n->region_id == 0 && reg_n->length_GB == 0) {
-              void *rp =
-                  (void *) ((((uintptr_t) new_offset) << 30) + arena_base());
-              tx_atomic_write(reg_n, changed_offset, changed_length, reg,
-                              new_offset, size_in_GB, region_id);
+          for (uint16_t r = 0; r < _region_count; ++r) {
+            DM_region *reg_n = &region_table_base()[r];
+            if (reg_n->region_id == 0 && reg_n->length_grain == 0) {
+              void *rp = arena_base() + grain_to_bytes(new_offset);
+              tx_atomic_write(reg_n, boost::numeric_cast<uint16_t>(changed_offset), boost::numeric_cast<uint16_t>(changed_length), reg,
+                              new_offset, size_in_grain, region_id);
               return rp;
             }
           }
@@ -237,22 +253,23 @@ class DM_region_header {
       }
     }
     if (!found)
-      throw General_exception("no more regions (size in GB=%u)", size_in_GB);
+      throw General_exception("no more regions (size in grain=%u)", size_in_grain);
 
     throw General_exception("no spare slots");
   }
 
   size_t get_max_available() const
   {
-    size_t max_size = 0;
-    for (uint16_t r = 0; r < _region_count; r++) {
-      const DM_region *reg = &_regions[r];
-      if (reg->length_GB > max_size) max_size = reg->length_GB;
-    }
-    return GB_to_bytes(max_size);
+    auto max_grain_element =
+      std::max_element(
+        &region_table_base()[0]
+			, &region_table_base()[_region_count]
+        , [] (const DM_region &a, const DM_region &b) -> bool { return a.length_grain < b.length_grain; }
+      );
+    return grain_to_bytes( max_grain_element == &region_table_base()[_region_count] ? 0 : max_grain_element->length_grain);
   }
 
-  inline size_t GB_to_bytes(unsigned GB) const { return ((size_t) GB) << 30; }
+  inline size_t grain_to_bytes(unsigned grain) const { return size_t(grain) << _log_grain_size; }
 
   inline void major_flush()
   {
@@ -273,7 +290,7 @@ class DM_region_header {
     _undo_log.clear_log();
   }
 
-  void tx_atomic_write(DM_region *dst0,
+  void tx_atomic_write(DM_region *dst0, // offset0, size0, offset1, size1 all expressed in grains
                        uint32_t   offset0,
                        uint32_t   size0,
                        DM_region *dst1,
@@ -284,13 +301,13 @@ class DM_region_header {
     _undo_log.log(dst0, sizeof(DM_region));
     _undo_log.log(dst1, sizeof(DM_region));
 
-    dst0->offset_GB = offset0;
-    dst0->length_GB = size0;
+    dst0->offset_grain = offset0;
+    dst0->length_grain = size0;
     pmem_flush(dst0, sizeof(DM_region));
 
     dst1->region_id = region_id1;
-    dst1->offset_GB = offset1;
-    dst1->length_GB = size1;
+    dst1->offset_grain = offset1;
+    dst1->length_grain = size1;
     pmem_flush(dst1, sizeof(DM_region));
 
     _undo_log.clear_log();
@@ -298,15 +315,16 @@ class DM_region_header {
 
   inline unsigned char *arena_base()
   {
-    return (((unsigned char *) this) + GB(1));
+    return static_cast<unsigned char *>(static_cast<void *>(this)) + grain_size();
   }
 
-  inline DM_region *region_table_base() { return _regions; }
+  inline DM_region *region_table_base() { return static_cast<DM_region *>(static_cast<void *>(this + 1)); }
+  inline const DM_region *region_table_base() const { return static_cast<const DM_region *>(static_cast<const void *>(this + 1)); }
 
   inline DM_region *region(size_t idx)
   {
     if (idx >= _region_count) return nullptr;
-    DM_region *p = (DM_region *) region_table_base();
+    DM_region *p = static_cast<DM_region *>(region_table_base());
     return &p[idx];
   }
 

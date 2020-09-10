@@ -20,7 +20,7 @@
 #include <cstdint> /* uint64_t */
 #include <vector>
 
-namespace Component
+namespace component
 {
   class IFabric_connection;
 }
@@ -30,7 +30,7 @@ struct buffer_state
   registered_memory _rm;
   std::vector<::iovec> v;
   std::vector<void *> d;
-  explicit buffer_state(Component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key, std::size_t msg_size);
+  explicit buffer_state(component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key, std::size_t msg_size);
   DELETE_COPY(buffer_state);
 };
 

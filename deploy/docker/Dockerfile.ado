@@ -3,6 +3,7 @@ COPY . /mcas
 WORKDIR /mcas
 ENV DEBIAN_FRONTEND=noninteractive
 RUN deps/install-apts-ubuntu-18.sh
+RUN apt install -y linux-headers-`uname -r`
 RUN git submodule update --init --recursive
 RUN rm -rf build && mkdir -p build
 WORKDIR /mcas/build
@@ -11,6 +12,6 @@ RUN make bootstrap && make install
 
 #FROM gcr.io/distroless/cc
 FROM ubuntu:18.04 
-RUN apt-get update && apt-get install -y libboost-program-options-dev libnuma-dev libkmod-dev
+RUN apt-get update && apt-get install -y libboost-program-options-dev libnuma-dev libkmod-dev libboost-system-dev
 COPY --from=build /mcas/build /mcas/build
-CMD ["/mcas/build/dist/bin/ado"]
+ENTRYPOINT ["/mcas/build/dist/bin/ado"]

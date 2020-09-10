@@ -46,8 +46,8 @@ int free_at(void * p, size_t length)
   return munmap(p, length);
 }
   
-status_t execute_invoke_noargs(Component::IMCAS * i_mcas,
-                               const Component::IMCAS::pool_t pool,
+status_t execute_invoke_noargs(component::IMCAS * i_mcas,
+                               const component::IMCAS::pool_t pool,
                                const std::string& key_name,
                                const std::string& method_name)
 {
@@ -59,7 +59,7 @@ status_t execute_invoke_noargs(Component::IMCAS * i_mcas,
 
   /* invoke */
   status_t rc;
-  std::vector<Component::IMCAS::ADO_response> response;
+  std::vector<component::IMCAS::ADO_response> response;
   
   rc = i_mcas->invoke_ado(pool,
                           key_name,

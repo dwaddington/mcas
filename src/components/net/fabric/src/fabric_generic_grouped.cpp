@@ -29,7 +29,7 @@
 #include <memory> /* unique_ptr */
 #include <sstream> /* ostringstream */
 
-class event_producer;
+struct event_producer;
 
 /**
  * Fabric/RDMA-based network component
@@ -257,7 +257,7 @@ void Fabric_generic_grouped::inject_send(const void *buf_, std::size_t len_)
  * @return Number of completions processed
  */
 
-std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_old &cb_)
+std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_old &cb_)
 {
   std::size_t ct_total = 0;
 
@@ -279,7 +279,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_definite &cb_)
+std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_definite &cb_)
 {
   std::size_t ct_total = 0;
 
@@ -301,7 +301,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_generic_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &cb_)
+std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &cb_)
 {
   std::size_t ct_total = 0;
 
@@ -323,7 +323,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const Component::
   return ct_total;
 }
 
-std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
+std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -345,7 +345,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_generic_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
+std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -367,7 +367,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const Component::
   return ct_total;
 }
 
-std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -389,7 +389,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const Component::IFabric_op
   return ct_total;
 }
 
-std::size_t Fabric_generic_grouped::poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
+std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept cb_, void *cb_param_)
 {
   std::size_t ct_total = 0;
 
@@ -411,7 +411,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const Component::
   return ct_total;
 }
 
-auto Fabric_generic_grouped::allocate_group() -> Component::IFabric_communicator *
+auto Fabric_generic_grouped::allocate_group() -> component::IFabric_communicator *
 {
   auto comm = new Fabric_comm_grouped(*this, this->_rxcq, this->_txcq);
   {

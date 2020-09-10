@@ -18,6 +18,7 @@
 #include <common/rand.h>
 #include "avl_malloc.h"
 #include "slab.h"
+#include <boost/numeric/conversion/cast.hpp>
 #include <limits.h>
 #include <stdint.h>
 
@@ -58,10 +59,12 @@ class Block_bitmap {
                uint64_t capacity,
                bool     initialize = true)
       : _capacity(capacity)
+      , _num_bitmap_pages((capacity / ELEMENTS_PER_BITMAP_PAGE) + 1)
+      , _bitmaps(static_cast<Bitmap_page *>(buffer))
   {
+    (void)_capacity; // unused
     if (buffer == nullptr) throw API_exception("bad argument");
 
-    _num_bitmap_pages = (capacity / ELEMENTS_PER_BITMAP_PAGE) + 1;
     if (_num_bitmap_pages * sizeof(Bitmap_page) > buffer_len)
       throw API_exception(
           "Block_bitmap: insufficient memory space for capacity");
@@ -70,14 +73,12 @@ class Block_bitmap {
       PLOG("Block_bitmap: allocated %ld pages (%ld MB)", _num_bitmap_pages,
            REDUCE_MB(_num_bitmap_pages * 4096));
 
-    _bitmaps = static_cast<Bitmap_page *>(buffer);
-
     if (initialize) {
       memset(_bitmaps, 0, sizeof(Bitmap_page) * _num_bitmap_pages);
       for (unsigned p = 0; p < _num_bitmap_pages; p++) {
         _bitmaps[p]._free_count = ELEMENTS_PER_BITMAP_PAGE;
         if (p < (_num_bitmap_pages - 1))
-          _bitmaps[p]._chain_id = p;
+          _bitmaps[p]._chain_id = int32_t(p);
         else
           _bitmaps[p]._chain_id = -1;
       }
@@ -100,7 +101,7 @@ class Block_bitmap {
 
     if ((hint > 0) && alloc_block_at(p, i, b)) {
       decrement_free_count(p);
-      return hint;
+      return int64_t(hint);
     }
 
     /* for the moment, simple first fit policy */
@@ -115,7 +116,7 @@ class Block_bitmap {
           if (alloc_block_at(p, i, b)) {
             decrement_free_count(p);
             int64_t allocated_block =
-                (int64_t)((p * ELEMENTS_PER_BITMAP_PAGE) + (i * 64) + b);
+                int64_t((p * ELEMENTS_PER_BITMAP_PAGE) + (i * 64) + b);
             return allocated_block;
           }
         }
@@ -170,7 +171,7 @@ class Block_bitmap {
 
     if (alloc_64_blocks_at(p, i)) {
       decrement_free_count(p, 64);
-      return hint;
+      return int64_t(hint);
     }
 
     /* for the moment, simple first fit policy */
@@ -183,7 +184,7 @@ class Block_bitmap {
         if (_bitmaps[p]._bits[i] == 0ULL) {
           if (alloc_64_blocks_at(p, i)) {
             decrement_free_count(64);
-            return (int64_t)((p * ELEMENTS_PER_BITMAP_PAGE) + (i * 64));
+            return int64_t((p * ELEMENTS_PER_BITMAP_PAGE) + (i * 64));
           }
         }
       }
@@ -242,7 +243,12 @@ class Block_bitmap {
   void decrement_free_count(unsigned p, unsigned dec = 1)
   {
     Bitmap_page *bp = &_bitmaps[p];
-    __sync_fetch_and_sub(&bp->_free_count, dec);
+#pragma GCC diagnostic push
+#if ( defined __clang_major__ && 4 <= __clang_major__ ) || 9 <= __GNUC__
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
+    __sync_fetch_and_sub(&bp->_free_count, int32_t(dec));
+#pragma GCC diagnostic pop
     assert(bp->_free_count >= 0);
   }
 
@@ -254,7 +260,12 @@ class Block_bitmap {
   void increment_free_count(unsigned p, unsigned inc = 1)
   {
     Bitmap_page *bp = &_bitmaps[p];
-    __sync_fetch_and_add(&bp->_free_count, inc);
+#pragma GCC diagnostic push
+#if ( defined __clang_major__ && 4 <= __clang_major__ ) || 9 <= __GNUC__
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
+    __sync_fetch_and_add(&bp->_free_count, int32_t(inc));
+#pragma GCC diagnostic pop
     assert(bp->_free_count > 0);
   }
 
@@ -326,10 +337,9 @@ class Block_bitmap {
                        unsigned &index,
                        unsigned &bit)
   {
-    uint64_t remainder;
-    page      = lea / ELEMENTS_PER_BITMAP_PAGE;
-    remainder = lea % ELEMENTS_PER_BITMAP_PAGE;
-    index     = remainder / 64;
+    page      = boost::numeric_cast<unsigned>(lea / ELEMENTS_PER_BITMAP_PAGE);
+    uint64_t remainder = lea % ELEMENTS_PER_BITMAP_PAGE;
+    index     = boost::numeric_cast<unsigned>(remainder / 64);
     bit       = remainder % 64;
   }
 

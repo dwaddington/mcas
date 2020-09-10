@@ -1,0 +1,5 @@
+/home/danielwaddington/mcas/src/kernel/modules/mcas/unit_test/CMakeFiles/rebuild_cache.dir
+/home/danielwaddington/mcas/src/kernel/modules/mcas/unit_test/CMakeFiles/edit_cache.dir
+/home/danielwaddington/mcas/src/kernel/modules/mcas/unit_test/CMakeFiles/mcas-mod-server.dir
+/home/danielwaddington/mcas/src/kernel/modules/mcas/unit_test/CMakeFiles/mcas-module-test.dir
+/home/danielwaddington/mcas/src/kernel/modules/mcas/unit_test/CMakeFiles/mcas-mod-client.dir

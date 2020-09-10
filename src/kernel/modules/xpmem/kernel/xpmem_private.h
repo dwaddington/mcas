@@ -285,7 +285,7 @@ extern void xpmem_detach_att(struct xpmem_access_permit *,
 extern int xpmem_mmap(struct file *, struct vm_area_struct *);
 
 /* found in xpmem_pfn.c */
-extern int xpmem_ensure_valid_PFN(struct xpmem_segment *, u64);
+extern int xpmem_ensure_valid_PFN(struct xpmem_segment *, u64, unsigned long*);
 extern u64 xpmem_vaddr_to_PFN(struct mm_struct *mm, u64 vaddr);
 extern int xpmem_block_recall_PFNs(struct xpmem_thread_group *, int);
 extern void xpmem_unpin_pages(struct xpmem_segment *, struct mm_struct *, u64,
@@ -296,7 +296,11 @@ extern int xpmem_fork_end(void);
 #define XPMEM_TGID_STRING_LEN	11
 extern spinlock_t xpmem_unpin_procfs_lock;
 extern struct proc_dir_entry *xpmem_unpin_procfs_dir;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
 extern struct file_operations xpmem_unpin_procfs_ops;
+#else
+extern struct proc_ops xpmem_unpin_procfs_ops;
+#endif
 
 /* found in xpmem_main.c */
 extern struct xpmem_partition *xpmem_my_part;
@@ -339,7 +343,11 @@ extern int xpmem_seg_down_read(struct xpmem_thread_group *,
 			       struct xpmem_segment *, int, int);
 extern int xpmem_validate_access(struct xpmem_access_permit *, off_t, size_t,
 				 int, u64 *);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
 extern struct file_operations xpmem_debug_printk_procfs_ops;
+#else
+extern struct proc_ops xpmem_debug_printk_procfs_ops;
+#endif
 /* found in xpmem_mmu_notifier.c */
 extern int xpmem_mmu_notifier_init(struct xpmem_thread_group *);
 extern void xpmem_mmu_notifier_unlink(struct xpmem_thread_group *);

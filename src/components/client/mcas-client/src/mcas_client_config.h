@@ -20,10 +20,11 @@
 
 namespace mcas
 {
-namespace Global
+namespace global
 {
 extern unsigned debug_level;
 }
+namespace Global = global;
 }  // namespace mcas
 
 #endif  // __mcas_CLIENT_CONFIG_H__

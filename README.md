@@ -1,6 +1,10 @@
 # MCAS
 
-Memory Centric Active Storage is a high-performance key-value store designed for persistent memory storage.
+Memory Centric Active Storage (MCAS) is a high-performance key-value store
+explicitly designed for persistent memory.  Beyond a conventional
+key-value store, MCAS provides the ability to provide custom in-store
+compute, ultimately reducing data movement across the network and
+improving performance.
 
 The key attributes of the solution are:
 
@@ -8,13 +12,23 @@ The key attributes of the solution are:
 2. Support for Intel Optane DC Persistent Memory or conventional DRAM (without persistence).
 3. Support for both RDMA and traditional TCP/IP network transports.
 4. Zero-copy transfer capable with RDMA and GPU-Direct capable.
-5. Support for C++ and Python clients. 
+5. Support for C++ based in-store compute plugins.
+6. Support for C++ and Python clients. 
 
 ## Documentation
 
 * [Quick Start](./info/quick_start.md)
 * [Overview](./info/MCAS_overview.md)
 * [More documentation](./info/index.md)
+
+
+## Run dependencies for your OS 
+
+``` bash
+cd deps
+./install-<Your-OS-Version>.sh
+cd ../
+``` 
 
 ## How to Build
 
@@ -24,20 +38,28 @@ Check out source (for example public version):
 git clone https://github.com/IBM/mcas.git
 ```
 
-### update submodules
+### Update submodules
 ```bash
 cd mcas
 git submodule update --init --recursive
 ```
 
-### configure
+### Configure
 
-Create build directory at root level.  We normally use `mcas/build`:
+Create build directory at root level.  We normally use `mcas/build` (The deadult build is in debug mode)
 
 ```bash
 mkdir build
 cd build
-cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+cmake -DBUILD_KERNEL_SUPPORT=ON -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+```
+
+Or perform a Release build (which will be much faster):
+
+```bash
+mkdir build
+cd build
+cmake -DBUILD_KERNEL_SUPPORT=ON -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
 ```
 
 Sometimes we build with an alternate compiler:
@@ -45,7 +67,7 @@ Sometimes we build with an alternate compiler:
 ```bash
 mkdir clang
 cd clang
-cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+cmake -DBUILD_KERNEL_SUPPORT=ON -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
 ```
 
 Or with code coverage:
@@ -53,17 +75,18 @@ Or with code coverage:
 ```bash
 mkdir coverage
 cd coverage
-cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=1 -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+cmake -DBUILD_KERNEL_SUPPORT=ON -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=1 -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
 ```
 
-### one-time build
+### One-time build
 ```bash
 make bootstrap
 ```
 
-### normal build
+### Normal build
 ```bash
 make -j
+make install 
 ```
 
 

@@ -24,57 +24,27 @@
 #include <netinet/in.h>
 #include <sys/socket.h> /* send */
 
-#include <unistd.h> /* close */
+#include <unistd.h> /* read */
 
 #include <cerrno>
 #include <stdexcept>
 
 Fd_socket::Fd_socket()
-  : _fd(-1)
+  : Fd_open()
 {}
 
 Fd_socket::Fd_socket(int fd_)
-  : _fd(fd_)
+  : Fd_open(fd_)
 {
-  if ( _fd < 0 )
+  if ( fd() < 0 )
   {
     throw std::logic_error("negative fd in Fd_socket::Fd_socket");
   }
 }
 
-Fd_socket::~Fd_socket()
-{
-  close();
-}
-
-Fd_socket::Fd_socket(Fd_socket &&o) noexcept
-  : _fd(o._fd)
-{
-  o._fd = -1;
-}
-
-Fd_socket &Fd_socket::operator=(Fd_socket &&o) noexcept
-{
-  if ( this != &o )
-  {
-    close();
-    _fd = o._fd;
-    o._fd = -1;
-  }
-  return *this;
-}
-
-void Fd_socket::close() noexcept
-{
-  if ( _fd != -1 )
-  {
-    ::close(_fd);
-  }
-}
-
 void Fd_socket::send(const void *buf, std::size_t size) const
 {
-  auto r = ::send(_fd, buf, size, MSG_NOSIGNAL);
+  auto r = ::send(fd(), buf, size, MSG_NOSIGNAL);
   if ( r < 0 )
   {
     auto e = errno;
@@ -91,7 +61,7 @@ void Fd_socket::recv(void *buf, std::size_t size) const
   std::ptrdiff_t r;
   do
   {
-     r = ::read(_fd, buf, size);
+     r = ::read(fd(), buf, size);
   } while (r == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) );
   if ( r < 0 )
   {

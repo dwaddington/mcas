@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -51,7 +51,7 @@
  * multiple key and data sizes)
  */
 
-using namespace Component;
+using namespace component;
 
 namespace {
 
@@ -83,13 +83,13 @@ class KVStore_test
   }
 
   static constexpr std::size_t threads = 4;
-  using poolv_t = std::array<Component::IKVStore::pool_t, threads>;
+  using poolv_t = std::array<component::IKVStore::pool_t, threads>;
 
   // Objects declared here can be used by all tests in the test case
 
   /* persistent memory if enabled at all, is simulated and not real */
   static bool pmem_simulated;
-  static Component::IKVStore * _kvstore;
+  static component::IKVStore * _kvstore;
 
   static constexpr unsigned many_key_length_short = 16;
   static constexpr unsigned many_key_length_long = 32;
@@ -122,13 +122,13 @@ class KVStore_test
     , std::size_t value_length
   ) -> kvv_t;
   static long unsigned put_many(
-    Component::IKVStore::pool_t pool
+    component::IKVStore::pool_t pool
     , const kvv_t &kvv
     , const std::string &descr
   );
   static long unsigned put_many_threaded(const kvv_t &kvv, const std::string &descr);
   static void get_many(
-    Component::IKVStore::pool_t pool
+    component::IKVStore::pool_t pool
     , const kvv_t &kv
     , const std::string &descr
   );
@@ -168,7 +168,7 @@ const std::size_t KVStore_test::many_count_target_small =
   std::getenv("COUNT_TARGET") ? std::stoul(std::getenv("COUNT_TARGET")) : 400;
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
-Component::IKVStore *KVStore_test::_kvstore;
+component::IKVStore *KVStore_test::_kvstore;
 KVStore_test::poolv_t KVStore_test::pool;
 
 constexpr unsigned KVStore_test::many_key_length_short;
@@ -196,18 +196,24 @@ TEST_F(KVStore_test, Instantiate)
 {
   /* create object instance through factory */
   auto link_library = "libcomponent-" + store_map::impl->name + ".so";
-  Component::IBase * comp = Component::load_component(link_library,
+  component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
   ASSERT_TRUE(comp);
   auto fact =
-    static_cast<IKVStore_factory *>(
-      comp->query_interface(IKVStore_factory::iid())
+    component::make_itf_ref(
+      static_cast<IKVStore_factory *>(
+        comp->query_interface(IKVStore_factory::iid())
+      )
     );
 
-  _kvstore = fact->create("owner", "name", store_map::location);
-
-  fact->release_ref();
+  _kvstore =
+    fact->create(
+      0
+      , {
+          { +component::IKVStore_factory::k_dax_config, store_map::location }
+        }
+    );
 }
 
 TEST_F(KVStore_test, RemoveOldPool)
@@ -229,12 +235,6 @@ TEST_F(KVStore_test, RemoveOldPool)
 
 TEST_F(KVStore_test, CreatePools)
 {
-  /* Note: when using USE_DRAM=n, the memory system takes 1 GB for overhead,
-   * Test which require the sum of all regions to be m require specifying m+1
-   * for USE_DRAM.
-   * Example: 4 threads, each requiring a 15GB region, require USE_DRAM=61.
-   */
-
   /* time to create pools, in estimate objects / second */
   std::cerr << "many_count_target " << many_count_target << "\n";
   std::cerr << "estimated_object_count " << estimated_object_count << "\n";
@@ -251,22 +251,22 @@ TEST_F(KVStore_test, CreatePools)
    *    estimated_object_count * size of index object / index efficiency
    *   rounded up to power of 2.
    */
-  auto index_alloc = round_up_to_pow2(( estimated_object_count * 64 * 5 ) / 5);
+  auto index_alloc = round_up_to_pow2(( estimated_object_count * 64U* 5U) / 5U);
   /* The largest segment, which consumes half the space, will be require
    * that double its size be availabe during allocation. (nupm::Region_map
    * requires size bytes aligned by alignment, where alignment == size.
    * The strategy for doing that is to ask for size+alignment bytes and
    * from that carve out size bytes properly aligned.
    */
-  index_alloc = index_alloc * 3 / 2;
+  index_alloc = index_alloc * 3U / 2U;
   auto key_alloc = large_keys_size * many_count_target;
   auto value_alloc = large_values_size * many_count_target;
   std::cerr << "index alloc " << index_alloc << "\n";
   std::cerr << "key alloc " << key_alloc << "\n";
   std::cerr << "value alloc " << value_alloc << "\n";
   auto pool_alloc_needed = index_alloc + key_alloc + value_alloc;
-  auto pool_header_size = 0x4d0;
-  auto pool_alloc = pool_header_size + pool_alloc_needed * 4 / 3;
+  std::size_t pool_header_size = 0x4d0;
+  auto pool_alloc = pool_header_size + pool_alloc_needed * 4U/ 3U;
   if ( std::getenv("POOL_ALLOCATE_FACTOR") )
   {
     double af = std::stod(getenv("POOL_ALLOCATE_FACTOR"));
@@ -361,7 +361,7 @@ TEST_F(KVStore_test, PopulateManyLargeLarge)
 }
 
 long unsigned KVStore_test::put_many(
-  Component::IKVStore::pool_t pool, const kvv_t &kvv, const std::string &descr
+  component::IKVStore::pool_t pool_, const kvv_t &kvv, const std::string &descr
 )
 {
   long unsigned count = 0;
@@ -376,7 +376,7 @@ long unsigned KVStore_test::put_many(
     {
       const auto &key = std::get<0>(kv);
       const auto &value = std::get<1>(kv);
-      auto r = _kvstore->put(pool, key, value.data(), value.length());
+      auto r = _kvstore->put(pool_, key, value.data(), value.length());
       if ( r == S_OK )
       {
           ++count;
@@ -466,7 +466,7 @@ TEST_F(KVStore_test, Size1)
 }
 
 void KVStore_test::get_many(
-  Component::IKVStore::pool_t pool
+  component::IKVStore::pool_t pool_
   , const kvv_t &kvv
   , const std::string &descr
 )
@@ -489,7 +489,7 @@ void KVStore_test::get_many(
         const auto &key = std::get<0>(kv);
         void * value = nullptr;
         size_t value_len = 0;
-        auto r = _kvstore->get(pool, key, value, value_len);
+        auto r = _kvstore->get(pool_, key, value, value_len);
         EXPECT_EQ(S_OK, r);
         if ( S_OK == r )
         {
@@ -569,7 +569,7 @@ TEST_F(KVStore_test, OpenPool2)
     }
   );
   ASSERT_TRUE(_kvstore);
-  using fv = std::vector<std::future<Component::IKVStore::pool_t>>;
+  using fv = std::vector<std::future<component::IKVStore::pool_t>>;
   fv v;
   for ( auto i = std::size_t(); i != pool.size(); ++i )
   {

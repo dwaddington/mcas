@@ -14,11 +14,11 @@
 #include "mcas_python_config.h"
 #include "pool_type.h"
 
-using namespace Component;
+using namespace component;
 
 typedef struct {
   PyObject_HEAD
-  Component::IMCAS * _mcas;
+  component::IMCAS * _mcas;
   int                _port;
 } Session;
 
@@ -92,7 +92,7 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   addr << p_ip << ":" << port;
 
 
-  using namespace Component;
+  using namespace component;
   
   /* create object instance through factory */
   std::string path = MCAS_LIB_PATH;
@@ -105,7 +105,7 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
     return -1;
   }
   
-  auto fact = static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid()));
+  auto fact = make_itf_ref(static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid())));
   if(fact == nullptr) {
     PyErr_SetString(PyExc_RuntimeError, "mcas.Session failed to get IMCAS_factory");
     return -1;
@@ -116,22 +116,25 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   if(p_env_user_name) user_name = p_env_user_name;
   else user_name = "unknown";
   
-  self->_mcas = fact->mcas_create(debug_level,
+  self->_mcas = fact->mcas_create(debug_level, 30,
                                   user_name,
                                   addr.str(),
                                   device);
   self->_port = port;
-  
-  fact->release_ref();
 
   PLOG("session: (%s)(%s) %p", addr.str().c_str(), device.c_str(), self->_mcas);
   return 0;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+
 static PyMemberDef Session_members[] = {
   {"port", T_ULONG, offsetof(Session, _port), READONLY, "Port"},
   {NULL}
 };
+
+#pragma GCC diagnostic pop
 
 PyDoc_STRVAR(open_pool_doc,"Session.open_pool(name,[readonly=True]) -> Open pool.");
 PyDoc_STRVAR(create_pool_doc,"Session.create_pool(name,pool_size,objcount) -> Create pool.");
@@ -213,7 +216,7 @@ static PyObject * open_pool(Session* self, PyObject *args, PyObject *kwds)
   assert(self->_mcas);
   Pool * p = Pool_new();
   uint32_t flags = 0;
-  if(read_only) flags |= Component::IKVStore::FLAGS_READ_ONLY;
+  if(read_only) flags |= component::IKVStore::FLAGS_READ_ONLY;
 
   self->_mcas->add_ref();
 
@@ -258,7 +261,7 @@ static PyObject * create_pool(Session* self, PyObject *args, PyObject *kwds)
   Pool * p = Pool_new();
   
   uint32_t flags = 0;
-  if(create_only) flags |= Component::IKVStore::FLAGS_CREATE_ONLY;
+  if(create_only) flags |= component::IKVStore::FLAGS_CREATE_ONLY;
 
   assert(self->_mcas);
   p->_mcas = self->_mcas;
@@ -310,7 +313,7 @@ static PyObject * delete_pool(Session* self, PyObject *args, PyObject *kwds)
 
 static PyObject * get_stats(Session* self, PyObject *args, PyObject *kwds)
 {
-  Component::IMCAS::Shard_stats stats;
+  component::IMCAS::Shard_stats stats;
 
   PLOG("mcas.Session.get_statistics ");
   status_t hr = self->_mcas->get_statistics(stats);

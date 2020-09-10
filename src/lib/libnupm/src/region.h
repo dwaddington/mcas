@@ -36,8 +36,11 @@
 #include <memory>
 #include <set>
 #include <sstream> /* stringstream */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <tbb/cache_aligned_allocator.h>
 #include <tbb/scalable_allocator.h>
+#pragma GCC diagnostic pop
 
 #define SANITY_CHECK 0
 namespace nupm {
@@ -47,6 +50,8 @@ namespace nupm {
  *
  */
 class Region {
+  Region(const Region &) = delete;
+  Region &operator=(const Region &) = delete;
   static constexpr unsigned _debug_level = 0;
 
   using list_t = std::forward_list<void *, tbb::scalable_allocator<void *>>;
@@ -57,6 +62,7 @@ class Region {
 #if SANITY_CHECK
     _used.push_front(p);
 #else
+    (void) p;
     ++_use_count;
 #endif
     if ( use_count() == _capacity / 2 )
@@ -212,8 +218,13 @@ public:
   }
 
   void *base() const { return _base; }
+
+  std::size_t capacity() const {
+    return _capacity;
+  }
+
   std::size_t size() const {
-    return static_cast<char *>(_top) - static_cast<char *>(_base);
+    return std::size_t(static_cast<char *>(_top) - static_cast<char *>(_base));
   }
 
   void debug_dump(std::string *out_log = nullptr) {
@@ -264,11 +275,36 @@ class Region_map {
   static constexpr unsigned NUM_BUCKETS = 64;
   static constexpr int MAX_NUMA_ZONES = 2;
   static constexpr unsigned _debug_level = 0;
+  static constexpr unsigned debug_level() { return _debug_level; }
 
 public:
-  Region_map() {}
+  Region_map()
+    : _mapper()
+    , _arena_allocator()
+    , _buckets()
+  {}
 
-  ~Region_map() {}
+  ~Region_map()
+   {
+     auto node_ix = 0;
+     for ( const auto &node_buckets : _buckets )
+     {
+       auto list_ix = 0;
+       for ( const auto & bucket_list : node_buckets )
+       {
+         if ( ! bucket_list.empty() )
+         {
+           CPLOG(1, "%s: node %d size %d", __func__, node_ix, 1 << list_ix);
+           for ( const auto &bucket : bucket_list )
+           {
+             CPLOG(1, "%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
+           }
+         }
+         ++list_ix;
+       }
+       ++node_ix;
+     }
+   }
 
   void add_arena(void *arena_base, size_t arena_length, int numa_node) {
     if (numa_node < 0 || numa_node >= MAX_NUMA_ZONES)
@@ -310,7 +346,7 @@ public:
     if (_debug_level > 2) {
       if (size <=
           nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
-        assert(((addr_t)p) % _mapper.rounded_up_object_size(size) ==
+        assert(reinterpret_cast<addr_t>(p) % _mapper.rounded_up_object_size(size) ==
                0); /* small objects should be size-aligned */
       }
     }
@@ -380,7 +416,7 @@ public:
       if (size <=
           nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
         /* small objects should be aligned with bucket object size */
-        assert(((addr_t)ptr) % _mapper.rounded_up_object_size(size) == 0);
+        assert(reinterpret_cast<addr_t>(ptr) % _mapper.rounded_up_object_size(size) == 0);
       }
     }
 
@@ -470,8 +506,8 @@ private:
     /* allocate region */
     auto region_object_size = _mapper.rounded_up_object_size(object_size);
 
-    /* If the object is to be allocated from a slab, the allocation alignment here must
-     * be for the whole slab, not just the object.
+    /* If the object is to be allocated for a slab, the allocation alignment here must
+     * be for the whole slab, not just the object. (But why?)
      */
     auto region_object_alignment =
       _mapper.could_exist_in_region(object_size)

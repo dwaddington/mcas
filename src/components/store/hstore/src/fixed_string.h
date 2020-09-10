@@ -48,8 +48,9 @@ namespace
  * - size: length of data (data immediately follows the fixed_string object)
  */
 template <typename T>
-	class fixed_string
+	struct fixed_string
 	{
+	private:
 		unsigned _ref_count;
 		unsigned _alignment;
 		signed _lock;
@@ -77,7 +78,7 @@ template <typename T>
 				, std::size_t alignment_
 			)
 				: fixed_string(
-					static_cast<std::size_t>(last_-first_ + pad_)
+					std::size_t(last_-first_) + pad_
 					, alignment_
 				)
 			{
@@ -166,6 +167,11 @@ template <typename T>
 		bool is_locked() const
 		{
 			return _lock != 0;
+		}
+
+		bool is_locked_exclusive() const
+		{
+			return _lock == -1;
 		}
 
 		void reset_lock()

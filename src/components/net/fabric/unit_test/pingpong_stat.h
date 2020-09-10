@@ -16,8 +16,9 @@
 #include <chrono> /* high_resolution_clock */
 #include <cstdint> /* uint64_t */
 
-class pingpong_stat
+struct pingpong_stat
 {
+private:
   std::chrono::high_resolution_clock::time_point _start;
   std::chrono::high_resolution_clock::time_point _stop;
   std::uint64_t _poll_count;

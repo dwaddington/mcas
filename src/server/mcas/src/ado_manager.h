@@ -6,7 +6,7 @@
 #include <threadipc/queue.h>
 
 #include <set>
-#include <thread>
+#include <future>
 #include <utility>
 #include <vector>
 
@@ -31,14 +31,21 @@ struct compare {
   }
 };
 
-class ADO_manager : public mcas::Config_file {
- public:
+class ADO_manager {
+
+private:
+  static constexpr unsigned _debug_level = 0;
+  mcas::Config_file         _config;
+  
+  inline unsigned debug_level() const { return _debug_level; }
+  
+public:
   ADO_manager(Program_options &options)
-    : mcas::Config_file(options.config_file),
+    : _config(options.debug_level, options.config),
       _ados{},
       _ado_cpu_pool{},
       _manager_cpu_pool{},
-      _thread(&ADO_manager::init, this)
+      _thread(std::async(std::launch::async, &ADO_manager::init, this))
   {
     while (!_running) usleep(1000);
     _sla = NULL;
@@ -48,7 +55,8 @@ class ADO_manager : public mcas::Config_file {
   ~ADO_manager() { exit(); }
   void setSLA();
 
- private:
+private:
+  static constexpr const char *_cname = "ADO_manager";
   SLA *                   _sla = NULL;
   std::vector<struct ado> _ados;
   // std::set<std::pair<unsigned int, unsigned int>, compare> _ado_cpu_pool;
@@ -56,21 +64,12 @@ class ADO_manager : public mcas::Config_file {
   std::set<unsigned int> _manager_cpu_pool;
   bool                   _running = false;
   bool                   _exit    = false;
-  std::thread            _thread;
+  std::future<void>      _thread;
 
   void init();
   void main_loop();
 
-  void exit()
-  {
-    _exit = true;
-    /* kill ADO processes */
-    for (auto &ado : _ados) kill_ado(ado);
-
-    Threadipc::Thread_ipc::instance()->cleanup();
-    _thread.join();
-    PLOG("Ado_manager: threads joined");
-  }
+  void exit();
 
   void resource_check()
   {

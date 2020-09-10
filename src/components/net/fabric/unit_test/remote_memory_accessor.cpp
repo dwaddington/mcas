@@ -27,7 +27,7 @@
 #include <vector>
 
 
-void remote_memory_accessor::send_memory_info(Component::IFabric_communicator &cnxn_, registered_memory &rm_)
+void remote_memory_accessor::send_memory_info(component::IFabric_communicator &cnxn_, registered_memory &rm_)
 {
   std::uint64_t vaddr = reinterpret_cast<std::uint64_t>(&rm_[0]);
   std::uint64_t key = rm_.key();
@@ -41,7 +41,7 @@ void remote_memory_accessor::send_memory_info(Component::IFabric_communicator &c
   send_msg(cnxn_, rm_, msg, sizeof msg);
 }
 
-void remote_memory_accessor::send_msg(Component::IFabric_communicator &cnxn_, registered_memory &rm_, const void *msg_, std::size_t len_)
+void remote_memory_accessor::send_msg(component::IFabric_communicator &cnxn_, registered_memory &rm_, const void *msg_, std::size_t len_)
 {
   std::memcpy(&rm_[0], msg_, len_);
   std::vector<::iovec> v{{&rm_[0],len_}};

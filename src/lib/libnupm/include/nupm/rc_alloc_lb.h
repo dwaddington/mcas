@@ -36,7 +36,7 @@ class Region_map;
  * NOTE: This class is NOT thread safe.
  *
  */
-class Rca_LB : public Common::Reconstituting_allocator {
+class Rca_LB : public common::Reconstituting_allocator {
  public:
   /**
    * Constructor
@@ -108,11 +108,11 @@ template <>
 	{
 		static auto allocate(nupm::Rca_LB *pmr, unsigned numa_node, std::size_t bytes, std::size_t alignment)
 		{
-			return pmr->alloc(bytes, numa_node, alignment);
+			return pmr->alloc(bytes, int(numa_node), alignment);
 		}
 		static auto deallocate(nupm::Rca_LB *pmr, unsigned numa_node, void *p, std::size_t bytes, std::size_t)
 		{
-			return pmr->free(p, numa_node, bytes);
+			return pmr->free(p, int(numa_node), bytes);
 		}
 	};
 #endif

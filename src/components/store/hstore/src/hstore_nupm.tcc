@@ -24,9 +24,8 @@
 #include <cstdlib> /* getenv */
 #include <cstring> /* strerror */
 
-namespace
-{
-  unsigned name_to_numa_node(const std::string &name)
+template <typename Region, typename Table, typename Allocator, typename LockType>
+  unsigned hstore_nupm<Region, Table, Allocator, LockType>::name_to_numa_node(const std::string &name)
   {
     if ( 0 == name.size() )
     {
@@ -46,9 +45,8 @@ namespace
       c = '0';
 #endif
     }
-    return c - '0';
+    return unsigned(c - '0');
   }
-}
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
   std::uint64_t hstore_nupm<Region, Table, Allocator, LockType>::dax_uuid_hash(const pool_path &p)
@@ -58,11 +56,8 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   }
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
-  bool hstore_nupm<Region, Table, Allocator, LockType>::debug() { return false; }
-
-template <typename Region, typename Table, typename Allocator, typename LockType>
-  hstore_nupm<Region, Table, Allocator, LockType>::hstore_nupm(const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_, bool debug_)
-    : pool_manager<::open_pool<std::unique_ptr<Region, region_closer_t>>>(debug_)
+  hstore_nupm<Region, Table, Allocator, LockType>::hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_)
+    : pool_manager<::open_pool<non_owner<region_type>>>(debug_level_)
     , _devdax_manager(std::move(mgr_))
     , _numa_node(name_to_numa_node(name_))
   {}
@@ -78,17 +73,11 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   }
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
-  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_create(
+  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_create_1(
     const pool_path &path_
     , std::size_t size_
-    , int flags_
-    , std::size_t expected_obj_count_
-  ) -> std::unique_ptr<open_pool_handle>
+  ) -> std::tuple<void *, std::size_t, std::uint64_t>
   {
-    if ( flags_ != 0 )
-    {
-      throw pool_error("unsupported flags " + std::to_string(flags_), pool_ec::pool_unsupported_mode);
-    }
     auto uuid = dax_uuid_hash(path_);
     auto size = size_;
 
@@ -101,28 +90,28 @@ template <typename Region, typename Table, typename Allocator, typename LockType
      * Ask for enough space to contain the header and to compensate for inefficiency
      * due to heap alignment.
      */
-    size = sizeof(Region) + size_ * 4 / 3;
+    size = sizeof(region_type) + size_ * 4 / 3;
 #endif
 
-#if defined HSTORE_GRAIN_SIZE
+#if defined HSTORE_LOG_GRAIN_SIZE
     /* _devdax_manager will allocate a region of some granularity But there is no mechanism for it to
      * tell us that. Round request up to a grain size, if specified, to avoid wasting space.
      */
-    size = round_up(size_, (HSTORE_GRAIN_SIZE));
+	const std::size_t hstore_grain_size = std::size_t(1) << (HSTORE_LOG_GRAIN_SIZE);
+    size = round_up(size_,hstore_grain_size);
 #endif
     /* Attempt to create a new pool. */
     try
     {
-      void *pop = _devdax_manager->create_region(uuid, _numa_node, size);
+      auto v = _devdax_manager->create_region(uuid, _numa_node, size);
       /* Guess that nullptr indicate a failure */
-      if ( ! pop )
+      if ( ! v )
       {
         throw pool_error("create_region fail: " + path_.str(), pool_ec::region_fail);
       }
-      PLOG(PREFIX "in %s: created region ID %" PRIx64 " at %p:0x%zx", LOCATION, path_.str().c_str(), uuid, pop, size);
-
-      open_pool_handle h(new (pop) Region(uuid, size, expected_obj_count_, _numa_node), region_closer_t(this->shared_from_this()));
-      return std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(path_, std::move(h), construction_mode::create);
+      PLOG(PREFIX "in %s: created region ID %" PRIx64 " at %p:0x%zx", LOCATION, path_.str().c_str(), uuid, v, size);
+      /* explicit constructor call for g++ 5 */
+      return std::tuple<void *, std::size_t, std::uint64_t>{ v, size, uuid };
     }
     catch ( const General_exception &e )
     {
@@ -138,31 +127,74 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     }
   }
 
-  template <typename Region, typename Table, typename Allocator, typename LockType>
-  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_open(
-    const pool_path &path_
-    , int flags_
+template <typename Region, typename Table, typename Allocator, typename LockType>
+  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_create_2(
+    AK_ACTUAL
+    void *v_
+    , std::size_t size_
+    , std::uint64_t uuid_
+    , component::IKVStore::flags_t flags_
+    , std::size_t expected_obj_count_
   ) -> std::unique_ptr<open_pool_handle>
   {
     if ( flags_ != 0 )
     {
       throw pool_error("unsupported flags " + std::to_string(flags_), pool_ec::pool_unsupported_mode);
     }
-    auto uuid = dax_uuid_hash(path_);
-    open_pool_handle pop(
-      std::unique_ptr<region_type, region_closer_t>(
-        new (_devdax_manager->open_region(uuid, _numa_node, nullptr)) region_type(_devdax_manager)
-        , region_closer_t(this->shared_from_this())
-      )
-    );
-    if ( ! pop )
+
+    /* Attempt to create a new pool. */
+    try
     {
-      throw std::invalid_argument("failed to re-open pool");
+      open_pool_handle h(new (v_) region_type(AK_REF this->debug_level(), uuid_, size_, expected_obj_count_, _numa_node));
+      return std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(AK_REF std::move(h), construction_mode::create);
+    }
+    catch ( const General_exception &e )
+    {
+      throw pool_error(std::string("create_region fail: ") + e.cause(), pool_ec::region_fail_general_exception);
+    }
+    catch ( const std::bad_alloc& e)
+    {
+      throw pool_error("create_region fail (bad alloc): ", pool_ec::region_fail_general_exception);
+    }
+    catch ( const API_exception &e )
+    {
+      throw pool_error(std::string("create_region fail: ") + e.cause(), pool_ec::region_fail_api_exception);
+    }
+  }
+
+  template <typename Region, typename Table, typename Allocator, typename LockType>
+  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_open_1(
+    const pool_path &path_
+  ) -> void *
+  {
+    auto uuid = dax_uuid_hash(path_);
+    auto v = _devdax_manager->open_region(uuid, _numa_node, nullptr);
+
+    if ( ! v )
+    {
+      throw pool_error("in Devdax_manger::open_region faili: " + path_.str(), pool_ec::region_fail);
     }
 
-    PLOG(PREFIX "in %s: opened region ID %" PRIx64 " at %p", LOCATION, path_.str().c_str(), uuid, static_cast<const void *>(pop.get()));
-    /* open_pool_handle is a managed region *, and pop is a region. */
-    auto s = std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(path_, std::move(pop), construction_mode::reconstitute);
+    return v;
+  }
+
+  template <typename Region, typename Table, typename Allocator, typename LockType>
+  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_open_2(
+    AK_ACTUAL
+    void *v
+    , component::IKVStore::flags_t flags_
+  ) -> std::unique_ptr<open_pool_handle>
+  {
+    if ( flags_ != 0 )
+    {
+      throw pool_error("unsupported flags " + std::to_string(flags_), pool_ec::pool_unsupported_mode);
+    }
+
+    open_pool_handle h(new (v) region_type(this->debug_level(), _devdax_manager));
+
+    PLOG(PREFIX "in open_2 region at %p", LOCATION, v);
+    /* open_pool_handle is a managed region * */
+    auto s = std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(AK_REF std::move(h), construction_mode::reconstitute);
     return s;
   }
 

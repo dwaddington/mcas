@@ -26,11 +26,18 @@
 
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
+#include <arpa/inet.h> /* inet_pton, htons */
+#include <netinet/ip.h> /* sockaddr_in */
 
+#include <strings.h> /* strcasecmp */
 
+#include <cinttypes> /* SCNu16 */
+#include <cstddef> /* size_t */
 #include <cstdint> /* uint32_t, uint64_t */
+#include <cstdlib> /* calloc, free */
 #include <cstring> /* strdup */
 #include <map>
+#include <regex>
 #include <stdexcept> /* domain_error */
 #include <string>
 #include <vector>
@@ -291,6 +298,10 @@ namespace
   {
     auto a = parse_array_uint8(v);
     auto k = static_cast<uint8_t *>(std::malloc(a.size()));
+    if ( k == nullptr )
+    {
+      throw std::bad_alloc();
+    }
     std::move(a.begin(), a.end(), k);
     std::free(*p);
     *p = k;
@@ -301,6 +312,10 @@ namespace
   {
     auto a = parse_array_uint8(v);
     auto k = static_cast<uint8_t *>(std::malloc(a.size()));
+    if ( k == nullptr )
+    {
+      throw std::bad_alloc();
+    }
     std::move(a.begin(), a.end(), k);
     std::free(*p);
     *p = k;
@@ -472,14 +487,124 @@ namespace
     { "caps", SET_BITSET(fi_info,caps,map_caps) },
     { "mode", SET_BITSET(fi_info,mode,map_mode) },
     { "addr_format", SET_SCALAR_MAPPED(fi_info,addr_format,map_addr_format) },
-    { "src", assign_addr<&fi_info::src_addr, &fi_info::src_addrlen> },
-    { "dest", assign_addr<&fi_info::dest_addr, &fi_info::dest_addrlen> },
+    { "src_addr", assign_addr<&fi_info::src_addr, &fi_info::src_addrlen> },
+    { "dest_addr", assign_addr<&fi_info::dest_addr, &fi_info::dest_addrlen> },
     { "tx_attr", { parse_struct<fi_tx_attr, &map_tx_attr, &fi_info::tx_attr> } },
     { "rx_attr", { parse_struct<fi_rx_attr, &map_rx_attr, &fi_info::rx_attr> } },
     { "ep_attr", { parse_struct<fi_ep_attr, &map_ep_attr, &fi_info::ep_attr> } },
     { "domain_attr", { parse_struct<fi_domain_attr, &map_domain_attr, &fi_info::domain_attr> } },
     { "fabric_attr", { parse_struct<fi_fabric_attr, &map_fabric_attr, &fi_info::fabric_attr> } },
   };
+
+  /* Begin address parting: would use ofi_str_toaddr, but it is not exported */
+  using inner_parse = int(const char *str, void *&addr, std::size_t &len);
+
+  std::regex rx_sin("://([^:]*)?(:([^/]*))?(/.*)?");
+  /*                    1       2 3        4     */
+
+  int sin_parse(const char *str, void *& addr, std::size_t &len)
+  {
+    std::cmatch mr;
+
+    len = sizeof(sockaddr_in);
+    auto sin = static_cast<sockaddr_in *>(::calloc(1, sizeof(sockaddr_in)));
+
+    sin->sin_family = AF_INET;
+
+    int rc = 0;
+
+    if ( std::regex_match(str, mr, rx_sin) )
+    {
+      auto ip = mr.str(1);
+      if ( ip.size() )
+      {
+        rc = 1 != ::inet_pton(AF_INET, ip.c_str(), &sin->sin_addr);
+      }
+      if ( rc == 0 && 3 < mr.size() )
+      {
+        uint16_t port = 0;
+        const auto &sm = mr[3];
+        if ( sm.matched )
+        {
+          auto port_str = sm.str();
+          int ct = ::sscanf(port_str.c_str(), "%" SCNu16, &port);
+          if ( ct != 1 )
+          {
+            rc = 1;
+          }
+        }
+        sin->sin_port = htons(port);
+      }
+    }
+    else
+    {
+      rc = 1;
+    }
+
+    if ( rc == 0 )
+    {
+      addr = sin;
+    }
+    else
+    {
+      ::free(sin);
+    }
+    return rc;
+  }
+
+  int sin6_parse(const char *, void *&, std::size_t &)
+  { /* not implemented */
+    return -1;
+  }
+
+  struct caseless_less
+  {
+    bool operator()(const std::string &a, const std::string &b) const
+    {
+      return strcasecmp(a.c_str(), b.c_str()) < 0;
+    }
+  };
+
+  const std::map<std::string, std::uint32_t, caseless_less> s_to_a {
+    { "fi_sockaddr", FI_SOCKADDR },
+    { "fi_sockaddr_in", FI_SOCKADDR_IN },
+    { "fi_sockaddr_in6", FI_SOCKADDR_IN6 },
+    { "fi_sockaddr_ib", FI_SOCKADDR_IB },
+    { "fi_addr_psmx", FI_ADDR_PSMX },
+    { "fi_addr_gni", FI_ADDR_GNI },
+    { "fi_addr_str", FI_ADDR_STR },
+  };
+
+  const std::map<std::uint32_t, inner_parse *> a_to_p {
+    { FI_SOCKADDR_IN, sin_parse },
+    { FI_SOCKADDR_IN6, sin6_parse },
+  };
+
+  std::regex rx("([^:]*)(:.*)?");
+
+  int str_to_addr(const char *str, std::uint32_t &format, void * &addr, std::size_t &len)
+  {
+    auto rc = 1;
+    std::cmatch mr;
+    if ( std::regex_match(str, mr, rx) )
+    {
+      const auto it_a = s_to_a.find(mr.str(1));
+      if ( it_a != s_to_a.end() )
+      {
+        const auto it_p = a_to_p.find(it_a->second);
+        if ( it_p != a_to_p.end() )
+        {
+          auto *fn = it_p->second;
+          rc = fn(mr.str(2).c_str(), addr, len);
+          if ( rc == 0 )
+          {
+            format = it_a->second;
+          }
+        }
+      }
+    }
+    return rc;
+  }
 
   std::shared_ptr<fi_info> parse_info(std::shared_ptr<fi_info> info, const rapidjson::Document &v)
   {
@@ -502,6 +627,39 @@ namespace
       catch (const std::domain_error &e)
       {
         throw std::domain_error{std::string{k} + " " + e.what()};
+      }
+    }
+
+    /* Parse of source addr, dest addr can handle only FI_ADDR_STR.
+     * Convert that to internal form.
+     */
+    if ( info->addr_format == FI_ADDR_STR )
+    {
+      if ( info->src_addr )
+      {
+        void *st{nullptr};
+        std::swap(st, info->src_addr);
+        if ( 0 == str_to_addr(static_cast<char *>(st), info->addr_format, info->src_addr, info->src_addrlen) )
+        {
+          ::free(st);
+        }
+        else
+        {
+          std::swap(st, info->src_addr);
+        }
+      }
+      if ( info->dest_addr )
+      {
+        void *st{nullptr};
+        std::swap(st, info->dest_addr);
+        if ( 0 == str_to_addr(static_cast<char *>(st), info->addr_format, info->dest_addr, info->dest_addrlen) )
+        {
+          ::free(st);
+        }
+        else
+        {
+          std::swap(st, info->dest_addr);
+        }
       }
     }
     return info;
@@ -547,7 +705,7 @@ std::shared_ptr<fi_info> parse_info(const std::string &s_)
  *      "mode" : (see above)
  *      "op_flags" : [ array of flags specified by strings enumerated in fabric_op_flags.h ]
  *      "msg_order" : [ array of flags specified by strings enumerated in fabric_msg_order.h ]
- *      "comp_order: [ array of flags specified by strings enumerated in fabric_comp_order.h ]
+ *      "comp_order": [ array of flags specified by strings enumerated in fabric_comp_order.h ]
  *      "inject_size" : unsigned
  *      "size" : unsigned
  *      "iov_limit" : unsigned
@@ -559,7 +717,7 @@ std::shared_ptr<fi_info> parse_info(const std::string &s_)
  *      "mode" : (see above)
  *      "op_flags" : [ array of flags specified by strings enumerated in fabric_op_flags.h ]
  *      "msg_order" : [ array of flags specified by strings enumerated in fabric_msg_order.h ]
- *      "comp_order: [ array of flags specified by strings enumerated in fabric_comp_order.h ]
+ *      "comp_order": [ array of flags specified by strings enumerated in fabric_comp_order.h ]
  *      "total_buffered_recv" : unsigned
  *      "size" : unsigned
  *      "iov_limit" : unsigned
@@ -583,37 +741,37 @@ std::shared_ptr<fi_info> parse_info(const std::string &s_)
  *    "domain_attr" : {
  *
  *               char                  *name;
- *                enum fi_threading     threading;
- *                enum fi_progress      control_progress;
- *                enum fi_progress      data_progress;
- *                enum fi_resource_mgmt resource_mgmt;
- *                enum fi_av_type       av_type;
- *                int                   mr_mode;
- *                size_t                mr_key_size" : unsigned
- *                size_t                cq_data_size" : unsigned
- *                size_t                cq_cnt" : unsigned
- *                size_t                ep_cnt" : unsigned
- *                size_t                tx_ctx_cnt" : unsigned
- *                size_t                rx_ctx_cnt" : unsigned
- *                size_t                max_ep_tx_ctx" : unsigned
- *                size_t                max_ep_rx_ctx" : unsigned
- *                size_t                max_ep_stx_ctx" : unsigned
- *                size_t                max_ep_srx_ctx" : unsigned
- *                size_t                cntr_cnt" : unsigned
- *                size_t                mr_iov_limit" : unsigned
- *                uint64_t              caps;
- *                uint64_t              mode;
- *                uint8_t               *auth_key;
- *                size_t                auth_key_size" : unsigned
- *                size_t                max_err_data" : unsigned
- *                size_t                mr_cnt" : unsigned
+ *                enum fi_threading     "threading";
+ *                enum fi_progress      "control_progress";
+ *                enum fi_progress      "data_progress";
+ *                enum fi_resource_mgmt "resource_mgmt";
+ *                enum fi_av_type       "av_type";
+ *                int                   "mr_mode";
+ *                size_t                "mr_key_size" : unsigned
+ *                size_t                "cq_data_size" : unsigned
+ *                size_t                "cq_cnt" : unsigned
+ *                size_t                "ep_cnt" : unsigned
+ *                size_t                "tx_ctx_cnt" : unsigned
+ *                size_t                "rx_ctx_cnt" : unsigned
+ *                size_t                "max_ep_tx_ctx" : unsigned
+ *                size_t                "max_ep_rx_ctx" : unsigned
+ *                size_t                "max_ep_stx_ctx" : unsigned
+ *                size_t                "max_ep_srx_ctx" : unsigned
+ *                size_t                "cntr_cnt" : unsigned
+ *                size_t                "mr_iov_limit" : unsigned
+ *                uint64_t              "caps";
+ *                uint64_t              "mode";
+ *                uint8_t               *"auth_key";
+ *                size_t                "auth_key_size" : unsigned
+ *                size_t                "max_err_data" : unsigned
+ *                size_t                "mr_cnt" : unsigned
  *    }
  *
  *    "fabric_attr" : {
- *                char              *name;
- *                char              *prov_name;
- *                uint32_t          prov_version" : unsigned
- *                uint32_t          api_version" : unsigned
+ *                char              *"name";
+ *                char              *"prov_name";
+ *                uint32_t          "prov_version" : unsigned
+ *                uint32_t          "api_version" : unsigned
  *    }
  *  }
  *

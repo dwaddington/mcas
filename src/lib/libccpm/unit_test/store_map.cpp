@@ -14,8 +14,8 @@
 
 const std::string store_map::impl_default = "hstore-cc";
 const store_map::impl_map_t store_map::impl_map = {
-  { "hstore-cc", { "hstore-cc", Component::hstore_factory } }
-  , { "hstore", { "hstore", Component::hstore_factory } }
+  { "hstore-cc", { "hstore-cc", component::hstore_factory } }
+  , { "hstore", { "hstore", component::hstore_factory } }
 };
 
 namespace

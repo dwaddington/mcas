@@ -57,7 +57,8 @@ extern "C" {
  *
  * @return Handle to channel or NULL on failure
  */
-channel_t uipc_create_channel(const char* path_name, size_t message_size,
+channel_t uipc_create_channel(const char* path_name,
+			      size_t message_size,
                               size_t queue_size);
 
 /**

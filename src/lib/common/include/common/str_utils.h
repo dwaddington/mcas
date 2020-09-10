@@ -30,7 +30,7 @@
 
 #include <string>
 
-namespace Common
+namespace common
 {
 /**
  * Simple global substring replacement
@@ -52,6 +52,6 @@ std::string string_replace(std::string &subject, const std::string &search,
  * @return Random string
  */
 std::string random_string(size_t length);
-}  // namespace Common
+}  // namespace common
 
 #endif  // __COMMON_STRUTILS_H__

@@ -1,11 +1,12 @@
 #ifndef __mcas_SERVER_TASK_KEY_FIND_H__
 #define __mcas_SERVER_TASK_KEY_FIND_H__
 
+#include "task.h"
+
+#include <gsl/pointers>
 #include <unistd.h>
 
 #include <string>
-
-#include "task.h"
 
 namespace mcas
 {
@@ -16,16 +17,17 @@ namespace mcas
  */
 class Key_find_task : public Shard_task {
   static constexpr unsigned MAX_COMPARES_PER_WORK = 5;
-  static const unsigned     _debug_level          = 0;
+  static const unsigned _debug_level          = 0;
 
  public:
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++" // uninitialized _expr, _out_key, _type
-  Key_find_task(const std::string& expression, offset_t offset, Connection_handler* handler, Component::IKVIndex* index)
-      : Shard_task(handler), _offset(offset), _index(index)
+#pragma GCC diagnostic ignored "-Weffc++"  // uninitialized _expr, _out_key, _type
+  Key_find_task(const std::string& expression, offset_t offset, Connection_handler* handler, gsl::not_null<component::IKVIndex*> index)
+      : Shard_task(handler),
+        _offset(offset),
+        _index(index)
   {
-    using namespace Component;
-    assert(_index);
+    using namespace component;
     _index->add_ref();
 
     if (_debug_level > 0) {
@@ -52,23 +54,20 @@ class Key_find_task : public Shard_task {
     else
       throw Logic_exception("unhandled expression");
 
-    assert(_index);
   }
 #pragma GCC diagnostic pop
 
-  Key_find_task(const Key_find_task &) = delete;
-  Key_find_task &operator=(const Key_find_task &) = delete;
-
-  ~Key_find_task() { _index->release_ref(); }
+  Key_find_task(const Key_find_task&) = delete;
+  Key_find_task& operator=(const Key_find_task&) = delete;
 
   //   case IKVIndex::FIND_TYPE_REGEX:
   // case IKVIndex::FIND_TYPE_EXACT:
   // case IKVIndex::FIND_TYPE_PREFIX:
   // }
 
-  status_t do_work()
+  status_t do_work() override
   {
-    using namespace Component;
+    using namespace component;
 
     status_t hr;
     try {
@@ -76,7 +75,7 @@ class Key_find_task : public Shard_task {
       //      PLOG("OFFSET=%lu", _offset);
       if (hr == E_MAX_REACHED) {
         _offset++;
-        return Component::IKVStore::S_MORE;
+        return component::IKVStore::S_MORE;
       }
       else if (hr == S_OK) {
         PLOG("matched: (%s)", _out_key.c_str());
@@ -101,11 +100,11 @@ class Key_find_task : public Shard_task {
   offset_t matched_position() const override { return _offset; }
 
  private:
-  std::string                 _expr;
-  std::string                 _out_key;
-  Component::IKVIndex::find_t _type;
-  offset_t                    _offset;
-  Component::IKVIndex*        _index;
+  std::string                             _expr;
+  std::string                             _out_key;
+  component::IKVIndex::find_t             _type;
+  offset_t                                _offset;
+  component::Itf_ref<component::IKVIndex> _index;
 };
 
 }  // namespace mcas

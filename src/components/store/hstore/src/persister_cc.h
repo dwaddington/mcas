@@ -19,9 +19,8 @@
 
 /* default "persister" for persistent memory: a no-op.
  */
-class persister
+struct persister
 {
-public:
   void persist(const void *, std::size_t) {}
 };
 

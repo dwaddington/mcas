@@ -29,8 +29,9 @@
 namespace impl
 {
 	template <typename AllocatorSegment, typename TypeAtomic>
-		class persist_data
+		struct persist_data
 		{
+		private:
 			/* Three types of allocation states at the moment. At most one at a time is "active" */
 			allocation_state_emplace _ase;
 			allocation_state_pin _aspd;
@@ -43,12 +44,16 @@ namespace impl
 			using allocator_type = AllocatorSegment;
 			using pm_type = persist_map<AllocatorSegment>;
 			using pa_type = persist_atomic<TypeAtomic>;
-			persist_data(std::size_t n, const AllocatorSegment &av)
+			persist_data(
+				AK_ACTUAL
+				std::size_t n
+				, const AllocatorSegment &av
+			)
 				: _ase{}
 				, _aspd{}
 				, _aspk{}
 				, _asx{}
-				, _persist_map(n, av, &_ase, &_aspd, &_aspk, &_asx)
+				, _persist_map(AK_REF n, av, &_ase, &_aspd, &_aspk, &_asx)
 				, _persist_atomic(&_ase)
 			{
 			}

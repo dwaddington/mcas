@@ -15,7 +15,7 @@
 #ifndef _FABRIC_CLIENT_GROUPED_H_
 #define _FABRIC_CLIENT_GROUPED_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric_server_grouped */
+#include <api/fabric_itf.h> /* component::IFabric_server_grouped */
 #include "fabric_connection_server.h"
 
 #include "fabric_generic_grouped.h"
@@ -27,7 +27,7 @@
 
 struct fi_info;
 struct fi_cq_err_entry;
-class event_producer;
+struct event_producer;
 class Fabric;
 class Fabric_comm_grouped;
 
@@ -37,14 +37,14 @@ class Fabric_comm_grouped;
 #endif
 
 class Fabric_server_grouped
-  : public Component::IFabric_server_grouped
+  : public component::IFabric_server_grouped
   , public Fabric_connection_server
-  , public Component::IFabric_communicator /* for internal use */
+  , public component::IFabric_communicator /* for internal use */
 {
   Fabric_op_control &c() { return *this; }
   Fabric_generic_grouped _g;
 
-  /* BEGIN Component::IFabric_server_grouped (IFabric_connection) */
+  /* BEGIN component::IFabric_server_grouped (IFabric_connection) */
   /**
    * @throw std::range_error - address already registered
    * @throw std::logic_error - inconsistent memory address tables
@@ -85,9 +85,9 @@ class Fabric_server_grouped
 public:
   std::size_t max_message_size() const noexcept override { return Fabric_op_control::max_message_size(); }
   std::size_t max_inject_size() const noexcept override { return Fabric_op_control::max_inject_size(); }
-  /* END Component::IFabric_server_grouped (IFabric_connection) */
+  /* END component::IFabric_server_grouped (IFabric_connection) */
 private:
-  Component::IFabric_communicator *allocate_group() override { return _g.allocate_group(); }
+  component::IFabric_communicator *allocate_group() override { return _g.allocate_group(); }
 
 public:
   /*
@@ -112,7 +112,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_old &completion_callback) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override
   {
     return Fabric_connection_server::poll_completions(completion_callback);
   }
@@ -120,7 +120,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_definite &completion_callback) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override
   {
     return Fabric_connection_server::poll_completions(completion_callback);
   }
@@ -128,7 +128,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &completion_callback) override
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override
   {
     return Fabric_connection_server::poll_completions_tentative(completion_callback);
   }
@@ -136,7 +136,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
   {
     return Fabric_connection_server::poll_completions(completion_callback, callback_param);
   }
@@ -144,7 +144,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
   {
     return Fabric_connection_server::poll_completions_tentative(completion_callback, callback_param);
   }
@@ -152,7 +152,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
   {
     return Fabric_connection_server::poll_completions(completion_callback, callback_param);
   }
@@ -160,7 +160,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
   {
     return Fabric_connection_server::poll_completions_tentative(completion_callback, callback_param);
   }

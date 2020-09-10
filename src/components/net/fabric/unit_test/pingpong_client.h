@@ -19,19 +19,20 @@
 #include <string>
 #include <memory> /* shared_ptr */
 
-namespace Component
+namespace component
 {
   class IFabric;
   class IFabric_client;
 }
 
-class registered_memory;
+struct registered_memory;
 
-class pingpong_client
+struct pingpong_client
 {
+private:
   void check_complete(::status_t stat);
 
-  std::shared_ptr<Component::IFabric_client> _cnxn;
+  std::shared_ptr<component::IFabric_client> _cnxn;
   pingpong_stat _stat;
   std::uint8_t _id;
 
@@ -39,7 +40,7 @@ protected:
   void do_quit();
 public:
   pingpong_client(
-    Component::IFabric &fabric
+    component::IFabric &fabric
     , const std::string &fabric_spec
     , const std::string ip_address
     , std::uint16_t port

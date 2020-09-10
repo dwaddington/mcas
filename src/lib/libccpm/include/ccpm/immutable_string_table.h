@@ -34,10 +34,11 @@ public:
   // };
                                         
 public:
+#if 0
   Immutable_string_table(void * buffer, size_t buffer_size)
     : Immutable_allocator_base(buffer, buffer_size) {
   }
-
+#endif
   Immutable_string_table(region_vector_t regions, bool force_init)
     : Immutable_allocator_base(regions, ccpm::accept_all, force_init) {
   }

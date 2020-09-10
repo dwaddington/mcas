@@ -15,7 +15,7 @@
 #ifndef _FABRIC_OP_CONTROL_H_
 #define _FABRIC_OP_CONTROL_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric_op_completer, ::status_t */
+#include <api/fabric_itf.h> /* component::IFabric_op_completer, ::status_t */
 #include "fabric_memory_control.h"
 #include "event_consumer.h"
 
@@ -38,8 +38,8 @@ struct fi_cq_err_entry;
 struct fid_cq;
 struct fid_ep;
 struct fid_mr;
-class event_producer;
-class event_registration;
+struct event_producer;
+struct event_registration;
 class Fabric;
 class Fabric_comm_grouped;
 class Fd_control;
@@ -50,7 +50,7 @@ class Fd_control;
 #endif
 
 class Fabric_op_control
-  : public Component::IFabric_op_completer
+  : public component::IFabric_op_completer
   , public Fabric_memory_control
   , public event_consumer
 {
@@ -81,7 +81,7 @@ class Fabric_op_control
   /* true after an FI_SHUTDOWN event has been observed */
   std::atomic<bool> _shut_down;
 
-  /* BEGIN Component::IFabric_op_completer */
+  /* BEGIN component::IFabric_op_completer */
 
   /* END IFabric_op_completer */
 
@@ -93,7 +93,7 @@ class Fabric_op_control
   /*
    * @throw std::system_error - writing event pipe
    */
-  void err(::fi_eq_err_entry &entry) noexcept override;
+  void err(::fid_eq *eq, ::fi_eq_err_entry &entry) noexcept override;
   /* END event_consumer */
 
   /*
@@ -150,37 +150,37 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_old &completion_callback) override;
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_definite &completion_callback) override;
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &completion_callback) override;
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override;
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override;
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override;
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(Component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override;
+  std::size_t poll_completions(component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override;
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override;
+  std::size_t poll_completions_tentative(component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override;
 
   std::size_t stalled_completion_count() override
   {

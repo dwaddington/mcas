@@ -15,26 +15,26 @@
 
 #ifdef __cplusplus
 
-#include <api/components.h>
-#include <api/fabric_itf.h>
-#include <api/kvstore_itf.h>
-#include <common/cpu.h>
-#include <common/cycles.h>
-#include <common/exceptions.h>
-#include <common/logging.h>
-#include <sys/mman.h>
-
-#include <map>
-#include <queue>
-#include <set>
-#include <thread>
-
 #include "buffer_manager.h"
 #include "fabric_connection_base.h"  // default to fabric transport
 #include "mcas_config.h"
 #include "pool_manager.h"
 #include "protocol.h"
+#include "protocol_ostream.h"
 #include "region_manager.h"
+
+#include <api/components.h>
+#include <api/fabric_itf.h>
+#include <api/kvstore_itf.h>
+#include <common/exceptions.h>
+#include <common/logging.h>
+#include <gsl/pointers>
+
+#include <cassert>
+#include <map>
+#include <queue>
+#include <utility> /* swap */
+#include <vector>
 
 namespace mcas
 {
@@ -46,12 +46,15 @@ using Connection_base = Fabric_connection_base;
 class Connection_handler
     : public Connection_base
     , public Region_manager {
- private:
-  unsigned option_DEBUG = mcas::Global::debug_level;
+  unsigned _debug_level;
 
-  /* Adaptor point for different transports */
-  using Connection = Component::IFabric_server;
-  using Factory    = Component::IFabric_server_factory;
+ protected:
+  enum State {
+    INITIAL,
+    WAIT_HANDSHAKE,
+    WAIT_NEW_MSG_RECV,
+    CLIENT_DISCONNECTED,
+  };
 
  public:
   enum {
@@ -62,210 +65,49 @@ class Connection_handler
 
   enum {
     ACTION_NONE = 0,
-    ACTION_RELEASE_VALUE_LOCK,
+    ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE,
     ACTION_POOL_DELETE,
   };
 
- protected:
-  enum State {
-    INITIALIZE,
-    POST_HANDSHAKE,
-    WAIT_HANDSHAKE,
-    WAIT_HANDSHAKE_RESPONSE_COMPLETION,
-    POST_MSG_RECV,
-    WAIT_NEW_MSG_RECV,
-    WAIT_RECV_VALUE,
-    WAIT_SEND_VALUE,
-  };
-
-  State _state = State::INITIALIZE;
-
- public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++" // many uninitialized/default initialized elements
-  Connection_handler(Factory* factory, Connection* connection)
-      : Connection_base(factory, connection), Region_manager(connection),
-        _pending_msgs{},
-        _pending_actions{},
-        _freq_mhz(Common::get_rdtsc_frequency_mhz())
-  {
-    _pending_actions.reserve(Buffer_manager<Connection>::DEFAULT_BUFFER_COUNT);
-    _pending_msgs.reserve(Buffer_manager<Connection>::DEFAULT_BUFFER_COUNT);
-  }
-#pragma GCC diagnostic pop
-
-  ~Connection_handler()
-  {
-    dump_stats();
-    //    exit(0); /* for profiler */
-  }
-
-  /**
-   * State machine transition tick.  It is really important that this tick
-   * execution duration is small, so that other connections are not impacted by
-   * the thread not returning to them.
-   *
-   */
-  int tick();
-
-  /**
-   * Change state in FSM
-   *
-   * @param s
-   */
-  inline void set_state(State s) { _state = s; /* we could add transition checking later */ }
-
-  /**
-   * Check for network completions
-   *
-   */
-  Fabric_connection_base::Completion_state check_network_completions()
-  {
-    auto state = poll_completions();
-    if (state == Fabric_connection_base::Completion_state::ADDED_DEFERRED_LOCK) {
-      /* deferred unlocks */
-      if (_deferred_unlock) {
-        if (option_DEBUG > 2) PLOG("adding action for deferred unlocking value @ %p", _deferred_unlock);
-        add_pending_action(action_t{ACTION_RELEASE_VALUE_LOCK, _deferred_unlock});
-        _deferred_unlock = nullptr;
-      }
-    }
-    return state;
-  }
-
-  /**
-   * Get pending message from the connection
-   *
-   * @param msg [out] Pointer to base protocol message
-   *
-   * @return Pointer to buffer holding the message or null if there are none
-   */
-  inline buffer_t* get_pending_msg(mcas::Protocol::Message*& msg)
-  {
-    if (_pending_msgs.empty()) return nullptr;
-    auto iob = _pending_msgs.back();
-    assert(iob);
-    _pending_msgs.pop_back();
-    msg = static_cast<mcas::Protocol::Message*>(iob->base());
-    return iob;
-  }
-
-  /**
-   * Peek at pending message from the connection. Used when the resources required
-   * to process a pending nessage may depend on the content of the message.
-   *
-   * @param msg [out] Pointer to base protocol message
-   *
-   * @return Pointer to buffer holding the message or null if there are none
-   */
-  inline mcas::Protocol::Message* peek_pending_msg() const
-  {
-    if (_pending_msgs.empty()) return nullptr;
-    auto iob = _pending_msgs.back();
-    assert(iob);
-    return static_cast<mcas::Protocol::Message*>(iob->base());
-  }
-
-  /**
-   * Discard a pending message from the connection. Used as a complement to
-   * peek_pending_msg
-   *
-   * @param msg [out] Pointer to base protocol message
-   *
-   * @return Pointer to buffer holding the message or null if there are none
-   */
-  inline buffer_t* pop_pending_msg()
-  {
-    assert(!_pending_msgs.empty());
-    auto iob = _pending_msgs.back();
-    _pending_msgs.pop_back();
-    return iob;
-  }
-
-  /**
-   * Get deferrd action
-   *
-   * @param action [out] Action
-   *
-   * @return True if action
-   */
-  inline bool get_pending_action(action_t& action)
-  {
-    if (_pending_actions.empty()) return false;
-
-    action = _pending_actions.back();
-
-    if (option_DEBUG > 2) PLOG("Connection_handler: popped pending action (%u, %p)", action.op, action.parm);
-
-    _pending_actions.pop_back();
-    return true;
-  }
-
-  /**
-   * Add an action to the pending queue
-   *
-   * @param action Action to add
-   */
-  inline void add_pending_action(const action_t action) { _pending_actions.push_back(action); }
-
-  /**
-   * Post a response
-   *
-   * @param iob IO buffer to post
-   */
-  inline void post_response(buffer_t* iob, buffer_t* val_iob = nullptr)
-  {
-    assert(iob);
-
-    post_send_buffer(iob, val_iob);
-    if (val_iob) {
-      _posted_value_buffer = val_iob;
-    }
-
-    _stats.response_count++;
-
-    set_state(POST_MSG_RECV); /* don't wait for this, let it be picked up in
-                                 the check_completions cycle */
-  }
-
-  /**
-   * Set up for pending value send/recv
-   *
-   * @param target
-   * @param target_len
-   * @param region
-   */
-  void set_pending_value(void* target, size_t target_len, Component::IFabric_connection::memory_region_t region);
-
-  inline void set_state_wait_send_value() { set_state(State::WAIT_SEND_VALUE); }
-
-  void add_memory_handle(Component::IKVStore::memory_handle_t handle) { _mr_vector.push_back(handle); }
-
-  Component::IKVStore::memory_handle_t pop_memory_handle()
-  {
-    if (_mr_vector.empty()) return nullptr;
-    auto mr = _mr_vector.back();
-    _mr_vector.pop_back();
-    return mr;
-  }
-
-  inline uint64_t auth_id() const { return _auth_id; }
-  inline void     set_auth_id(uint64_t id) { _auth_id = id; }
-
-  inline size_t max_message_size() const { return _max_message_size; }
-
-  inline Pool_manager& pool_manager() { return _pool_manager; }
-
  private:
-  struct {
-    uint64_t response_count               = 0;
-    uint64_t recv_msg_count               = 0;
-    uint64_t send_msg_count               = 0;
-    uint64_t wait_recv_value_misses       = 0;
-    uint64_t wait_msg_recv_misses         = 0;
-    uint64_t wait_respond_complete_misses = 0;
-    uint64_t last_count                   = 0;
-    uint64_t next_stamp                   = 0;
+  State    _state       = State::INITIAL;
+  unsigned option_DEBUG = mcas::Global::debug_level;
+
+  /* list of pre-registered memory regions; normally one region */
+  std::vector<component::IKVStore::memory_handle_t> _mr_vector;
+
+  uint64_t               _tick_count alignas(8);
+  uint64_t               _auth_id;
+  std::queue<buffer_t *> _pending_msgs;
+  std::queue<action_t>   _pending_actions;
+#if 0
+  double                 _freq_mhz;
+#endif
+  Pool_manager _pool_manager; /* instance shared across connections */
+  /* Adaptor point for different transports */
+  using Connection = component::IFabric_server;
+  using Factory    = component::IFabric_server_factory;
+
+  struct stats {
+    uint64_t response_count;
+    uint64_t recv_msg_count;
+    uint64_t send_msg_count;
+    uint64_t wait_send_value_misses;
+    uint64_t wait_msg_recv_misses;
+    uint64_t wait_respond_complete_misses;
+    uint64_t last_count;
+    uint64_t next_stamp;
+    stats()
+        : response_count(0),
+          recv_msg_count(0),
+          send_msg_count(0),
+          wait_send_value_misses(0),
+          wait_msg_recv_misses(0),
+          wait_respond_complete_misses(0),
+          last_count(0),
+          next_stamp(0)
+    {
+    }
   } _stats alignas(8);
 
   void dump_stats()
@@ -279,24 +121,277 @@ class Connection_handler
     PINF("Recv message count          : %lu", _stats.recv_msg_count);
     PINF("Send message count          : %lu", _stats.send_msg_count);
     PINF("Response count              : %lu", _stats.response_count);
-    PINF("WAIT_RECV_VALUE misses      : %lu", _stats.wait_recv_value_misses);
+    PINF("WAIT_SEND_VALUE misses      : %lu", _stats.wait_send_value_misses);
     PINF("WAIT_RESPOND_COMPLETE misses: %lu", _stats.wait_respond_complete_misses);
     PINF("-----------------------------------------");
   }
 
- private:
-  /* list of pre-registered memory regions; normally one region */
-  std::vector<Component::IKVStore::memory_handle_t> _mr_vector;
+  static void static_send_value_callback(void *cnxn, buffer_t *iob) noexcept
+  {
+    auto base = static_cast<Fabric_connection_base *>(cnxn);
+    static_cast<Connection_handler *>(base)->send_value_callback(iob);
+  }
+  void send_value_callback(buffer_t *iob) noexcept
+  {
+    if (0 < option_DEBUG) {
+      char *p = static_cast<char *>(iob->base().get());
+      PLOG("Completed send value (%p) [%2.2x %2.2x %2.2x...]", static_cast<const void *>(iob), 0xff & int(p[0]),
+           0xff & int(p[1]), 0xff & int(p[2]));
+    }
+    _deferred_unlock.push(iob->base());
+    --_send_value_posted_count;
+    posted_count_log();
+    delete iob;
+    ++_stats.send_msg_count;
+  }
 
-  uint64_t               _tick_count alignas(8) = 0;
-  uint64_t               _auth_id               = 0;
-  std::vector<buffer_t*> _pending_msgs;
-  std::vector<action_t>  _pending_actions;
-  float                  _freq_mhz;
-  Pool_manager           _pool_manager; /* instance shared across connections */
+  /**
+   * Change state in FSM
+   *
+   * @param s
+   */
+  inline void set_state(State s)
+  {
+    if (2 < option_DEBUG) {
+      const std::map<int, const char *> m{
+          {INITIAL, "INITIAL"}, {WAIT_HANDSHAKE, "WAIT_HANDSHAKE"}, {WAIT_NEW_MSG_RECV, "WAIT_NEW_MSG_RECV"}};
+      PLOG("state %s -> %s", m.find(_state)->second, m.find(s)->second);
+    }
+    _state = s; /* we could add transition checking later */
+  }
+
+  static void static_send_callback2(void *cnxn, buffer_t *iob) noexcept
+  {
+    auto base = static_cast<Fabric_connection_base *>(cnxn);
+    static_cast<Connection_handler *>(base)->send_callback2(iob);
+  }
+  void send_callback2(buffer_t *iob) noexcept
+  {
+    assert(iob->value_adjunct);
+    if (0 < option_DEBUG) {
+      PLOG("Completed send2 (value_adjunct %p)", static_cast<const void *>(iob->value_adjunct));
+    }
+    _deferred_unlock.push(iob->value_adjunct);
+    send_callback(iob);
+  }
+
+ public:
+  explicit Connection_handler(unsigned debug_level_,
+    gsl::not_null<Factory *> factory,
+    gsl::not_null<Connection *> connection);
+
+  ~Connection_handler();
+
+  inline bool client_connected() { return _state != State::CLIENT_DISCONNECTED; }
+
+  auto allocate_send() { return allocate(static_send_callback); }
+  auto allocate_recv() { return allocate(static_recv_callback); }
+
+  /**
+   * State machine transition tick.  It is really important that this tick
+   * execution duration is small, so that other connections are not impacted by
+   * the thread not returning to them.
+   *
+   */
+  int tick();
+  /**
+   * Check for network completions
+   *
+   */
+  Fabric_connection_base::Completion_state check_network_completions()
+  {
+    auto state = poll_completions();
+
+    while (!_deferred_unlock.empty()) {
+      //      void *deferred_unlock = nullptr;
+      //???     std::swap(deferred_unlock, _deferred_unlock.front());
+      void *deferred_unlock = _deferred_unlock.front();
+      if (option_DEBUG > 2)
+        PLOG("adding action for deferred unlocking value @ %p", deferred_unlock);
+      add_pending_action(action_t{ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE, deferred_unlock});
+      _deferred_unlock.pop();
+    }
+
+    return state;
+  }
+
+  /**
+   * Peek at pending message from the connection. Used when the resources
+   * required to process a pending nessage may depend on the content of the
+   * message.
+   *
+   * @param msg [out] Pointer to base protocol message
+   *
+   * @return Pointer to buffer holding the message or null if there are none
+   */
+  inline mcas::Protocol::Message *peek_pending_msg() const
+  {
+    return _pending_msgs.empty() ? nullptr
+                                 : static_cast<mcas::Protocol::Message *>(_pending_msgs.front()->base().get());
+  }
+
+  /**
+   * Discard a pending message from the connection. Used along with tick
+   * (which adds pending messages) and peek (which peeks at them).
+   *
+   * @param msg [out] Pointer to base protocol message
+   *
+   * @return Pointer to buffer holding the message or null if there are none
+   */
+  inline buffer_t *pop_pending_msg()
+  {
+    assert(!_pending_msgs.empty());
+    auto iob = _pending_msgs.front();
+    _pending_msgs.pop();
+    return iob;
+  }
+
+  /**
+   * Get deferred actions
+   *
+   * @param action [out] Action
+   *
+   * @return True if action
+   */
+  inline bool get_pending_action(action_t &action)
+  {
+    if (_pending_actions.empty()) return false;
+
+    action = _pending_actions.front();
+
+    if (option_DEBUG > 2) PLOG("Connection_handler: popped pending action (%u, %p)", action.op, action.parm);
+
+    _pending_actions.pop();
+    return true;
+  }
+
+  template <typename MT>
+  void msg_log(const unsigned level_, const MT *msg_, const char *desc_, const char *direction_)
+  {
+    if (level_ < _debug_level) {
+      std::ostringstream m;
+      m << *msg_;
+      PLOG("%s (%s) %s", direction_, desc_, m.str().c_str());
+    }
+  }
+
+  template <typename MT>
+  void msg_recv_log(const MT *m, const char *desc)
+  {
+    msg_recv_log(1, m, desc);
+  }
+
+  template <typename MT>
+  void msg_recv_log(const unsigned level, const MT *msg, const char *desc)
+  {
+    msg_log(level, msg, desc, "RECV");
+  }
+
+  template <typename MT>
+  void msg_send_log(const MT *m, const char *desc)
+  {
+    msg_send_log(1, m, desc);
+  }
+
+  template <typename MT>
+  void msg_send_log(const unsigned level, const MT *msg, const char *desc)
+  {
+    msg_log(level, msg, desc, "SEND");
+  }
+
+  /**
+   * Add an action to the pending queue
+   *
+   * @param action Action to add
+   */
+  inline void add_pending_action(const action_t& action)
+  {
+    _pending_actions.push(action);
+  }
+
+  template <typename Msg>
+  void post_send_buffer(gsl::not_null<buffer_t *> buffer, Msg *msg, const char *desc)
+  {
+    msg_send_log(msg, desc);
+    Connection_base::post_send_buffer(buffer);
+  }
+
+  template <typename Msg>
+  void post_send_buffer2(gsl::not_null<buffer_t *> buffer,
+                         const ::iovec &           val_iov,
+                         void *                    val_desc,
+                         Msg *                     msg,
+                         const char *              func_name)
+  {
+    msg_send_log(msg, func_name);
+    Connection_base::post_send_buffer2(buffer, val_iov, val_desc);
+  }
+
+  /**
+   * Post a response
+   *
+   * @param iob IO buffer to post
+   */
+  template <typename Msg>
+  inline void post_response2(gsl::not_null<buffer_t *> iob,
+                             const ::iovec &           val_iov,
+                             void *                    val_desc,
+                             Msg *                     msg,
+                             const char *              func_name)
+  {
+    iob->set_completion(static_send_callback2, val_iov.iov_base);
+    post_send_buffer2(iob, val_iov, val_desc, msg, func_name);
+    /* don't wait for this, let it be picked up in the check_completions cycle
+     */
+
+    _stats.response_count++;
+  }
+
+  /**
+   * Post a response
+   *
+   * @param iob IO buffer to post
+   */
+  template <typename Msg>
+  inline void post_response(gsl::not_null<buffer_t *> iob, Msg *msg, const char *desc)
+  {
+    post_send_buffer(iob, msg, desc);
+    /* don't wait for this, let it be picked up in the check_completions cycle
+     */
+
+    _stats.response_count++;
+  }
+
+  void post_send_value_buffer(gsl::not_null<buffer_t *> posted_value_buffer)
+  {
+    posted_value_buffer->set_completion(static_send_value_callback);
+    Connection_base::post_send_value_buffer(posted_value_buffer);
+  }
+
+  /**
+   * Set up for pending value send/recv
+   *
+   * @param target
+   * @param target_len
+   * @param region
+   */
+  void add_memory_handle(component::IKVStore::memory_handle_t handle) { _mr_vector.push_back(handle); }
+
+  component::IKVStore::memory_handle_t pop_memory_handle()
+  {
+    if (_mr_vector.empty()) return nullptr;
+    auto mr = _mr_vector.back();
+    _mr_vector.pop_back();
+    return mr;
+  }
+
+  inline uint64_t      auth_id() const { return _auth_id; }
+  inline void          set_auth_id(uint64_t id) { _auth_id = id; }
+  inline size_t        max_message_size() const { return _max_message_size; }
+  inline Pool_manager &pool_manager() { return _pool_manager; }
 };
 
 }  // namespace mcas
 #endif
 
-#endif  // __SHARD_HPP__
+#endif  // __CONNECTION_HANDLER_H__

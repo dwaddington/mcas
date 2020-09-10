@@ -23,6 +23,7 @@
 #define __NUPM_RC_ALLOC_AVL_H__
 
 #include <common/memory.h>
+#include <memory>
 #include <string>
 
 namespace nupm
@@ -34,7 +35,9 @@ class Rca_AVL_internal;
  * NOTE: This class is NOT thread safe.
  *
  */
-class Rca_AVL : public Common::Reconstituting_allocator {
+class Rca_AVL : public common::Reconstituting_allocator {
+  Rca_AVL(const Rca_AVL &) = delete;
+  Rca_AVL &operator=(const Rca_AVL &) = delete;
  public:
   Rca_AVL();
   ~Rca_AVL();
@@ -88,7 +91,7 @@ class Rca_AVL : public Common::Reconstituting_allocator {
   void debug_dump(std::string *out_log = nullptr);
 
  private:
-  Rca_AVL_internal *_rca;
+  std::unique_ptr<Rca_AVL_internal> _rca;
 };
 }  // namespace nupm
 #endif

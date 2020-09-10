@@ -22,23 +22,38 @@
 #ifndef __EXAMPLE_FB_PLUGIN_H__
 #define __EXAMPLE_FB_PLUGIN_H__
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+
 #include <common/cycles.h>
 #include <api/ado_itf.h>
 #include <example_fb_proto_generated.h>
+#include <libpmem.h>
 
 /** 
-    Simple versioning root structure (fixed length). This version
-    is not crash consistent 
+    Simple versioning root structure (fixed length).
  */
 class ADO_example_fb_plugin_root
 {
 public:
-  static constexpr unsigned MAX_VERSIONS = 3;
+  static constexpr int MAX_VERSIONS = 3;
   
   ADO_example_fb_plugin_root() {}
 
   void init() {
-    memset(this, 0, sizeof(ADO_example_fb_plugin_root));
+    pmem_memset_persist(this, 0, sizeof(ADO_example_fb_plugin_root));
+  }
+
+  void check_recovery() {
+    /* check for undo; this does not deal with failure on recovery */
+    if(_undo.mid_tx()) {
+      _current_slot = _undo.slot;
+      _values[_current_slot] = _undo.value;
+      _value_lengths[_current_slot] = _undo.value_len;
+      _timestamps[_current_slot] = _undo.timestamp;
+      pmem_persist(this, sizeof(*this));
+      _undo.clear();
+    }
   }
   
   void * add_version(void * value,
@@ -47,10 +62,25 @@ public:
     assert(value);
     void * rv = _values[_current_slot];
     rv_len = _value_lengths[_current_slot];
+
+    /* create undo log for transaction */
+    _undo = { _current_slot,
+              _values[_current_slot],
+              _value_lengths[_current_slot],
+              _timestamps[_current_slot] };
+    pmem_persist(&_undo, sizeof(_undo));
+
+    /* perform transaction */
     _values[_current_slot] = value;
     _value_lengths[_current_slot] = value_len;
     _timestamps[_current_slot] = rdtsc();
-    if(++_current_slot == MAX_VERSIONS) _current_slot = 0;
+    _current_slot++;    
+    if(_current_slot == MAX_VERSIONS) _current_slot = 0;
+    pmem_persist(&_current_slot, sizeof(_current_slot));
+
+    /* reset undo log */
+    _undo.clear();
+               
     return rv; /* return value to be deleted */
   }
 
@@ -58,13 +88,12 @@ public:
                    void*& out_value,
                    size_t& out_value_len,
                    cpu_time_t& out_time_stamp) const {
-    int slot = _current_slot;
+    int slot = _current_slot - 1;
     assert(abs(version_index) < MAX_VERSIONS);
     while(version_index < 0) {
       slot--;
       if(slot == -1) slot = MAX_VERSIONS - 1;
       version_index++;
-      PLOG("slot %d: %p", slot, _values[slot]);
     }
     out_value = _values[slot];
     out_value_len = _value_lengths[slot];
@@ -72,14 +101,30 @@ public:
   }
   
 private:
-  void *     _values[MAX_VERSIONS];
-  size_t     _value_lengths[MAX_VERSIONS];
-  int        _current_slot;
-  cpu_time_t _timestamps[MAX_VERSIONS];
+  alignas(8) void *     _values[MAX_VERSIONS];
+  alignas(8) size_t     _value_lengths[MAX_VERSIONS];
+  alignas(8) int        _current_slot = 0;
+  alignas(8) cpu_time_t _timestamps[MAX_VERSIONS];
+
+  struct alignas(8) {
+    int        slot;
+    void *     value;
+    size_t     value_len;
+    cpu_time_t timestamp;
+
+    void clear() {
+      pmem_memset_persist(this, 0, sizeof(*this));
+    }
+
+    bool mid_tx() const {
+      return timestamp > 0;
+    }
+    
+  } _undo;
 };
   
 
-class ADO_example_fb_plugin : public Component::IADO_plugin
+class ADO_example_fb_plugin : public component::IADO_plugin
 {  
 private:
   static constexpr bool option_DEBUG = true;
@@ -106,9 +151,9 @@ public:
   DECLARE_VERSION(0.1f);
   DECLARE_COMPONENT_UUID(0x84307b41,0x84f1,0x496d,0xbfbf,0xb5,0xe4,0xcf,0x40,0x70,0xe3);
   
-  void * query_interface(Component::uuid_t& itf_uuid) override {
-    if(itf_uuid == Component::IADO_plugin::iid()) {
-      return (void *) static_cast<Component::IADO_plugin*>(this);
+  void * query_interface(component::uuid_t& itf_uuid) override {
+    if(itf_uuid == component::IADO_plugin::iid()) {
+      return (void *) static_cast<component::IADO_plugin*>(this);
     }
     else return NULL; // we don't support this interface
   }
@@ -138,6 +183,6 @@ public:
 };
 
 
-
+#pragma GCC diagnostic pop
 
 #endif

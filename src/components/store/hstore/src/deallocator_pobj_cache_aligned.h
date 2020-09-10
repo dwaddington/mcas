@@ -34,10 +34,10 @@
 #include <cstdlib> /* size_t, ptrdiff_t */
 
 template <typename T, typename Deallocator = deallocator_pobj<T>>
-	class deallocator_pobj_cache_aligned;
+	struct deallocator_pobj_cache_aligned;
 
 template <>
-	class deallocator_pobj_cache_aligned<void, deallocator_pobj<void>>
+	struct deallocator_pobj_cache_aligned<void, deallocator_pobj<void>>
 	{
 	protected:
 		static unsigned constexpr cache_align = 48U;
@@ -55,7 +55,7 @@ template <>
 	};
 
 template <typename T, typename Deallocator>
-	class deallocator_pobj_cache_aligned
+	struct deallocator_pobj_cache_aligned
 		: public Deallocator
 	{
 	protected:

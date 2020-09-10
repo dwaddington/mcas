@@ -15,4 +15,4 @@ add_definitions(-DCONFIG_DEBUG)
 
 add_executable(libcommon-test1 test1.cpp)
 target_compile_options(libcommon-test1 PUBLIC $<$<CONFIG:Debug>:-O0> -g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2) # -Wconversion
-target_link_libraries(libcommon-test1 numa gtest boost_system pthread dl common gcov)  # add proflier for google profiler
+target_link_libraries(libcommon-test1 common gtest boost_system pthread dl numa gcov)  # add proflier for google profiler

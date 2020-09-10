@@ -642,6 +642,13 @@ namespace eastl
 		back_insert_iterator& operator=(const_reference value)
 			{ container.push_back(value); return *this; }
 
+		/* For cases where const_reference includes a "normal" value_type and an allocator (for tracking):
+		 * enable a push given just the value_type, if a constructor exists which combines the value and
+		 * the tracker.
+		 */
+		back_insert_iterator& operator=(const typename container_type::value_type::value_type &value)
+			{ container.push_back(typename container_type::value_type(value, container.get_allocator())); return *this; }
+
 		back_insert_iterator& operator*()
 			{ return *this; }
 
@@ -695,6 +702,13 @@ namespace eastl
 
 		front_insert_iterator& operator=(const_reference value)
 			{ container.push_front(value); return *this; }
+
+		/* For cases where const_reference includes a "normal" value_type and an allocator (for tracking):
+		 * enable a push given just the value_type, if an "imbue" function exists to add the tracker
+		 * to the bare value_type.
+		 */
+		front_insert_iterator& operator=(const typename container_type::value_type::value_type &value)
+			{ container.push_front(typename container_type::value_type(value, &container.allocator())); return *this; }
 
 		front_insert_iterator& operator*()
 			{ return *this; }
@@ -767,6 +781,17 @@ namespace eastl
 		insert_iterator& operator=(const_reference value)
 		{
 			it = container.insert(it, value);
+			++it;
+			return *this;
+		}
+
+		/* For cases where const_reference includes a "normal" value_type and an allocator (for tracking):
+		 * enable a push given just the value_type, if an "imbue" function exists to add the tracker
+		 * to the bare value_type.
+		 */
+		insert_iterator& operator=(const typename container_type::value_type::value_type &value)
+		{
+			it = container.insert(typename container_type::value_type(value, &container.allocator()));
 			++it;
 			return *this;
 		}

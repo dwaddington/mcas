@@ -17,19 +17,19 @@
 #include "uipc.h"
 #include <string>
 
-class channel_wrap
+class Channel_wrap
 {
   channel_t _ch;
 public:
-  channel_wrap(channel_t ch_)
+  Channel_wrap(channel_t ch_)
     : _ch(ch_)
   {}
-  channel_wrap()
-    : channel_wrap(nullptr)
+  Channel_wrap()
+    : Channel_wrap(nullptr)
   {}
-  channel_wrap(const channel_wrap &) = delete;
-  channel_wrap &operator=(const channel_wrap &) = delete;
-  ~channel_wrap()
+  Channel_wrap(const Channel_wrap &) = delete;
+  Channel_wrap &operator=(const Channel_wrap &) = delete;
+  ~Channel_wrap()
   {
     close();
   }

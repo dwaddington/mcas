@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/mcas-module-test.dir/test.cpp.o  -o mcas-module-test   -L/usr/local/lib  -L/usr/local/lib64  -Wl,-rpath,/usr/local/lib:/usr/local/lib64 -lboost_program_options -lprofiler -lboost_system -lboost_date_time -lboost_filesystem -lgtest -lpthread -lcommon -ldl -lnuma -lnupm -ltbb 

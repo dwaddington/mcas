@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -26,7 +26,7 @@
 #include <stdexcept>
 #include <string>
 
-using namespace Component;
+using namespace component;
 
 namespace {
 
@@ -56,7 +56,7 @@ class KVStore_test : public ::testing::Test {
   static bool pmem_simulated;
   /* persistent memory is effective (either real, indicated by no PMEM_IS_PMEM_FORCE or simulated by PMEM_IS_PMEM_FORCE 0 not 1 */
   static bool pmem_effective;
-  static Component::IKVStore * _kvstore;
+  static component::IKVStore * _kvstore;
 
   static constexpr std::size_t estimated_object_count = 0;
   static constexpr std::size_t many_count_target = 20;
@@ -80,7 +80,7 @@ constexpr char KVStore_test::long_value[24];
 
 bool KVStore_test::pmem_simulated = getenv("PMEM_IS_PMEM_FORCE");
 bool KVStore_test::pmem_effective = ! getenv("PMEM_IS_PMEM_FORCE") || getenv("PMEM_IS_PMEM_FORCE") == std::string("0");
-Component::IKVStore * KVStore_test::_kvstore;
+component::IKVStore * KVStore_test::_kvstore;
 
 constexpr unsigned KVStore_test::many_key_length;
 constexpr unsigned KVStore_test::many_value_length;
@@ -97,24 +97,29 @@ TEST_F(KVStore_test, Instantiate)
   /* create object instance through factory */
   /* This test only: use hstore-pe. the version compiled with simulated injection */
   auto link_library = "libcomponent-" + store_map::impl->name + "-pe.so";
-  Component::IBase * comp = Component::load_component(link_library,
+  component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
   ASSERT_TRUE(comp);
-  auto fact = static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid()));
+  auto fact = component::make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
-  _kvstore = fact->create("owner", "name", store_map::location);
-
-  fact->release_ref();
+  _kvstore =
+    fact->create(
+      0
+      , {
+          { +component::IKVStore_factory::k_dax_config, store_map::location }
+        }
+    );
 }
 
-class pool_open
+struct pool_open
 {
-  Component::IKVStore *_kvstore;
-  Component::IKVStore::pool_t _pool;
+private:
+  component::IKVStore *_kvstore;
+  component::IKVStore::pool_t _pool;
 public:
   explicit pool_open(
-    Component::IKVStore *kvstore_
+    component::IKVStore *kvstore_
     , const std::string& name_
     , unsigned int flags = 0
   )
@@ -128,7 +133,7 @@ public:
   }
 
   explicit pool_open(
-    Component::IKVStore *kvstore_
+    component::IKVStore *kvstore_
     , const std::string& name_
     , const size_t size
     , unsigned int flags = 0
@@ -145,7 +150,7 @@ public:
     _kvstore->close_pool(_pool);
   }
 
-  Component::IKVStore::pool_t pool() const noexcept { return _pool; }
+  component::IKVStore::pool_t pool() const noexcept { return _pool; }
 };
 
 TEST_F(KVStore_test, RemoveOldPool)

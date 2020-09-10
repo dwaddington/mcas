@@ -8,8 +8,8 @@
 #include <nupm/mcas_mod.h>
 #include <thread>
 
-using namespace Component;
-using namespace Common;
+using namespace component;
+using namespace common;
 using namespace std;
 
 namespace {
@@ -52,7 +52,7 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
   memset(pop, 0, size);
   PLOG("touched memory.");
   strcpy(pop, "Hello!");
-  PLOG("I have put the memory (%p): %s", pop, pop);
+  PLOG("I have put the memory (%p): %s", reinterpret_cast<void*>(pop), pop);
 
   status_t rc = nupm::expose_memory(token, pop, size);
   if(rc != S_OK) PLOG("rc=%d", rc);

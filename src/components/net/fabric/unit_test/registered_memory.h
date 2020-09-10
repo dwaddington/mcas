@@ -18,13 +18,14 @@
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */
 
-namespace Component
+namespace component
 {
   class IFabric_connection;
 }
 
-class registered_memory
+struct registered_memory
 {
+private:
   /* There may be an alignment restriction on registered memory, May be 8, or 16. */
   std::vector<char> _memory;
   registration _registration;
@@ -34,7 +35,7 @@ public:
    * NOTE: if the memory remote key is used (that is, if the mr attributes do not include FI_PROV_KEY),
    * the key must the unique among registered memories.
    */
-  explicit registered_memory(Component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key);
+  explicit registered_memory(component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key);
   registered_memory(registered_memory &&rm) = default;
   registered_memory& operator=(registered_memory &&rm) = default;
 

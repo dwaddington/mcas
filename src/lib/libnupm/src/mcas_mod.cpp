@@ -28,7 +28,7 @@ typedef struct
 {
   uint64_t token; /* token of previously exposed memory */
 }
-__attribute__((packed)) IOCTL_REMOVE_msg;  
+__attribute__((packed)) IOCTL_REMOVE_msg;
 
 typedef struct
 {
@@ -37,7 +37,7 @@ typedef struct
     size_t size;
   };
 }
-__attribute__((packed)) IOCTL_QUERY_msg;  
+__attribute__((packed)) IOCTL_QUERY_msg;
 //------------------------------------------------------------
 
 
@@ -46,7 +46,7 @@ bool nupm::check_mcas_kernel_module()
   int fd = open("/dev/mcas", O_RDWR, 0666);
   close(fd);
   return (fd != -1);
-}  
+}
 
 status_t nupm::expose_memory(Memory_token token, void * vaddr, size_t vaddr_size)
 {
@@ -59,7 +59,7 @@ status_t nupm::expose_memory(Memory_token token, void * vaddr, size_t vaddr_size
   IOCTL_EXPOSE_msg ioparam = {token, vaddr, vaddr_size};
 
   /* call kernel module to expose memory */
-  status_t rc = ioctl(fd, IOCTL_CMD_EXPOSE, &ioparam); 
+  status_t rc = ioctl(fd, IOCTL_CMD_EXPOSE, &ioparam);
   close(fd);
 
   return rc;
@@ -76,7 +76,7 @@ status_t nupm::revoke_memory(Memory_token token)
   IOCTL_REMOVE_msg ioparam = {token};
   status_t rc = ioctl(fd, IOCTL_CMD_REMOVE, &ioparam);
   close(fd);
-  
+
   return rc;
 }
 
@@ -91,25 +91,25 @@ void * nupm::mmap_exposed_memory(Memory_token token,
   }
 
   /* use ioctl to get size of area before calling mmap */
-  IOCTL_QUERY_msg msg = {token};
+  IOCTL_QUERY_msg msg = {{token}};
   status_t rc = ioctl(fd, IOCTL_CMD_QUERY, &msg);
 
   if(rc) {
     PERR("nupm::mmap_exposed_memory ioctl failed, with err code %d", rc);
     return nullptr;
   }
-  
+
   size = msg.size;
-  
-  offset_t offset = ((offset_t)token) << 12; /* must be 4KB aligned */
+
+  offset_t offset = offset_t(token) << 12; /* must be 4KB aligned */
 
   void * ptr = ::mmap(target_addr,
                       size,
                       PROT_READ | PROT_WRITE,
                       MAP_SHARED | MAP_FIXED, // | MAP_HUGETLB, // | MAP_HUGE_2MB,
                       fd,
-                      offset); 
+                      off_t(offset));
 
-  close(fd);  
+  close(fd);
   return ptr;
 }

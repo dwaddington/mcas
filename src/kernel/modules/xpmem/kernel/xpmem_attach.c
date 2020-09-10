@@ -146,13 +146,13 @@ xpmem_close_handler(struct vm_area_struct *vma)
 	/* clear out the private data for the vma being unmapped */
 	vma->vm_private_data = NULL;
 
-out:
+ out:
 	mutex_unlock(&att->mutex);
 	xpmem_att_deref(att);
 
 	/* cause the demise of the current thread group */
 	XPMEM_DEBUG("xpmem_close_handler: unexpected unmap of XPMEM segment at "
-	       "[0x%lx - 0x%lx]\n", vma->vm_start, vma->vm_end);
+              "[0x%lx - 0x%lx]\n", vma->vm_start, vma->vm_end);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
 	force_sig(SIGKILL);
 #else
@@ -161,7 +161,7 @@ out:
 }
 
 static
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,1,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0)
 int
 #else
 vm_fault_t
@@ -169,7 +169,7 @@ vm_fault_t
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 xpmem_fault_handler(struct vm_fault *vmf)
 #else
-xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
+  xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 #endif
 {
 	int ret, att_locked = 0;
@@ -177,10 +177,10 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
 	u64 vaddr = (u64)(uintptr_t) vmf->address;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-        struct vm_area_struct *vma = vmf->vma;
+  struct vm_area_struct *vma = vmf->vma;
 #endif
 #else
-        u64 vaddr = (u64)(uintptr_t) vmf->virtual_address;
+  u64 vaddr = (u64)(uintptr_t) vmf->virtual_address;
 #endif
 	u64 seg_vaddr;
 	unsigned long pfn = 0, old_pfn = 0;
@@ -272,7 +272,7 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	if (mutex_lock_killable(&att->mutex))
 		goto out_2;
-        att_locked = 1;
+  att_locked = 1;
 
 	if ((att->flags & XPMEM_FLAG_DESTROYING) ||
 	    (ap_tg->flags & XPMEM_FLAG_DESTROYING) ||
@@ -286,17 +286,15 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 	seg_vaddr = (att->vaddr & PAGE_MASK) + (vaddr - att->at_vaddr);
 	XPMEM_DEBUG("vaddr = %llx, seg_vaddr = %llx", vaddr, seg_vaddr);
 
-        ret = xpmem_ensure_valid_PFN(seg, seg_vaddr);
-        if (ret != 0)
+  ret = xpmem_ensure_valid_PFN(seg, seg_vaddr, &pfn);
+  if (ret != 0)
 		goto out_2;
-
-	pfn = xpmem_vaddr_to_PFN(seg_tg->mm, seg_vaddr);
 
 	att->flags |= XPMEM_FLAG_VALIDPTEs;
 
-out_2:
+ out_2:
 	xpmem_seg_up_read(seg_tg, seg, 1);
-out_1:
+ out_1:
 	xpmem_ap_deref(ap);
 	xpmem_tg_deref(ap_tg);
 
@@ -308,7 +306,7 @@ out_1:
 	 * call remap_pfn_range() with the att->mutex locked and don't
 	 * perform the redundant remap_pfn_range() when a PFN already exists.
 	 */
-        if (pfn && pfn_valid(pfn)) {
+  if (pfn && pfn_valid(pfn)) {
 		old_pfn = xpmem_vaddr_to_PFN(current->mm, vaddr);
 		if (old_pfn) {
 			if (old_pfn == pfn) {
@@ -330,13 +328,13 @@ out_1:
 		}
 
 		XPMEM_DEBUG("calling remap_pfn_range() vaddr=%llx, pfn=%lx",
-				vaddr, pfn);
+                vaddr, pfn);
 		if ((remap_pfn_range(vma, vaddr, pfn, PAGE_SIZE,
-				     vma->vm_page_prot)) == 0) {
+                         vma->vm_page_prot)) == 0) {
 			ret = VM_FAULT_NOPAGE;
 		}
 	}
-out:
+ out:
 	if (seg_tg_mmap_sem_locked)
 		up_read(&seg_tg->mm->mmap_sem);
 
@@ -344,11 +342,15 @@ out:
 		mutex_unlock(&att->mutex);
 
 	/* NTH: Cray had this conditional on att_locked but that seems incorrect.
-         * Looks like I was correct. Cray fixed this as well. */
-        xpmem_tg_deref(seg_tg);
-        xpmem_seg_deref(seg);
+   * Looks like I was correct. Cray fixed this as well. */
+  xpmem_tg_deref(seg_tg);
+  xpmem_seg_deref(seg);
 	xpmem_att_deref(att);
 
+  if (ret == VM_FAULT_SIGBUS) {
+		XPMEM_DEBUG("fault returning SIGBUS vaddr=%llx, pfn=%lx", vaddr, pfn);
+	}
+  
 	return ret;
 }
 
@@ -384,7 +386,7 @@ xpmem_mmap(struct file *file, struct vm_area_struct *vma)
  */
 int
 xpmem_attach(struct file *file, xpmem_apid_t apid, off_t offset, size_t size,
-	     u64 vaddr, int fd, int att_flags, u64 *at_vaddr_p)
+             u64 vaddr, int fd, int att_flags, u64 *at_vaddr_p)
 {
 	int ret;
 	unsigned long flags, prot_flags = PROT_READ | PROT_WRITE;
@@ -490,10 +492,10 @@ xpmem_attach(struct file *file, xpmem_apid_t apid, off_t offset, size_t size,
 
 		down_write(&current->mm->mmap_sem);
 		existing_vma = find_vma_intersection(current->mm, vaddr,
-						     vaddr + size);
+                                         vaddr + size);
 		up_write(&current->mm->mmap_sem);
 		for ( ; existing_vma && existing_vma->vm_start < vaddr + size
-				; existing_vma = existing_vma->vm_next) {
+            ; existing_vma = existing_vma->vm_next) {
 			if (xpmem_is_vm_ops_set(existing_vma)) {
 				ret = -EINVAL;
 				goto out_3;
@@ -514,7 +516,7 @@ xpmem_attach(struct file *file, xpmem_apid_t apid, off_t offset, size_t size,
 
 	vma->vm_private_data = att;
 	vma->vm_flags |=
-	    VM_DONTCOPY | VM_DONTDUMP | VM_IO | VM_DONTEXPAND | VM_PFNMAP;
+    VM_DONTCOPY | VM_DONTDUMP | VM_IO | VM_DONTEXPAND | VM_PFNMAP;
 	vma->vm_ops = &xpmem_vm_ops;
 
 	att->at_vma = vma;
@@ -529,7 +531,7 @@ xpmem_attach(struct file *file, xpmem_apid_t apid, off_t offset, size_t size,
 	*at_vaddr_p = at_vaddr + offset_in_page(att->vaddr);
 
 	ret = 0;
-out_3:
+ out_3:
 	if (ret != 0) {
 		att->flags |= XPMEM_FLAG_DESTROYING;
 		spin_lock(&ap->lock);
@@ -539,9 +541,9 @@ out_3:
 	}
 	mutex_unlock(&att->mutex);
 	xpmem_att_deref(att);
-out_2:
+ out_2:
 	xpmem_seg_up_read(seg_tg, seg, 0);
-out_1:
+ out_1:
 	xpmem_ap_deref(ap);
 	xpmem_tg_deref(ap_tg);
 	xpmem_seg_deref(seg);
@@ -655,7 +657,7 @@ xpmem_detach_att(struct xpmem_access_permit *ap, struct xpmem_attachment *att)
 
 
 	XPMEM_DEBUG("detaching attr %p. current->mm = %p, att->mm = %p", att,
-		    (void *) current->mm, (void *) att->mm);
+              (void *) current->mm, (void *) att->mm);
 
 	mm = current->mm ? current->mm : att->mm;
 
@@ -720,7 +722,7 @@ xpmem_detach_att(struct xpmem_access_permit *ap, struct xpmem_attachment *att)
  */
 static void
 xpmem_clear_PTEs_of_att(struct xpmem_attachment *att, u64 start, u64 end,
-							int from_mmu)
+                        int from_mmu)
 {
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 17, 0)
   int ret;
@@ -799,13 +801,13 @@ xpmem_clear_PTEs_of_att(struct xpmem_attachment *att, u64 start, u64 end,
 		unpin_at = att->at_vaddr + offset_start;
 		invalidate_len = offset_end - offset_start;
 		DBUG_ON(offset_in_page(unpin_at) ||
-				offset_in_page(invalidate_len));
+            offset_in_page(invalidate_len));
 		XPMEM_DEBUG("unpin_at = %llx, invalidate_len = %llx\n",
-				unpin_at, invalidate_len);
+                unpin_at, invalidate_len);
 
 		/* Unpin the pages */
 		xpmem_unpin_pages(att->ap->seg, att->mm, unpin_at,
-							invalidate_len);
+                      invalidate_len);
 
 		/*
 		 * Clear the PTEs, using the vma out of the att if we
@@ -831,7 +833,7 @@ xpmem_clear_PTEs_of_att(struct xpmem_attachment *att, u64 start, u64 end,
 		if (offset_start == 0 && att->at_size == invalidate_len)
 			att->flags &= ~XPMEM_FLAG_VALIDPTEs;
 	}
-out:
+ out:
 	if (from_mmu) {
 		mutex_unlock(&att->invalidate_mutex);
 	} else {
@@ -847,7 +849,7 @@ out:
  */
 static void
 xpmem_clear_PTEs_of_ap(struct xpmem_access_permit *ap, u64 start, u64 end,
-							int from_mmu)
+                       int from_mmu)
 {
 	struct xpmem_attachment *att;
 
@@ -866,7 +868,7 @@ xpmem_clear_PTEs_of_ap(struct xpmem_access_permit *ap, u64 start, u64 end,
 			/* att was deleted from ap->att_list, start over */
 			xpmem_att_deref(att);
 			att = list_entry(&ap->att_list, struct xpmem_attachment,
-					 att_list);
+                       att_list);
 		} else
 			xpmem_att_deref(att);
 	}
@@ -880,7 +882,7 @@ xpmem_clear_PTEs_of_ap(struct xpmem_access_permit *ap, u64 start, u64 end,
  */
 void
 xpmem_clear_PTEs_range(struct xpmem_segment *seg, u64 start, u64 end,
-								int from_mmu)
+                       int from_mmu)
 {
 	struct xpmem_access_permit *ap;
 
@@ -896,7 +898,7 @@ xpmem_clear_PTEs_range(struct xpmem_segment *seg, u64 start, u64 end,
 			/* ap was deleted from seg->ap_list, start over */
 			xpmem_ap_deref(ap);
 			ap = list_entry(&seg->ap_list,
-					 struct xpmem_access_permit, ap_list);
+                      struct xpmem_access_permit, ap_list);
 		} else
 			xpmem_ap_deref(ap);
 	}

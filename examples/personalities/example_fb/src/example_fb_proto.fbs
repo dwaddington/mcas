@@ -1,12 +1,12 @@
 // FlatBuffers IDL file
 
-namespace Example_fb_protocol;
+namespace example_fb_protocol;
 
 table Ack
 {
   status : int;
 }
-  
+
 table PutRequest
 {
   key   : string;

@@ -22,7 +22,7 @@
 #include <exception>
 #include <iostream> /* cerr */
 
-namespace Component
+namespace component
 {
   class IFabric;
 }
@@ -59,7 +59,7 @@ namespace
 }
 
 pingpong_client::pingpong_client(
-  Component::IFabric &fabric_
+  component::IFabric &fabric_
   , const std::string &fabric_spec_
   , const std::string ip_address_
   , std::uint16_t port_

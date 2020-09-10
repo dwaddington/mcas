@@ -34,21 +34,27 @@
 #ifndef __COMMON_SEMAPHORE_H__
 #define __COMMON_SEMAPHORE_H__
 
+#include <common/common.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
 
-namespace Common
+namespace common
 {
 class Semaphore {
  public:
   Semaphore(int count_ = 0) : count(count_) {}
 
   inline void post() {
-    std::unique_lock<std::mutex> lock(mtx);
-    count++;
+    {
+      std::unique_lock<std::mutex> lock(mtx);
+      count++;
+    }
     cv.notify_one();
   }
 
@@ -80,5 +86,8 @@ class Semaphore {
   int count;
 };
 
-}  // namespace Common
+}  // namespace common
+
+#pragma GCC diagnostic pop
+
 #endif

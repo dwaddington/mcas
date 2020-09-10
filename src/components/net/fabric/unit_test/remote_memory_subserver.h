@@ -18,12 +18,13 @@
 #include <api/fabric_itf.h> /* IFabric_commuicator */
 #include <memory> /* shared_ptr */
 
-class server_grouped_connection;
+struct server_grouped_connection;
 
-class remote_memory_subserver
+struct remote_memory_subserver
 {
+private:
   server_grouped_connection &_parent;
-  std::shared_ptr<Component::IFabric_communicator> _cnxn;
+  std::shared_ptr<component::IFabric_communicator> _cnxn;
   registered_memory _rm_out;
   registered_memory _rm_in;
 
@@ -36,7 +37,7 @@ public:
     , std::uint64_t remote_key_index
   );
 
-  Component::IFabric_communicator &cnxn() { return *_cnxn; }
+  component::IFabric_communicator &cnxn() { return *_cnxn; }
 };
 
 #endif

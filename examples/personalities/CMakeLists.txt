@@ -4,5 +4,5 @@ add_subdirectory(example_fb)
 add_subdirectory(cpp_list)
 add_subdirectory(cpp_symtab)
 add_subdirectory(python_numpy)
-add_subdirectory(finance_graph)
+
 

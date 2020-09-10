@@ -19,6 +19,7 @@
 struct Options
 {
   unsigned debug_level;
+  unsigned patience;
   std::string server;
   std::string device;
   std::string data;
@@ -26,11 +27,11 @@ struct Options
 } g_options;
 
 
-Component::IMCAS * init(const std::string& server_hostname,  int port)
+component::IMCAS * init(const std::string& server_hostname,  int port)
 {
-  using namespace Component;
+  using namespace component;
   
-  IBase *comp = Component::load_component("libcomponent-mcasclient.so",
+  IBase *comp = component::load_component("libcomponent-mcasclient.so",
                                           mcas_client_factory);
 
   auto fact = (IMCAS_factory *) comp->query_interface(IMCAS_factory::iid());
@@ -40,7 +41,7 @@ Component::IMCAS * init(const std::string& server_hostname,  int port)
   std::stringstream url;
   url << g_options.server << ":" << g_options.port;
   
-  IMCAS * mcas = fact->mcas_create(g_options.debug_level,
+  IMCAS * mcas = fact->mcas_create(g_options.debug_level, g_options.patience,
                                    "None",
                                    url.str(),
                                    g_options.device);
@@ -59,7 +60,7 @@ int main(int argc, char * argv[])
 {
   namespace po = boost::program_options;
 
-  Component::IMCAS* i_mcas = nullptr;
+  component::IMCAS* i_mcas = nullptr;
   try {
     po::options_description desc("Options");
 
@@ -69,6 +70,7 @@ int main(int argc, char * argv[])
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Device (e.g. mlnx5_0)")
       ("port", po::value<unsigned>()->default_value(11911), "Server port")
       ("debug", po::value<unsigned>()->default_value(0), "Debug level")
+      ("patience", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
       ;
 
     po::variables_map vm;
@@ -94,7 +96,8 @@ int main(int argc, char * argv[])
     g_options.device = vm["device"].as<std::string>();
     g_options.data = vm["data"].as<std::string>();
     g_options.port = vm["port"].as<unsigned>();
-    g_options.debug_level = vm["debug"].as<unsigned>();   
+    g_options.debug_level = vm["debug"].as<unsigned>();
+    g_options.patience = vm["patience"].as<unsigned>();
 
     /* create MCAS session */
     i_mcas = init(vm["server"].as<std::string>(), vm["port"].as<unsigned>());

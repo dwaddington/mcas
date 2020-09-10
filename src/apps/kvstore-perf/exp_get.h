@@ -11,7 +11,7 @@
 
 class ExperimentGet : public Experiment
 {
-  std::size_t _i;
+  pool_entry_offset_t _i;
   std::vector<double> _start_time;
   std::vector<double> _latencies;
   BinStatistics _latency_stats;
@@ -48,7 +48,7 @@ public:
     }
 
     // end experiment if we've reached the total number of components
-    if ( _i + 1 == pool_num_objects() )
+    if ( std::size_t(_i + 1) == pool_num_objects() )
     {
       PINF("[%u] reached total number of components. Exiting.", core);
       return false;
@@ -63,7 +63,7 @@ public:
 
       {
         StopwatchInterval si(timer);
-        auto rc = store()->get(pool(), g_data->key(_i), pval, pval_len);
+        auto rc = store()->get(pool(), g_data->key(std::size_t(_i)), pval, pval_len);
         if ( rc != S_OK )
         {
           std::ostringstream e;
@@ -80,7 +80,7 @@ public:
       throw;
     }
 
-    _update_data_process_amount(core, _i);
+    _update_data_process_amount(core, std::size_t(_i));
 
     double lap_time = timer.get_lap_time_in_seconds();
     double time_since_start = timer.get_time_in_seconds();
@@ -115,11 +115,11 @@ public:
     return true;
   }
 
-  void cleanup_custom(unsigned core)
+  void cleanup_custom(unsigned core) override
   {
     double run_time = timer.get_time_in_seconds();
     double iops = double(_i) / run_time;
-    PINF("[%u] get: IOPS: %2g in %2g seconds", core, iops, run_time);
+    PINF("[%u] %s: IOPS--> %2g (%lu operations over %2g seconds)", core, test_name().c_str(), iops, _i, run_time);
     _update_aggregate_iops(iops);
 
     double throughput = _calculate_current_throughput();
@@ -128,7 +128,8 @@ public:
     if ( is_json_reporting() )
     {
       // compute _start_time_stats pre-lock
-      BinStatistics start_time_stats = _compute_bin_statistics_from_vectors(_latencies, _start_time, bin_count(), _start_time.front(), _start_time.at(_i-1), _i);
+      auto i = std::size_t(_i);
+      BinStatistics start_time_stats = _compute_bin_statistics_from_vectors(_latencies, _start_time, bin_count(), _start_time.front(), _start_time.at(i-1), i);
 
       // get existing results, read to document variable
       std::lock_guard<std::mutex> g(g_write_lock);

@@ -15,7 +15,7 @@
 #ifndef _FABRIC_CLIENT_H_
 #define _FABRIC_CLIENT_H_
 
-#include <api/fabric_itf.h> /* Component::IFabric_client */
+#include <api/fabric_itf.h> /* component::IFabric_client */
 #include "fabric_connection_client.h"
 
 #include <cstdint> /* uint{16,64}_t */
@@ -23,7 +23,7 @@
 
 struct fi_info;
 
-class event_producer;
+struct event_producer;
 class Fabric;
 
 #pragma GCC diagnostic push
@@ -32,7 +32,7 @@ class Fabric;
 #endif
 
 class Fabric_client
-  : public Component::IFabric_client
+  : public component::IFabric_client
   , public Fabric_connection_client
 {
 public:
@@ -69,7 +69,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_old &completion_callback) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override
   {
     return Fabric_connection_client::poll_completions(completion_callback);
   }
@@ -77,7 +77,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_definite &completion_callback) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override
   {
     return Fabric_connection_client::poll_completions(completion_callback);
   }
@@ -85,7 +85,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_tentative &completion_callback) override
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override
   {
     return Fabric_connection_client::poll_completions_tentative(completion_callback);
   }
@@ -93,7 +93,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
   {
     return Fabric_connection_client::poll_completions(completion_callback, callback_param);
   }
@@ -101,7 +101,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
   {
     return Fabric_connection_client::poll_completions_tentative(completion_callback, callback_param);
   }
@@ -109,7 +109,7 @@ public:
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const Component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
   {
     return Fabric_connection_client::poll_completions(completion_callback, callback_param);
   }
@@ -117,7 +117,7 @@ public:
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const Component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
   {
     return Fabric_connection_client::poll_completions_tentative(completion_callback, callback_param);
   }

@@ -1,41 +1,48 @@
 #!/bin/bash
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
 
-TESTID=$(basename --suffix .sh -- $0)
-DESC=hstore-8-8
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+. "$DIR/functions.sh"
 
-NODE_IP=$(ip addr | grep -Po 'inet \K10.0.0.[0-9]+' | head -1)
+TESTID=$(basename --suffix .sh -- $0)
+DAXTYPE="$(choose_dax_type)"
+VALUE_LENGTH=8
+# kvstore-keylength-valuelength-store-netprovider
+DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
+
+# parameters for MCAS server and client
+NODE_IP="$(node_ip)"
+DEBUG=${DEBUG:-0}
+
+# parameters for MCAS server
+SERVER_CONFIG="hstore-$DAXTYPE-0"
 
 # launch MCAS server
-DAX_RESET=1 ./dist/bin/mcas --conf ./dist/testing/hstore-0.conf --debug 0 &> test$TESTID-server.log &
+DAX_RESET=1 ./dist/bin/mcas --config "$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP")" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
 sleep 3
 
-#launch client
-./dist/bin/kvstore-perf --port 11911 --cores 14 --server $NODE_IP --test put --component mcas --elements 2000000 --size 400000000 --skip_json_reporting --device_name mlx5_0 --key_length 8 --value_length 8 --debug_level 0 &> test$TESTID-client.log &
+# launch client
+ELEMENT_COUNT=$(scale_by_transport 2000000)
+STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*80/10)) # too small
+STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*84/10)) # sufficient
+CLIENT_LOG="test$TESTID-client.log"
+./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 
 # arm cleanup
 trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
-tail --pid=$CLIENT_PID -f /dev/null
+wait $CLIENT_PID; CLIENT_RC=$?
+wait $SERVER_PID; SERVER_RC=$?
 
 # check result
-iops=$(cat test$TESTID-client.log | grep -Po 'IOPS: \K[0-9]*')
-echo "Test $TESTID: $DESC IOPS ($iops)"
-
 if [ "$1" == "release" ]; then
-    LIMIT="220000"
+    GOAL=185000 # was 220K
 else
-    LIMIT="92000"
-fi
-if [ -z "$iops" ]; then
-    echo -e "Test $TESTID: \e[31mfail (no data)\e[0m"
-elif [ "$iops" -lt $LIMIT ]; then
-    echo -e "Test $TESTID: \e[31mfail ($iops of $LIMIT IOPS)\e[0m"
-else
-    echo -e "Test $TESTID: \e[32mpassed\e[0m"
+    GOAL=85000
 fi
 
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $DESC $GOAL

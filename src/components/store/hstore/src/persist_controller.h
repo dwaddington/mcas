@@ -32,14 +32,15 @@
  * goes through this class. Ideally this should also get writes to persist_data::_sc.
  */
 
-class perishable_expiry;
+struct perishable_expiry;
 
 namespace impl
 {
 	template <typename Allocator, typename SizeChange>
-		class persist_size_change
+		struct persist_size_change
 			: public SizeChange
 		{
+		private:
 			persist_controller<Allocator> *_pc;
 		public:
 			persist_size_change(persist_controller<Allocator> &pc_)
@@ -62,10 +63,10 @@ namespace impl
 		};
 
 	template <typename Allocator>
-		class persist_controller
+		struct persist_controller
 			: public Allocator
 		{
-
+		private:
 			using allocator_type = Allocator;
 			using persist_data_t = persist_map<allocator_type>;
 			using value_type = typename allocator_type::value_type;
@@ -95,14 +96,16 @@ namespace impl
 			}
 
 		public:
-			explicit persist_controller(const allocator_type &av, persist_data_t *persist, construction_mode mode);
+			explicit persist_controller(
+				AK_FORMAL
+				const allocator_type &av, persist_data_t *persist, construction_mode mode);
 
 			persist_controller(const persist_controller &) = delete;
 			auto operator=(
 				const persist_controller &
 			) -> persist_controller & = delete;
 
-			auto resize_prolog() -> bucket_aligned_t *;
+			auto resize_prolog(AK_FORMAL0) -> bucket_aligned_t *;
 			auto resize_restart_prolog() -> bucket_aligned_t *;
 			void resize_interlog();
 			void resize_epilog();

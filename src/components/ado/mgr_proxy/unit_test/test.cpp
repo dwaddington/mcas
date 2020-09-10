@@ -6,8 +6,8 @@
 #include <memory>
 #include <vector>
 
-using namespace Component;
-using namespace Common;
+using namespace component;
+using namespace common;
 using namespace std;
 
 namespace {
@@ -28,34 +28,37 @@ protected:
   }
 
   // Objects declared here can be used by all tests in the test case
+#if 0 // unused
   static std::unique_ptr<void> kill_buffer;
-  static Component::IADO_manager_proxy *_ado_manager;
-  static Component::IADO_proxy *_ado;
+#endif
+  static component::Itf_ref<component::IADO_manager_proxy> _ado_manager;
+  static component::IADO_proxy *_ado;
 };
 
-Component::IADO_manager_proxy *IADO_manager_proxy_test::_ado_manager;
-Component::IADO_proxy *IADO_manager_proxy_test::_ado;
+component::Itf_ref<component::IADO_manager_proxy> IADO_manager_proxy_test::_ado_manager;
+component::IADO_proxy *IADO_manager_proxy_test::_ado;
 
 TEST_F(IADO_manager_proxy_test, Instantiate) {
   /* create object instance through factory */
-  Component::IBase *comp = Component::load_component(
-      "libcomponent-adomgrproxy.so", Component::ado_manager_proxy_factory);
+  component::IBase *comp = component::load_component(
+      "libcomponent-adomgrproxy.so", component::ado_manager_proxy_factory);
 
   ASSERT_TRUE(comp);
   auto fact =
-    static_cast<IADO_manager_proxy_factory *>(comp->query_interface(IADO_manager_proxy_factory::iid()));
+    make_itf_ref(
+      static_cast<IADO_manager_proxy_factory *>(comp->query_interface(IADO_manager_proxy_factory::iid()))
+    );;
 
-  _ado_manager = fact->create(1, 0, "", 1);
-
-  fact->release_ref();
+  _ado_manager.reset(fact->create(1, 0, "", 1));
 }
 
 TEST_F(IADO_manager_proxy_test, createADOProx) {
   PINF("Run create ADO proxy");
   string filename = "/home/xuluna/workspace/mcas/build/src/server/ado/ado";
   vector<string> args;
-  ASSERT_TRUE(_ado_manager);
+  ASSERT_TRUE(_ado_manager.get());
   _ado = _ado_manager->create(123, // auth id
+			      0, // debug level
                               nullptr,
                               999,
                               "pool-name", //      const std::string &pool_name,
@@ -68,8 +71,8 @@ TEST_F(IADO_manager_proxy_test, createADOProx) {
 
 
 TEST_F(IADO_manager_proxy_test, Shutdown) {
-  _ado_manager->shutdown(_ado);
-  _ado_manager->release_ref();
+  _ado_manager->shutdown_ado(_ado);
+  _ado_manager.reset(nullptr);
 }
 
 } // namespace

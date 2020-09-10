@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,16 +11,19 @@
    limitations under the License.
 */
 
-#ifndef CCPM_LIST_ITEM_H__
-#define CCPM_LIST_ITEM_H__
+#ifndef CCPM_LIST_ITEM_H
+#define CCPM_LIST_ITEM_H
+
+#include <cassert>
 
 namespace ccpm
 {
 	/*
 	 * Doubly linked list.
 	 */
-	class list_item
+	struct list_item
 	{
+	private:
 		list_item *_prev;
 		list_item *_next;
 	public:
@@ -28,30 +31,45 @@ namespace ccpm
 		list_item(const list_item &) = delete;
 		list_item &operator=(const list_item &) = delete;
 
+		/* forcibly remove from a list */
+		void force_reset()
+		{
+			_prev = this;
+			_next = this;
+		}
+
 		/* insert i after this item */
 		void insert_after(list_item *i)
 		{
+			assert( ! i->is_in_list() );
 			const auto n = this->_next;
 			i->_next = n;
 			i->_prev = this;
 			this->_next = i;
 			n->_prev = i;
+			assert( i->is_in_list() );
 		}
 
 		/* insert this item before i */
 		void insert_before(list_item *i)
 		{
+			assert( ! i->is_in_list() );
 			const auto p = this->_prev;
 			i->_prev = p;
 			i->_next = this;
 			this->_prev = i;
 			p->_next = i;
+			assert( i->is_in_list() );
 		}
 
 		void remove()
 		{
+			assert( is_in_list() );
 			_prev->_next = _next;
 			_next->_prev = _prev;
+			_prev = this;
+			_next = this;
+			assert( ! is_in_list() );
 		}
 
 		list_item *prev() { return _prev; }
@@ -59,7 +77,10 @@ namespace ccpm
 		list_item *next() { return _next; }
 		const list_item *next() const { return _next; }
 
+		/* for list head: empty check */
 		bool empty() const { return this == _next; }
+		/* for a list item: "empty" means it is not in a list */
+		bool is_in_list() const { return ! empty(); }
 
 		/* returns true if element e is in the list.
 		 * "this" is assumed to be a list anchor;

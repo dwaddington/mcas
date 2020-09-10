@@ -32,10 +32,10 @@ This will run a test of 1M insertions (key length 8 and value length 32) on a re
 
 ## Local engine test
 
-To continuous measure the 100% read performance (hstore with DRAM):
+To continuous measure the 100% read performance (hstore):
 
 ```bash
-USE_DRAM=8 DAX_RESET=1 ./dist/bin/kvstore-perf --cores=0-9 --component hstore --test throughput --read_pct=100 --key_length 8 --value_length 48 --element 100000 --debug 3 --device_name=/dev/dax --size 100000000 --skip_json_reporting
+DAX_RESET=1 ./dist/bin/kvstore-perf --cores=0-9 --component hstore --test throughput --read_pct=100 --key_length 8 --value_length 48 --element 100000 --debug 3 --device_name=/dev/dax --size 100000000 --skip_json_reporting
 ```
 
 

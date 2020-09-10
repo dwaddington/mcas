@@ -29,7 +29,7 @@ public:
     {
     }
 
-    void initialize_custom(unsigned core)
+    void initialize_custom(unsigned core) override
     {
         _latency_stats = BinStatistics(bin_count(), bin_threshold_min(), bin_threshold_max());
 
@@ -90,14 +90,14 @@ public:
         return true;
     }
 
-    void cleanup_custom(unsigned core)
+    void cleanup_custom(unsigned core) override
     {
         _debug_print(core, "cleanup_custom started");
 
         timer.stop();  // should already be stopped here; just in case
         double run_time = timer.get_time_in_seconds();
         double iops = double(_i) / run_time;
-        PINF("[%u] put_direct: IOPS: %2g over period of %2g seconds", core, iops, run_time);
+        PINF("[%u] %s: IOPS--> %2g (%lu operations over %2g seconds)", core, test_name().c_str(), iops, _i, run_time);
         _update_aggregate_iops(iops);
 
         double throughput = _calculate_current_throughput();

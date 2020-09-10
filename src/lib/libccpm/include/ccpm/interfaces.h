@@ -82,7 +82,9 @@ class IHeap
 {
 public:
   virtual ~IHeap() {}
+
   /* Reconstitute/initialize slab from existing memory
+   *
    * @param regions Pointer/length regions of contiguous memory
    * @param resolver Access to an object which can resolve the ambiguity
    *        over area ownership which occurs during iphase of allocate()
@@ -97,8 +99,6 @@ public:
                             const bool force_init = false) = 0;
 
   /* Allocate memory
-   *
-   *
    *
    * @param ptr in/out: nullptr -> pointer to newly allocated memory
    *                    On a successful allocation the allocator will
@@ -171,8 +171,7 @@ public:
 /**
  * Heap allocator (variable sized allocations)
  */
-class IHeapGrowable
-  : public IHeap
+class IHeap_expandable : public IHeap
 {
 public:
   /* Add an additional regions to the heap

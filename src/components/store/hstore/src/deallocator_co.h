@@ -35,18 +35,17 @@
 #include <cstdlib> /* size_t, ptrdiff_t */
 
 template <typename T, typename Persister>
-	class deallocator_co;
+	struct deallocator_co;
 #if 0
 template <>
-	class deallocator_co<void, persister_pmem>
+	struct deallocator_co<void, persister_pmem>
 		: public persister_pmem
 	{
-	public:
 		using value_type = void;
 	};
 #endif
-template <class Persister>
-	class deallocator_co<void, Persister>
+template <typename Persister>
+	struct deallocator_co<void, Persister>
 		: public Persister
 	{
 	public:
@@ -57,7 +56,7 @@ template <class Persister>
 	};
 
 template <typename T, typename Persister>
-	class deallocator_co
+	struct deallocator_co
 		: public Persister
 	{
 	public:

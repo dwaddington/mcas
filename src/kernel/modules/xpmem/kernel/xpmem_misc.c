@@ -315,6 +315,7 @@ xpmem_debug_printk_procfs_open(struct inode *inode, struct file *file)
 	return single_open(file, xpmem_debug_printk_procfs_show, NULL);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
 struct file_operations xpmem_debug_printk_procfs_ops = {
 	.owner		= THIS_MODULE,
 	.llseek		= seq_lseek,
@@ -323,3 +324,12 @@ struct file_operations xpmem_debug_printk_procfs_ops = {
 	.open		= xpmem_debug_printk_procfs_open,
 	.release	= single_release,
 };
+#else
+struct proc_ops xpmem_debug_printk_procfs_ops = {
+	.proc_lseek   = seq_lseek,
+	.proc_read    = seq_read,
+	.proc_write   = xpmem_debug_printk_procfs_write,
+	.proc_open    = xpmem_debug_printk_procfs_open,
+	.proc_release = single_release,
+};
+#endif

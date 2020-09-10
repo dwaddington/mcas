@@ -23,11 +23,12 @@ namespace impl
 {
 	/* Client-side persistent allocation state when using the crash-consistent
 	 * allocator in an extend operation */
-	class allocation_state_extend
+	struct allocation_state_extend
 	{
+	private:
 		/* Allocation pointers stored here are tentative, and will be
 		 * disclaimed upon restart *unless* (*pmask & mask) != 0, which
-		 * indicates that the map ownershi mask at pmask acknowledges
+		 * indicates that the map ownership mask at pmask acknowledges
 		 * ownership of the pointers.
 		 * An emplace operation allocate up to two values: key string
 		 * and value string.

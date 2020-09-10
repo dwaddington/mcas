@@ -20,8 +20,9 @@
 #include <map>
 #include <vector>
 
-class perishable
+struct perishable
 {
+private:
 	using syndrome = std::vector<void *>;
 	struct less
 	{

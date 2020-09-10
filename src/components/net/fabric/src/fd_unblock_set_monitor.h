@@ -23,8 +23,9 @@
 #include <mutex>
 #include <set>
 
-class fd_unblock_set_monitor
+struct fd_unblock_set_monitor
 {
+private:
   std::mutex &_m;
   std::set<int> &_s;
   int _fd;

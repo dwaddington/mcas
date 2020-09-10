@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/danielwaddington/mcas/src/kernel/modules/mcas/unit_test/mcas_server.cpp
+api/ado_itf.h
+-
+api/components.h
+-
+common/str_utils.h
+-
+common/utils.h
+-
+common/logging.h
+-
+gtest/gtest.h
+-
+nupm/dax_map.h
+-
+nupm/mcas_mod.h
+-
+boost/program_options.hpp
+-
+

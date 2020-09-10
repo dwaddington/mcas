@@ -26,7 +26,7 @@
 #include <api/components.h>
 #include <common/types.h>
 
-namespace Component
+namespace component
 {
 #pragma GCC diagnostic push
 //#pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -34,7 +34,7 @@ namespace Component
 /**
  * ICrypto security services for MCAS
  */
-class ICrypto : public Component::IBase {
+class ICrypto : public component::IBase {
 
 public:
   typedef enum { /* matches gnutls for ease of translation */
@@ -56,7 +56,7 @@ public:
 
 public:
   DECLARE_INTERFACE_UUID(0xD7F80DD6,0xBB71,0x48C3,0xAF6E,0x2C,0x2E,0xFD,0x7A,0x3B,0xD7);
-  
+
 public:
   class Opaque_crypto_session {
   public:
@@ -64,7 +64,7 @@ public:
     virtual bool is_server_side() const = 0;
     virtual ~Opaque_crypto_session() {}
   };
-  
+
   using session_t  = Opaque_crypto_session*;
 
   /**
@@ -80,7 +80,7 @@ public:
                               const std::string& cert_file,
                               const std::string& key_file) = 0;
 
-  
+
   /**
    * @brief      Server-side accept certificate-based session
    *
@@ -180,7 +180,7 @@ public:
    *
    * @return     S_OK on success
    */
-  virtual status_t hmac(Component::ICrypto::mac_algorithm_t algo,
+  virtual status_t hmac(component::ICrypto::mac_algorithm_t algo,
                         const std::string& key,
                         const void * in_data,
                         const size_t in_data_size,
@@ -198,7 +198,7 @@ public:
   virtual status_t initialize_cipher(const session_t session,
                                      const cipher_t cipher,
                                      const std::string key) = 0;
-  
+
   /**
    * @brief      AEAD encrypt (initialize_cipher should be called a priori)
    *             Authenticated Encryption with Associated Data
@@ -250,7 +250,7 @@ public:
                                 size_t cipher_text_len,
                                 void * out_plain_text,
                                 size_t * out_plain_text_len) = 0;
-  
+
   /**
    * @brief      Send data as encrypted record
    *
@@ -260,8 +260,8 @@ public:
    *
    * @return     Number of bytes sent or < 0 for error
    */
-  virtual ssize_t record_send(const session_t session, 
-                              const void * data, 
+  virtual ssize_t record_send(const session_t session,
+                              const void * data,
                               size_t data_len) = 0;
 
   /**
@@ -274,8 +274,8 @@ public:
    * @return     Number of bytes received or < 0 for error
    */
   virtual ssize_t record_recv(const session_t session,
-                              void * data, 
-                              size_t data_len) = 0;                                                                      
+                              void * data,
+                              size_t data_len) = 0;
   /**
    * @brief      Closes a session.
    *
@@ -286,7 +286,7 @@ public:
   virtual status_t close_session(const session_t session) = 0;
 };
 
-class ICrypto_factory : public Component::IBase {
+class ICrypto_factory : public component::IBase {
  public:
   DECLARE_INTERFACE_UUID(0xFAC80DD6,0xBB71,0x48C3,0xAF6E,0x2C,0x2E,0xFD,0x7A,0x3B,0xD7);
 
@@ -295,6 +295,6 @@ class ICrypto_factory : public Component::IBase {
 };
 #pragma GCC diagnostic pop
 
-}  // namespace Component
+}  // namespace component
 
 #endif

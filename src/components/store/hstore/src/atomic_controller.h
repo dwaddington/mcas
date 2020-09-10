@@ -29,12 +29,13 @@
 namespace impl
 {
 	template <typename Value>
-		class persist_atomic;
+		struct persist_atomic;
 
 	template <typename Table>
-		class atomic_controller
+		struct atomic_controller
 			: private std::allocator_traits<typename Table::allocator_type>::template rebind_alloc<mod_control>
 		{
+		private:
 			using table_t = Table;
 			using allocator_type =
 				typename std::allocator_traits<typename table_t::allocator_type>::template rebind_alloc<mod_control>;
@@ -45,8 +46,9 @@ namespace impl
 #if 0
 			bool _tick_expired;
 #endif
-			class update_finisher
+			struct update_finisher
 			{
+			private:
 				impl::atomic_controller<table_t> &_ctlr;
 			public:
 				update_finisher(impl::atomic_controller<table_t> &ctlr_);
@@ -89,12 +91,14 @@ namespace impl
 			void redo();
 
 			void enter_update(
+				AK_FORMAL
 				typename table_t::allocator_type al_
 				, const std::string &key
-				, std::vector<Component::IKVStore::Operation *>::const_iterator first
-				, std::vector<Component::IKVStore::Operation *>::const_iterator last
+				, std::vector<component::IKVStore::Operation *>::const_iterator first
+				, std::vector<component::IKVStore::Operation *>::const_iterator last
 			);
 			void enter_replace(
+				AK_FORMAL
 				typename table_t::allocator_type al
 				, const std::string &key
 				, const char *data
@@ -107,7 +111,7 @@ namespace impl
 				mt &d0
 				, mt &d1
 			);
-			friend class atomic_controller<table_t>::update_finisher;
+			friend struct atomic_controller<table_t>::update_finisher;
 	};
 }
 
