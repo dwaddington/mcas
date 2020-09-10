@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILES=$(grep -lr '\W/home/' $@ | grep -v -E './src/lib/libzyre|./src/components/ado/.*_proxy/unit_test')
+FILES=$(grep -lr '\W/home/' $@ | grep -v -E './src/lib/libzyre|./src/components/ado/.*_proxy/unit_test|./src/lib/zyre')
 
 if [[ -n "$FILES" ]]
 then :
