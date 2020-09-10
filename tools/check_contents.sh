@@ -14,7 +14,7 @@ EOF
 	exit 1
 fi
 
-FILES=$(find $@ -type f ! -size 0 -exec grep -IL . "{}" \; | grep -v -E './src/lib/(EASTL|flatbuffers|libbase64|rapidjson|tbb|libzyre)')
+FILES=$(find $@ -type f ! -size 0 -exec grep -IL . "{}" \; | grep -v -E './.git|./tools|./deploy|./src/lib/(EASTL|flatbuffers|libbase64|rapidjson|tbb|libzyre)')
 if [[ -n "$FILES" ]]
 then :
 	cat <<EOF

@@ -54,7 +54,7 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
 
 TEST_F(IADO_manager_proxy_test, createADOProx) {
   PINF("Run create ADO proxy");
-  string filename = "/home/xuluna/workspace/mcas/build/src/server/ado/ado";
+  string filename = "~/mcas/build/src/server/ado/ado";
   vector<string> args;
   ASSERT_TRUE(_ado_manager.get());
   _ado = _ado_manager->create(123, // auth id
