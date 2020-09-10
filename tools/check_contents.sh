@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILES=$(grep -lr '\W/home/' $@ | grep -v -E './src/lib/libzyre|./src/components/ado/.*_proxy/unit_test|./src/lib/zyre')
+FILES=$(grep -lr '\W/home/' $@ | grep -v -E './src/lib/zyre|./src/components/ado/.*_proxy/unit_test')
 
 if [[ -n "$FILES" ]]
 then :
@@ -14,7 +14,7 @@ EOF
 	exit 1
 fi
 
-FILES=$(find $@ -type f ! -size 0 -exec grep -IL . "{}" \; | grep -v -E './.git|./tools|./deploy|./src/lib/(EASTL|flatbuffers|libbase64|rapidjson|tbb|libzyre)')
+FILES=$(find $@ -type f ! -size 0 -exec grep -IL . "{}" \; | grep -v -E './.git|./tools|./deploy|./src/lib/(EASTL|flatbuffers|libbase64|rapidjson|tbb|zyre)')
 if [[ -n "$FILES" ]]
 then :
 	cat <<EOF
