@@ -4,6 +4,7 @@ Server Configuration Syntax
 ===
 
 The JSON schema for a configuration is:
+
 	{
 	    "type": "object",
 	    "additionalProperties": false,
