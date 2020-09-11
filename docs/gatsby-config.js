@@ -4,7 +4,7 @@ module.exports = {
     description: 'Memory-Centric Active Storage',
     keywords: 'persistent memory, RDMA, active objects, key-value',
   },
-  pathPrefix: "/Daniel-Waddington/mcas-docs",
+  pathPrefix: "/mcas",
   plugins: [
     {
       resolve: 'gatsby-plugin-manifest',
