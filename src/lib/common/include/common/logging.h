@@ -36,9 +36,24 @@
 #ifndef __COMMON_LOGGING_H__
 #define __COMMON_LOGGING_H__
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdarg.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdarg>
+
+namespace common
+{
+  struct log_source
+  {
+  private:
+	unsigned _debug_level;
+  protected:
+	unsigned debug_level() const { return _debug_level; }
+	explicit log_source(unsigned debug_level_)
+      : _debug_level(debug_level_)
+    {}
+   log_source(const log_source &) = default;
+  };
+}
 
 #define NORMAL_CYAN "\033[36m"
 #define NORMAL_MAGENTA "\033[35m"

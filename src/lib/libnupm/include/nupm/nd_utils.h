@@ -30,6 +30,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <sys/uio.h> /* iovec */
 
 namespace libndctl
 {
@@ -50,6 +51,15 @@ struct stat;
 
 namespace nupm
 {
+  class mapping_element : private ::iovec
+  {
+  public:
+    mapping_element(void *vaddr, std::size_t size, int prot, int flags, int fd);
+    ~mapping_element();
+    using ::iovec::iov_base;
+    using ::iovec::iov_len;
+  };
+
 class ND_control_exception : public Exception {
  public:
   ND_control_exception() : Exception("ND_control error"), _err_code(E_FAIL) {}
@@ -95,17 +105,7 @@ class ND_control {
    * Destructor
    *
    */
-  virtual ~ND_control() noexcept(false);
-
-  /**
-   * Get the mapped regions for a specific NUMA zone
-   *
-   * @param numa_zone
-   *
-   * @return Copy of a vector of region base, size pairs
-   */
-  std::vector<std::pair<void *, size_t>> get_regions(int numa_zone)
-      __attribute__((deprecated));
+  virtual ~ND_control();
 
   /**
    * Map regions with device DAX
@@ -113,7 +113,6 @@ class ND_control {
    * @param Hint for base address
    */
   void map_regions(unsigned long base_addr = 0) __attribute__((deprecated));
-
  private:
   void init_devdax();
 
@@ -126,11 +125,27 @@ class ND_control {
   std::map<std::string, std::string> _ns_to_dax;
   std::map<std::string, std::string> _dax_to_ns;
 
-  std::map<int, std::vector<std::pair<void *, size_t>>> _mappings;
+ private:
+  using mapping_vec_t = std::vector<mapping_element>;
+  using mappings_t = std::map<int, mapping_vec_t>;
+  mappings_t                         _mappings;
+
+  /**
+   * Get the mapped regions for a specific NUMA zone
+   *
+   * @param numa_zone
+   *
+   * @return Copy of a vector of region base, size pairs
+   */
+  const mapping_vec_t &get_regions(int numa_zone)
+      __attribute__((deprecated));
+ protected:
+  mappings_t::const_iterator get_mapping(int i) const { return _mappings.find(i); }
+  mappings_t::const_iterator get_mappings_end() const { return _mappings.end(); }
 };
 
 /**
- * Get size of a dax device 
+ * Get size of a dax device
  */
 size_t get_dax_device_size(const struct stat &statbuf);
 size_t get_dax_device_size(int fd);
