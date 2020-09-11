@@ -1,0 +1,26 @@
+{
+  "name": "example",
+  "private": true,
+  "version": "1.22.1",
+  "license": "Apache 2.0",
+  "scripts": {
+    "develop": "gatsby develop -H 0.0.0.0",
+    "develop:clean": "yarn clean && yarn develop",
+    "build": "gatsby build",
+    "build:clean": "yarn clean && gatsby build",
+    "serve": "gatsby serve",
+    "clean": "gatsby clean",
+    "build:analyze": "ANALYZE=true yarn build",
+    "build:prefix": "gatsby build --prefix-paths",
+    "serve:prefix": "gatsby serve --prefix-paths",
+    "test:prefix": "yarn build:prefix && yarn serve:prefix",
+    "deploy": "gatsby build --prefix-paths && gh-pages -d public -b master"
+  },
+  "dependencies": {
+    "gatsby": "^2.20.4",
+    "gatsby-theme-carbon": "^1.22.1",
+    "gh-pages": "^2.2.0",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1"
+  }
+}
