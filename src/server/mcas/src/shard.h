@@ -257,14 +257,14 @@ class Shard : public Shard_transport {
   inline void add_task_list(Shard_task *task) { _tasks.push_back(task); }
 
   inline size_t session_count() const { return _handlers.size(); }
-public:
+
   struct sg_result {
     std::vector<Protocol::Message_IO_response::locate_element> sg_list;
     std::uint64_t mr_low;
     std::uint64_t mr_high;
     std::uint64_t excess_length;
   };
-private:
+
   auto offset_to_sg_list(
     range<std::uint64_t> t
     , const std::vector<::iovec> &region_breaks
