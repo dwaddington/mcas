@@ -108,6 +108,7 @@ enum OP_TYPE : uint8_t {
   OP_GET_RELEASE = 18,  // free lock from DMA read
   OP_LOCATE      = 19,  // locate space for DMA access
   OP_RELEASE     = 20,  // release space located for DMA access
+  OP_RELEASE_WITH_FLUSH = 21,  // flush and release space located for DMA access
   OP_INVALID     = 0xFE, // not applicable
 };
 

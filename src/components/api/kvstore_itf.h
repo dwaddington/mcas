@@ -719,7 +719,7 @@ class IKVStore : public component::IBase {
    * @param alignment Alignment hint in bytes, 0 if no alignment is needed
    * @param out_addr Pointer to allocated region
    *
-   * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND
+   * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND, E_NOT_SUPPORTED
    */
   virtual status_t allocate_pool_memory(const pool_t pool,
                                         const size_t size,
@@ -737,9 +737,23 @@ class IKVStore : public component::IBase {
    * @param size Size in bytes of allocation; if provided this accelerates
    * release
    *
-   * @return S_OK on success, E_INVAL, E_POOL_NOT_FOUND
+   * @return S_OK on success, E_INVAL, E_POOL_NOT_FOUND, E_NOT_SUPPORTED
    */
   virtual status_t free_pool_memory(pool_t pool, const void* addr, size_t size = 0)
+  {
+    return E_NOT_SUPPORTED;
+  }
+
+  /**
+   * Flush memory from pool
+   *
+   * @param pool Pool handle
+   * @param addr Address of memory to flush
+   * @param size Size in bytes to flush
+   *
+   * @return S_OK on success, E_INVAL, E_POOL_NOT_FOUND, E_NOT_SUPPORTED
+   */
+  virtual status_t flush_pool_memory(pool_t pool, const void* addr, size_t size)
   {
     return E_NOT_SUPPORTED;
   }

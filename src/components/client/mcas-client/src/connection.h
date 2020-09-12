@@ -428,8 +428,6 @@ class Connection_handler : public Connection_base {
                                                     void *                              desc,
                                                     unsigned                            flags);
 
-  void put_release(const pool_t pool, const std::uint64_t target);
-
   std::tuple<uint64_t, uint64_t, std::size_t> get_locate(const pool_t   pool,
                                                          const void *   key,
                                                          const size_t   key_len,
@@ -443,8 +441,6 @@ class Connection_handler : public Connection_base {
                                                     component::Registrar_memory_direct *rmd,
                                                     void *                              desc,
                                                     unsigned                            flags);
-
-  void get_release(const pool_t pool, const std::uint64_t target);
 
   iob_ptr make_iob_ptr(buffer_t::completion_t);
   iob_ptr make_iob_ptr_recv();
@@ -461,8 +457,6 @@ class Connection_handler : public Connection_base {
   static void read_complete(void *, buffer_t *iob);
 
   std::tuple<uint64_t, std::vector<locate_element>> locate(pool_t pool, std::size_t offset, std::size_t size);
-
-  void release(pool_t pool, std::size_t offset, std::size_t size);
 
   component::IMCAS::async_handle_t get_direct_offset_async(pool_t                              pool,
                                                            std::size_t                         offset,

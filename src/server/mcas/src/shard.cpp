@@ -1434,6 +1434,9 @@ void Shard::process_message_IO_request(Connection_handler *handler, const Protoc
   case Protocol::OP_RELEASE:
     io_response_release(handler, msg, iob);
     break;
+  case Protocol::OP_RELEASE_WITH_FLUSH:
+    io_response_release_with_flush(handler, msg, iob);
+    break;
   case Protocol::OP_PUT:
     io_response_put(handler, msg, iob);
     break;
@@ -1467,25 +1470,99 @@ std::vector<::iovec> region_breaks(const std::vector<::iovec> regions_)
 }
 }  // namespace
 
+auto Shard::offset_to_sg_list(
+  range<std::uint64_t> t
+  , const std::vector<::iovec> &region_breaks_
+) -> sg_result
+{
+  CPLOG(2, "region break count %zu", region_breaks_.size());
+  for (const auto &e : region_breaks_) {
+    CPLOG(2, "region break %p len 0x%zx", e.iov_base, e.iov_len);
+  }
+  auto it_begin = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.first, [](const uint64_t a, const iovec &b) {
+      return a < reinterpret_cast<std::uint64_t>(b.iov_base);
+    });
+  auto it_end   = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.second, [](const uint64_t a, const iovec &b) {
+      return a < reinterpret_cast<std::uint64_t>(b.iov_base);
+    });
+
+  CPLOG(2, "it_begin %zu it_end %zu", it_begin - region_breaks_.begin(), it_end - region_breaks_.begin());
+
+  /* beginning and ending offsets, within the beginning and ending regions,
+   * respectively */
+  auto begin_off = t.first - (it_begin == region_breaks_.begin() ? 0 : (it_begin - 1)->iov_len);
+  auto end_off   = t.second - (it_end == region_breaks_.begin() ? 0 : (it_end - 1)->iov_len);
+
+  std::vector<::iovec> transfer;
+  auto                 mr_low  = std::numeric_limits<std::uint64_t>::max();
+  auto                 mr_high = std::numeric_limits<std::uint64_t>::min();
+
+  CPLOG(2, "initial begin_off 0x%" PRIx64 " end_off 0x%" PRIx64 " mr_low 0x%" PRIx64 " mr_high 0x%" PRIx64, begin_off,
+         end_off, mr_low, mr_high);
+
+  /* The range from t_begin to t_end may be contained in discontigous memory.
+   * Build a scatter-gather list.
+   */
+  std::vector<Protocol::Message_IO_response::locate_element> sg_list;
+
+  /* Entries before the last */
+  while (it_begin != it_end) {
+    /* range to fetch must fit within a single region, This one does not. */
+    assert(it_begin->iov_base);
+
+    CPLOG(2, "loop iov_base %p iov_len 0x%zx begin_off %zu", it_begin->iov_base, it_begin->iov_len, begin_off);
+
+    const auto m_low  = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + begin_off;
+    const auto m_high = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + it_begin->iov_len;
+    mr_low            = std::min(mr_low, m_low);
+    mr_high           = std::max(mr_high, m_high);
+
+    CPLOG(2, "loop m_low 0x%" PRIu64 " m_high 0x%" PRIu64 " mr_low 0x%" PRIu64 " mr_high 0x%" PRIu64, m_low, m_high,
+           mr_low, mr_high);
+
+    sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
+    begin_off = 0;
+  }
+
+  /* last entry */
+  assert(it_begin->iov_base);
+
+  CPLOG(2, "final iov_base %p iov_len 0x%zx begin_off %zu", it_begin->iov_base, it_begin->iov_len, begin_off);
+
+  auto m_low = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + begin_off;
+  /* end of last element, not to exceed the pools memory element */
+  auto excess_length = it_begin->iov_len < end_off ? end_off - it_begin->iov_len : 0;
+  auto m_high        = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + end_off - excess_length;
+  mr_low             = std::min(mr_low, m_low);
+  mr_high            = std::max(mr_high, m_high);
+
+  CPLOG(2, "final m_low 0x%" PRIx64 " m_high 0x%" PRIx64 " mr_low 0x%" PRIx64 " mr_high 0x%" PRIx64 " size 0x%" PRIx64,
+         m_low, m_high, mr_low, mr_high, m_high - m_low);
+
+  sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
+  return sg_result{ std::move(sg_list), mr_low, mr_high, excess_length };
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //   LOCATE   //
 /////////////////////
 void Shard::io_response_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
 {
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
-  CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", static_cast<const void *>(this), t.first,
+  CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", static_cast<const void *>(this), msg->get_offset(),
        msg->get_size(), msg->request_id());
 
   std::vector<::iovec> regions;
   auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
   if (status == S_OK) {
+    const auto rb = region_breaks(regions);
+#if 0
     if (2 < _debug_level) {
       PLOG("region count %zu", regions.size());
       for (const auto &e : regions) {
         PLOG("region %p len 0x%zx", e.iov_base, e.iov_len);
       }
     }
-    auto rb = region_breaks(regions);
     if (2 < _debug_level) {
       PLOG("region break count %zu", rb.size());
       for (const auto &e : rb) {
@@ -1553,9 +1630,11 @@ void Shard::io_response_locate(Connection_handler *handler, const Protocol::Mess
            m_low, m_high, mr_low, mr_high, m_high - m_low);
 
     sg_list.push_back(Protocol::Message_IO_response::locate_element{m_low, m_high - m_low});
-
+#else
+    auto sgr = offset_to_sg_list(t, rb);
+#endif
     /* Register the entire range */
-    memory_registered<Connection_base> mr(_debug_level, handler, reinterpret_cast<void *>(mr_low), mr_high - mr_low, 0,
+    memory_registered<Connection_base> mr(_debug_level, handler, reinterpret_cast<void *>(sgr.mr_low), sgr.mr_high - sgr.mr_low, 0,
                                           0);
 #if 0
     auto cmd = "/bin/cat /proc/" + std::to_string(::getpid()) + "/smaps";
@@ -1564,11 +1643,11 @@ void Shard::io_response_locate(Connection_handler *handler, const Protocol::Mess
 #endif
     auto key = mr.key();
     /* register deregister task for space */
-    add_space_shared(range<std::uint64_t>(t.first, t.second - excess_length), std::move(mr));
+    add_space_shared(range<std::uint64_t>(t.first, t.second - sgr.excess_length), std::move(mr));
 
     /* respond, with the scatter-gather list as "data" */
     auto response = respond1(handler, iob, msg, S_OK);
-    response->copy_in_data(&*sg_list.begin(), sg_list.size() * sizeof *sg_list.begin());
+    response->copy_in_data(&*sgr.sg_list.begin(), sgr.sg_list.size() * sizeof *sgr.sg_list.begin());
     iob->set_length(response->msg_len());
     response->key = key;
 
@@ -1599,6 +1678,43 @@ void Shard::io_response_release(Connection_handler *handler, const Protocol::Mes
     CPLOG(2, "%s: RELEASE: (%p) [0x%" PRIx64 "..0x%" PRIx64 ") error %s", __func__, static_cast<const void *>(this),
          t.first, t.second, e.cause());
     status = E_INVAL;
+  }
+  respond2(handler, iob, msg, status, __func__);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//   RELEASE_WITH_FLUSH   //
+/////////////////////
+void Shard::io_response_release_with_flush(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob)
+{
+  const char *tag = "RELEASE_WITH_FLUSH";
+  range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
+  CPLOG(2, "%s: (%p) offset 0x%zx size %zu request_id=%lu", tag, static_cast<const void *>(this), t.first,
+       msg->get_size(), msg->request_id());
+
+  std::vector<::iovec> regions;
+  auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
+  if (status == S_OK) {
+    const auto rb = region_breaks(regions);
+
+    auto sgr = offset_to_sg_list(t, rb);
+    try {
+      for ( const auto &e : sgr.sg_list )
+      {
+        auto s = _i_kvstore->flush_pool_memory(msg->pool_id(), reinterpret_cast<const void *>(e.addr), e.len);
+        if ( status == S_OK )
+        {
+          status = s;
+        }
+      }
+
+      release_space_shared(t);
+    }
+    catch (const Logic_exception &e) {
+      CPLOG(2, "%s: %s: (%p) [0x%" PRIx64 "..0x%" PRIx64 ") error %s", tag, __func__, static_cast<const void *>(this),
+           t.first, t.second, e.cause());
+      status = E_INVAL;
+    }
   }
   respond2(handler, iob, msg, status, __func__);
 }
