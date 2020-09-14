@@ -25,7 +25,6 @@
 #include <common/exceptions.h>  // base Exception class
 #include <daxctl/libdaxctl.h>
 #include <numa.h>
-#include <experimental/filesystem>
 #include <map>
 #include <string>
 #include <utility>
@@ -44,8 +43,6 @@ namespace libndctl
 #define DIMM_HANDLE(n, s, i, c, d)                              \
   (((n & 0xfff) << 16) | ((s & 0xf) << 12) | ((i & 0xf) << 8) | \
    ((c & 0xf) << 4) | (d & 0xf))
-
-namespace fs = std::experimental::filesystem;
 
 struct stat;
 

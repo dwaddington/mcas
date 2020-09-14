@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+#include <experimental/filesystem>
 #include <fstream>
 #include <streambuf>
 
@@ -209,6 +210,7 @@ auto ND_control::get_regions(int numa_zone) -> const mapping_vec_t &
 
 void ND_control::init_devdax()
 {
+  namespace fs = std::experimental::filesystem;
   if (!_pmem_present) return;
 
   /* find out which dax devices belong to which NUMA zones */
