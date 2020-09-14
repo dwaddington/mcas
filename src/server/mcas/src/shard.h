@@ -217,6 +217,7 @@ class Shard : public Shard_transport {
   void io_response_configure(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_locate(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_release(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_release_with_flush(Connection_handler *handler, const Protocol::Message_IO_request *msg, buffer_t *iob);
 
   void process_info_request(Connection_handler *handler, const Protocol::Message_INFO_request *msg, profile &pr);
   void process_ado_request(Connection_handler *handler, const Protocol::Message_ado_request *msg);
@@ -257,7 +258,18 @@ class Shard : public Shard_transport {
 
   inline size_t session_count() const { return _handlers.size(); }
 
- private:
+  struct sg_result {
+    std::vector<Protocol::Message_IO_response::locate_element> sg_list;
+    std::uint64_t mr_low;
+    std::uint64_t mr_high;
+    std::uint64_t excess_length;
+  };
+
+  auto offset_to_sg_list(
+    range<std::uint64_t> t
+    , const std::vector<::iovec> &region_breaks
+  ) -> sg_result;
+
   inline bool ado_enabled() const { return (_i_ado_mgr && _ado_plugins.size() > 0); }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }

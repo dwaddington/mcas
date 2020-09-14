@@ -287,6 +287,11 @@ public:
     const void* addr,
     size_t size) override;
 
+  status_t flush_pool_memory(
+    pool_t pool,
+    const void* addr,
+    size_t size) override;
+
   pool_iterator_t open_pool_iterator(pool_t pool) override;
 
   status_t deref_pool_iterator(

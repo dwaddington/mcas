@@ -865,6 +865,29 @@ catch ( const std::exception & )
   return E_FAIL;
 }
 
+auto hstore::flush_pool_memory(
+  const pool_t pool,
+  const void* const addr,
+  const size_t size
+) -> status_t
+try
+{
+  const auto session = static_cast<session_t *>(locate_session(pool));
+  return
+    session
+    ? ( session->flush_memory(addr, size), S_OK )
+    : int(component::IKVStore::E_POOL_NOT_FOUND)
+    ;
+}
+catch ( const API_exception & ) /* bad pointer */
+{
+  return E_INVAL;
+}
+catch ( const std::exception & )
+{
+  return E_FAIL;
+}
+
 auto hstore::open_pool_iterator(pool_t pool) -> pool_iterator_t
 {
   auto session = static_cast<session_t *>(locate_session(pool));
