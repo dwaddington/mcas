@@ -619,7 +619,7 @@ private:
       );
 
       _iobrd.reset(nullptr);
-      /* DMA is complete. Issue GET_RELEASE */
+      /* DMA is complete. Issue OP_RELEASE */
 
       /* send release message */
       const auto msg = new (_iobs2->base()) protocol::Message_IO_request(
@@ -636,7 +636,7 @@ private:
         return E_BUSY;
       }
       /* What to do when second recv completes */
-      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "ASYNC RELEASE");
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "OP_RELEASE");
       return response_msg->get_status();
       /* End */
     }
@@ -809,11 +809,11 @@ private:
       );
 
       _iobrd.reset(nullptr);
-      /* DMA is complete. Issue GET_RELEASE */
+      /* DMA is complete. Issue OP_RELEASE */
 
       /* send release message */
       const auto msg = new (_iobs2->base()) protocol::Message_IO_request(
-          _auth_id, c->request_id(), _pool, protocol::OP_TYPE::OP_RELEASE, _offset, _length);
+          _auth_id, c->request_id(), _pool, protocol::OP_TYPE::OP_RELEASE_WITH_FLUSH, _offset, _length);
 
         c->post_recv(&*_iobr2);
         c->sync_inject_send(&*_iobs2, msg, __func__);
@@ -825,7 +825,7 @@ private:
         return E_BUSY;
       }
       /* What to do when second recv completes */
-      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "ASYNC RELEASE");
+      const auto response_msg = c->msg_recv<const mcas::protocol::Message_IO_response>(&*_iobr2, "OP_RELEASE_WITH_FLUSH,");
       return response_msg->get_status();
       /* End */
     }
@@ -1230,46 +1230,6 @@ std::tuple<uint64_t, uint64_t, std::size_t> Connection_handler::get_locate(const
                                                      response_msg->data_length()};
 }
 
-void Connection_handler::get_release(const pool_t pool, const std::uint64_t target)
-{
-  const auto iobr = make_iob_ptr_recv();
-  const auto iobs = make_iob_ptr_send();
-
-  /* send advance leader message */
-  const auto msg = new (iobs->base())
-      protocol::Message_IO_request(auth_id(), request_id(), pool, protocol::OP_TYPE::OP_GET_RELEASE, target);
-
-  post_recv(&*iobr);
-  sync_inject_send(&*iobs, msg, __func__);
-  wait_for_completion(&*iobr);
-
-  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
-
-  if (response_msg->get_status() != S_OK) {
-    throw remote_fail(msg->get_status());
-  }
-}
-
-void Connection_handler::release(const pool_t pool_, std::size_t offset_, std::size_t size_)
-{
-  const auto iobr = make_iob_ptr_recv();
-  const auto iobs = make_iob_ptr_send();
-
-  /* send advance leader message */
-  const auto msg = new (iobs->base())
-      protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_TYPE::OP_RELEASE, offset_, size_);
-
-  post_recv(&*iobr);
-  sync_inject_send(&*iobs, msg, __func__);
-  wait_for_completion(&*iobr);
-
-  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
-
-  if (response_msg->get_status() != S_OK) {
-    throw remote_fail(msg->get_status());
-  }
-}
-
 std::tuple<uint64_t, uint64_t> Connection_handler::put_locate(const pool_t   pool,
                                                               const void *   key,
                                                               const size_t   key_len,
@@ -1296,26 +1256,6 @@ std::tuple<uint64_t, uint64_t> Connection_handler::put_locate(const pool_t   poo
   }
 
   return std::tuple<uint64_t, uint64_t>{response_msg->addr, response_msg->key};
-}
-
-void Connection_handler::put_release(const pool_t pool, const std::uint64_t target)
-{
-  const auto iobr = make_iob_ptr_recv();
-  const auto iobs = make_iob_ptr_send();
-
-  /* send advance leader message */
-  const auto msg = new (iobs->base())
-      protocol::Message_IO_request(auth_id(), request_id(), pool, protocol::OP_TYPE::OP_PUT_RELEASE, target);
-
-  post_recv(&*iobr);
-  sync_inject_send(&*iobs, msg, __func__);
-  wait_for_completion(&*iobr);
-
-  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
-
-  if (response_msg->get_status() != S_OK) {
-    throw remote_fail(msg->get_status());
-  }
 }
 
 IMCAS::async_handle_t Connection_handler::put_locate_async(const pool_t                        pool,

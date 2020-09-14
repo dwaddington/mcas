@@ -4,6 +4,7 @@ Server Configuration Syntax
 ===
 
 The JSON schema for a configuration is:
+
 	{
 	    "type": "object",
 	    "additionalProperties": false,
@@ -209,4 +210,4 @@ The DAX configuration is specified by a separate component, but often needss to 
 Notes:
 ---
 
-If the The addr parameter of a DAX configuration region embedded in a Server Configuration is specified as a string, rather than an integer, it will be converted to an integer by std::stoull. This permits easlity recognizeable specificatoins of base-2 aligned addresses such as "0x900000000".
+If the addr parameter of a DAX configuration region embedded in a Server Configuration is specified as a string, rather than an integer, it will be converted to an integer by std::stoull. This permits easlity recognizeable specificatoins of base-2 aligned addresses such as "0x900000000".

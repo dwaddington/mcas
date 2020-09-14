@@ -30,6 +30,7 @@
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <tbb/scalable_allocator.h>
 #pragma GCC diagnostic pop
+#include <common/logging.h>
 #include <common/time.h>
 #include <limits>
 #include <map>
@@ -58,6 +59,7 @@ struct lock_result
 template <typename Handle, typename Allocator, typename Table, typename LockType>
 	struct session
 		: public Handle
+		, private common::log_source
 	{
 	private:
 		struct pool_iterator;
@@ -72,7 +74,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		table_t _map;
 		impl::atomic_controller<table_t> _atomic_state;
 		std::uint64_t _writes;
-		bool _debug;
 		std::map<pool_iterator *, std::shared_ptr<pool_iterator>> _iterators;
 
 		struct pool_iterator
@@ -214,9 +215,10 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 #endif
 				, Handle &&pop_
 				, Persist *persist_data_
-				, bool debug_ = false
+				, unsigned debug_level_ = 0
 			)
 			: Handle(std::move(pop_))
+			, common::log_source(debug_level_)
 			, _heap(
 				Allocator(
 #if USE_CC_HEAP == 2
@@ -232,7 +234,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			, _map(persist_data_, _heap)
 			, _atomic_state(*persist_data_, _map)
 			, _writes(0)
-			, _debug(debug_)
 			, _iterators()
 		{}
 
@@ -242,9 +243,10 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			AK_ACTUAL
 			Handle &&pop_
 			, construction_mode mode_
-			, bool debug_ = false
+			, unsigned debug_level_ = 0
 		)
 			: Handle(std::move(pop_))
+			, common::log_source(debug_level_)
 			, _heap(
 				Allocator(
 					this->pool()->locate_heap()
@@ -254,7 +256,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			, _map(AK_REF &this->pool()->persist_data()._persist_map, mode_, _heap)
 			, _atomic_state(this->pool()->persist_data()._persist_atomic, _map, mode_)
 			, _writes(0)
-			, _debug(debug_)
 			, _iterators()
 		{}
 
@@ -554,10 +555,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				 */
 				if ( value_len != 0 )
 				{
-					if ( _debug )
-					{
-						PLOG(PREFIX "allocating object %zu bytes", LOCATION, value_len);
-					}
+					CPLOG(1, PREFIX "allocating object %zu bytes", LOCATION, value_len);
 
 					++_writes;
 					auto r =
@@ -897,6 +895,16 @@ PLOG("%s", s.str().c_str());
 			/* ERROR: leaks memory on a crash */
 #endif
 			allocator().deallocate(p, size);
+		}
+
+		void flush_memory(
+			const void* addr
+			, size_t size
+		)
+		{
+			persistent_t<char *> p = static_cast<char *>(const_cast<void *>(addr));
+            CPLOG(2, "%s: %p %zx", __func__, addr, size);
+			allocator().persist(p, size);
 		}
 
 		unsigned percent_used() const
