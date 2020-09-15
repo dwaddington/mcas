@@ -6,7 +6,7 @@ pipeline {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					sh '''cd ${WORKSPACE} ; git submodule update --init -f ; ls ${WORKSPACE}/src/lib/GSL
-					cd ${WORKSPACE} ; mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
+					cd ${WORKSPACE} ; mkdir -p build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
 					cd ${WORKSPACE}/build ; make bootstrap ; make
 					'''
 				}
