@@ -19,22 +19,24 @@ pipeline {
 					sh '''export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64
 					cd ${WORKSPACE}/build
 					./dist/testing/run-tests.sh release &> results.log
+					grep fail results.log
 					if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi'''
 				}
 			}
 		}
+	}
+	post {
+		success {
+			githubNotify(status: 'SUCCESS', description: 'Jenkins build OK')
+		}
+		failure {
+			githubNotify(status: 'FAILED', description: 'Jenkins build failed')
+		}
+	}
+}
 				   /*mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .. ; make bootstrap; make; make -j install; ln -s ${WORKSPACE}/build/dist/lib/libfabric.so ${WORKSPACE}/build/dist/lib/libfabric.so.1 ; ln -s ${WORKSPACE}/build/dist/lib/libcityhash.so ${WORKSPACE}/build/dist/lib/libcityhash.so.0 ; ln -s ${WORKSPACE}/build/dist/lib/libxpmem.so ${WORKSPACE}/build/dist/lib/libxpmem.so.',
 	echo "Build result: ${BUILD_RESULT}"
 	*/
 	/*RUN_RESULT = sh ( script : 'cd ${WORKSPACE}/build ; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64 ; ./dist/testing/run-tests.sh release &> results.log ; if grep fail results.log ; then echo FAILED; false; else echo SUCCESS; exit 0; fi', returnStatus: true ) == 0
 	echo "Run result: ${RUN_RESULT}"*/
 
-
-	    stage('Github Notify') {
-	      steps {
-	        githubNotify(status: 'SUCCESS', description: 'Jenkins build OK')
-	      }
-	    }
-
-  }
-}
