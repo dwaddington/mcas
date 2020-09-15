@@ -4,7 +4,7 @@ pipeline {
     stage('Build') {
       steps {
 				timeout(time: 60, unit: 'MINUTES') {
-					sh '''	cd ${WORKSPACE}
+					sh '''cd ${WORKSPACE}
 					git submodule update --init --recursive
 					mkdir build
 					cd build
