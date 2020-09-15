@@ -17,10 +17,8 @@ pipeline {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					sh '''export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64
-					cd ${WORKSPACE}/build
-					DIR=${WORKSPACE}/build/dist/testing ./dist/testing/run-tests.sh release &> results.log
-					grep fail results.log
-					if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi'''
+					cd ${WORKSPACE}/build ; DIR=${WORKSPACE}/build/dist/testing ./dist/testing/run-tests.sh ; if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi
+					'''
 				}
 			}
 		}
