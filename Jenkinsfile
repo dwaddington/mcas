@@ -5,10 +5,12 @@ pipeline {
 	      	steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					sh '''cd ${WORKSPACE} ; git submodule update --init -f 
-					cd ${WORKSPACE} ; mkdir -p build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
-					cd ${WORKSPACE}/build ; make bootstrap ; make -j ; make -j install
-					'''
+					dir('${WORKSPACE}') {
+						sh '''git submodule update --init -f 
+						mkdir -p build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
+						make bootstrap ; make -j ; make -j install
+						'''	
+					}
 				}
 			}
 	    }
@@ -16,8 +18,12 @@ pipeline {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					sh "export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64 ; cd ${WORKSPACE}/build ; DIR=${WORKSPACE}/build/dist/testing ./dist/testing/run-tests.sh release"
-					sh 	"cd ${WORKSPACE}/build ; if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi"
+					dir('${WORKSPACE}/build') {
+						sh '''export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64
+						./dist/testing/run-tests.sh release
+						if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi
+						'''
+					}					
 				}
 			}
 		}
