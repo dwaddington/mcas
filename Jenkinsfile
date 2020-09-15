@@ -5,7 +5,7 @@ pipeline {
 	      steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					sh '''cd ${WORKSPACE} ; git submodule update --init --recursive
+					bash '''cd ${WORKSPACE} ; git submodule update --init ; ls ${WORKSPACE}/src/lib/GSL
 					cd ${WORKSPACE} ; mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
 					cd ${WORKSPACE}/build ; make bootstrap ; make
 					'''
