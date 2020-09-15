@@ -4,10 +4,10 @@ pipeline {
     stage('Build') {
       steps {
 
-        BUILD_RESULT = sh ( "cd ${WORKSPACE} ;	git submodule update --init --recursive ; mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .. ; make bootstrap; make; make -j install; ln -s ${WORKSPACE}/build/dist/lib/libfabric.so ${WORKSPACE}/build/dist/lib/libfabric.so.1 ; ln -s ${WORKSPACE}/build/dist/lib/libcityhash.so ${WORKSPACE}/build/dist/lib/libcityhash.so.0 ; ln -s ${WORKSPACE}/build/dist/lib/libxpmem.so ${WORKSPACE}/build/dist/lib/libxpmem.so.0",	returnStatus: true ) == 0
+        BUILD_RESULT = sh ( '''cd ${WORKSPACE} ;	git submodule update --init --recursive ; mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .. ; make bootstrap; make; make -j install; ln -s ${WORKSPACE}/build/dist/lib/libfabric.so ${WORKSPACE}/build/dist/lib/libfabric.so.1 ; ln -s ${WORKSPACE}/build/dist/lib/libcityhash.so ${WORKSPACE}/build/dist/lib/libcityhash.so.0 ; ln -s ${WORKSPACE}/build/dist/lib/libxpmem.so ${WORKSPACE}/build/dist/lib/libxpmem.so.0''',	returnStatus: true ) == 0
 	echo "Build result: ${BUILD_RESULT}"
 	
-	RUN_RESULT = sh ( "cd ${WORKSPACE}/build ;	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64 ; ./dist/testing/run-tests.sh release &> results.log ; if grep fail results.log ; then echo FAILED; false;	else echo SUCCESS; exit 0;fi ",	returnStatus: true ) == 0
+	RUN_RESULT = sh ( '''cd ${WORKSPACE}/build ;	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64 ; ./dist/testing/run-tests.sh release &> results.log ; if grep fail results.log ; then echo FAILED; false;	else echo SUCCESS; exit 0;fi ''',	returnStatus: true ) == 0
 	echo "Run result: ${RUN_RESULT}"
       }
     }
