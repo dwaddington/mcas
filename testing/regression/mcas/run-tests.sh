@@ -1,7 +1,11 @@
 #!/bin/bash
 ulimit -a > ulimit.log
 env > env.log
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+if [ -z "$DIR" ]
+then
+  DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+fi
+
 DELAY=8
 # run each test
 $DIR/mcas-mapstore-basic-0.sh $1
