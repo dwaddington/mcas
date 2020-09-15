@@ -16,21 +16,12 @@ pipeline {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					sh '''cd ${WORKSPACE}/build
+					RUN_RESULT = sh (script: '''cd ${WORKSPACE}/build
 					export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64
 					./dist/testing/run-tests.sh release &> results.log
 					if grep fail results.log ; then echo FAILED; false; else echo SUCCESS; exit 0; fi
-					'''
-					node {
-						def rfile1 = new File("${WORKSPACE}/build/results.log")
-						def lines = rfile1.readLines()
-						def error_found = lines.find{ line-> line =~ /FAILED/ }
-						if (error_found) {
-							currentBuild.result = "FAILURE"
-							throw new Exception("Run failure stopped pipeline")
-						}
-					}
-
+					''', 
+					returnStatus: true)
 				}
 			}
 		}
