@@ -4,14 +4,15 @@ pipeline {
     stage('Build') {
       steps {
 	timeout(time: 3, unit: 'MINUTES') {
-	sh '''	cd ${WORKSPACE}
-		git submodule update --init --recursive
-		mkdir build
-		cd build
-		cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
-		make bootstrap
-		make
-	'''
+		sh '''	cd ${WORKSPACE}
+			git submodule update --init --recursive
+			mkdir build
+			cd build
+			cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
+			make bootstrap
+			make
+		'''
+	}
 			   /*mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .. ; make bootstrap; make; make -j install; ln -s ${WORKSPACE}/build/dist/lib/libfabric.so ${WORKSPACE}/build/dist/lib/libfabric.so.1 ; ln -s ${WORKSPACE}/build/dist/lib/libcityhash.so ${WORKSPACE}/build/dist/lib/libcityhash.so.0 ; ln -s ${WORKSPACE}/build/dist/lib/libxpmem.so ${WORKSPACE}/build/dist/lib/libxpmem.so.',
 	echo "Build result: ${BUILD_RESULT}"
 	*/
