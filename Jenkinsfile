@@ -31,5 +31,11 @@ fi'''
       }
     }
 
+    stage('Github Notify') {
+      steps {
+        githubNotify(status: 'SUCCESS', description: 'Jenkins build OK')
+      }
+    }
+
   }
 }
