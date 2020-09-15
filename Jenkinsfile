@@ -16,11 +16,7 @@ pipeline {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					RUN_RESULT = sh (script: '''cd ${WORKSPACE}/build
-					export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64
-					./dist/testing/run-tests.sh release &> results.log
-					if grep fail results.log ; then echo FAILED; false; else echo SUCCESS; exit 0; fi
-					''', 
+					RUN_RESULT = sh (script: "cd ${WORKSPACE}/build ; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64 ./dist/testing/run-tests.sh release &> results.log ; if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi",
 					returnStatus: true)
 				}
 			}
