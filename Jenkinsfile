@@ -6,6 +6,7 @@ pipeline {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					sh '''cd ${WORKSPACE}
+					git submodule
 					git submodule update --init --recursive
 					ls ${WORKSPACE}/src/lib/GSL
 					mkdir build
