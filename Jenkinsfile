@@ -14,7 +14,7 @@ pipeline {
 					'''
 				}
 			}
-    },
+    }
 		stage('Run') {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') {
