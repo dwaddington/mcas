@@ -7,7 +7,7 @@ pipeline {
 				{
 					sh '''cd ${WORKSPACE}
 					git submodule update --init --recursive
-					ls ${WORKSPACE}/src/lib
+					ls ${WORKSPACE}/src/lib/GSL
 					mkdir build
 					cd build
 					cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
