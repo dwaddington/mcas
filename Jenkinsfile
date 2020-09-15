@@ -1,24 +1,23 @@
 pipeline {
   	agent any
   	stages {
-	    /*stage('Release Build') {
+	    stage('Release Build') {
 	      	steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					sh '''cd ${WORKSPACE} ; git submodule update --init -f 
 					cd ${WORKSPACE} ; mkdir -p build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
-					cd ${WORKSPACE}/build ; make bootstrap ; make
+					cd ${WORKSPACE}/build ; make bootstrap ; make -j ; make -j install
 					'''
 				}
 			}
-	    }*/
+	    }
 		stage('Release Run') {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					sh '''export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64
 					cd ${WORKSPACE}/build
-					make install
 					./dist/testing/run-tests.sh release &> results.log
 					if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi'''
 				}
