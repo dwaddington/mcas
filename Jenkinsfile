@@ -30,7 +30,7 @@ pipeline {
 			githubNotify(status: 'SUCCESS', description: 'Jenkins build OK')
 		}
 		failure {
-			githubNotify(status: 'FAILED', description: 'Jenkins build failed')
+			githubNotify(status: 'FAILURE', description: 'Jenkins build failed')
 		}
 	}
 }
