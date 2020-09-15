@@ -21,12 +21,14 @@ pipeline {
 					./dist/testing/run-tests.sh release &> results.log
 					if grep fail results.log ; then echo FAILED; false; else echo SUCCESS; exit 0; fi
 					'''
-					def rfile1 = new File("${WORKSPACE}/build/results.log")
-					def lines = rfile1.readLines()
-					def error_found = lines.find{ line-> line =~ /FAILED/ }
-					if (error_found) {
-						currentBuild.result = "FAILURE"
-						throw new Exception("Run failure stopped pipeline")
+					node {
+						def rfile1 = new File("${WORKSPACE}/build/results.log")
+						def lines = rfile1.readLines()
+						def error_found = lines.find{ line-> line =~ /FAILED/ }
+						if (error_found) {
+							currentBuild.result = "FAILURE"
+							throw new Exception("Run failure stopped pipeline")
+						}
 					}
 
 				}
