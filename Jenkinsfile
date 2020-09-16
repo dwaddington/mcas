@@ -5,11 +5,13 @@ pipeline {
 	      	steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					echo('${WORKSPACE}')
-					sh '''cd ${WORKSPACE} ; git submodule update --init -f 
-					cd ${WORKSPACE} ; mkdir -p build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist ..
-					cd ${WORKSPACE}/build ; make bootstrap ; make -j ; make -j install
-					'''
+					sh "git submodule update --init -f"
+					sh "mkdir -p build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
+
+					dir('build') {
+						sh "make bootstrap ; make -j ; make -j install"	
+					}
+					
 				}
 			}
 	    }
