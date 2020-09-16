@@ -24,7 +24,8 @@ pipeline {
 					dir('release-build') {
 						
 						withEnv(["LD_LIBRARY_PATH=${pwd()}/dist/lib:${pwd()}/dist/lib64"]) {
-							sh "./dist/testing/run-tests.sh release"
+							sh "echo $LD_LIBRARY_PATH"
+							sh "LD_LIBRARY_PATH={pwd()}/dist/lib:${pwd()}/dist/lib64 ./dist/testing/run-tests.sh release"
 						}
 						sh "if grep fail results.log ; then exit -1; else exit 0; fi"
 					}					
