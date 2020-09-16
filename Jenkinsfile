@@ -1,8 +1,6 @@
 pipeline {
   	agent any
-  	environment {
-   		LD_LIBRARY_PATH = "${pwd()}/dist/lib:${pwd()}/dist/lib64"
-	}
+  	
   	stages {
 	    stage('Release Build') {
 	      	steps {
@@ -19,6 +17,9 @@ pipeline {
 			}
 	    }
 		stage('Release Run') {
+			environment {
+   				LD_LIBRARY_PATH = "${pwd()}/dist/lib:${pwd()}/dist/lib64"
+			}
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
