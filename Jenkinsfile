@@ -18,9 +18,6 @@ pipeline {
 				{
 					dir('${WORKSPACE}/build') {
 						sh "export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64"
-						sh "export DIR=${WORKSPACE}/build"
-						sh "ls"
-						sh "echo $DIR"
 						sh "./dist/testing/run-tests.sh release"
 						sh "if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi"
 					}					
