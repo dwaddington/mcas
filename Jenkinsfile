@@ -16,7 +16,7 @@ pipeline {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					dir('${env.WORKSPACE}/build') {
+					dir('build') {
 						//sh "export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64"
 						sh "ls -la ${pwd()}"
 						sh "./dist/testing/run-tests.sh release"
