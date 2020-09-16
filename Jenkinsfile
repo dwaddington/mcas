@@ -16,10 +16,10 @@ pipeline {
 			steps {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
-					dir('${WORKSPACE}/build') {
-						sh "export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64"
+					dir('build') {
+						//sh "export LD_LIBRARY_PATH=${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64"
 						sh "ls -la ${pwd()}"
-						sh "${WORKSPACE}/build/dist/testing/run-tests.sh release"
+						sh "./dist/testing/run-tests.sh release"
 						sh "if grep fail results.log ; then echo FAILED; exit -1; else echo SUCCESS; exit 0; fi"
 					}					
 				}
