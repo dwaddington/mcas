@@ -24,6 +24,9 @@ pipeline {
 					dir('release-build') {
 						
 						withEnv(["LD_LIBRARY_PATH=${pwd()}/dist/lib:${pwd()}/dist/lib64"]) {
+							sh "ln -s ./dist/lib/libfabric.so ./dist/lib/libfabric.so.1"
+							sh "ln -s ./dist/lib/libcityhash.so ./dist/lib/libcityhash.so.0"
+							sh "ln -s ./dist/lib/libxpmem.so ./dist/lib/libxpmem.so.0"
 							sh "echo $LD_LIBRARY_PATH"
 							sh "./dist/testing/run-tests.sh release"
 						}
