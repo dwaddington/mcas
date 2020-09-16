@@ -19,12 +19,12 @@ pipeline {
 		stage('Release Run') {
 			
 			steps {
+				environment {
+   							LD_LIBRARY_PATH = "${pwd()}/dist/lib:${pwd()}/dist/lib64"
+				}
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					dir('release-build') {
-						environment {
-   							LD_LIBRARY_PATH = "${pwd()}/dist/lib:${pwd()}/dist/lib64"
-						}
 						echo('${LD_LIBRARY_PATH}')
 						sh "./dist/testing/run-tests.sh release"
 						sh "if grep fail results.log ; then exit -1; else exit 0; fi"
