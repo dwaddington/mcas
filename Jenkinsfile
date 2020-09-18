@@ -23,9 +23,9 @@ pipeline {
 					dir('debug-build') {
 						
 						withEnv(["LD_LIBRARY_PATH=${pwd()}/dist/lib:${pwd()}/dist/lib64"]) {
-							sh "ln -s ${pwd()}/dist/lib/libfabric.so.1.13.1 ${pwd()}/dist/lib/libfabric.so.1"
-							sh "ln -s ${pwd()}/dist/lib/libcityhash.so ${pwd()}/dist/lib/libcityhash.so.0"
-							sh "ln -s ${pwd()}/dist/lib/libxpmem.so ${pwd()}/dist/lib/libxpmem.so.0"
+							sh "ln -s -f ${pwd()}/dist/lib/libfabric.so.1.13.1 ${pwd()}/dist/lib/libfabric.so.1"
+							sh "ln -s -f ${pwd()}/dist/lib/libcityhash.so ${pwd()}/dist/lib/libcityhash.so.0"
+							sh "ln -s -f ${pwd()}/dist/lib/libxpmem.so ${pwd()}/dist/lib/libxpmem.so.0"
 							sh "echo $LD_LIBRARY_PATH"
 							sh "./dist/testing/run-tests.sh"
 						}
@@ -56,9 +56,9 @@ pipeline {
 					dir('release-build') {
 						
 						withEnv(["LD_LIBRARY_PATH=${pwd()}/dist/lib:${pwd()}/dist/lib64"]) {
-							sh "ln -s ${pwd()}/dist/lib/libfabric.so.1.13.1 ${pwd()}/dist/lib/libfabric.so.1"
-							sh "ln -s ${pwd()}/dist/lib/libcityhash.so ${pwd()}/dist/lib/libcityhash.so.0"
-							sh "ln -s ${pwd()}/dist/lib/libxpmem.so ${pwd()}/dist/lib/libxpmem.so.0"
+							sh "ln -s -f ${pwd()}/dist/lib/libfabric.so.1.13.1 ${pwd()}/dist/lib/libfabric.so.1"
+							sh "ln -s -f ${pwd()}/dist/lib/libcityhash.so ${pwd()}/dist/lib/libcityhash.so.0"
+							sh "ln -s -f ${pwd()}/dist/lib/libxpmem.so ${pwd()}/dist/lib/libxpmem.so.0"
 							sh "echo $LD_LIBRARY_PATH"
 							sh "./dist/testing/run-tests.sh release"
 						}
@@ -77,9 +77,3 @@ pipeline {
 		}
 	}
 }
-				   /*mkdir build ; cd build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .. ; make bootstrap; make; make -j install; ln -s ${WORKSPACE}/build/dist/lib/libfabric.so ${WORKSPACE}/build/dist/lib/libfabric.so.1 ; ln -s ${WORKSPACE}/build/dist/lib/libcityhash.so ${WORKSPACE}/build/dist/lib/libcityhash.so.0 ; ln -s ${WORKSPACE}/build/dist/lib/libxpmem.so ${WORKSPACE}/build/dist/lib/libxpmem.so.',
-	echo "Build result: ${BUILD_RESULT}"
-	*/
-	/*RUN_RESULT = sh ( script : 'cd ${WORKSPACE}/build ; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${WORKSPACE}/build/dist/lib:${WORKSPACE}/build/dist/lib64 ; ./dist/testing/run-tests.sh release &> results.log ; if grep fail results.log ; then echo FAILED; false; else echo SUCCESS; exit 0; fi', returnStatus: true ) == 0
-	echo "Run result: ${RUN_RESULT}"*/
-
