@@ -105,7 +105,7 @@ class IADO_plugin : public component::IBase {
     /* Compile time ALLOC_TYPE differentiators. */
     struct alloc_type_malloc {}; /* use in place of response_buffer_t(..., false) */
     struct alloc_type_pool {}; /* use in place of response_buffer_t(..., true */
-  private:
+
     enum class alloc_type_t : std::uint32_t {
       POOL         = 0,
       MALLOC       = 1,
@@ -113,6 +113,7 @@ class IADO_plugin : public component::IBase {
       POOL_TO_FREE = 4, /* buffer is pool memory which should be freed */
     };
 
+  private:
     response_buffer_t(void* ptr_p,
                       size_t len_p,
                       uint32_t layer_id_,
@@ -125,6 +126,7 @@ class IADO_plugin : public component::IBase {
      * Preserved as an undefined function to catch accidental match with the
      * uint32_t parameter constructor.
      */
+  public:
     response_buffer_t(void* ptr_p,
                       size_t len_p,
                       bool pool_ref); /* false => alloc_type_malloc, true => alloc_type_pool */
