@@ -38,7 +38,7 @@ private:
 
 public:
   ADO_manager(Program_options &options)
-    : log_source(0),
+    : log_source(0U),
       _config(options.debug_level, options.config),
       _ados{},
       _ado_cpu_pool{},
