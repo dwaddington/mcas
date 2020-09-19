@@ -196,8 +196,14 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					d.unlock();
 				}
 			}
-			catch ( ... )
-			{}
+			catch ( const Exception & )
+			{
+				return;
+			}
+			catch ( const std::exception & )
+			{
+				return;
+			}
 		};
 
 		auto allocator() const { return _heap; }

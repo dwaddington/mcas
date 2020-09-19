@@ -60,7 +60,8 @@ try
 }
 catch ( const std::exception &e )
 {
-  std::cerr << "SERVER connection shutdown error " << e.what();
+  std::cerr << "SERVER connection shutdown error " << e.what() << "\n";
+  return;
 }
 
 /* The server does not need to do anything to solicit an event,

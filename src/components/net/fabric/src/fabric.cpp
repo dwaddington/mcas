@@ -102,7 +102,6 @@ namespace
   }
   catch ( const fabric_runtime_error &e )
   {
-std::cerr << "ATTR: " << tostr(attr_) << "\n";
     throw e.add(tostr(attr_));
   }
 

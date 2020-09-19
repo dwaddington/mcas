@@ -102,6 +102,7 @@ try
 catch ( std::exception &e )
 {
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  return;
 }
 
 std::size_t remote_memory_server_grouped::max_message_size() const

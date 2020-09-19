@@ -79,6 +79,7 @@ try
 catch ( std::exception &e )
 {
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  return;
 }
 
 void remote_memory_client_grouped::send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)

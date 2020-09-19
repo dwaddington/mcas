@@ -71,12 +71,16 @@ try
 {
   char c{};
   auto sz = ::write(_end.fd_write(), &c, 1);
-  (void) sz;
+  if ( sz != 1 )
+  {
+    std::cerr << __func__ << ": failed to signal end of connection" << "\n";
+  }
   _listener.get();
 }
 catch ( const std::exception &e )
 {
-  std::cerr << __func__ << ": SERVER connection error: " << e.what();
+  std::cerr << __func__ << ": SERVER connection error: " << e.what() << "\n";
+  return;
 }
 
 size_t Fabric_server_generic_factory::max_message_size() const noexcept
@@ -189,7 +193,7 @@ try
 }
 catch ( const std::exception &e )
 {
-  std::cerr << __func__ << " (Fabric_server_factory) listen failure " << e.what() << "\n";
+  std::cerr << __func__ << ": listen failure " << e.what() << "\n";
   _listen_exception = std::current_exception();
   throw;
 }
@@ -315,6 +319,7 @@ Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
 
   if ( _listen_exception )
   {
+    std::cerr << __func__ << ": _listen_exception present, rethrowing\n";
     std::rethrow_exception(_listen_exception);
   }
 
