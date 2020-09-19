@@ -353,22 +353,26 @@ void Shard::main_loop(common::profiler &pr_)
     }
     else if (_handlers.empty()) { /* if there are no sessions, sleep thread */
       usleep(SESSIONS_EMPTY_USLEEP);
-      check_for_new_connections();
+      try {
+        check_for_new_connections();
+      }
+      catch (const std::exception &e) {
+        PERR("Shard: cannot get new connection: %s", e.what());
+        _thread_exit = true;
+      }
       service_cluster_signals();
       continue;
     }
 
-
     /* check for new connections or sleep on none */
-    try {
-      if (tick % CHECK_CONNECTION_INTERVAL == 0) {
+    if (tick % CHECK_CONNECTION_INTERVAL == 0) {
+      try {
         check_for_new_connections();
       }
-    }
-    catch (const std::exception &e) {
-      PERR("Shard: cannot get new connection: %s", e.what());
-      throw e;
-
+      catch (const std::exception &e) {
+        PERR("Shard: cannot get new connection: %s", e.what());
+        _thread_exit = true;
+      }
     }
 
     /* periodic cluster signal handling */
