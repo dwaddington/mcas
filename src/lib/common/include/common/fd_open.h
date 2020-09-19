@@ -19,9 +19,14 @@
 
 namespace common
 {
+  struct fd_open_traits
+  {
+    static constexpr int none = -1;
+  };
+
   class Fd_open
   {
-    moveable_value<int, -1> _fd;
+    moveable_value<int, fd_open_traits> _fd;
     void close() noexcept;
   public:
     Fd_open();

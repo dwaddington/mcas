@@ -47,11 +47,15 @@ namespace common
   private:
 	unsigned _debug_level;
   protected:
-	unsigned debug_level() const { return _debug_level; }
+    ~log_source() {}
 	explicit log_source(unsigned debug_level_)
       : _debug_level(debug_level_)
     {}
-   log_source(const log_source &) = default;
+    explicit log_source(const log_source *other)
+      : log_source(other->debug_level())
+    {}
+    unsigned debug_level() const { return _debug_level; }
+    log_source(const log_source &other) = default;
   };
 }
 

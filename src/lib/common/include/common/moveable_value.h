@@ -18,19 +18,28 @@
 
 namespace common
 {
+  template <typename T>
+    struct moveable_traits
+    {
+      static constexpr T none = T();
+    };
   /* A value which zero-initializes the source when moved.
    * helpful for classes which use a pointer or bool to denote
    * "moved from" state.
    */
-  template <typename T, T None = T()>
+  /* Note: the choice of zero-initializer should be controlled
+   * by a trait type, not by a template parameter.
+   * Use of a template parameter restricts the type if T
+   */
+  template <typename T, typename Traits = moveable_traits<T>>
     struct moveable_value
     {
       T v;
-      moveable_value(T v_)
+      moveable_value(const T &v_)
         : v(v_)
       {}
       moveable_value(moveable_value &&o_) noexcept
-        : v(None)
+        : v(Traits::none)
       {
         using std::swap;
         swap(v, o_.v);
@@ -44,6 +53,34 @@ namespace common
       }
 
       operator T() const { return v; }
+    };
+
+  /* Like moveable_value, but T is a class or struct and
+   * therefore can be a base class
+   */
+  template <typename T, typename Traits = moveable_traits<T>>
+    struct moveable_struct
+      : protected T
+    {
+      /* construct a moveable_struct from T constructor args */
+      template <typename ... Args>
+        explicit moveable_struct(Args&& ... args)
+          : T(std::forward<Args>(args)...)
+        {}
+
+      moveable_struct(moveable_struct &&o_) noexcept
+        : T(Traits::none)
+      {
+        using std::swap;
+        swap(*static_cast<T *>(this), static_cast<T &>(o_));
+      }
+
+      moveable_struct &operator=(moveable_struct &&o_) noexcept
+      {
+        using std::swap;
+        swap(*static_cast<T *>(this), static_cast<T &>(o_));
+        return *this;
+      }
     };
 
 }
