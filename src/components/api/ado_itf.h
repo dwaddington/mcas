@@ -113,48 +113,32 @@ class IADO_plugin : public component::IBase {
       POOL_TO_FREE = 4, /* buffer is pool memory which should be freed */
     };
 
-  private:
+  public:
+    response_buffer_t(const response_buffer_t &) = delete;
+    
+    response_buffer_t &operator=(const response_buffer_t &) = delete;
+    
     response_buffer_t(void* ptr_p,
                       size_t len_p,
                       uint32_t layer_id_,
                       alloc_type_t type)
-      : ptr(ptr_p), len(len_p), layer_id(layer_id_), _alloc_type(type) {
-    }
+      : ptr(ptr_p), len(len_p), layer_id(layer_id_), _alloc_type(type) {}
 
-    /* An obfuscated (possibly outdated) version of
-     * response_buffer_t(p, len_p, alloc_type_t::MALLOC (or not alloc_type_t::POOL).
-     * Preserved as an undefined function to catch accidental match with the
-     * uint32_t parameter constructor.
-     */
-  public:
-    response_buffer_t(void* ptr_p,
-                      size_t len_p,
-                      bool pool_ref); /* false => alloc_type_malloc, true => alloc_type_pool */
-
-  public:
     response_buffer_t(const void * addr_)
-      : addr(addr_), len(0), layer_id(0), _alloc_type(alloc_type_t::INLINE) {
-    }
+      : addr(addr_), len(0), layer_id(0), _alloc_type(alloc_type_t::INLINE) {}
 
     response_buffer_t(void* ptr_p,
                       size_t len_p,
                       alloc_type_malloc)
-      : response_buffer_t(ptr_p, len_p, 0, alloc_type_t::MALLOC)
-    {}
+      : response_buffer_t(ptr_p, len_p, 0, alloc_type_t::MALLOC) {}
 
     response_buffer_t(void* ptr_p,
                       size_t len_p,
                       alloc_type_pool)
-      : response_buffer_t(ptr_p, len_p, 0, alloc_type_t::POOL)
-    {}
-
-    response_buffer_t(const response_buffer_t &) = delete;
-    response_buffer_t &operator=(const response_buffer_t &) = delete;
+      : response_buffer_t(ptr_p, len_p, 0, alloc_type_t::POOL) {}
 
     response_buffer_t(const response_buffer_t &other, std::function<void *(const response_buffer_t &src)> copy_data_)
-      : response_buffer_t( (other.is_malloc() ? copy_data_(other) : other.ptr), other.len, other.layer_id, other._alloc_type)
-    {
-    }
+      : response_buffer_t( (other.is_malloc() ? copy_data_(other) : other.ptr), other.len, other.layer_id, other._alloc_type) {}
 
     response_buffer_t(response_buffer_t &&other) noexcept
       : len(other.len)
@@ -207,8 +191,10 @@ class IADO_plugin : public component::IBase {
 
     uint64_t len = 0;
     uint32_t layer_id;
+    
   private:
     alloc_type_t _alloc_type;
+    
   public:
     ~response_buffer_t()
     {
