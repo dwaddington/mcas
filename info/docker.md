@@ -1,4 +1,4 @@
-# Deploy and Run MCAS inside Container
+# Deploy and Run MCAS inside a Docker Container
 
 Similar to containerizing the ADO process, the MCAS server process can also run within a container. This document shows how to build and run the MCAS server inside container. Note this is different from [ADO Docker Containerization](./ado-docker.md) which only launches ADO processes inside container.
 
