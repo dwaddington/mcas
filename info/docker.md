@@ -19,23 +19,25 @@ On Docker Hub (https://hub.docker.com/) create an account and a registry.
 
 - Build image:
 ```bash
-docker build -f $MCAS_HOME/deploy/docker/Dockerfile.mcas-ubuntu-18 -t <your-docker-username>/ibm-mcas-runtime .
+docker build -f $MCAS_HOME/deploy/docker/Dockerfile.mcas-ubuntu-18 -t <your-docker-username>/ibm-mcas-runtime:ubuntu18 .
   ```
 
 - (Optional) Push image to Docker Hub, e.g.:
 ```bash
-docker push <your_username>/ibm-mcas-runtime
+docker login
+docker push <your-docker-username>/ibm-mcas-runtime:ubuntu18
 ```
 
 ## Run MCAS Docker Image:
+
 - If running with RDMA:
 ```bash
-docker run --rm -it --privileged --cap-add=ALL -v /dev:/dev -v /lib/modules:/lib/modules --net=host --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm --ulimit memlock=-1 <your-docker-username</ibm-mcas-runtime bash
+docker run --rm -it --privileged --cap-add=ALL -v /dev:/dev -v /lib/modules:/lib/modules --net=host --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm --ulimit memlock=-1 <your-docker-username>/ibm-mcas-runtime:ubuntu18 bash
 ```
 
 - If running with standard sockets:
 ```bash
-docker run --rm -it --privileged --cap-add=ALL -v /dev:/dev -v /lib/modules:/lib/modules --ulimit memlock=-1 res-mcas-docker-local.artifactory.swg-devops.com/mcas:latest bash
+docker run --rm -it --privileged --cap-add=ALL -v /dev:/dev -v /lib/modules:/lib/modules --ulimit memlock=-1 <your-docker-username>/ibm-mcas-runtime:ubuntu18 bash
 ```
 
 After getting into the bash console, your mcas binary is located in
