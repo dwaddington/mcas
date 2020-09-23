@@ -6,7 +6,7 @@ the MCAS server inside container. Note this is different from [ADO Docker Contai
 
 ## Setup Docker Environment
 - Follow [Ubuntu install instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/) 
-or [Fedora install instructions](https://docs.docker.com/engine/install/fedora/)to install docker.
+or [Fedora install instructions](https://docs.docker.com/engine/install/fedora/) to install docker.
 
 - Add yours user id into the docker group for non-root execution.
 
