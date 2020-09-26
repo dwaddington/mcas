@@ -19,26 +19,38 @@
 
 #include <common/logging.h>
 #include <sys/mman.h>
+#include <cerrno>
 #include <cstring>
+
+namespace
+{
+	/* not-present value must be compile-time evaluable.
+     * MMAP_FAILED is not; use nullptr instead
+     */
+    static ::iovec translate_mmap_result(::iovec iov_)
+    {
+      return iov_.iov_base == MAP_FAILED ? ::iovec{nullptr, errno} : iov_;
+    }
+}
 
 common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd) noexcept
   : memory_mapped(
-    ::mmap(vaddr, size, prot, flags, fd, 0), size
+    ::iovec{
+      ::mmap(vaddr, size, prot, flags, fd, 0)
+      , size
+    }
   )
 {
 }
 
-common::memory_mapped::memory_mapped(void *vaddr, std::size_t size) noexcept
-  : moveable_struct<::iovec, iovec_moveable_traits>(::iovec{vaddr, size})
+common::memory_mapped::memory_mapped(::iovec iov_) noexcept
+  : moveable_struct<::iovec, iovec_moveable_traits>(translate_mmap_result(iov_))
 {
-  if (iov_base == MAP_FAILED) {
-    iov_len = errno;
-  }
 }
 
 common::memory_mapped::~memory_mapped()
 {
-  if ( iov_base != MAP_FAILED )
+  if ( iov_base != nullptr )
   {
     if ( ::munmap(iov_base, iov_len) != 0 )
     {

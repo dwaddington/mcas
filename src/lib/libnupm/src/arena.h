@@ -20,6 +20,7 @@
 
 #include <experimental/string_view>
 #include <cstddef>
+#include <vector>
 
 namespace nupm
 {

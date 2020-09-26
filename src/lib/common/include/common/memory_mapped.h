@@ -16,23 +16,23 @@
 
 #include <common/moveable_struct.h>
 #include <cstddef>
-#include <sys/mman.h> /* MAP_FAILED */
 #include <sys/uio.h> /* iovec */
 
 namespace common
 {
   struct iovec_moveable_traits
   {
-    static constexpr ::iovec none{MAP_FAILED, 0};
+    static constexpr ::iovec none{nullptr, 0};
   };
+
   /*
    * Memory which is mapped, and which is to be unmapped
    */
   struct memory_mapped : public moveable_struct<::iovec, iovec_moveable_traits>
   {
   public:
-    /* minimalist: arguments are result of ::mmap, and size */
-    memory_mapped(void *vaddr, std::size_t size) noexcept;
+    /* minimalist: argument is pointer and size */
+    memory_mapped(::iovec iov) noexcept;
     /* non-minimalist: arguments are input to ::mmap */
     memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd) noexcept;
 	memory_mapped(memory_mapped &&) = default;
@@ -40,6 +40,7 @@ namespace common
     ~memory_mapped();
     using ::iovec::iov_base;
     using ::iovec::iov_len;
+	operator bool() const { return iov_base != nullptr; }
     ::iovec iov() const { return *this; }
   };
 }

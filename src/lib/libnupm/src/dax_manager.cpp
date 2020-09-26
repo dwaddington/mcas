@@ -269,7 +269,7 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 				_mapped_spaces.insert(
 					mapped_spaces::value_type(
 						p.string()
-						, std::move(registered_opened_space(this, p.string(), r.first))
+						, std::move(registered_opened_space(*this, this, p.string(), r.first))
 					)
 				);
 			if ( ! itb.second )
@@ -336,7 +336,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
 				p.string()
-				, std::move(registered_opened_space(this, p.string(), base))
+				, std::move(registered_opened_space(*this, this, p.string(), base))
 			)
 		);
 	if ( ! itb.second )
@@ -600,9 +600,14 @@ std::vector<common::memory_mapped> opened_space::map_fs(int fd, const std::vecto
 }
 
 /* opened_space constructor for eevdax: filename, single address, unknown size */
-opened_space::opened_space(dax_manager * dm_, const std::string &p, const addr_t base_addr)
+opened_space::opened_space(
+  const common::log_source & ls_
+  , dax_manager * dm_
+  , const std::string &p
+  , const addr_t base_addr
+)
 try
-  : common::log_source(*dm_)
+  : common::log_source(ls_)
   , _fd_open(::open(p.c_str(), O_RDWR, 0666))
   , _range(dm_, map_dev(_fd_open.fd(), base_addr))
 {
@@ -614,9 +619,14 @@ catch ( std::exception &e )
 }
 
 /* opened_space constructor for fsdax: filename, multiple mappings, unknown size */
-opened_space::opened_space(dax_manager * dm_, const std::string &p, const std::vector<::iovec> &mapping)
+opened_space::opened_space(
+  const common::log_source & ls_
+  , dax_manager * dm_
+  , const std::string &p
+  , const std::vector<::iovec> &mapping
+)
 try
-  : common::log_source(*dm_)
+  : common::log_source(ls_)
   , _fd_open(::open(p.c_str(), O_RDWR, 0666))
   , _range(dm_, map_fs(_fd_open.fd(), mapping))
 {

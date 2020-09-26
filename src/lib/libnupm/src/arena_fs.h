@@ -19,9 +19,7 @@
 #include <common/logging.h>
 
 #include <experimental/filesystem>
-#include <cstddef>
 #include <string>
-#include <vector>
 
 namespace common
 {

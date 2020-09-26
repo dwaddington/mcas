@@ -103,8 +103,8 @@ struct opened_space : private common::log_source
   std::vector<common::memory_mapped> map_dev(int fd, const addr_t base_addr);
   std::vector<common::memory_mapped> map_fs(int fd, const std::vector<::iovec> &mapping);
 public:
-  opened_space(dax_manager * dm_, const std::string &path, const addr_t base_addr);
-  opened_space(dax_manager * dm_, const std::string &path, const std::vector<::iovec> &mapping);
+  opened_space(const common::log_source &, dax_manager * dm_, const std::string &path, const addr_t base_addr);
+  opened_space(const common::log_source &, dax_manager * dm_, const std::string &path, const std::vector<::iovec> &mapping);
   opened_space(opened_space &&) noexcept = default;
   opened_space &operator=(opened_space &&) noexcept = default;
 };
@@ -116,13 +116,23 @@ private:
 public:
   opened_space _or;
 public:
-  registered_opened_space(dax_manager * dm_, const std::string &path_, addr_t base_addr_)
+  registered_opened_space(
+    const common::log_source &ls_
+    , dax_manager * dm_
+    , const std::string &path_
+    , addr_t base_addr_
+  )
     : _pu(path_)
-    , _or(dm_, path_, base_addr_)
+    , _or(ls_, dm_, path_, base_addr_)
   {}
-  registered_opened_space(dax_manager * dm_, const std::string &path_, const std::vector<::iovec> &mapping_)
+  registered_opened_space(
+    const common::log_source &ls_
+    , dax_manager * dm_
+    , const std::string &path_
+    , const std::vector<::iovec> &mapping_
+  )
     : _pu(path_)
-    , _or(dm_, path_, mapping_)
+    , _or(ls_, dm_, path_, mapping_)
   {}
   registered_opened_space(const registered_opened_space &) = delete;
   registered_opened_space &operator=(const registered_opened_space &) = delete;

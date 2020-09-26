@@ -54,31 +54,23 @@ std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<:
 	{
 		using namespace nupm;
 		mapped_elements.emplace_back(
-			::mmap(
+			e.iov_base
+			, e.iov_len
+			, PROT_READ | PROT_WRITE
+			, flags
+			, fd
+		);
+
+		if ( ! mapped_elements.back() )
+		{
+			mapped_elements.pop_back();
+			flags &= ~MAP_SYNC;
+			mapped_elements.emplace_back(
 				e.iov_base
 				, e.iov_len
 				, PROT_READ | PROT_WRITE
 				, flags
 				, fd
-				, 0
-			)
-			, e.iov_len
-		);
-
-		if ( mapped_elements.back().iov_base == MAP_FAILED )
-		{
-			mapped_elements.pop_back();
-			flags &= ~MAP_SYNC;
-			mapped_elements.emplace_back(
-				::mmap(
-					e.iov_base
-					, e.iov_len
-					, PROT_READ | PROT_WRITE
-					, flags
-					, fd
-					, 0
-				)
-				, e.iov_len
 			);
 		}
 
@@ -210,7 +202,6 @@ auto arena_fs::region_get(string_view id_) -> std::vector<::iovec>
 
 	auto path_data_local = path_data(id_);
 	auto path_map_local = path_map(id_);
-	auto path = path_data(id_);
 
 	/* file is created and opened */
 	bool commit = false;
