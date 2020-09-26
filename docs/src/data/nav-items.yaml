@@ -2,6 +2,9 @@
 - title: Getting started
   pages:
     - path: /getting-started
+- title: News
+  pages:
+    - path: /news
 #- title: Demo
 #  pages:
 #    - path: /demo
