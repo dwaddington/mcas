@@ -4,8 +4,8 @@ from dm import dm
 
 class fsdax(dm):
     """ fsdax specification (within a shard) """
-    def __init__(self, region=0, file="hstore-test"):
-        dm.__init__(self, {"path": "/mnt/pmem%d/%s" % (region, file)})
+    def __init__(self, region=0):
+        dm.__init__(self, {"path": "/mnt/pmem%d" % (region,)})
 
 class devdax(dm):
     """ devdax specification (within a shard) """

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,23 +11,16 @@
    limitations under the License.
 */
 
+#ifndef _MCAS_COMMON_MOVEABLE_TRAITS_
+#define _MCAS_COMMON_MOVEABLE_TRAITS_
 
-#ifndef COMANCHE_HSTORE_DEVDAX_MANAGER_H
-#define COMANCHE_HSTORE_DEVDAX_MANAGER_H
-
-#include <nupm/devdax_manager.h>
-
-#include <string>
-
-class Devdax_manager
-	: public nupm::Devdax_manager
+namespace common
 {
-public:
-	Devdax_manager(
-		unsigned debug_level_
-		, const std::string &dax_map
-		, bool force_reset = false
-	);
-};
+  template <typename T>
+    struct moveable_traits
+    {
+      static constexpr T none = T();
+    };
+}
 
 #endif

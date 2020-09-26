@@ -46,7 +46,7 @@
 #include <memory>
 #include <vector>
 
-class Devdax_manager;
+struct dax_manager;
 
 namespace impl
 {
@@ -162,7 +162,7 @@ public:
 	explicit heap_cc_shared(
 		unsigned debug_level
 		, uint64_t pool0_uuid
-		, const std::unique_ptr<Devdax_manager> &devdax_manager_
+		, const std::unique_ptr<dax_manager> &dax_manager_
 	);
 	explicit heap_cc_shared(
 		unsigned debug_level
@@ -176,7 +176,7 @@ public:
 	);
 	explicit heap_cc_shared(
 		unsigned debug_level
-		, const std::unique_ptr<Devdax_manager> &devdax_manager
+		, const std::unique_ptr<dax_manager> &dax_manager
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -193,7 +193,7 @@ public:
 	static void *iov_limit(const ::iovec &r);
 
 	auto grow(
-		const std::unique_ptr<Devdax_manager> & devdax_manager_
+		const std::unique_ptr<dax_manager> & dax_manager_
 		, std::uint64_t uuid_
 		, std::size_t increment_
 	) -> std::size_t;

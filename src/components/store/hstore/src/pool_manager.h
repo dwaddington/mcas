@@ -20,6 +20,7 @@
 #include "alloc_key.h"
 
 #include <common/logging.h> /* log_source */
+#include <gsl/pointers>
 #include <sys/uio.h>
 #include <cstddef>
 #include <functional>
@@ -82,7 +83,7 @@ public:
 
 };
 
-class Devdax_manager;
+struct dax_manager;
 
 template <typename Pool>
   struct pool_manager
@@ -103,11 +104,11 @@ template <typename Pool>
     virtual auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-    ) -> std::tuple<void *, std::size_t, std::uint64_t> = 0;
+    ) -> std::tuple<gsl::not_null<void *>, std::size_t, std::uint64_t> = 0;
 
     virtual auto pool_create_2(
       AK_FORMAL
-      void *v_
+      gsl::not_null<void *> v_
       , std::size_t size_
       , std::uint64_t uuid_
       , component::IKVStore::flags_t flags_
@@ -116,16 +117,16 @@ template <typename Pool>
 
     virtual auto pool_open_1(
       const pool_path &path_
-    ) -> void * = 0;
+    ) -> gsl::not_null<void *>  = 0;
 
     virtual auto pool_open_2(
       AK_FORMAL
-      void *addr_
+      gsl::not_null<void *> addr_
       , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<Pool> = 0;
 
     virtual void pool_delete(const pool_path &path) = 0;
-    virtual const std::unique_ptr<Devdax_manager> & devdax_manager() const = 0;
+    virtual const std::unique_ptr<dax_manager> & get_dax_manager() const = 0;
   };
 #pragma GCC diagnostic pop
 

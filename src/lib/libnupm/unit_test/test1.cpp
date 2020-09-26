@@ -9,7 +9,7 @@
 
 #include "heap_allocator.h"
 #include "arena_alloc.h"
-#include "devdax_manager.h"
+#include "dax_manager.h"
 #include "rc_alloc_avl.h"
 #include "rc_alloc_lb.h"
 #include "tx_cache.h"
@@ -503,37 +503,33 @@ TEST_F(Libnupm_test, DevdaxManager)
     ASSERT_TRUE(s > 0);
   }
 
-  nupm::Devdax_manager::config_t config;
+  nupm::dax_manager::config_t config;
   config.path = "/dev/dax0.0";
   config.addr = 0x900000000;
   config.region_id = 0;
-  
+
   {
-    nupm::Devdax_manager ddm({config},true);
+    nupm::dax_manager ddm(common::log_source(0U), {config},true);
   }
 
-  nupm::Devdax_manager ddm({config});  // rebuild
+  nupm::dax_manager ddm(common::log_source(0U), {config});  // rebuild
 
-  
-  size_t   p_len = 0;
-  uint64_t uuid  = Options.uuid;
+  std::string uuid  = std::to_string(Options.uuid);
 
-  if(uuid == 0) uuid = 1;
-
-  size_t size = MB(256);
   ddm.debug_dump(0); /* region id 0 */
 
   PLOG("Opening existing region..");
-  void *p = ddm.open_region(uuid, 0, &p_len);
-  if (p) {
-    PLOG("Opened existing region %p OK", p);
+  auto iovs = ddm.open_region(uuid, 0);
+  if (iovs.size() == 1) {
+    PLOG("Opened existing region %p OK", iovs.front().iov_base);
     ddm.debug_dump(0);
     PLOG("Now erasing it...");
     ddm.erase_region(uuid, 0);
     ddm.debug_dump(0);
   }
 
-  p = ddm.create_region(uuid, 0, size);
+  size_t size = MB(256);
+  auto p = ddm.create_region(uuid, 0, size);
   if (p) PLOG("created region %p ", p);
   ASSERT_TRUE(p);
   memset(p, 0, 4096);

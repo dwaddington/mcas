@@ -41,7 +41,7 @@
 template <typename Handle, typename Allocator, typename Table, typename LockType>
 	struct session;
 
-class Devdax_manager;
+struct dax_manager;
 
 struct lock_result
 {
@@ -507,7 +507,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 #endif
 
 		auto pool_grow(
-			const std::unique_ptr<Devdax_manager> &dax_mgr_
+			const std::unique_ptr<dax_manager> &dax_mgr_
 			, const std::size_t increment_
 		) const -> std::size_t
 		{

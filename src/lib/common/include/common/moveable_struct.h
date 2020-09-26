@@ -11,42 +11,40 @@
    limitations under the License.
 */
 
-#ifndef _MCAS_COMMON_MOVEABLE_VALUE_
-#define _MCAS_COMMON_MOVEABLE_VALUE_
+#ifndef _MCAS_COMMON_MOVEABLE_STRUCT_
+#define _MCAS_COMMON_MOVEABLE_STRUCT_
 
 #include <common/moveable_traits.h>
 #include <algorithm> /* swap */
 
 namespace common
 {
-  /*
-   * A value which zero-initializes the source when moved.
-   * helpful for classes which use a special value, such as
-   * nullptr or false, to denote "moved from" state.
-   * moveable_traits<T>::none is that special value.
+  /* Like moveable_value, but T is a class or struct and
+   * therefore can be a base class
    */
   template <typename T, typename Traits = moveable_traits<T>>
-    struct moveable_value
+    struct moveable_struct
+      : protected T
     {
-      T v;
-      moveable_value(const T &v_)
-        : v(v_)
-      {}
-      moveable_value(moveable_value &&o_) noexcept
-        : v(Traits::none)
+      /* construct a moveable_struct from T constructor args */
+      template <typename ... Args>
+        explicit moveable_struct(Args&& ... args)
+          : T(std::forward<Args>(args)...)
+        {}
+
+      moveable_struct(moveable_struct &&o_) noexcept
+        : T(Traits::none)
       {
         using std::swap;
-        swap(v, o_.v);
+        swap(*static_cast<T *>(this), static_cast<T &>(o_));
       }
 
-      moveable_value &operator=(moveable_value &&o_) noexcept
+      moveable_struct &operator=(moveable_struct &&o_) noexcept
       {
         using std::swap;
-        swap(v, o_.v);
+        swap(*static_cast<T *>(this), static_cast<T &>(o_));
         return *this;
       }
-
-      operator T() const { return v; }
     };
 }
 

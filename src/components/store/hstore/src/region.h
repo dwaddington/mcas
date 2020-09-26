@@ -24,7 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 
-class Devdax_manager;
+struct dax_manager;
 
 template <typename PersistData, typename Heap, typename HeapAllocator>
   struct region
@@ -37,6 +37,10 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
 
   private:
     std::uint64_t magic;
+    /* The hashed value of the string which names the region.
+     * Preserved only form the basis for new strings generated
+     * for grow.
+     */
     std::uint64_t _uuid;
     heap_type _heap;
     persist_data_type _persist_data;
@@ -84,13 +88,13 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
 #pragma GCC diagnostic ignored "-Wuninitialized"
     region(
       unsigned debug_level
-      , const std::unique_ptr<Devdax_manager> & devdax_manager_
+      , const std::unique_ptr<dax_manager> & dax_manager_
     )
       : magic(0)
       , _uuid(this->_uuid)
       , _heap(
         debug_level
-        , devdax_manager_
+        , dax_manager_
 #if USE_CC_HEAP == 4
         , &this->_persist_data.ase()
         , &this->_persist_data.aspd()
@@ -135,11 +139,11 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
       return _heap.regions();
     }
     auto grow(
-      const std::unique_ptr<Devdax_manager> & devdax_manager_
+      const std::unique_ptr<dax_manager> & dax_manager_
       , std::size_t increment_
     ) -> std::size_t
     {
-      return _heap.grow(devdax_manager_, _uuid, increment_);
+      return _heap.grow(dax_manager_, _uuid, increment_);
     }
     /* region used by heap_cc follows */
   };

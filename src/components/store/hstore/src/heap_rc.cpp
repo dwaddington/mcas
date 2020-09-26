@@ -12,7 +12,7 @@
 */
 
 #include "heap_rc.h"
-#include "devdax_manager.h"
+#include "dax_manager.h"
 #include "hstore_config.h"
 #include <common/utils.h>
 #include <cinttypes>
@@ -131,7 +131,7 @@ heap_rc_shared::heap_rc_shared(unsigned debug_level_, void *pool_, std::size_t s
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
-heap_rc_shared::heap_rc_shared(unsigned debug_level_, const std::unique_ptr<Devdax_manager> &devdax_manager_)
+heap_rc_shared::heap_rc_shared(unsigned debug_level_, const std::unique_ptr<dax_manager> &dax_manager_)
 	: _pool0(this->_pool0)
 	, _numa_node(this->_numa_node)
 	, _more_region_uuids_size(this->_more_region_uuids_size)
@@ -151,7 +151,7 @@ heap_rc_shared::heap_rc_shared(unsigned debug_level_, const std::unique_ptr<Devd
 
 	for ( std::size_t i = 0; i != _more_region_uuids_size; ++i )
 	{
-		auto r = open_region(devdax_manager_, _more_region_uuids[i], _numa_node);
+		auto r = open_region(dax_manager_, _more_region_uuids[i], _numa_node);
 		_eph->add_managed_region(r, _numa_node);
 		VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
 		VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
@@ -164,15 +164,14 @@ heap_rc_shared::~heap_rc_shared()
 	quiesce();
 }
 
-::iovec heap_rc_shared::open_region(const std::unique_ptr<Devdax_manager> &devdax_manager_, std::uint64_t uuid_, unsigned numa_node_)
+::iovec heap_rc_shared::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 {
-	::iovec iov;
-	iov.iov_base = devdax_manager_->open_region(uuid_, numa_node_, &iov.iov_len);
-	if ( iov.iov_base == 0 )
+	auto iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_);
+	if ( iovs.size() != 1 )
 	{
 		throw std::range_error("failed to re-open region " + std::to_string(uuid_));
 	}
-	return iov;
+	return iovs.front();
 }
 
 std::vector<::iovec> heap_rc_shared::regions() const
@@ -186,7 +185,7 @@ void *heap_rc_shared::iov_limit(const ::iovec &r)
 }
 
 auto heap_rc_shared::grow(
-	const std::unique_ptr<Devdax_manager> & devdax_manager_
+	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
 ) -> std::size_t
@@ -207,10 +206,10 @@ auto heap_rc_shared::grow(
 			{
 				try
 				{
-					/* Note: crash between here and "Slot persist done" may cause devdax_manager_
+					/* Note: crash between here and "Slot persist done" may cause dax_manager_
 					 * to leak the region.
 					 */
-					::iovec r { devdax_manager_->create_region(uuid_next, _numa_node, size), size };
+					::iovec r { dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size), size };
 					{
 						auto &slot = _more_region_uuids[_more_region_uuids_size];
 						slot = uuid_next;

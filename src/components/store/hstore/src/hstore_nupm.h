@@ -20,13 +20,14 @@
 #include "hstore_nupm_types.h"
 #include "hstore_open_pool.h"
 #include "persister_nupm.h"
+#include <gsl/pointers>
 
 #include <cstring> /* strerror */
 
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib> /* getenv */
 
-class Devdax_manager;
+struct dax_manager;
 
 template <typename PersistData, typename Heap, typename HeapAllocator>
   struct region;
@@ -50,7 +51,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   public:
     using open_pool_handle = ::open_pool<non_owner<region_type>>;
   private:
-    std::unique_ptr<Devdax_manager> _devdax_manager;
+    std::unique_ptr<dax_manager> _dax_manager;
     unsigned _numa_node;
 
     static std::uint64_t dax_uuid_hash(const pool_path &p);
@@ -63,21 +64,21 @@ template <typename Region, typename Table, typename Allocator, typename LockType
 
     static unsigned name_to_numa_node(const std::string &name);
   public:
-    hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_);
+    hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<dax_manager> mgr_);
 
     virtual ~hstore_nupm();
 
-    const std::unique_ptr<Devdax_manager> & devdax_manager() const override { return _devdax_manager; }
+    const std::unique_ptr<dax_manager> & get_dax_manager() const override { return _dax_manager; }
     void pool_create_check(std::size_t) override;
 
     auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-    ) -> std::tuple<void *, std::size_t, std::uint64_t> override;
+    ) -> std::tuple<gsl::not_null<void *>, std::size_t, std::uint64_t> override;
 
     auto pool_create_2(
       AK_FORMAL
-      void *v_
+      gsl::not_null<void *> v_
       , std::size_t size_
       , std::uint64_t uuid_
       , component::IKVStore::flags_t flags_
@@ -86,11 +87,11 @@ template <typename Region, typename Table, typename Allocator, typename LockType
 
     auto pool_open_1(
       const pool_path &path_
-    ) -> void * override;
+    ) -> gsl::not_null<void *> override;
 
     auto pool_open_2(
       AK_FORMAL
-      void * addr_
+      gsl::not_null<void *> addr_
       , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<open_pool_handle> override;
 

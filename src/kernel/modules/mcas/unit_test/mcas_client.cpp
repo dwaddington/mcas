@@ -5,7 +5,7 @@
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <nupm/devdax_manager.h>
+#include <nupm/dax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <boost/program_options.hpp>
 

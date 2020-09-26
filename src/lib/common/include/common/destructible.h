@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -10,24 +10,23 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#ifndef _MCAS_COMMON_DESTRUCTIBLE_
+#define _MCAS_COMMON_DESTRUCTIBLE_
 
+#include <utility> // forward
 
-/*
- * Authors:
- *
- * Daniel G. Waddington (daniel.waddington@ibm.com)
- *
- */
-
-#ifndef __NUPM_H__
-#define __NUPM_H__
-
-#ifndef __cplusplus
-#error NUPM is a C++ library
-#endif
-
-#include "dax_manager.h"
-#include "nd_utils.h"
-#include "rc_alloc_lb.h"
+namespace common
+{
+	/* Wrapper around a type T, enable destruction when T's desstructor is protected */
+	template <typename T>
+		struct destructible
+			: public T
+		{
+			template <typename ... Args>
+				explicit destructible(Args&& ... args)
+					: T(std::forward<Args>(args)...)
+				{}
+		};
+}
 
 #endif

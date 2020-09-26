@@ -18,6 +18,7 @@
 #include "buffer_manager.h" /* Buffer_manager */
 
 #include <api/fabric_itf.h> /* IFabric_client, IFabric_memory_region, IFabric_op_completer. IKVStore */
+#include <common/destructible.h>
 #include <common/exceptions.h>
 #include <iterator> /* begin, end */
 
@@ -26,18 +27,6 @@ namespace mcas
 using memory_registered_fabric = memory_registered<component::IFabric_client>;
 namespace client
 {
-
-  /* Wrapper around a type T, enable destruction when T's desstructor is protected */
-  template <typename T>
-    struct destructible
-      : public T
-    {
-      template <typename ... Args>
-        explicit destructible(Args&& ... args)
-          : T(std::forward<Args>(args)...)
-        {}
-    };
-
 static constexpr size_t NUM_BUFFERS = 64; /* defines max outstanding */
 
 class Fabric_transport : protected common::log_source {
@@ -53,7 +42,7 @@ class Fabric_transport : protected common::log_source {
   /* Buffer manager defined in server/mcas/src/ */
   using buffer_base     = Buffer_manager<Transport>::buffer_base;
   using buffer_t        = Buffer_manager<Transport>::buffer_internal;
-  using buffer_external = destructible<buffer_base>;
+  using buffer_external = common::destructible<buffer_base>;
   using memory_region_t = component::IFabric_memory_region *;
 
   double cycles_per_second;

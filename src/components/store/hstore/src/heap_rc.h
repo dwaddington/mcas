@@ -43,7 +43,7 @@
 #include <memory>
 #include <vector>
 
-class Devdax_manager;
+struct dax_manager;
 
 namespace impl
 {
@@ -120,10 +120,10 @@ private:
 	std::unique_ptr<heap_rc_shared_ephemeral> _eph;
 public:
 	explicit heap_rc_shared(unsigned debug_level, void *pool_, std::size_t sz_, unsigned numa_node_);
-	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<Devdax_manager> &devdax_manager_);
+	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<dax_manager> &dax_manager_);
 	/* allocation_state_combined offered, but not used */
-	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_combined *)
-		: heap_rc_shared(debug_level, devdax_manager)
+	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<dax_manager> &dax_manager, impl::allocation_state_combined *)
+		: heap_rc_shared(debug_level, dax_manager)
 	{
 	}
 
@@ -132,12 +132,12 @@ public:
 
 	~heap_rc_shared();
 
-	static ::iovec open_region(const std::unique_ptr<Devdax_manager> &devdax_manager_, std::uint64_t uuid_, unsigned numa_node_);
+	static ::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_);
 
 	static void *iov_limit(const ::iovec &r);
 
 	auto grow(
-		const std::unique_ptr<Devdax_manager> & devdax_manager_
+		const std::unique_ptr<dax_manager> & dax_manager_
 		, std::uint64_t uuid_
 		, std::size_t increment_
 	) -> std::size_t;

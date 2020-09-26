@@ -100,7 +100,7 @@ auto hstore::move_pool(const component::IKVStore::pool_t p) -> std::shared_ptr<o
   return s2;
 }
 
-hstore::hstore(const std::string &owner, const std::string &name, std::unique_ptr<Devdax_manager> &&mgr_)
+hstore::hstore(const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr_)
   : _pool_manager(std::make_shared<pm>(debug_level(), owner, name, std::move(mgr_)))
   , _pools_mutex{}
   , _pools{}
@@ -267,7 +267,7 @@ auto hstore::grow_pool( //
   }
   try
   {
-    reconfigured_size = session->pool_grow(_pool_manager->devdax_manager(), increment_size);
+    reconfigured_size = session->pool_grow(_pool_manager->get_dax_manager(), increment_size);
   }
   catch ( const std::bad_alloc & )
   {
@@ -457,7 +457,7 @@ auto hstore::get_attribute(
   const std::string* key) -> status_t
 {
   out_attr.clear();
-  
+
   const auto session = static_cast<const session_t *>(locate_session(pool));
   if ( ! session )
   {

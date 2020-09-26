@@ -17,7 +17,7 @@
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
-#include "devdax_manager.h"
+#include "dax_manager.h"
 #include <ccpm/cca.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>
@@ -167,23 +167,22 @@ namespace
 		return ::iovec{reinterpret_cast<void *>(c), last - c};
 	}
 
-	::iovec open_region(const std::unique_ptr<Devdax_manager> &devdax_manager_, std::uint64_t uuid_, unsigned numa_node_)
+	::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 	{
-		::iovec iov;
-		iov.iov_base = devdax_manager_->open_region(uuid_, numa_node_, &iov.iov_len);
-		if ( iov.iov_base == 0 )
+		auto iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_);
+		if ( iovs.size() != 1 )
 		{
 			throw std::range_error("failed to re-open region " + std::to_string(uuid_));
 		}
-		return iov;
+		return iovs.front();
 	}
 
-	const ccpm::region_vector_t add_regions(ccpm::region_vector_t &&rv_, const std::unique_ptr<Devdax_manager> &devdax_manager_, unsigned numa_node_, std::uint64_t *first_, std::uint64_t *last_)
+	const ccpm::region_vector_t add_regions(ccpm::region_vector_t &&rv_, const std::unique_ptr<dax_manager> &dax_manager_, unsigned numa_node_, std::uint64_t *first_, std::uint64_t *last_)
 	{
 		auto v = std::move(rv_);
 		for ( auto it = first_; it != last_; ++it )
 		{
-			auto r = open_region(devdax_manager_, *it, numa_node_);
+			auto r = open_region(dax_manager_, *it, numa_node_);
 			VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
 			VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
 			v.push_back(r);
@@ -232,13 +231,13 @@ heap_cc_shared::heap_cc_shared(
 }
 
 #if 0
-heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, const std::unique_ptr<Devdax_manager> &devdax_manager_, unsigned numa_node_)
-	: _pool0(align(open_region(devdax_manager_, pool0_uuid_, numa_node_)))
+heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, const std::unique_ptr<dax_manager> &dax_manager_, unsigned numa_node_)
+	: _pool0(align(open_region(dax_manager_, pool0_uuid_, numa_node_)))
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _eph(
 		std::make_unique<heap_cc_shared_ephemeral>(
-			debug_level_, add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), devdax_manager_, numa_node_, nullptr, nullptr)
+			debug_level_, add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), dax_manager_, numa_node_, nullptr, nullptr)
 		)
 	)
 {
@@ -258,7 +257,7 @@ heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, cons
 #pragma GCC diagnostic ignored "-Wuninitialized"
 heap_cc_shared::heap_cc_shared(
 	unsigned debug_level_
-	, const std::unique_ptr<Devdax_manager> &devdax_manager_
+	, const std::unique_ptr<dax_manager> &dax_manager_
 	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
@@ -279,7 +278,7 @@ heap_cc_shared::heap_cc_shared(
 				ccpm::region_vector_t(
 					_pool0.iov_base, _pool0.iov_len
 				)
-				, devdax_manager_
+				, dax_manager_
 				, _numa_node
 				, &_more_region_uuids[0]
 				, &_more_region_uuids[_more_region_uuids_size]
@@ -321,7 +320,7 @@ void *heap_cc_shared::iov_limit(const ::iovec &r)
 }
 
 auto heap_cc_shared::grow(
-	const std::unique_ptr<Devdax_manager> & devdax_manager_
+	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
 ) -> std::size_t
@@ -342,10 +341,10 @@ auto heap_cc_shared::grow(
 			{
 				try
 				{
-					/* Note: crash between here and "Slot persist done" may cause devdax_manager_
+					/* Note: crash between here and "Slot persist done" may cause dax_manager_
 					 * to leak the region.
 					 */
-					::iovec r { devdax_manager_->create_region(uuid_next, _numa_node, size), size };
+					::iovec r { dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size), size };
 					{
 						auto &slot = _more_region_uuids[_more_region_uuids_size];
 						slot = uuid_next;

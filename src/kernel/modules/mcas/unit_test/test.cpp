@@ -4,7 +4,7 @@
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <nupm/devdax_manager.h>
+#include <nupm/dax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <thread>
 
@@ -38,17 +38,17 @@ size_t g_size = 1024;
 TEST_F(IADO_manager_proxy_test, Instantiate) {
   /* create object instance through factory */
   // allocate memory
-  vector<nupm::Devdax_manager::config_t> conf;
-  nupm::Devdax_manager::config_t c;
+  vector<nupm::dax_manager::config_t> conf;
+  nupm::dax_manager::config_t c;
   c.path = "/dev/dax0.0";
   c.addr = 0x9000000000;
   c.region_id = 0;
   conf.push_back(c);
-  nupm::Devdax_manager ddm(conf, true);
+  nupm::dax_manager ddm(common::log_source(0U), conf, true);
 
   nupm::revoke_memory(token);
   size_t size = g_size;
-  char *pop = static_cast<char *>(ddm.create_region(1234, 0, size));
+  char *pop = static_cast<char *>(ddm.create_region("1234", 0, size));
   memset(pop, 0, size);
   PLOG("touched memory.");
   strcpy(pop, "Hello!");

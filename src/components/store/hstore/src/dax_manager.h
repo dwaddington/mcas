@@ -12,22 +12,22 @@
 */
 
 
-/*
- * Authors:
- *
- * Daniel G. Waddington (daniel.waddington@ibm.com)
- *
- */
+#ifndef COMANCHE_HSTORE_DAX_MANAGER_H
+#define COMANCHE_HSTORE_DAX_MANAGER_H
 
-#ifndef __NUPM_H__
-#define __NUPM_H__
+#include <nupm/dax_manager.h>
 
-#ifndef __cplusplus
-#error NUPM is a C++ library
-#endif
+#include <string>
 
-#include "dax_manager.h"
-#include "nd_utils.h"
-#include "rc_alloc_lb.h"
+struct dax_manager
+	: public nupm::dax_manager
+{
+public:
+	dax_manager(
+		const common::log_source &ls_
+		, const std::string &dax_map
+		, bool force_reset = false
+	);
+};
 
 #endif

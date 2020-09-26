@@ -55,7 +55,7 @@
 
 template <typename T>
   struct pool_manager;
-class Devdax_manager;
+struct dax_manager;
 template <typename Handle, typename Allocator, typename Table, typename Lock>
   struct session;
 
@@ -112,7 +112,7 @@ public:
    * Constructor
    *
    */
-  hstore(const std::string &owner, const std::string &name, std::unique_ptr<Devdax_manager> &&mgr);
+  hstore(const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr);
 
   /**
    * Destructor

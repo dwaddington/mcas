@@ -18,6 +18,8 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
 include_directories("../common/include")
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
@@ -36,7 +38,7 @@ add_library(nupm SHARED ${SOURCES})
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0> -fopenmp)
-target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem gcov)
+target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem cityhash gcov)
 
 add_subdirectory(unit_test)
 
