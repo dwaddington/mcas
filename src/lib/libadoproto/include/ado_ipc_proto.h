@@ -339,7 +339,7 @@ struct Work_response : public Message {
       void *const r_ptr = data_ptr;
       new (r_ptr) IADO_plugin::response_buffer_t(
         b
-        , [&b, &data_ptr] (const IADO_plugin::response_buffer_t &b2) -> void *
+        , [&data_ptr] (const IADO_plugin::response_buffer_t &b2) -> void *
           {
             ::memcpy(data_ptr + sizeof(IADO_plugin::response_buffer_t), b2.ptr, b2.len);
             data_ptr += b2.len;
@@ -358,7 +358,7 @@ struct Work_response : public Message {
       count++;
     }
 
-    response_len += (data_ptr - data_ptr_begin);
+    response_len += std::size_t(data_ptr - data_ptr_begin);
 
     /* if this happens, corruption already occurred */
     if((response_len + sizeof(Work_response)) > buffer_size)

@@ -255,7 +255,7 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 		auto p = e.path();
 		if ( p.extension().string() == ".data" )
 		{
-			CPLOG(1, "%s %p", __func__, p.c_str());
+			CPLOG(1, "%s %s", __func__, p.c_str());
 			common::Fd_open fd(::open(p.c_str(), O_RDWR));
 
 			auto pm = p.replace_extension(".map");
@@ -269,7 +269,7 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 				_mapped_spaces.insert(
 					mapped_spaces::value_type(
 						p.string()
-						, std::move(registered_opened_space(*this, this, p.string(), r.first))
+						, registered_opened_space(*this, this, p.string(), r.first)
 					)
 				);
 			if ( ! itb.second )
@@ -336,7 +336,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
 				p.string()
-				, std::move(registered_opened_space(*this, this, p.string(), base))
+				, registered_opened_space(*this, this, p.string(), base)
 			)
 		);
 	if ( ! itb.second )
@@ -413,11 +413,9 @@ dax_manager::dax_manager(
 
     auto itc =
       _arenas.insert(
-        std::move(
-          std::make_pair(
-            config.region_id
-            , (this->*arena_make)(p, config.addr, force_reset)
-          )
+        std::make_pair(
+          config.region_id
+          , (this->*arena_make)(p, config.addr, force_reset)
         )
       );
     if ( ! itc.second )
@@ -476,7 +474,7 @@ void *dax_manager::create_region(string_view name, arena_id_t arena_id, const si
 {
   guard_t           g(_reentrant_lock);
   auto arena = lookup_arena(arena_id);
-  CPLOG(1, "%s: %p size %zu", __func__, name.begin(), size);
+  CPLOG(1, "%s: %s size %zu", __func__, name.begin(), size);
   /* No way for the user to get the actual length, except to shut down and then call open_region */
   return arena->region_create(name, size, this).iov_base;
 }

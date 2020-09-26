@@ -106,7 +106,9 @@ public:
   opened_space(const common::log_source &, dax_manager * dm_, const std::string &path, const addr_t base_addr);
   opened_space(const common::log_source &, dax_manager * dm_, const std::string &path, const std::vector<::iovec> &mapping);
   opened_space(opened_space &&) noexcept = default;
+#if 0
   opened_space &operator=(opened_space &&) noexcept = default;
+#endif
 };
 
 struct registered_opened_space
@@ -137,7 +139,9 @@ public:
   registered_opened_space(const registered_opened_space &) = delete;
   registered_opened_space &operator=(const registered_opened_space &) = delete;
   registered_opened_space(registered_opened_space &&) noexcept = default;
+#if 0
   registered_opened_space &operator=(registered_opened_space &&) noexcept = default;
+#endif
 };
 
 struct registry_memory_mapped

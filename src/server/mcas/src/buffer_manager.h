@@ -33,7 +33,7 @@
 
 namespace
 {
-  auto alloc_base(std::size_t len) -> gsl::not_null<void *>
+  inline auto alloc_base(std::size_t len) -> gsl::not_null<void *>
   {
     auto b = ::aligned_alloc(MiB(2), len);
     if (b == nullptr) {

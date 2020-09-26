@@ -34,7 +34,6 @@
 #include <stdexcept>
 
 static constexpr unsigned MAP_LOG_GRAIN = 21U;
-static constexpr std::size_t MAP_GRAIN = std::size_t(1) << MAP_LOG_GRAIN;
 static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 
 #ifndef MAP_SYNC
@@ -168,7 +167,7 @@ catch ( std::runtime_error & )
 void *arena_fs::region_open(const string_view id_, std::size_t size_, gsl::not_null<nupm::registry_memory_mapped *> mh_)
 try {
 	auto pd = path_data(id_);
-	CPLOG(1, "%s %p %zu", __func__, pd.c_str(), size_);
+	CPLOG(1, "%s %s %zu", __func__, pd.c_str(), size_);
 	common::Fd_open fd(::open(path_data(id_).c_str(), O_RDWR));
 	return region_open(fd.fd(), get_mapping(path_map(id_), size_), mh_);
 }
@@ -222,7 +221,7 @@ auto arena_fs::region_get(string_view id_) -> std::vector<::iovec>
 	auto base_addr = mh_->allocate_address_range(size);
 
 	/* Extend the file to the specified size */
-	auto rc = ::ftruncate(fd, size);
+	auto rc = ::ftruncate(fd, ::off_t(size));
 	if ( rc < 0 )
 	{
 		auto e = errno;

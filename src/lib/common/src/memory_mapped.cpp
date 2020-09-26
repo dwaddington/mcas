@@ -29,9 +29,11 @@ namespace
      */
     static ::iovec translate_mmap_result(::iovec iov_)
     {
-      return iov_.iov_base == MAP_FAILED ? ::iovec{nullptr, errno} : iov_;
+      return iov_.iov_base == MAP_FAILED ? ::iovec{nullptr, std::size_t(errno)} : iov_;
     }
 }
+
+constexpr ::iovec common::iovec_moveable_traits::none;
 
 common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd) noexcept
   : memory_mapped(
