@@ -316,13 +316,13 @@ fid_mr * Fabric_memory_control::make_fid_mr_reg_ptr(
     if ( _paging_test )
     {
       auto rc = ::madvise(const_cast<void *>(buf), len, MADV_DONTNEED);
-      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", buf, len, rc ? " refused " : "accepted");
+      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", buf, len, rc ? " refused" : " accepted");
     }
   }
   catch ( const fabric_runtime_error &e )
   {
     std::ostringstream s;
-    s << " in " << __func__ << " calling ::fi_mr_reg(domain " << &*_domain << " buf " << buf << ", len " << len << ", access " << access << ", offset " << offset << ", key " << key << ", flags " << flags << ", fid_mr " << &f << ", context " << static_cast<void *>(context) << ")";
+    s << std::showbase << std::hex << " in " << __func__ << " calling ::fi_mr_reg(domain " << &*_domain << " buf " << buf << ", len " << len << ", access " << access << ", offset " << offset << ", key " << key << ", flags " << flags << ", fid_mr " << &f << ", context " << static_cast<void *>(context) << ")";
     throw e.add(s.str());
   }
   FABRIC_TRACE_FID(f);
