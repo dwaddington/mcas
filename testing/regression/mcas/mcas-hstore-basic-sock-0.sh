@@ -4,8 +4,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
-TESTID=$(basename --suffix .sh -- $0)
 DAXTYPE="$(choose_dax_type)"
+TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
 VALUE_LENGTH=8
 # kvstore-keylength-valuelength-store-netprovider
 DESC=hstore-8-8-$DAXTYPE-sock
