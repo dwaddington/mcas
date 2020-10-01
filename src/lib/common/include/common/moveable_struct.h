@@ -45,6 +45,14 @@ namespace common
         swap(*static_cast<T *>(this), static_cast<T &>(o_));
         return *this;
       }
+
+      T release()
+      {
+        T t(Traits::none);
+        using std::swap;
+        swap(t, static_cast<T &>(*this));
+        return t;
+      }
     };
 }
 

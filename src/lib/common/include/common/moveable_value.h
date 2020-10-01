@@ -46,6 +46,14 @@ namespace common
         return *this;
       }
 
+      T release()
+      {
+        T t(Traits::none);
+        using std::swap;
+        swap(t, v);
+        return t;
+      }
+
       operator T() const { return v; }
     };
 }
