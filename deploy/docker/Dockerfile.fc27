@@ -1,0 +1,16 @@
+FROM fedora:27 
+RUN dnf install -y kernel-headers 
+RUN yum install rdma-core libibverbs libibverbs-utils librdmacm libibumad opensm infiniband-diags srptools perftest mstflint librdmacm-utils -y
+COPY . /mcas
+WORKDIR /mcas/deps
+RUN ./install-yum-fc27.sh
+WORKDIR /mcas
+RUN git submodule update --init --recursive
+RUN rm -rf build && mkdir -p build
+WORKDIR /mcas/build
+RUN mkdir -p /lib/modules/`uname -r`/ && ln -s /usr/src/kernels/`uname -r` /lib/modules/`uname -r`/build
+RUN cmake -DBUILD_KERNEL_SUPPORT=1 -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+RUN make bootstrap && make install
+
+#ENTRYPOINT ["/mcas/build/dist/bin/mcas"]
+CMD ["/mcas/build/dist/bin/mcas"]
