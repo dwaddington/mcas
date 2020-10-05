@@ -27,7 +27,7 @@ pipeline {
 							sh "ln -s -f ${pwd()}/dist/lib/libcityhash.so ${pwd()}/dist/lib/libcityhash.so.0"
 							sh "ln -s -f ${pwd()}/dist/lib/libxpmem.so ${pwd()}/dist/lib/libxpmem.so.0"
 							sh "echo $LD_LIBRARY_PATH"
-							sh "./dist/testing/run-tests.sh"
+							sh "./dist/testing/run-tests.sh > results.log"
 						}
 						sh "if grep fail results.log ; then exit -1; else exit 0; fi"
 					}					
@@ -60,7 +60,7 @@ pipeline {
 							sh "ln -s -f ${pwd()}/dist/lib/libcityhash.so ${pwd()}/dist/lib/libcityhash.so.0"
 							sh "ln -s -f ${pwd()}/dist/lib/libxpmem.so ${pwd()}/dist/lib/libxpmem.so.0"
 							sh "echo $LD_LIBRARY_PATH"
-							sh "./dist/testing/run-tests.sh release"
+							sh "./dist/testing/run-tests.sh release > results.log"
 						}
 						sh "if grep fail results.log ; then exit -1; else exit 0; fi"
 					}					
