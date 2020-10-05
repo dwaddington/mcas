@@ -41,7 +41,7 @@ wait $SERVER_PID; SERVER_RC=$?
 if [ "$1" == "release" ]; then
     GOAL=175000 # was 220K
 else
-    GOAL=70000
+    GOAL=68000
 fi
 
 pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $DESC $GOAL
