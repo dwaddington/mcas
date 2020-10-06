@@ -144,8 +144,6 @@ int main(int argc, char *argv[])
     g_options.triggered_profile = vm.count("triggered-profile");
     g_options.profile_file_main = vm.count("profile") ? vm["profile"].as<std::string>() : "";
 
-    PLOG("forced-exit:%s", g_options.forced_exit ? "yes" : "no");
-
     mcas::global::debug_level = g_options.debug_level = vm["debug"].as<unsigned>();
 
     std::unique_ptr<ADO_manager> mgr;
@@ -176,30 +174,28 @@ int main(int argc, char *argv[])
 
       if (!factory) throw Logic_exception("unable to create Zyre factory");
 
-      auto local_node_name = config.cluster_local_name();
 
       std::string net_interface = common::get_eth_device_from_ip(config.cluster_ip_addr());
       if(net_interface.empty())
         throw General_exception("cannot find interface for %s", config.cluster_ip_addr().c_str());
 
-      /* if the node name is not specified in the cluster section,
-         then derive a node name from hostname, net, port
-      */
-      if (local_node_name.empty()) {
-        std::array<char,255> host_name;
-        ::gethostname(&host_name[0], host_name.size());
+      /* derive node name */
+      std::string local_node_name;
+      std::array<char,255> host_name;
+      ::gethostname(&host_name[0], host_name.size());
 
-        std::ostringstream node_name;
-        node_name << "mcas-" << &host_name[0] << "-" << net_interface << "-" << config.cluster_net_port();
-        local_node_name = node_name.str();
-      }
+      std::ostringstream node_name;
+        
+      /* Zyre node name prefixed with mcas-server- */
+      node_name << "mcas-server-" << &host_name[0] << "-" << ::getpid(); //net_interface << "-" << config.cluster_net_port();
+      local_node_name = node_name.str();
 
-      PLOG("Starting Zyre node: %s", local_node_name.c_str());
+      PMAJOR("MCAS: starting Zyre node: %s", local_node_name.c_str());
 
       zyre = make_itf_ref(factory->create(g_options.debug_level,
-                                            local_node_name,
-                                            net_interface,
-                                            config.cluster_net_port()));
+                                          local_node_name,
+                                          net_interface,
+                                          config.cluster_net_port()));
 
       if (!zyre) throw Logic_exception("unable to create Zyre component instance");
     }
@@ -235,21 +231,16 @@ int main(int argc, char *argv[])
               if(++added == 2) break; /* only take two fields  */
             }
 
-            PMAJOR("MCAS server got message (uuid=%s type=%s content=%s)",
-                   msg_sender_uuid.c_str(), msg_type.c_str(), ss.str().c_str());
+            if (g_options.debug_level > 0)
+              PMAJOR("MCAS server got message (uuid=%s type=%s content=%s)",
+                     msg_sender_uuid.c_str(), msg_type.c_str(), ss.str().c_str());
 
-            if(ss.str() != "MCAS-AVAIL") { /* don't pass up heartbeats */
-              launcher->send_cluster_event(msg_sender_uuid, /* translate? */
-                                             msg_type,
-                                             ss.str());
-            }
-
+            launcher->send_cluster_event(msg_sender_uuid, /* translate? */
+                                         msg_type,
+                                         ss.str());
           }
 
           if (g_options.debug_level > 3) zyre->dump_info();
-
-          /* sent heartbeat */
-         zyre->shout(group,"X-MSG", "MCAS-AVAIL");
         }
 
         /* should be coordinated with zyre heartbeat */
