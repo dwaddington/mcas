@@ -60,8 +60,9 @@ public:
   virtual status_t unregister_direct_memory(const memory_handle_t handle) = 0;
 };
 
-class IMCAS : public component::IBase
-  , public Registrar_memory_direct {
+class IMCAS : public component::IBase,
+              public Registrar_memory_direct
+{
  public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0x33af1b99,0xbc51,0x49ff,0xa27b,0xd4,0xe8,0x19,0x03,0xbb,0x02);
@@ -369,20 +370,20 @@ class IMCAS : public component::IBase
    * @return S_OK, or error code
    */
   virtual status_t async_get_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , void* out_buffer
-    , async_handle_t& out_handle
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+    const IMCAS::pool_t pool,
+    const offset_t offset,
+    size_t &size,
+    void* out_buffer,
+    async_handle_t& out_handle,
+    const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
   ) = 0;
 
   virtual status_t get_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , void* out_buffer
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+    const IMCAS::pool_t pool,
+    const offset_t offset,
+    size_t &size,
+    void* out_buffer,
+    const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
   ) = 0;
 
   /**
@@ -398,20 +399,20 @@ class IMCAS : public component::IBase
    * @return S_OK, or error code
    */
   virtual status_t async_put_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , const void *const buffer
-    , async_handle_t& out_handle
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+    const IMCAS::pool_t pool,
+    const offset_t offset,
+    size_t &size,
+    const void *const buffer,
+    async_handle_t& out_handle,
+    const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
   ) = 0;
 
   virtual status_t put_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , const void *const buffer
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+    const IMCAS::pool_t pool,
+    const offset_t offset,
+    size_t &size,
+    const void *const buffer,
+    const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
   ) = 0;
 
   /**
@@ -682,20 +683,20 @@ class IMCAS_factory : public IKVStore_factory {
    *
    * @return Pointer to IMCAS instance. Use release_ref() to close.
    */
-  virtual IMCAS* mcas_create(
-    unsigned // debug_level,
-    , unsigned // patience with server (in seconds)
-    , const std::string& // owner
-    , const boost::optional<std::string>& // src_nic_device
-    , const boost::optional<std::string>& // src_ip_addr
-    , const std::string& // dest_addr_with_port
-  )
+  virtual IMCAS* mcas_create(unsigned, // debug_level
+                             unsigned, // patience with server (in seconds)
+                             const std::string&, // owner
+                             const boost::optional<std::string>&, // src_nic_device
+                             const boost::optional<std::string>&, // src_ip_addr
+                             const std::string& // dest_addr_with_port
+                             )
   {
-    throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,,owner,addr_with_port,"
+    throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,owner,addr_with_port,"
                         "nic_device) not implemented");
   }
+  
   IMCAS* mcas_create(unsigned debug_level,
-    unsigned patience,
+                     unsigned patience,
                      const std::string& owner,
                      const std::string& dest_addr_with_port,
                      const std::string& nic_device)
