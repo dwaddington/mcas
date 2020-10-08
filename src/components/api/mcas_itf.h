@@ -1,14 +1,14 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2020] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 #ifndef __API_MCAS_ITF__
@@ -22,9 +22,9 @@
 #include <cstdint> /* uint16_t */
 #include <memory>
 
-#define DECLARE_OPAQUE_TYPE(NAME) \
-  struct Opaque_##NAME {          \
-    virtual ~Opaque_##NAME() {}   \
+#define DECLARE_OPAQUE_TYPE(NAME)               \
+  struct Opaque_##NAME {                        \
+    virtual ~Opaque_##NAME() {}                 \
   }
 
 namespace component
@@ -60,14 +60,15 @@ public:
   virtual status_t unregister_direct_memory(const memory_handle_t handle) = 0;
 };
 
-class IMCAS : public component::IBase
-  , public Registrar_memory_direct {
- public:
+class IMCAS : public component::IBase,
+              public Registrar_memory_direct
+{
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0x33af1b99,0xbc51,0x49ff,0xa27b,0xd4,0xe8,0x19,0x03,0xbb,0x02);
   // clang-format on
 
- public:
+public:
   DECLARE_OPAQUE_TYPE(async_handle);
 
   using async_handle_t  = Opaque_async_handle*;
@@ -81,13 +82,13 @@ class IMCAS : public component::IBase
   static constexpr async_handle_t  ASYNC_HANDLE_INIT  = nullptr;
 
   enum {
-    FLAGS_NONE        = IKVStore::FLAGS_NONE,
-    FLAGS_READ_ONLY   = IKVStore::FLAGS_READ_ONLY,
-    FLAGS_SET_SIZE    = IKVStore::FLAGS_SET_SIZE,
-    FLAGS_CREATE_ONLY = IKVStore::FLAGS_CREATE_ONLY,
-    FLAGS_DONT_STOMP  = IKVStore::FLAGS_DONT_STOMP,
-    FLAGS_NO_RESIZE   = IKVStore::FLAGS_NO_RESIZE,
-    FLAGS_MAX_VALUE   = IKVStore::FLAGS_MAX_VALUE,
+        FLAGS_NONE        = IKVStore::FLAGS_NONE,
+        FLAGS_READ_ONLY   = IKVStore::FLAGS_READ_ONLY,
+        FLAGS_SET_SIZE    = IKVStore::FLAGS_SET_SIZE,
+        FLAGS_CREATE_ONLY = IKVStore::FLAGS_CREATE_ONLY,
+        FLAGS_DONT_STOMP  = IKVStore::FLAGS_DONT_STOMP,
+        FLAGS_NO_RESIZE   = IKVStore::FLAGS_NO_RESIZE,
+        FLAGS_MAX_VALUE   = IKVStore::FLAGS_MAX_VALUE,
   };
 
   /* per-shard statistics */
@@ -105,12 +106,12 @@ class IMCAS : public component::IBase
     uint64_t last_op_count_snapshot;
     uint16_t client_count;
 
-   public:
+  public:
     Shard_stats()
-        : op_request_count(0)
-        , op_put_count(0), op_get_count(0), op_put_direct_count(0), op_get_direct_count(0), op_get_twostage_count(0)
-        , op_ado_count(0), op_erase_count(0), op_get_direct_offset_count(0)
-        , op_failed_request_count(0), last_op_count_snapshot(0), client_count(0)
+      : op_request_count(0)
+      , op_put_count(0), op_get_count(0), op_put_direct_count(0), op_get_direct_count(0), op_get_twostage_count(0)
+      , op_ado_count(0), op_erase_count(0), op_get_direct_offset_count(0)
+      , op_failed_request_count(0), last_op_count_snapshot(0), client_count(0)
     {
     }
   } __attribute__((packed));
@@ -131,7 +132,7 @@ class IMCAS : public component::IBase
   /*< only take read lock */
   static constexpr ado_flags_t ADO_FLAG_READ_ONLY = 0x20;
   
- public:
+public:
   /**
    * Determine thread safety of the component
    *
@@ -344,11 +345,11 @@ class IMCAS : public component::IBase
    * invalid alignment, or other error code
    */
   virtual status_t async_get_direct(const IMCAS::pool_t          pool,
-                              const std::string&           key,
-                              void*                        out_value,
-                              size_t&                      out_value_len,
-                              async_handle_t             & out_handle,
-                              const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
+                                    const std::string&           key,
+                                    void*                        out_value,
+                                    size_t&                      out_value_len,
+                                    async_handle_t             & out_handle,
+                                    const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   virtual status_t get_direct(const IMCAS::pool_t          pool,
                               const std::string&           key,
@@ -369,21 +370,21 @@ class IMCAS : public component::IBase
    * @return S_OK, or error code
    */
   virtual status_t async_get_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , void* out_buffer
-    , async_handle_t& out_handle
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-  ) = 0;
+                                           const IMCAS::pool_t pool,
+                                           const offset_t offset,
+                                           size_t &size,
+                                           void* out_buffer,
+                                           async_handle_t& out_handle,
+                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+                                           ) = 0;
 
   virtual status_t get_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , void* out_buffer
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-  ) = 0;
+                                     const IMCAS::pool_t pool,
+                                     const offset_t offset,
+                                     size_t &size,
+                                     void* out_buffer,
+                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+                                     ) = 0;
 
   /**
    * Write memory directly into client-provided memory.
@@ -398,21 +399,21 @@ class IMCAS : public component::IBase
    * @return S_OK, or error code
    */
   virtual status_t async_put_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , const void *const buffer
-    , async_handle_t& out_handle
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-  ) = 0;
+                                           const IMCAS::pool_t pool,
+                                           const offset_t offset,
+                                           size_t &size,
+                                           const void *const buffer,
+                                           async_handle_t& out_handle,
+                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+                                           ) = 0;
 
   virtual status_t put_direct_offset(
-    const IMCAS::pool_t pool
-    , const offset_t offset
-    , size_t &size
-    , const void *const buffer
-    , const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-  ) = 0;
+                                     const IMCAS::pool_t pool,
+                                     const offset_t offset,
+                                     size_t &size,
+                                     const void *const buffer,
+                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
+                                     ) = 0;
 
   /**
    * Check for completion from asynchronous invocation
@@ -502,56 +503,58 @@ class IMCAS : public component::IBase
    */
   virtual status_t free_memory(void* p) = 0;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
+  
   /**
    * ADO_response data structure manages response data sent back from the ADO
    * invocations.  The free function is so we can eventually support zero-copy.
    * The layer id identifies which ADO plugin the response came from.
    */
   class ADO_response {
-   public:
-    // using free_function_t = std::function<void(void*)>;
 
-    class Data {
+  private:
+
+#pragma GCC diagnostic push /* pointer members are considered inefficient */
+#pragma GCC diagnostic ignored "-Weffc++"
+    
+    class Data_reference {
     public:
-      Data(void * data) : _data(data) { }
-      Data() = delete;
-      /* DUMB POINTER */
-      virtual ~Data() { ::free(_data); }
+      Data_reference(void * data) : _data(data) { assert(data); }
+      Data_reference() = delete;
+      virtual ~Data_reference() { assert(_data); ::free(_data); }
       void * _data;
     };
 
+#pragma GCC diagnostic pop
+    
+  public:
+    ADO_response() = delete;
+    
     ADO_response(void* data, size_t data_len, uint32_t layer_id)
-      : _data(std::make_shared<Data>(data)),
+      : _ref(std::make_shared<Data_reference>(data)),
         _data_len(data_len),
-        _layer_id(layer_id)
-    {
-    }
+        _layer_id(layer_id) {}
 
-    ADO_response(ADO_response&& src) noexcept :
-      _data(src.datasp()),
-      _data_len(src.data_len()),
-      _layer_id(src.layer_id())
-    {
-    }
+    ADO_response(ADO_response&& src) noexcept
+      : _ref(src.datasp()),
+        _data_len(src.data_len()),
+        _layer_id(src.layer_id()) {}
 
-    inline std::string str() const { assert(_data); assert(_data_len > 0); std::string s(data(), data_len()); return s; }
-    inline const char* data() const { return static_cast<const char*>(_data->_data); }
-    inline size_t   data_len() const { return _data_len; }
+    inline std::string str() const { return std::string(data(), data_len()); }
+    inline const char* data() const { return static_cast<const char*>(_ref->_data); }
+    inline size_t data_len() const { return _data_len; }
     inline uint32_t layer_id() const { return _layer_id; }
-    inline std::shared_ptr<Data>& datasp() { return  _data; }
+    inline std::shared_ptr<Data_reference>& datasp() { return _ref; }
 
     template <typename T>
-    inline T* cast_data() const  {  return static_cast<T*>(_data->_data);   }
+    inline T* cast_data() const  {  return static_cast<T*>(_ref->_data);   }
 
   private:
-    std::shared_ptr<Data> _data;
-    size_t                _data_len;
-    uint32_t              _layer_id; /* optional layer identifier */
+    std::shared_ptr<Data_reference> _ref; /* smart pointer */
+    size_t                          _data_len;
+    uint32_t                        _layer_id; /* optional layer identifier */
   };
 
-#pragma GCC diagnostic pop
+
   /**
    * Used to invoke an operation on an active data object
    *
@@ -586,18 +589,18 @@ class IMCAS : public component::IBase
 
 
   /**
-     * Used to invoke an operation on an active data object
-     *
-     * @param pool Pool handle
-     * @param key Key. Note, if key is empty, the work request is key-less.
-     * @param request Request data
-     * @param request_len Length of request in bytes
-     * @param flags Flags for invocation (see ADO_FLAG_XXX)
-     * @param out_async_handle Handle to task for later result collection
-     * @param value_size Optional parameter to define value size to create for on-demand
-     *
-     * @return S_OK on success
-     */
+   * Used to invoke an operation on an active data object
+   *
+   * @param pool Pool handle
+   * @param key Key. Note, if key is empty, the work request is key-less.
+   * @param request Request data
+   * @param request_len Length of request in bytes
+   * @param flags Flags for invocation (see ADO_FLAG_XXX)
+   * @param out_async_handle Handle to task for later result collection
+   * @param value_size Optional parameter to define value size to create for on-demand
+   *
+   * @return S_OK on success
+   */
   virtual status_t async_invoke_ado(const IMCAS::pool_t        pool,
                                     const std::string&         key,
                                     const void*                request,
@@ -666,7 +669,7 @@ class IMCAS : public component::IBase
 };
 
 class IMCAS_factory : public IKVStore_factory {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xfacf1b99,0xbc51,0x49ff,0xa27b,0xd4,0xe8,0x19,0x03,0xbb,0x02);
   // clang-format on
@@ -682,20 +685,20 @@ class IMCAS_factory : public IKVStore_factory {
    *
    * @return Pointer to IMCAS instance. Use release_ref() to close.
    */
-  virtual IMCAS* mcas_create(
-    unsigned // debug_level,
-    , unsigned // patience with server (in seconds)
-    , const std::string& // owner
-    , const boost::optional<std::string>& // src_nic_device
-    , const boost::optional<std::string>& // src_ip_addr
-    , const std::string& // dest_addr_with_port
-  )
+  virtual IMCAS* mcas_create(unsigned, // debug_level
+                             unsigned, // patience with server (in seconds)
+                             const std::string&, // owner
+                             const boost::optional<std::string>&, // src_nic_device
+                             const boost::optional<std::string>&, // src_ip_addr
+                             const std::string& // dest_addr_with_port
+                             )
   {
-    throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,,owner,addr_with_port,"
+    throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,owner,addr_with_port,"
                         "nic_device) not implemented");
   }
+  
   IMCAS* mcas_create(unsigned debug_level,
-    unsigned patience,
+                     unsigned patience,
                      const std::string& owner,
                      const std::string& dest_addr_with_port,
                      const std::string& nic_device)
