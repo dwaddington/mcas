@@ -11,23 +11,25 @@
    limitations under the License.
 */
 
+#ifndef _MCAS_FD_LOCKED_H_
+#define _MCAS_FD_LOCKED_H_
 
-#ifndef COMANCHE_HSTORE_DEVDAX_MANAGER_H
-#define COMANCHE_HSTORE_DEVDAX_MANAGER_H
+#include <common/fd_open.h>
 
-#include <nupm/devdax_manager.h>
-
-#include <string>
-
-class Devdax_manager
-	: public nupm::Devdax_manager
+namespace common
 {
-public:
-	Devdax_manager(
-		unsigned debug_level_
-		, const std::string &dax_map
-		, bool force_reset = false
-	);
-};
+  struct fd_locked
+    : public Fd_open
+  {
+    fd_locked();
+    /*
+     * @throw std::logic_error : initialized with a negative value
+     */
+    explicit fd_locked(int fd);
+
+    fd_locked(fd_locked &&) noexcept = default;
+    fd_locked &operator=(fd_locked &&) noexcept = default;
+  };
+}
 
 #endif

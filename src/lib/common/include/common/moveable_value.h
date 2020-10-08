@@ -11,26 +11,29 @@
    limitations under the License.
 */
 
-#include <algorithm> /* swap */
-
 #ifndef _MCAS_COMMON_MOVEABLE_VALUE_
 #define _MCAS_COMMON_MOVEABLE_VALUE_
 
+#include <common/moveable_traits.h>
+#include <algorithm> /* swap */
+
 namespace common
 {
-  /* A value which zero-initializes the source when moved.
-   * helpful for classes which use a pointer or bool to denote
-   * "moved from" state.
+  /*
+   * A value which zero-initializes the source when moved.
+   * helpful for classes which use a special value, such as
+   * nullptr or false, to denote "moved from" state.
+   * moveable_traits<T>::none is that special value.
    */
-  template <typename T, T None = T()>
+  template <typename T, typename Traits = moveable_traits<T>>
     struct moveable_value
     {
       T v;
-      moveable_value(T v_)
+      moveable_value(const T &v_)
         : v(v_)
       {}
       moveable_value(moveable_value &&o_) noexcept
-        : v(None)
+        : v(Traits::none)
       {
         using std::swap;
         swap(v, o_.v);
@@ -43,8 +46,16 @@ namespace common
         return *this;
       }
 
+      T release()
+      {
+        T t(Traits::none);
+        using std::swap;
+        swap(t, v);
+        return t;
+      }
+
       operator T() const { return v; }
     };
-
 }
+
 #endif

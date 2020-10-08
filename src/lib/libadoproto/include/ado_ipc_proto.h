@@ -16,6 +16,8 @@
 #include <api/ado_itf.h>
 #include <common/exceptions.h>
 #include <common/dump_utils.h>
+#include <algorithm>
+#include <experimental/string_view>
 #include <vector>
 #include <string.h>
 #include <stdexcept>
@@ -52,6 +54,7 @@ enum {
   MSG_TYPE_UNLOCK_REQUEST = 17,
   MSG_TYPE_CONFIGURE_REQUEST = 18,
   MSG_TYPE_CLUSTER_EVENT = 19,
+  MSG_TYPE_MAP_MEMORY_NAMED = 20,
 };
 
 typedef enum {
@@ -243,6 +246,33 @@ struct Map_memory : public Message {
 
 };
 
+struct Map_memory_named : public Message {
+  static constexpr uint8_t id = MSG_TYPE_MAP_MEMORY_NAMED;
+  static constexpr const char *description = "mcas::ipc::Map_memory_named";
+
+  using string_view = std::experimental::string_view;
+  Map_memory_named(size_t buffer_size,
+    unsigned region_id_,
+    string_view pool_name_,
+    std::size_t offset_,
+             ::iovec iov_)
+    : Message(id), region_id(region_id_), iov(iov_), offset(offset_), pool_name_len(pool_name_.size())
+  {
+    if(sizeof(Map_memory) + pool_name_len > buffer_size)
+      throw std::length_error(description);
+    std::copy(pool_name_.begin(), pool_name_.end(), pool_name());
+  }
+
+  size_t   region_id;
+  ::iovec  iov;
+  size_t   offset;
+  size_t   pool_name_len;
+  char    *pool_name()
+  {
+    return static_cast<char *>(static_cast<void *>(this+1));
+  }
+};
+
 //-------------
 
 struct Work_request : public Message {
@@ -339,7 +369,7 @@ struct Work_response : public Message {
       void *const r_ptr = data_ptr;
       new (r_ptr) IADO_plugin::response_buffer_t(
         b
-        , [&b, &data_ptr] (const IADO_plugin::response_buffer_t &b2) -> void *
+        , [&data_ptr] (const IADO_plugin::response_buffer_t &b2) -> void *
           {
             ::memcpy(data_ptr + sizeof(IADO_plugin::response_buffer_t), b2.ptr, b2.len);
             data_ptr += b2.len;
@@ -358,7 +388,7 @@ struct Work_response : public Message {
       count++;
     }
 
-    response_len += (data_ptr - data_ptr_begin);
+    response_len += std::size_t(data_ptr - data_ptr_begin);
 
     /* if this happens, corruption already occurred */
     if((response_len + sizeof(Work_response)) > buffer_size)

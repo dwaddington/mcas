@@ -265,12 +265,12 @@ class IKVStore : public component::IBase {
    * DMA engines.
    *
    * @param pool Pool handle
-   * @param out_regions Mapped memory regions
+   * @param out_regions Backing file name (if any), Mapped memory regions
    *
    * @return S_OK on success or E_POOL_NOT_FOUND.  Components that do not
    * support this return E_NOT_SUPPORTED.
    */
-  virtual status_t get_pool_regions(const pool_t pool, std::vector<::iovec>& out_regions)
+  virtual status_t get_pool_regions(const pool_t pool, std::pair<std::string, std::vector<::iovec>>& out_regions)
   {
     return E_NOT_SUPPORTED; /* not supported in FileStore */
   }

@@ -862,22 +862,22 @@ TEST_F(KVStore_test, GetRegions)
 {
   ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
-  std::vector<::iovec> v;
+  std::pair<std::string, std::vector<::iovec>> v;
   auto r = _kvstore->get_pool_regions(pool, v);
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    EXPECT_EQ(1, v.size());
-    if ( 1 == v.size() )
+    EXPECT_EQ(1, v.second.size());
+    if ( 1 == v.second.size() )
     {
-      PMAJOR("Pool region at %p len %zu", v[0].iov_base, v[0].iov_len);
-      auto iov_base = reinterpret_cast<std::uintptr_t>(v[0].iov_base);
+      PMAJOR("Pool region at %p len %zu", v.second[0].iov_base, v.second[0].iov_len);
+      auto iov_base = reinterpret_cast<std::uintptr_t>(v.second[0].iov_base);
       /* region no longer needs to be well-aligned, but heap_cc still aligns to a
        * page boundary.
        */
       EXPECT_EQ(iov_base & 0xfff, 0);
-      EXPECT_GT(v[0].iov_len, many_count_target * 64U * 3U * 2U);
-      EXPECT_LT(v[0].iov_len, GB(512));
+      EXPECT_GT(v.second[0].iov_len, many_count_target * 64U * 3U * 2U);
+      EXPECT_LT(v.second[0].iov_len, GB(512));
     }
   }
 }

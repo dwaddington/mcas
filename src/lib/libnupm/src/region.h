@@ -81,7 +81,7 @@ class Region : private common::log_source {
 
 public:
   Region(void *region_ptr, const size_t region_size, const size_t object_size)
-      : common::log_source(0),
+      : common::log_source(0U),
         _object_size(object_size), _base(region_ptr),
         _top(static_cast<char *>(_base) + region_size),
         _free_list{},
@@ -277,7 +277,7 @@ class Region_map : private common::log_source {
 
 public:
   Region_map()
-    : common::log_source(0)
+    : common::log_source(0U)
     , _mapper()
     , _arena_allocator()
     , _buckets()

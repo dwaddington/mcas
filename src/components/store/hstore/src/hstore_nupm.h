@@ -20,13 +20,14 @@
 #include "hstore_nupm_types.h"
 #include "hstore_open_pool.h"
 #include "persister_nupm.h"
+#include <gsl/pointers>
 
 #include <cstring> /* strerror */
 
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib> /* getenv */
 
-class Devdax_manager;
+struct dax_manager;
 
 template <typename PersistData, typename Heap, typename HeapAllocator>
   struct region;
@@ -49,8 +50,11 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     using lock_type_t = LockType;
   public:
     using open_pool_handle = ::open_pool<non_owner<region_type>>;
+    using base = pool_manager<open_pool_handle>;
+    using typename base::region_access;
+    using typename base::region_access_create;
   private:
-    std::unique_ptr<Devdax_manager> _devdax_manager;
+    std::unique_ptr<dax_manager> _dax_manager;
     unsigned _numa_node;
 
     static std::uint64_t dax_uuid_hash(const pool_path &p);
@@ -63,34 +67,32 @@ template <typename Region, typename Table, typename Allocator, typename LockType
 
     static unsigned name_to_numa_node(const std::string &name);
   public:
-    hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<Devdax_manager> mgr_);
+    hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<dax_manager> mgr_);
 
     virtual ~hstore_nupm();
 
-    const std::unique_ptr<Devdax_manager> & devdax_manager() const override { return _devdax_manager; }
+    const std::unique_ptr<dax_manager> & get_dax_manager() const override { return _dax_manager; }
     void pool_create_check(std::size_t) override;
 
     auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-    ) -> std::tuple<void *, std::size_t, std::uint64_t> override;
+    ) -> region_access_create override;
 
     auto pool_create_2(
       AK_FORMAL
-      void *v_
-      , std::size_t size_
-      , std::uint64_t uuid_
-      , component::IKVStore::flags_t flags_
-      , std::size_t expected_obj_count_
+      const region_access_create &rac
+      , component::IKVStore::flags_t flags
+      , std::size_t expected_obj_count
     ) -> std::unique_ptr<open_pool_handle> override;
 
-    auto pool_open_1(
+    region_access pool_open_1(
       const pool_path &path_
-    ) -> void * override;
+    ) override;
 
     auto pool_open_2(
       AK_FORMAL
-      void * addr_
+      const region_access & v_
       , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<open_pool_handle> override;
 
@@ -99,7 +101,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     void pool_delete(const pool_path &path_) override;
 
     /* ERROR: want get_pool_regions(<proper type>, std::vector<::iovec>&) */
-    std::vector<::iovec> pool_get_regions(const open_pool_handle &) const override;
+    std::pair<std::string, std::vector<::iovec>> pool_get_regions(const open_pool_handle &) const override;
   };
 #pragma GCC diagnostic pop
 

@@ -115,6 +115,7 @@ try
 catch ( std::exception &e )
 {
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  return;
 }
 
 void remote_memory_client::write(const std::string &msg_, bool force_error_)

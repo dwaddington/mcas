@@ -61,7 +61,7 @@ mapping_element::mapping_element(void *vaddr, std::size_t size, int prot, int fl
   if (iov_base == MAP_FAILED) {
     auto e = errno;
     std::ostringstream msg;
-    msg << __FILE__ << " ND_control::map_regions mmap failed on DRAM for region allocation"
+    msg << __func__ << " mmap failed"
       << " alignment="
       << std::hex << 0
       << " size=" << std::dec << size << " :" << strerror(e);
@@ -295,7 +295,6 @@ void ND_control::map_regions(unsigned long base_addr)
     }
   }
 }
-
 
 size_t get_dax_device_size(const struct stat &statbuf)
 {

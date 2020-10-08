@@ -116,7 +116,8 @@ try
 }
 catch ( const std::exception &e )
 {
-  std::cerr << "CLIENT connection shutdown error " << e.what();
+  std::cerr << "CLIENT connection shutdown error " << e.what() << "\n";
+  return;
 }
 
 /* _ev.read_eq() in client, no-op in server */

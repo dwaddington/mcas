@@ -14,11 +14,12 @@
 
 #include "hstore.h"
 
-#include "devdax_manager.h"
+#include "dax_manager.h"
 
 #include <common/json.h>
 #include <common/utils.h>
 
+#include <algorithm> /* max */
 #include <cstdlib> /* getenv */
 #include <string>
 
@@ -51,10 +52,10 @@ void hstore_factory::unload()
 }
 
 /*
- * See devdax_manager.cpp for the schema for the JSON "dax_map" parameter.
+ * See dax_manager.cpp for the schema for the JSON "dax_map" parameter.
  */
 auto hstore_factory::create(
-  unsigned
+  unsigned debug_level_
   , const IKVStore_factory::map_create & mc
 ) -> component::IKVStore *
 {
@@ -65,12 +66,16 @@ auto hstore_factory::create(
 
   namespace c_json = common::json;
   using json = c_json::serializer<c_json::dummy_writer>;
-  unsigned debug_level = unsigned(debug_it == mc.end() ? 0 : std::stoul(debug_it->second));
+  unsigned map_debug_level = unsigned(debug_it == mc.end() ? 0 : std::stoul(debug_it->second));
   component::IKVStore *obj =
     new hstore(
       owner_it == mc.end() ? "owner" : owner_it->second
       , name_it == mc.end() ? "name" : name_it->second
-      , std::make_unique<Devdax_manager>(debug_level, dax_config_it == mc.end() ? json::array().str() : dax_config_it->second, bool(std::getenv("DAX_RESET")))
+      , std::make_unique<dax_manager>(
+          common::log_source(std::max(debug_level_, map_debug_level))
+          , dax_config_it == mc.end() ? json::array().str() : dax_config_it->second
+          , bool(std::getenv("DAX_RESET"))
+        )
     );
   obj->add_ref();
 

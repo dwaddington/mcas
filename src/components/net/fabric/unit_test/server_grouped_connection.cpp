@@ -39,6 +39,7 @@ try
 catch ( std::exception &e )
 {
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  return;
 }
 
 component::IFabric_communicator *server_grouped_connection::allocate_group() const

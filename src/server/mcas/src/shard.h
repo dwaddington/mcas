@@ -29,6 +29,7 @@
 #include <common/spsc_bounded_queue.h>
 
 #include <csignal> /* sig_atomic_t */
+#include <experimental/string_view>
 #include <list>
 #include <memory>
 #include <string>
@@ -133,6 +134,8 @@ class Shard : public Shard_transport, private common::log_source {
   using task_list_t         = std::list<Shard_task *>;
 
  public:
+  using string_view = std::experimental::string_view;
+
   Shard(const Config_file &config_file,
         unsigned           shard_index,
         const std::string &dax_config,

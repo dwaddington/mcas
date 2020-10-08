@@ -4,7 +4,7 @@
 #include <common/utils.h>
 #include <common/logging.h>
 #include <gtest/gtest.h>
-#include <nupm/devdax_manager.h>
+#include <nupm/dax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <boost/program_options.hpp>
 
@@ -40,18 +40,18 @@ int main(int argc, char **argv)
     return -1;
   }
 
-  vector<nupm::Devdax_manager::config_t> conf;
-  nupm::Devdax_manager::config_t c;
+  vector<nupm::dax_manager::config_t> conf;
+  nupm::dax_manager::config_t c;
   c.path = "/dev/dax0.0";
   c.addr = 0x9000000000;
   c.region_id = 0;
   conf.push_back(c);
-  nupm::Devdax_manager ddm(conf, true);
+  nupm::dax_manager ddm(common::log_source(0U), conf, true);
 
   nupm::revoke_memory(token);
 
   uint64_t *addr = reinterpret_cast<uint64_t *>
-    (ddm.create_region(1234 /* uuid */, 0, size)); //size*8));
+    (ddm.create_region("1234" /* id */, 0, size).second[0].iov_base); //size*8));
 
   auto count = size / sizeof(uint64_t);
   auto count_per_page = PAGE_SIZE /sizeof(uint64_t);

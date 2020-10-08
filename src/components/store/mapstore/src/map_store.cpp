@@ -1232,10 +1232,11 @@ status_t Map_store::map_keys(const IKVStore::pool_t pool,
 }
 
 status_t Map_store::get_pool_regions(const pool_t pool,
-                                     std::vector<::iovec> &out_regions) {
+                                     std::pair<std::string, std::vector<::iovec>> &out_regions) {
   auto session = get_session(pool);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
-  return session->pool->get_pool_regions(out_regions);
+  out_regions.first.clear();
+  return session->pool->get_pool_regions(out_regions.second);
 }
 status_t Map_store::grow_pool(const pool_t pool, const size_t increment_size,
                               size_t &reconfigured_size) {

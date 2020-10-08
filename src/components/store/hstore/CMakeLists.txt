@@ -14,7 +14,7 @@ add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 set(SOURCES
 	src/as_emplace.cpp
 	src/as_extend.cpp
-	src/devdax_manager.cpp
+	src/dax_manager.cpp
 	src/heap_cc.cpp
 	src/heap_rc.cpp
 	src/hop_hash_log.cpp
@@ -47,7 +47,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libccpm/include)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
+#include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
 include_directories(../../)
 

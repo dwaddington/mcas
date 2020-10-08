@@ -17,7 +17,7 @@
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
-#include "devdax_manager.h"
+#include "dax_manager.h"
 #include <ccpm/cca.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>
@@ -46,12 +46,27 @@ heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
 	, std::unique_ptr<ccpm::IHeap_expandable> p
-	, const ccpm::region_vector_t &rv_
+	, const std::string & backing_file_
+	, const std::vector<::iovec> &rv_full_
+	, const ::iovec &pool0_heap_
 )
 	: common::log_source(debug_level_)
 	, _heap(std::move(p))
-	, _managed_regions(rv_.begin(), rv_.end())
-	, _capacity(std::accumulate(rv_.begin(), rv_.end(), ::iovec{nullptr, 0}, [] (const auto &a, const auto &b) -> ::iovec { return {nullptr, a.iov_len + b.iov_len}; }).iov_len)
+	, _managed_regions(backing_file_, rv_full_)
+	, _capacity(
+		pool0_heap_.iov_len
+		+
+		std::accumulate(
+/* Note: rv_full_ must contain at least the first element, representing pool 0 */
+			rv_full_.begin() + 1
+			, rv_full_.end()
+			, ::iovec{nullptr, 0}
+			, [] (const auto &a, const auto &b) -> ::iovec
+				{
+					return {nullptr, a.iov_len + b.iov_len};
+				}
+		).iov_len
+	)
 	, _allocated(
 		[this] ()
 		{
@@ -67,6 +82,26 @@ heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
 	, _hist_alloc()
 	, _hist_inject()
 	, _hist_free()
+{
+
+  for ( const auto &r : rv_full_ )
+  {
+    CPLOG(2, "heap_rc_shared_ephemeral: %s : %p.%zx", __func__, r.iov_base, r.iov_len);
+  }
+  CPLOG(2, "heap_rc_shared_ephemeral: %s : pool0_heap: %p.%zx", __func__, pool0_heap_.iov_base, pool0_heap_.iov_len);
+}
+
+heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
+	unsigned debug_level_
+	, impl::allocation_state_emplace *ase_
+	, impl::allocation_state_pin *aspd_
+	, impl::allocation_state_pin *aspk_
+	, impl::allocation_state_extend *asx_
+	, const std::string & backing_file_
+	, const std::vector<::iovec> &rv_full_
+	, const ::iovec &pool0_heap_
+)
+	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(ccpm::region_vector_t(pool0_heap_)), backing_file_, rv_full_, pool0_heap_)
 {}
 
 heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
@@ -75,32 +110,21 @@ heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
-	, const ccpm::region_vector_t &rv_
-	)
-	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(rv_), rv_)
-{}
-
-heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	unsigned debug_level_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, const ccpm::region_vector_t &rv_
+	, const std::string & backing_file_
+	, const std::vector<::iovec> &rv_full_
+	, const ::iovec &pool0_heap_
 	, ccpm::ownership_callback_t f
 )
-	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(rv_, f), rv_)
+	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(ccpm::region_vector_t(pool0_heap_), f), backing_file_, rv_full_, pool0_heap_)
 {}
 
 void heap_cc_shared_ephemeral::add_managed_region(const ::iovec &r_)
 {
 	ccpm::region_vector_t rv(r_);
 	_heap->add_regions(rv);
-	for ( const auto &r : rv )
-	{
-		_managed_regions.push_back(r);
-		_capacity += r.iov_len;
-	}
+	_capacity += r_.iov_len;
+	PLOG("heap_rc_shared_ephemeral: %s : %p.%zx", __func__, r_.iov_base, r_.iov_len);
+	_managed_regions.second.push_back(r_);
 }
 
 std::size_t heap_cc_shared_ephemeral::free(persistent_t<void *> *p_, std::size_t sz_)
@@ -145,6 +169,7 @@ std::size_t heap_cc_shared_ephemeral::free(persistent_t<void *> *p_, std::size_t
 
 namespace
 {
+#if 0
 	::iovec align(void *first_, std::size_t sz_, std::size_t alignment_)
 	{
 		auto first = reinterpret_cast<uintptr_t>(first_);
@@ -166,26 +191,34 @@ namespace
 		}
 		return ::iovec{reinterpret_cast<void *>(c), last - c};
 	}
-
-	::iovec open_region(const std::unique_ptr<Devdax_manager> &devdax_manager_, std::uint64_t uuid_, unsigned numa_node_)
+#endif
+	::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 	{
-		::iovec iov;
-		iov.iov_base = devdax_manager_->open_region(uuid_, numa_node_, &iov.iov_len);
-		if ( iov.iov_base == 0 )
+		auto file_and_iov = dax_manager_->open_region(std::to_string(uuid_), numa_node_);
+		if ( file_and_iov.second.size() != 1 )
 		{
 			throw std::range_error("failed to re-open region " + std::to_string(uuid_));
 		}
-		return iov;
+		return file_and_iov.second.front();
 	}
 
-	const ccpm::region_vector_t add_regions(ccpm::region_vector_t &&rv_, const std::unique_ptr<Devdax_manager> &devdax_manager_, unsigned numa_node_, std::uint64_t *first_, std::uint64_t *last_)
+	const ccpm::region_vector_t add_regions_full(ccpm::region_vector_t &&rv_, const ::iovec pool0_heap_, const std::unique_ptr<dax_manager> &dax_manager_, unsigned numa_node_, std::uint64_t *first_, std::uint64_t *last_)
 	{
 		auto v = std::move(rv_);
 		for ( auto it = first_; it != last_; ++it )
 		{
-			auto r = open_region(devdax_manager_, *it, numa_node_);
-			VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
-			VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
+			auto r = open_region(dax_manager_, *it, numa_node_);
+			if ( it == first_ )
+			{
+				(void) pool0_heap_;
+				VALGRIND_MAKE_MEM_DEFINED(pool0_heap_.iov_base, pool0_heap_.iov_len);
+				VALGRIND_CREATE_MEMPOOL(pool0_heap_.iov_base, 0, true);
+			}
+			else
+			{
+				VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
+				VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
+			}
 			v.push_back(r);
 		}
 		return v;
@@ -202,11 +235,13 @@ heap_cc_shared::heap_cc_shared(
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
-	, void *p
-	, std::size_t sz
+	, ::iovec pool0_full_
+	, ::iovec pool0_heap_
 	, unsigned numa_node_
+	, const std::string & backing_file_
 )
-	: _pool0(align(p, sz, MiB(2)))
+	: _pool0_full(pool0_full_)
+	, _pool0_heap(pool0_heap_)
 	, _numa_node(numa_node_)
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
@@ -217,28 +252,30 @@ heap_cc_shared::heap_cc_shared(
 			, aspd_
 			, aspk_
 			, asx_
-			, ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len)
+			, backing_file_
+			, std::vector<::iovec>(1, _pool0_full) // ccpm::region_vector_t(_pool0_full.iov_base, _pool0_heap.iov_len)
+			, pool0_heap_
 		)
 	)
 {
 	/* cursor now locates the best-aligned region */
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
-		, " pool ", _pool0.iov_base, " .. ", iov_limit(_pool0)
-		, " size ", _pool0.iov_len
+		, " pool ", _pool0_heap.iov_base, " .. ", iov_limit(_pool0_heap)
+		, " size ", _pool0_heap.iov_len
 		, " new"
 	);
-	VALGRIND_CREATE_MEMPOOL(_pool0.iov_base, 0, false);
+	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, false);
 }
 
 #if 0
-heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, const std::unique_ptr<Devdax_manager> &devdax_manager_, unsigned numa_node_)
-	: _pool0(align(open_region(devdax_manager_, pool0_uuid_, numa_node_)))
+heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, const std::unique_ptr<dax_manager> &dax_manager_, unsigned numa_node_)
+	: _pool0(align(open_region(dax_manager_, pool0_uuid_, numa_node_)))
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _eph(
 		std::make_unique<heap_cc_shared_ephemeral>(
-			debug_level_, add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), devdax_manager_, numa_node_, nullptr, nullptr)
+			debug_level_, add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), dax_manager_, numa_node_, nullptr, nullptr)
 		)
 	)
 {
@@ -258,13 +295,15 @@ heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, cons
 #pragma GCC diagnostic ignored "-Wuninitialized"
 heap_cc_shared::heap_cc_shared(
 	unsigned debug_level_
-	, const std::unique_ptr<Devdax_manager> &devdax_manager_
+	, const std::unique_ptr<dax_manager> &dax_manager_
+	, const std::string &backing_file_
 	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
 )
-	: _pool0(this->_pool0)
+	: _pool0_full(this->_pool0_full)
+	, _pool0_heap(this->_pool0_heap)
 	, _numa_node(this->_numa_node)
 	, _more_region_uuids_size(this->_more_region_uuids_size)
 	, _more_region_uuids(this->_more_region_uuids)
@@ -275,15 +314,18 @@ heap_cc_shared::heap_cc_shared(
 			, aspd_
 			, aspk_
 			, asx_
-			, add_regions(
+			, backing_file_
+			, add_regions_full(
 				ccpm::region_vector_t(
-					_pool0.iov_base, _pool0.iov_len
+					_pool0_full.iov_base, _pool0_full.iov_len
 				)
-				, devdax_manager_
+				, _pool0_heap
+				, dax_manager_
 				, _numa_node
 				, &_more_region_uuids[0]
 				, &_more_region_uuids[_more_region_uuids_size]
 			)
+			, _pool0_heap
 			, [ase_, aspd_, aspk_, asx_] (const void *p) -> bool {
 				/* To answer whether the map or the allocator owns pointer p?
 				 * Guessing that true means that the map owns p
@@ -296,12 +338,12 @@ heap_cc_shared::heap_cc_shared(
 {
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
-		, " pool ", _pool0.iov_base, " .. ", iov_limit(_pool0)
-		, " size ", _pool0.iov_len
+		, " pool ", _pool0_heap.iov_base, " .. ", iov_limit(_pool0_heap)
+		, " size ", _pool0_heap.iov_len
 		, " reconstituting"
 	);
-	VALGRIND_MAKE_MEM_DEFINED(_pool0.iov_base, _pool0.iov_len);
-	VALGRIND_CREATE_MEMPOOL(_pool0.iov_base, 0, true);
+	VALGRIND_MAKE_MEM_DEFINED(_pool0_heap.iov_base, _pool0_heap.iov_len);
+	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, true);
 }
 #pragma GCC diagnostic pop
 
@@ -310,7 +352,7 @@ heap_cc_shared::~heap_cc_shared()
 	quiesce();
 }
 
-std::vector<::iovec> heap_cc_shared::regions() const
+std::pair<std::string, std::vector<::iovec>> heap_cc_shared::regions() const
 {
 	return _eph->get_managed_regions();
 }
@@ -321,7 +363,7 @@ void *heap_cc_shared::iov_limit(const ::iovec &r)
 }
 
 auto heap_cc_shared::grow(
-	const std::unique_ptr<Devdax_manager> & devdax_manager_
+	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
 ) -> std::size_t
@@ -342,10 +384,10 @@ auto heap_cc_shared::grow(
 			{
 				try
 				{
-					/* Note: crash between here and "Slot persist done" may cause devdax_manager_
+					/* Note: crash between here and "Slot persist done" may cause dax_manager_
 					 * to leak the region.
 					 */
-					::iovec r { devdax_manager_->create_region(uuid_next, _numa_node, size), size };
+					std::vector<::iovec> rv = dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size).second;
 					{
 						auto &slot = _more_region_uuids[_more_region_uuids_size];
 						slot = uuid_next;
@@ -356,13 +398,16 @@ auto heap_cc_shared::grow(
 						++_more_region_uuids_size;
 						persister_nupm::persist(&_more_region_uuids_size, _more_region_uuids_size);
 					}
-					_eph->add_managed_region(r);
-					hop_hash_log<trace_heap_summary>::write(
-						LOG_LOCATION
-						, " pool ", r.iov_base, " .. ", iov_limit(r)
-						, " size ", r.iov_len
-						, " grow"
-					);
+					for ( const auto & r : rv )
+					{
+						_eph->add_managed_region(r);
+						hop_hash_log<trace_heap_summary>::write(
+							LOG_LOCATION
+							, " pool ", r.iov_base, " .. ", iov_limit(r)
+							, " size ", r.iov_len
+							, " grow"
+						);
+					}
 					break;
 				}
 				catch ( const std::bad_alloc & )
@@ -386,10 +431,10 @@ auto heap_cc_shared::grow(
 
 void heap_cc_shared::quiesce()
 {
-	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", _pool0.iov_len, " allocated ", _eph->_allocated);
-	VALGRIND_DESTROY_MEMPOOL(_pool0.iov_base);
-	VALGRIND_MAKE_MEM_UNDEFINED(_pool0.iov_base, _pool0.iov_len);
-	_eph->write_hist<trace_heap_summary>(_pool0);
+	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", _pool0_heap.iov_len, " allocated ", _eph->_allocated);
+	VALGRIND_DESTROY_MEMPOOL(_pool0_heap.iov_base);
+	VALGRIND_MAKE_MEM_UNDEFINED(_pool0_heap.iov_base, _pool0_heap.iov_len);
+	_eph->write_hist<trace_heap_summary>(_pool0_heap);
 	_eph.reset(nullptr);
 }
 
@@ -439,15 +484,15 @@ void heap_cc_shared::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_
 		 */
 		perishable::tick();
 
-		VALGRIND_MEMPOOL_ALLOC(_pool0.iov_base, p_, sz);
+		VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p_, sz);
 		/* size grows twice: once for aligment, and possibly once more in allocation */
-		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0.iov_base, " addr ", p_, " size ", sz_, "->", sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz_, "->", sz);
 		_eph->_allocated += sz;
 		_eph->_hist_alloc.enter(sz);
 	}
 	catch ( const std::bad_alloc & )
 	{
-		_eph->write_hist<true>(_pool0);
+		_eph->write_hist<true>(_pool0_heap);
 		/* Sometimes lack of space will cause heap to throw a bad_alloc. */
 		throw;
 	}
@@ -455,9 +500,9 @@ void heap_cc_shared::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_
 
 void heap_cc_shared::free(persistent_t<void *> *p_, std::size_t sz_)
 {
-	VALGRIND_MEMPOOL_FREE(_pool0.iov_base, p_);
+	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p_);
 	auto sz = _eph->free(p_, sz_);
-	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0.iov_base, " addr ", p_, " size ", sz_, "->", sz);
+	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz_, "->", sz);
 }
 
 void heap_cc_shared::extend_arm() const

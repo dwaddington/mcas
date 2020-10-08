@@ -36,4 +36,5 @@ try
 catch ( std::exception &e )
 {
   std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  return;
 }

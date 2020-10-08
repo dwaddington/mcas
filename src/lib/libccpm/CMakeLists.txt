@@ -26,7 +26,6 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
 
-set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 

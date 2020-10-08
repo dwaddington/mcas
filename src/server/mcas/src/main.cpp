@@ -249,6 +249,14 @@ int main(int argc, char *argv[])
 
       launcher->wait_for_all();
     }
+    catch ( const Exception &e )
+    {
+      PLOG("%s: Exception %s", __func__, e.cause());
+    }
+    catch ( const std::exception &e )
+    {
+      PLOG("%s: std::exception %s", __func__, e.what());
+    }
     catch ( ... )
     {
     }

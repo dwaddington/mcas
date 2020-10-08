@@ -58,16 +58,16 @@ int main()
 {
   size_t size = 1000000;
 
-  
-  //  Devdax_manager ddm({{"/dev/dax0.3", 0x9000000000, 0},
+
+  //  dax_manager ddm({{"/dev/dax0.3", 0x9000000000, 0},
   int fd = open("/dev/mcas", O_RDWR);
   assert(fd != -1);
 
   void * ptr = nullptr;
   void * pm_addr = ((void*) 0x900000000);
-  
+
 #ifdef USE_AEP
-  nupm::Devdax_manager pm({{"/dev/dax1.0", ((uint64_t)pm_addr), 0}}, true);
+  nupm::_manager pm({{"/dev/dax1.0", ((uint64_t)pm_addr), 0}}, true);
   ptr = pm.create_region(1, 0, size);
 #else
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
@@ -79,13 +79,13 @@ int main()
              flags,
              -1,
              0);
-    
+
 #endif
 
   // touch memory
   memset(ptr, 0, size);
 
-  PINF("touched ptr=%p", ptr);  
+  PINF("touched ptr=%p", ptr);
 
   IOCTL_EXPOSE_msg ioparam;
   ioparam.token = TOKEN;
@@ -110,7 +110,7 @@ int main()
                         PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_FIXED, // | MAP_HUGETLB, // | MAP_HUGE_2MB,
                         fd,
-                        offset); 
+                        offset);
 
     if(ptr != ((void*) -1)) {
       PLOG("Success!! (ptr=%p)", ptr);
@@ -128,13 +128,13 @@ int main()
 
     close(fd);
   }
-  
+
   PLOG("removing exposure...");
 
   /* signal child */
   //  kill(child_pid, SIGHUP);
   //  sleep(3);
-  
+
   {
     int rc;
     IOCTL_REMOVE_msg ioparam;
@@ -149,6 +149,6 @@ int main()
   PLOG("parent closing");
   munmap(ptr, size);
 
-  
+
   close(fd);
 }

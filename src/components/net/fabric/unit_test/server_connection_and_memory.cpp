@@ -52,4 +52,5 @@ try
 catch ( std::exception &e )
 {
   std::cerr << "(destructor) " << __func__ << ": " << e.what() << "\n";
+  return;
 }

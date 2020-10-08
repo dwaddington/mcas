@@ -228,7 +228,7 @@ static long mcas_dev_ioctl(struct file *filp,
 
 #ifdef DEBUG
 	pr_info("mcas: memremap %llx (phys) -> %p (virt) [0x%x,0x%x,..]",
-		paddr, kaddr, ((char*)kaddr)[0],((char*)kaddr)[0]);
+		paddr, kaddr, ((char*)kaddr)[0],((char*)kaddr)[1]);
 #endif
 
 	/* need to add for each page? */
@@ -435,7 +435,7 @@ static vm_fault_t mcas_fault_mmap(struct vm_fault * vmf)
 
 #ifdef DEBUG  
   pr_info("mcas: mcas_fault_map got exposure phys=%llx kaddr=%p\n", out_paddr, kaddr);
-  pr_info("mcas: mcas_fault_map kaddr=[0x%x,0x%x,..]", ((char*)kaddr)[0],((char*)kaddr)[0]);
+  pr_info("mcas: mcas_fault_map kaddr=[0x%x,0x%x,..]", ((char*)kaddr)[0],((char*)kaddr)[1]);
 #endif
   
   pfn = out_paddr >> PAGE_SHIFT;

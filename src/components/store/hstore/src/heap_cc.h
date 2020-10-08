@@ -27,12 +27,12 @@
 #if 0
 #include <valgrind/memcheck.h>
 #else
-#define VALGRIND_CREATE_MEMPOOL(pool, x, y) do {} while(0)
-#define VALGRIND_DESTROY_MEMPOOL(pool) do {} while(0)
-#define VALGRIND_MAKE_MEM_DEFINED(pool, size) do {} while(0)
-#define VALGRIND_MAKE_MEM_UNDEFINED(pool, size) do {} while(0)
-#define VALGRIND_MEMPOOL_ALLOC(pool, addr, size) do {} while(0)
-#define VALGRIND_MEMPOOL_FREE(pool, size) do {} while(0)
+#define VALGRIND_CREATE_MEMPOOL(pool, x, y) do { (void) (pool); (void) (x); (void) (y); } while(0)
+#define VALGRIND_DESTROY_MEMPOOL(pool) do { (void) (pool); } while(0)
+#define VALGRIND_MAKE_MEM_DEFINED(pool, size) do { (void) (pool); (void) (size); } while(0)
+#define VALGRIND_MAKE_MEM_UNDEFINED(pool, size) do { (void) (pool); (void) (size); } while(0)
+#define VALGRIND_MEMPOOL_ALLOC(pool, addr, size) do { (void) (pool); (void) (addr); (void) (size); } while(0)
+#define VALGRIND_MEMPOOL_FREE(pool, size) do { (void) (pool); (void) (size); } while(0)
 #endif
 #include <ccpm/interfaces.h>
 #include <common/exceptions.h> /* General_exception */
@@ -46,7 +46,7 @@
 #include <memory>
 #include <vector>
 
-class Devdax_manager;
+struct dax_manager;
 
 namespace impl
 {
@@ -69,9 +69,10 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 struct heap_cc_shared_ephemeral
   : private common::log_source
 {
+	using managed_regions_t = std::pair<std::string, std::vector<::iovec>>;
 private:
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
-	std::vector<::iovec> _managed_regions;
+	managed_regions_t _managed_regions;
 	std::size_t _capacity;
 	std::size_t _allocated;
 	impl::allocation_state_emplace *_ase;
@@ -97,9 +98,11 @@ private:
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, std::unique_ptr<ccpm::IHeap_expandable> p
-		, const ccpm::region_vector_t &rv
+		, const std::string &backing_file
+		, const std::vector<::iovec> &rv_full
+		, const ::iovec &pool0_heap
 	);
-	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
+	managed_regions_t get_managed_regions() const { return _managed_regions; }
 
 	template <bool B>
 		void write_hist(const ::iovec & pool_) const
@@ -133,7 +136,9 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, const ccpm::region_vector_t &rv_
+		, const std::string &backing_file
+		, const std::vector<::iovec> &rv_full
+		, const ::iovec &pool0_heap_
 	);
 	explicit heap_cc_shared_ephemeral(
 		unsigned debug_level
@@ -141,7 +146,9 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, const ccpm::region_vector_t &rv_
+		, const std::string &backing_file
+		, const std::vector<::iovec> &rv_full
+		, const ::iovec &pool0_heap
 		, ccpm::ownership_callback_t f
 	);
 	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
@@ -151,8 +158,10 @@ public:
 
 struct heap_cc_shared
 {
+	using managed_regions_t = std::pair<std::string, std::vector<::iovec>>;
 private:
-	::iovec _pool0;
+	::iovec _pool0_full; /* entire extent of pool 0 */
+	::iovec _pool0_heap; /* portion of pool 0 which can be used for the heap */
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
@@ -161,22 +170,20 @@ private:
 public:
 	explicit heap_cc_shared(
 		unsigned debug_level
-		, uint64_t pool0_uuid
-		, const std::unique_ptr<Devdax_manager> &devdax_manager_
-	);
-	explicit heap_cc_shared(
-		unsigned debug_level
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, void *p
-		, std::size_t sz
+		, ::iovec pool0_full
+		, ::iovec pool0_heap
 		, unsigned numa_node
+		, const std::string &backing_file
 	);
+
 	explicit heap_cc_shared(
 		unsigned debug_level
-		, const std::unique_ptr<Devdax_manager> &devdax_manager
+		, const std::unique_ptr<dax_manager> &dax_manager
+		, const std::string &backing_file
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -193,7 +200,7 @@ public:
 	static void *iov_limit(const ::iovec &r);
 
 	auto grow(
-		const std::unique_ptr<Devdax_manager> & devdax_manager_
+		const std::unique_ptr<dax_manager> & dax_manager_
 		, std::uint64_t uuid_
 		, std::size_t increment_
 	) -> std::size_t;
@@ -228,7 +235,7 @@ public:
 			);
 	}
 
-	std::vector<::iovec> regions() const;
+	managed_regions_t regions() const;
 };
 
 struct heap_cc

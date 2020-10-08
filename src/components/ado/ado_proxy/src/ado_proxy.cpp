@@ -147,6 +147,13 @@ status_t ADO_proxy::send_memory_map(uint64_t token, size_t size, void *value_vad
   return S_OK;
 }
 
+status_t ADO_proxy::send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, ::iovec iov)
+{
+  PLOG("ADO_proxy:%s sending", __func__);
+  _ipc->send_memory_map_named(region_id, pool_name, offset, iov);
+  return S_OK;
+}
+
 status_t ADO_proxy::send_work_request(const uint64_t work_request_key,
                                       const char *   key,
                                       const size_t   key_len,

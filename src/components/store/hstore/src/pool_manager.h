@@ -20,6 +20,7 @@
 #include "alloc_key.h"
 
 #include <common/logging.h> /* log_source */
+#include <gsl/pointers>
 #include <sys/uio.h>
 #include <cstddef>
 #include <functional>
@@ -82,12 +83,14 @@ public:
 
 };
 
-class Devdax_manager;
+struct dax_manager;
 
 template <typename Pool>
   struct pool_manager
     : protected common::log_source
   {
+    using region_access = std::pair<std::string, std::vector<::iovec>>;
+    using region_access_create = std::tuple<std::string, ::iovec, std::uint64_t>;
     pool_manager(unsigned debug_level_) : common::log_source(debug_level_) {}
     virtual ~pool_manager() {}
 
@@ -95,7 +98,7 @@ template <typename Pool>
 
     virtual void pool_close_check(const std::string &) = 0;
 
-    virtual std::vector<::iovec> pool_get_regions(const Pool &) const = 0;
+    virtual std::pair<std::string, std::vector<::iovec>> pool_get_regions(const Pool &) const = 0;
 
     /*
      * throws pool_error if create_region fails
@@ -103,29 +106,27 @@ template <typename Pool>
     virtual auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-    ) -> std::tuple<void *, std::size_t, std::uint64_t> = 0;
+    ) -> region_access_create = 0;
 
     virtual auto pool_create_2(
       AK_FORMAL
-      void *v_
-      , std::size_t size_
-      , std::uint64_t uuid_
-      , component::IKVStore::flags_t flags_
-      , std::size_t expected_obj_count_
+      const region_access_create & rac
+      , component::IKVStore::flags_t flags
+      , std::size_t expected_obj_count
     ) -> std::unique_ptr<Pool> = 0;
 
     virtual auto pool_open_1(
       const pool_path &path_
-    ) -> void * = 0;
+    ) -> region_access = 0;
 
     virtual auto pool_open_2(
       AK_FORMAL
-      void *addr_
+      const region_access & access_
       , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<Pool> = 0;
 
     virtual void pool_delete(const pool_path &path) = 0;
-    virtual const std::unique_ptr<Devdax_manager> & devdax_manager() const = 0;
+    virtual const std::unique_ptr<dax_manager> & get_dax_manager() const = 0;
   };
 #pragma GCC diagnostic pop
 

@@ -26,12 +26,12 @@
 #if 0
 #include <valgrind/memcheck.h>
 #else
-#define VALGRIND_CREATE_MEMPOOL(pool, x, y) do {} while(0)
-#define VALGRIND_DESTROY_MEMPOOL(pool) do {} while(0)
-#define VALGRIND_MAKE_MEM_DEFINED(pool, size) do {} while(0)
-#define VALGRIND_MAKE_MEM_UNDEFINED(pool, size) do {} while(0)
-#define VALGRIND_MEMPOOL_ALLOC(pool, addr, size) do {} while(0)
-#define VALGRIND_MEMPOOL_FREE(pool, size) do {} while(0)
+#define VALGRIND_CREATE_MEMPOOL(pool, x, y) do { (void) (pool); (void) (x); (void) (y); } while(0)
+#define VALGRIND_DESTROY_MEMPOOL(pool) do { (void) (pool); } while(0)
+#define VALGRIND_MAKE_MEM_DEFINED(pool, size) do { (void) (pool); (void) (size); } while(0)
+#define VALGRIND_MAKE_MEM_UNDEFINED(pool, size) do { (void) (pool); (void) (size); } while(0)
+#define VALGRIND_MEMPOOL_ALLOC(pool, addr, size) do { (void) (pool); (void) (addr); (void) (size); } while(0)
+#define VALGRIND_MEMPOOL_FREE(pool, size) do { (void) (pool); (void) (size); } while(0)
 #endif
 #include <common/exceptions.h> /* General_exception */
 
@@ -43,7 +43,7 @@
 #include <memory>
 #include <vector>
 
-class Devdax_manager;
+struct dax_manager;
 
 namespace impl
 {
@@ -51,10 +51,12 @@ namespace impl
 }
 
 struct heap_rc_shared_ephemeral
+	: private common::log_source
 {
+	using region_access = std::pair<std::string, std::vector<::iovec>>;
 private:
 	nupm::Rca_LB _heap;
-	std::vector<::iovec> _managed_regions;
+	region_access _managed_regions;
 	std::size_t _allocated;
 	std::size_t _capacity;
 	/* The set of reconstituted addresses. Only needed during recovery.
@@ -74,10 +76,10 @@ private:
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
 public:
-	explicit heap_rc_shared_ephemeral(unsigned debug_level);
+	explicit heap_rc_shared_ephemeral(unsigned debug_level, const std::string & backing_file);
 
-	void add_managed_region(const ::iovec &r, unsigned numa_node);
-	std::vector<::iovec> get_managed_regions() const { return _managed_regions; }
+	void add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, unsigned numa_node);
+	region_access get_managed_regions() const { return _managed_regions; }
 
 	template <bool B>
 		void write_hist(const ::iovec & pool_) const
@@ -112,18 +114,20 @@ public:
 
 struct heap_rc_shared
 {
+	using region_access = std::pair<std::string, std::vector<::iovec>>;
 private:
-	::iovec _pool0;
+	::iovec _pool0_full; /* entire extent of pool 0 */
+	::iovec _pool0_heap; /* portion of pool 0 which can be used for the heap */
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
 	std::unique_ptr<heap_rc_shared_ephemeral> _eph;
 public:
-	explicit heap_rc_shared(unsigned debug_level, void *pool_, std::size_t sz_, unsigned numa_node_);
-	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<Devdax_manager> &devdax_manager_);
+	explicit heap_rc_shared(unsigned debug_level, ::iovec pool0_full, ::iovec pool0_heap, unsigned numa_node, const std::string &backing_file);
+	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<dax_manager> &dax_manager, const std::string &backing_file);
 	/* allocation_state_combined offered, but not used */
-	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<Devdax_manager> &devdax_manager, impl::allocation_state_combined *)
-		: heap_rc_shared(debug_level, devdax_manager)
+	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<dax_manager> &dax_manager, const std::string &backing_file, impl::allocation_state_combined *)
+		: heap_rc_shared(debug_level, dax_manager, backing_file)
 	{
 	}
 
@@ -132,29 +136,29 @@ public:
 
 	~heap_rc_shared();
 
-	static ::iovec open_region(const std::unique_ptr<Devdax_manager> &devdax_manager_, std::uint64_t uuid_, unsigned numa_node_);
+	static ::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager, std::uint64_t uuid, unsigned numa_node);
 
 	static void *iov_limit(const ::iovec &r);
 
 	auto grow(
-		const std::unique_ptr<Devdax_manager> & devdax_manager_
-		, std::uint64_t uuid_
-		, std::size_t increment_
+		const std::unique_ptr<dax_manager> & dax_manager
+		, std::uint64_t uuid
+		, std::size_t increment
 	) -> std::size_t;
 
 	void quiesce();
 
-	void *alloc(std::size_t sz_, std::size_t alignment_);
+	void *alloc(std::size_t sz, std::size_t alignment);
 
-	void inject_allocation(const void * p, std::size_t sz_);
+	void inject_allocation(const void * p, std::size_t sz);
 
-	void free(void *p_, std::size_t sz_, std::size_t alignment_);
+	void free(void *p, std::size_t sz, std::size_t alignment);
 
 	unsigned percent_used() const {
     return _eph->capacity() == 0 ? 0xFFFFU : unsigned(_eph->allocated() * 100U / _eph->capacity());
   }
 
-	bool is_reconstituted(const void * p_) const;
+	bool is_reconstituted(const void * p) const;
 
 	/* debug */
 	unsigned numa_node() const
@@ -162,7 +166,7 @@ public:
 		return _numa_node;
 	}
 
-	std::vector<::iovec> regions() const;
+    region_access regions() const;
 };
 
 struct heap_rc

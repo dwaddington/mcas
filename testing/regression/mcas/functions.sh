@@ -100,11 +100,24 @@ scale_by_transport () {
  echo $(( (base + factor - 1) / factor ))
 }
 
+has_devdax () {
+ test -c /dev/dax0.0
+}
+
+has_fsdax () {
+ test -d /mnt/pmem1
+}
+
 # Decide whether to use device DAX or FS DAX, depending on whether this system has devdax configured
 choose_dax_type() {
- if test -c /dev/dax0.0
- then echo devdax
- else echo fsdax
+ if [[ -n "$DAXTYPE" ]]
+ then
+  echo $DAXTYPE
+ else
+  if has_devdax
+  then echo devdax
+  else echo fsdax
+  fi
  fi
 }
 

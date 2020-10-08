@@ -231,16 +231,25 @@ std::size_t get_pool_size(component::Itf_ref<component::IMCAS> &mcas_, make_hand
 void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t mh_, component::IMCAS::pool_t pool_, std::size_t max_)
 {
   auto len = get_pool_size(mcas_, mh_, pool_, max_);
+  /* header_len must be larger than aregion" header (see hstore/src/region.h),
+   * currently ox22c0, to avoid overwriting region data.
+   */
+  auto header_len = 0x3000;
+  ASSERT_LE(header_len, len);
+  len -= header_len; /* Will not save or restore the header area */
   auto save_buffer = static_cast<char *>(aligned_alloc(KiB(4), len));
   EXPECT_NE(nullptr, save_buffer);
   {
     auto mem = mh_(mcas_, save_buffer, len);
     auto save_len = len;
-    EXPECT_EQ(S_OK, mcas_->get_direct_offset(pool_, 0, save_len, save_buffer, mem->get()));
+    EXPECT_EQ(S_OK, mcas_->get_direct_offset(pool_, header_len + 0U, save_len, save_buffer, mem->get()));
     EXPECT_EQ(len, save_len);
   }
 
-  /* fill the entire pool with xes, writing random sizes until all bytes are filled */
+  /* fill the entire pool (except the initial 0x2000 bytes, which should encompass the
+   * hstore "heap" data
+   * with xes, writing random sizes until all bytes are filled
+   */
   {
     std::size_t offset = 0;
     for ( ; offset != len ; )
@@ -250,7 +259,7 @@ void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t
       EXPECT_NE(nullptr, xes);
       std::memset(xes, 'x', xes_len);
       auto mem = mh_(mcas_, xes, xes_len);
-      EXPECT_EQ(S_OK, mcas_->put_direct_offset(pool_, offset, xes_len, xes, mem->get()));
+      EXPECT_EQ(S_OK, mcas_->put_direct_offset(pool_, header_len + offset, xes_len, xes, mem->get()));
       EXPECT_LE(offset + xes_len, len);
       offset += xes_len;
       free(xes);
@@ -267,7 +276,7 @@ void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t
       EXPECT_NE(nullptr, xes);
       std::memset(xes, 'y', xes_len);
       auto mem = mh_(mcas_, xes, xes_len);
-      EXPECT_EQ(S_OK, mcas_->get_direct_offset(pool_, offset, xes_len, xes, mem->get()));
+      EXPECT_EQ(S_OK, mcas_->get_direct_offset(pool_, header_len + offset, xes_len, xes, mem->get()));
       EXPECT_LE(offset + xes_len, len);
       EXPECT_EQ(xes + xes_len, std::find_if_not(xes, xes + xes_len, [] (char c) { return c == 'x'; }));
       offset += xes_len;
@@ -279,7 +288,7 @@ void wipe_and_restore(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t
   {
     auto mem = mh_(mcas_, save_buffer, len);
     auto restore_len = len;
-    EXPECT_EQ(S_OK, mcas_->put_direct_offset(pool_, 0, restore_len, save_buffer, mem->get()));
+    EXPECT_EQ(S_OK, mcas_->put_direct_offset(pool_, header_len + 0, restore_len, save_buffer, mem->get()));
     EXPECT_EQ(len, restore_len);
   }
   free(save_buffer);
@@ -373,7 +382,7 @@ void get_put_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_hand
   ASSERT_NE(nullptr, scan_buffer);
   std::size_t offset = 0;
 
-  /* write x's to the entire pool, then restore it.requires 3 * pools_size bytes */
+  /* write x's to the entire pool, then restore it. Requires 3 * pools_size bytes */
   wipe_and_restore(mcas, mh_, pool, GiB(1));
 
   auto mem = mh_(mcas, scan_buffer, scan_buffer_len);

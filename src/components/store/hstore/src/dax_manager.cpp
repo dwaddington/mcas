@@ -12,7 +12,7 @@
 */
 
 
-#include "devdax_manager.h"
+#include "dax_manager.h"
 
 #include <common/json.h>
 #include <rapidjson/error/en.h>
@@ -207,16 +207,16 @@ namespace
 
 #define SET_SCALAR(S,M) assignment<decltype(S::M)>::assign_scalar<S, &S::M>
 
-	parse_map<nupm::Devdax_manager::config_t> config_t_attr
+	parse_map<nupm::dax_manager::config_t> config_t_attr
 	{
-		{ dax_config::region_id, SET_SCALAR(nupm::Devdax_manager::config_t, region_id) },
-		{ dax_config::path, SET_SCALAR(nupm::Devdax_manager::config_t, path) },
-		{ dax_config::addr, SET_SCALAR(nupm::Devdax_manager::config_t, addr) },
+		{ dax_config::region_id, SET_SCALAR(nupm::dax_manager::config_t, region_id) },
+		{ dax_config::path, SET_SCALAR(nupm::dax_manager::config_t, path) },
+		{ dax_config::addr, SET_SCALAR(nupm::dax_manager::config_t, addr) },
 	};
 
-	std::vector<nupm::Devdax_manager::config_t> parse_devdax_string(unsigned debug_level_, const std::string &dax_map_)
+	std::vector<nupm::dax_manager::config_t> parse_devdax_string(unsigned debug_level_, const std::string &dax_map_)
 	{
-		std::vector<nupm::Devdax_manager::config_t> dax_config;
+		std::vector<nupm::dax_manager::config_t> dax_config;
 		rapidjson::Document doc;
 		{
 			doc.Parse(dax_map_.c_str());
@@ -272,10 +272,10 @@ namespace
 	}
 }
 
-Devdax_manager::Devdax_manager(
-	unsigned debug_level_
+dax_manager::dax_manager(
+	const common::log_source &ls_
 	, const std::string &dax_map
 	, bool force_reset
 )
-	: nupm::Devdax_manager(debug_level_, parse_devdax_string(debug_level_, dax_map), force_reset)
+	: nupm::dax_manager(ls_, parse_devdax_string(ls_.debug_level(), dax_map), force_reset)
 {}

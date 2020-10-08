@@ -20,11 +20,14 @@
 #include <common/logging.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
+#include <common/fd_open.h>
+#include <common/memory_mapped.h>
 #include <common/dump_utils.h>
 #include <api/interfaces.h>
 #include <nupm/mcas_mod.h>
-#include <atomic>
 #include <boost/program_options.hpp>
+#include <sys/mman.h>
+#include <atomic>
 #include <condition_variable>
 #include <cstring>
 #include <iostream>
@@ -43,9 +46,21 @@
 #include <nupm/mcas_mod.h>
 #include <xpmem.h>
 
+#ifndef MAP_SYNC
+#define MAP_SYNC 0x80000
+#endif
+
+#ifndef MAP_SHARED_VALIDATE
+#define MAP_SHARED_VALIDATE 0x03
+#endif
+
 #ifdef PROFILE
 #include <gperftools/profiler.h>
 #endif
+
+static constexpr unsigned MAP_LOG_GRAIN = 21U;
+static constexpr std::size_t MAP_GRAIN = std::size_t(1) << MAP_LOG_GRAIN;
+static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 
 using namespace component;
 
@@ -515,6 +530,45 @@ int main(int argc, char* argv[])
 
               /* register memory with plugins */
               if(plugin_mgr.register_mapped_memory(mm->shard_addr, mm_addr, mm->size) != S_OK)
+                throw General_exception("calling register_mapped_memory on ADO plugin failed");
+
+              break;
+            }
+            case mcas::ipc::MSG_TYPE_MAP_MEMORY_NAMED: {
+
+              auto * mm = static_cast<Map_memory_named*>(static_cast<void *>(buffer));
+
+              assert(memory_type != 0xFF);
+
+              common::Fd_open fd(::open(std::string(mm->pool_name(), mm->pool_name_len).c_str(), O_RDWR));
+
+              int flags = MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE;
+              common::memory_mapped mme(mm->iov.iov_base, mm->iov.iov_len, PROT_READ|PROT_WRITE, flags, fd.fd(), mm->offset);
+              if ( ! mme )
+              {
+                flags &= ~MAP_SYNC;
+                mme = common::memory_mapped(mm->iov.iov_base, mm->iov.iov_len, PROT_READ|PROT_WRITE, flags, fd.fd(), mm->offset);
+              }
+              if ( ! mme )
+              {
+                throw General_exception(
+                  "%s: %.*s mmap(%p, 0x%zx, %s, 0x%x=%s, %i, 0x%zu) failed unexpectly: %zu/%s"
+                  , __func__, int(mm->pool_name_len), mm->pool_name()
+                  , mm->iov.iov_base, mm->iov.iov_len, "PROT_READ|PROT_WRITE", flags, "MAP_SHARED_VALIDATE|MAP_FIXED", fd.fd(), mm->offset
+                  , mme.iov_len, ::strerror(int(mme.iov_len))
+                );
+              }
+
+              PMAJOR("ADO: mapped region %u pool %.*s addr=%p:%zu", unsigned(mm->region_id), int(mm->pool_name_len), mm->pool_name(), mm->iov.iov_base, mm->iov.iov_len);
+
+              /* ADO does not use common::memory_mapped */
+              auto mme_local = mme.release();
+
+              /* record mapping information for clean up */
+              g_shared_memory_mappings.push_back(std::make_pair(mme_local.iov_base, mme_local.iov_len));
+
+              /* register memory with plugins */
+              if(plugin_mgr.register_mapped_memory(mm->iov.iov_base, mme_local.iov_base, mm->iov.iov_len) != S_OK)
                 throw General_exception("calling register_mapped_memory on ADO plugin failed");
 
               break;
