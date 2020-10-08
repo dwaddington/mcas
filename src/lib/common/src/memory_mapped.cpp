@@ -36,9 +36,14 @@ namespace
 constexpr ::iovec common::iovec_moveable_traits::none;
 
 common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd) noexcept
+  : memory_mapped(vaddr, size, prot, flags, fd, 0)
+{
+}
+
+common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd, off_t offset) noexcept
   : memory_mapped(
     ::iovec{
-      ::mmap(vaddr, size, prot, flags, fd, 0)
+      ::mmap(vaddr, size, prot, flags, fd, offset)
       , size
     }
   )

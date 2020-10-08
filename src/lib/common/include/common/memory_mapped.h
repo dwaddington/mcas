@@ -35,6 +35,7 @@ namespace common
     memory_mapped(::iovec iov) noexcept;
     /* non-minimalist: arguments are input to ::mmap */
     memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd) noexcept;
+    memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd, off_t offset) noexcept;
 	memory_mapped(memory_mapped &&) = default;
 	memory_mapped &operator=(memory_mapped &&) = default;
     ~memory_mapped();
