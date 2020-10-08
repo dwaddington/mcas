@@ -2092,8 +2092,7 @@ status_t Connection_handler::find(const IMCAS::pool_t pool,
 
   try {
     const auto msg =
-        new (iobs->base()) mcas::protocol::Message_INFO_request(auth_id(), mcas::protocol::INFO_TYPE_FIND_KEY, pool);
-    msg->offset = offset;
+        new (iobs->base()) mcas::protocol::Message_INFO_request(auth_id(), mcas::protocol::INFO_TYPE_FIND_KEY, pool, offset);
 
     msg->set_key(iobs->length(), key_expression);
 
@@ -2107,7 +2106,7 @@ status_t Connection_handler::find(const IMCAS::pool_t pool,
 
     if (status == S_OK) {
       out_matched_key    = response_msg->c_str();
-      out_matched_offset = response_msg->offset;
+      out_matched_offset = response_msg->Offset();
     }
   }
   catch (const Exception &e) {

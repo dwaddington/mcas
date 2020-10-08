@@ -32,10 +32,11 @@ private:
   gsl::not_null<nupm::DM_region_header *> _hdr;
 public:
   arena_dev(const common::log_source &ls, gsl::not_null<nupm::DM_region_header *> hdr);
-  auto region_get(string_view uuid) -> std::vector<::iovec> override;
-  auto region_create(string_view uuid, std::size_t size, gsl::not_null<nupm::registry_memory_mapped *> mh) -> ::iovec override;
-  void region_erase(string_view uuid) override;
+  region_access region_get(string_view id) override;
+  region_access region_create(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh, std::size_t size) override;
+  void region_erase(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh) override;
   std::size_t get_max_available() override;
+  bool is_file_backed() const override { return false; }
   void debug_dump() const override;
 };
 

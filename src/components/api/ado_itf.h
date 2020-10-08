@@ -29,6 +29,7 @@
 #include <common/time.h>
 #include <component/base.h>
 
+#include <experimental/string_view>
 #include <functional>
 #include <map>
 #include <string>
@@ -679,6 +680,7 @@ class IADO_proxy : public component::IBase {
   // clang-format on
 
   using work_id_t = uint64_t; /*< work handle/identifier */
+  using string_view = std::experimental::string_view;
 
   /* ADO-to-SHARD (and vice versa) protocol */
 
@@ -723,6 +725,20 @@ class IADO_proxy : public component::IBase {
    * @return S_OK on success
    */
   virtual status_t send_memory_map(uint64_t token, size_t size, void* value_vaddr) = 0;
+
+  /**
+   * Send a memory mapi by name request to ADO
+   *
+   * @param region_id Configuration "region" in which the name exists
+   * @param file_name name of the (fsdax) file which contains the memory
+   * @param offset offset of the area to be mapped, within the file
+   * @param size Size of the memory
+   * @param value_vaddr Virtual address as mapped by shard (may be different in
+   * ADO)
+   *
+   * @return S_OK on success
+   */
+  virtual status_t send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, ::iovec iov) = 0;
 
   /**
    * Send a work request to the ADO

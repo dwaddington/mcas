@@ -247,21 +247,20 @@ struct Message_pool_request : public Message {
   auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
- public:
   Message_pool_request(size_t             buffer_size,
                        uint64_t           auth_id,
-                       uint64_t           request_id,
                        size_t             pool_size,
                        size_t             expected_object_count,
                        OP_TYPE            op_,
                        const std::string& pool_name,
+                       uint64_t           pool_id_,
                        uint32_t           flags_)
       : Message(auth_id, (sizeof *this), id, op_),
         _pool_size(pool_size),
-        _expected_object_count(expected_object_count)
+        _expected_object_count(expected_object_count),
+        _pool_id(pool_id_),
+        _flags(flags_)
   {
-    _flags = flags_;
-    (void) request_id;  // unused
     assert(op_);
     assert(this->op());
     if (buffer_size < (sizeof *this)) throw std::length_error(description);
@@ -275,25 +274,40 @@ struct Message_pool_request : public Message {
 
     increase_msg_len(len + 1);
   }
-
-  Message_pool_request(size_t buffer_size, uint64_t auth_id, uint64_t request_id, OP_TYPE op_, uint64_t pool_id_)
-      : Message_pool_request(buffer_size, auth_id, request_id, 0, 0, op_, "", 0)
+ public:
+  Message_pool_request(size_t             buffer_size,
+                       uint64_t           auth_id,
+                       uint64_t           // request_id
+                       ,
+                       size_t             pool_size,
+                       size_t             expected_object_count,
+                       OP_TYPE            op_,
+                       const std::string& pool_name,
+                       uint32_t           flags_)
+      : Message_pool_request(buffer_size, auth_id, pool_size, expected_object_count, op_, pool_name, 0, flags_)
   {
-    _pool_id = pool_id_;
+  }
+
+  Message_pool_request(size_t buffer_size, uint64_t auth_id,
+     uint64_t // request_id
+     , OP_TYPE op_, uint64_t pool_id_)
+      : Message_pool_request(buffer_size, auth_id, 0, 0, op_, "", pool_id_, 0)
+  {
   }
 
   const char* pool_name() const { return data(); }
 
+private:
   size_t _pool_size;                              /*< size of pool in bytes */
-  auto   pool_size() const { return _pool_size; } /*< size of pool in bytes */
   size_t _expected_object_count;
+  /* _pool_id and _flags were formerly a union, but without a discriminant */
+  uint64_t _pool_id;
+  uint64_t _flags;
+public:
+  auto   pool_size() const { return _pool_size; } /*< size of pool in bytes */
   auto   expected_object_count() const { return _expected_object_count; }
-  union {
-    uint64_t _pool_id;
-    uint32_t _flags;
-  };
   auto pool_id() const { return _pool_id; }
-  auto flags() const { return _flags; }
+  auto flags() const { return boost::numeric_cast<uint32_t>(_flags); }
   /* data immediately follows */
 } __attribute__((packed));
 
@@ -306,11 +320,8 @@ struct Message_pool_response : public Message {
                              charu. This used to be char */
   auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
  public:
-  Message_pool_response(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID) {}
-#pragma GCC diagnostic pop
+  Message_pool_response(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID), pool_id() {}
 
   uint64_t pool_id;
 } __attribute__((packed));
@@ -362,8 +373,6 @@ struct Message_IO_request : public Message_numbered_request {
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
  public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_IO_request(size_t      buffer_size,
                      uint64_t    auth_id,
                      uint64_t    request_id_,
@@ -375,24 +384,26 @@ struct Message_IO_request : public Message_numbered_request {
                      size_t      value_len_,
                      uint32_t    flags_)
       : Message_numbered_request(auth_id, (sizeof *this), MSG_TYPE_IO_REQUEST, op_, request_id_, pool_id_),
-        _flags(flags_)
+        _key_len(),
+        _val_len(),
+        addr(),
+        _flags(flags_),
+        _padding()
   {
     set_key_and_value(buffer_size, key_, key_len_, value, value_len_);
     increase_msg_len(key_len_ + value_len_ + 1);
   }
-#pragma GCC diagnostic pop
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_IO_request(uint64_t auth_id, uint64_t request_id_, uint64_t pool_id_, OP_TYPE op_, std::uint64_t target_)
       : Message_numbered_request(auth_id, (sizeof *this), id, op_, request_id_, pool_id_),
-        addr(target_)
+        _key_len(),
+        _val_len(),
+        addr(target_),
+        _flags(0),
+        _padding()
   {
   }
-#pragma GCC diagnostic pop
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   /* For OP_LOCATE. max_offset is requested offset + requested size.
    * Borrow _key_len field to store the region id,
    * and _val_len field to store the max_offset
@@ -405,10 +416,12 @@ struct Message_IO_request : public Message_numbered_request {
                      std::size_t   size_)
       : Message_numbered_request(auth_id_, (sizeof *this), id, op_, request_id_, pool_id_),
         _key_len(offset_),
-        _val_len(size_)
+        _val_len(size_),
+        addr(),
+        _flags(0),
+        _padding()
   {
   }
-#pragma GCC diagnostic pop
 
   Message_IO_request(size_t             buffer_size,
                      uint64_t           auth_id,
@@ -431,8 +444,6 @@ struct Message_IO_request : public Message_numbered_request {
   {
   }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   /* key, and data_length */
   Message_IO_request(size_t      buffer_size,
                      uint64_t    auth_id,
@@ -444,12 +455,15 @@ struct Message_IO_request : public Message_numbered_request {
                      size_t      value_len,
                      uint32_t    flags_)
       : Message_numbered_request(auth_id, (sizeof *this), id, op_, request_id, pool_id_),
-        _flags(flags_)
+        _key_len(),
+        _val_len(),
+        addr(),
+        _flags(flags_),
+        _padding()
   {
     set_key_value_len(buffer_size, key, key_len_, value_len);
     increase_msg_len(key_len_ + 1); /* we don't add value len, this will be in next buffer */
   }
-#pragma GCC diagnostic pop
 
   Message_IO_request(size_t             buffer_size,
                      uint64_t           auth_id,
@@ -576,17 +590,16 @@ class Message_IO_response : public Message_numbered_response {
   auto edata() const { return static_cast<const locate_element*>(static_cast<const void*>(this + 1)); }
   auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_IO_response(size_t               // buffer_size
                       ,
                       uint64_t auth_id,
                       uint64_t request_id_)
       : Message_numbered_response(auth_id, (sizeof *this), id, OP_INVALID, request_id_),
-        _data_len(0)
+        _data_len(0),
+        addr(),
+        key()
   {
   }
-#pragma GCC diagnostic pop
 
   void copy_in_data(const void* in_data, size_t len)
   {
@@ -639,23 +652,35 @@ struct Message_INFO_request : public Message {
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
  public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_INFO_request(uint64_t auth_id, component::IKVStore::Attribute type_, std::uint64_t pool_id_)
       : Message(auth_id, (sizeof *this), id, OP_INVALID),
         _pool_id(pool_id_),
         _type(type_),
+        pad(),
+        offset(),
         key_len(0)
   {
   }
+
   Message_INFO_request(uint64_t auth_id, INFO_TYPE type_, uint64_t pool_id_)
       : Message(auth_id, (sizeof *this), id, OP_INVALID),
         _pool_id(pool_id_),
         _type(type_),
+        pad(),
+        offset(),
         key_len(0)
   {
   }
-#pragma GCC diagnostic pop
+
+  Message_INFO_request(uint64_t auth_id, INFO_TYPE type_, uint64_t pool_id_, offset_t offset_)
+      : Message(auth_id, (sizeof *this), id, OP_INVALID),
+        _pool_id(pool_id_),
+        _type(type_),
+        pad(),
+        offset(offset_),
+        key_len(0)
+  {
+  }
 
   const char* key() const { return cdata(); }
   const char* c_str() const { return cdata(); }
@@ -673,11 +698,11 @@ struct Message_INFO_request : public Message {
     data()[key_len] = '\0';
   }
 
+  auto     pool_id() const { return _pool_id; }
+  auto     type() const { return _type; }
   // fields
   uint64_t _pool_id;
-  auto     pool_id() const { return _pool_id; }
   uint32_t _type;
-  auto     type() const { return _type; }
   uint32_t pad;
   uint64_t offset;
   uint64_t key_len;
@@ -694,16 +719,7 @@ struct Message_INFO_response : public Message {
   auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
- public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
-  Message_INFO_response(uint64_t authid) : Message(authid, (sizeof *this), id, OP_INVALID) {}
-#pragma GCC diagnostic pop
-
-  size_t      base_message_size() const { return (sizeof *this); }
-  size_t      message_size() const { return (sizeof *this) + _value_len + 1; }
-  const char* c_str() const { return cdata(); }
-
+  Message_INFO_response(uint64_t authid_, offset_t offset_) : Message(authid_, (sizeof *this), id, OP_INVALID), _v{}, _offset(offset_) {}
   void set_value(size_t buffer_size, const void* value, size_t len)
   {
     if (UNLIKELY((len + 1 + (sizeof *this)) > buffer_size))
@@ -711,20 +727,36 @@ struct Message_INFO_response : public Message {
 
     std::memcpy(data(), value, len); /* only copy key and set value length */
     data()[len] = '\0';
-    _value_len  = len;
+    _v._value_len  = len;
   }
 
-  void set_value(std::size_t value_) { _value = value_; }
+ public:
+  Message_INFO_response(uint64_t authid_) : Message_INFO_response(authid_, offset_t()) {}
 
-  auto value_numeric() const { return _value; }
+  size_t      base_message_size() const { return (sizeof *this); }
+  size_t      message_size() const { return (sizeof *this) + _v._value_len + 1; }
+  const char* c_str() const { return cdata(); }
+
+  void set_value(size_t buffer_size, const void* value, size_t len, offset_t offset_)
+  {
+    set_value(buffer_size, value, len);
+    _offset = offset_;
+  }
+
+  void set_value(std::size_t value_) { _v._value = value_; }
+
+  auto value_numeric() const { return _v._value; }
+  std::size_t value() const { return _v._value; }
+  offset_t Offset() const { return _offset; }
 
   // fields
+  /* The type of the request (to which this is a response) determines the field */
+private:
   union {
     size_t _value;
     size_t _value_len;
-  };
-  offset_t    offset;
-  std::size_t value() const { return _value; }
+  } _v;
+  offset_t   _offset;
   /* data immediately follows */
 } __attribute__((packed));
 
@@ -804,10 +836,7 @@ struct Message_close_session : public Message {
   static constexpr auto        id          = MSG_TYPE_CLOSE_SESSION;
   static constexpr const char* description = "Message_close_session";
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
-  Message_close_session(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID) {}
-#pragma GCC diagnostic pop
+  Message_close_session(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID), seq() {}
 
   // fields
   uint64_t seq;
@@ -818,14 +847,11 @@ struct Message_stats : public Message {
   static constexpr auto        id          = MSG_TYPE_STATS;
   static constexpr const char* description = "Message_stats";
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_stats(uint64_t auth, const component::IMCAS::Shard_stats& shard_stats)
       : Message(auth, (sizeof *this), id, OP_INVALID),
         stats(shard_stats)
   {
   }
-#pragma GCC diagnostic pop
 
   size_t message_size() const { return sizeof(Message_stats); }
   // fields
@@ -847,8 +873,6 @@ struct Message_ado_request : public Message_numbered_request {
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
  public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_ado_request(size_t             buffer_size,
                       uint64_t           auth_id,
                       uint64_t           request_id,
@@ -859,7 +883,9 @@ struct Message_ado_request : public Message_numbered_request {
                       uint32_t           flags_,
                       size_t             odvl = 4096)
       : Message_numbered_request(auth_id, (sizeof *this), id, OP_INVALID, request_id, pool_id_),
+        key_len(),
         ondemand_val_len(odvl),
+        invocation_data_len(),
         flags(flags_)
 
   {
@@ -875,7 +901,6 @@ struct Message_ado_request : public Message_numbered_request {
 
     if (invocation_data_len > 0) std::memcpy(&data()[key_len + 1], invocation_data, invocation_data_len_);
   }
-#pragma GCC diagnostic pop
 
   /* ca;er could use Message::msg_len */
   size_t         message_size() const { return msg_len(); }
@@ -903,8 +928,6 @@ struct Message_put_ado_request : public Message_numbered_request {
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
  public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Message_put_ado_request(size_t             buffer_size,
                           uint64_t           auth_id,
                           uint64_t           request_id,
@@ -917,8 +940,11 @@ struct Message_put_ado_request : public Message_numbered_request {
                           size_t             root_len,
                           uint32_t           flags_)
       : Message_numbered_request(auth_id, (sizeof *this), id, OP_INVALID, request_id, pool_id_),
+        key_len(),
+        invocation_data_len(),
         flags(flags_),
         _val_len(value_len),
+        val_addr(),
         root_val_len(root_len)
   {
     assert(invocation_data);
@@ -945,8 +971,7 @@ struct Message_put_ado_request : public Message_numbered_request {
 
     val_addr = reinterpret_cast<uint64_t>(value);
   }
-#pragma GCC diagnostic pop
-  /* callser could use Message::msg_len */
+  /* caller could use Message::msg_len */
   std::size_t message_size() const { return msg_len(); }
   const char* key() const { return cdata(); }
   size_t      get_key_len() const { return key_len; }

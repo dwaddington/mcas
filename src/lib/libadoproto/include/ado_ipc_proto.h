@@ -16,6 +16,8 @@
 #include <api/ado_itf.h>
 #include <common/exceptions.h>
 #include <common/dump_utils.h>
+#include <algorithm>
+#include <experimental/string_view>
 #include <vector>
 #include <string.h>
 #include <stdexcept>
@@ -52,6 +54,7 @@ enum {
   MSG_TYPE_UNLOCK_REQUEST = 17,
   MSG_TYPE_CONFIGURE_REQUEST = 18,
   MSG_TYPE_CLUSTER_EVENT = 19,
+  MSG_TYPE_MAP_MEMORY_NAMED = 20,
 };
 
 typedef enum {
@@ -241,6 +244,33 @@ struct Map_memory : public Message {
   size_t   size;
   void *   shard_addr;
 
+};
+
+struct Map_memory_named : public Message {
+  static constexpr uint8_t id = MSG_TYPE_MAP_MEMORY_NAMED;
+  static constexpr const char *description = "mcas::ipc::Map_memory_named";
+
+  using string_view = std::experimental::string_view;
+  Map_memory_named(size_t buffer_size,
+    unsigned region_id_,
+    string_view pool_name_,
+    std::size_t offset_,
+             ::iovec iov_)
+    : Message(id), region_id(region_id_), iov(iov_), offset(offset_), pool_name_len(pool_name_.size())
+  {
+    if(sizeof(Map_memory) + pool_name_len > buffer_size)
+      throw std::length_error(description);
+    std::copy(pool_name_.begin(), pool_name_.end(), pool_name());
+  }
+
+  size_t   region_id;
+  ::iovec  iov;
+  size_t   offset;
+  size_t   pool_name_len;
+  char    *pool_name()
+  {
+    return static_cast<char *>(static_cast<void *>(this+1));
+  }
 };
 
 //-------------

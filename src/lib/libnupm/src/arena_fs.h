@@ -17,6 +17,7 @@
 #include "arena.h"
 
 #include <common/logging.h>
+#include <common/fd_locked.h>
 
 #include <experimental/filesystem>
 #include <string>
@@ -35,8 +36,12 @@ private:
 	using path = std::experimental::filesystem::path;
 	path _dir;
 
-	void *region_open(int fd, const std::vector<::iovec> &mapping, gsl::not_null<nupm::registry_memory_mapped *> mh);
-	void *region_open(string_view id, std::size_t size, gsl::not_null<nupm::registry_memory_mapped *> mh);
+	void *region_create_inner(
+		common::fd_locked &&fd
+		, const path &path_
+		, gsl::not_null<nupm::registry_memory_mapped *> mh
+		, const std::vector<::iovec> &mapping
+	);
 	path path_data(string_view id) const
 	{
 		using namespace std::string_literals;
@@ -50,10 +55,11 @@ private:
 	static std::vector<::iovec> get_mapping(const path &path_map, const std::size_t expected_size);
 public:
 	arena_fs(const common::log_source &ls, path dir);
-	auto region_get(string_view uuid) -> std::vector<::iovec> override;
-	auto region_create(string_view uuid, std::size_t size, gsl::not_null<nupm::registry_memory_mapped *> mh) -> ::iovec override;
-	void region_erase(string_view uuid) override;
+	region_access region_get(string_view id) override;
+	region_access region_create(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh, std::size_t size) override;
+	void region_erase(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh) override;
 	std::size_t get_max_available() override;
+    bool is_file_backed() const override { return true; }
 	void debug_dump() const override;
 	static std::pair<std::vector<::iovec>, std::size_t> get_mapping(const path &path_map);
 	static std::vector<common::memory_mapped> fd_mmap(int fd, const std::vector<::iovec> &map, int flags);

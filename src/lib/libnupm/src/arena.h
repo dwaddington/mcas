@@ -30,18 +30,20 @@ namespace nupm
 struct arena
   : private common::log_source
 {
+  using region_access = std::pair<std::string, std::vector<::iovec>>;
   using string_view = std::experimental::string_view;
   arena(const common::log_source &ls) : common::log_source(ls) {}
   virtual ~arena() {}
   virtual void debug_dump() const = 0;
-  virtual std::vector<::iovec> region_get(string_view uuid) = 0;
-  virtual ::iovec region_create(string_view uuid, std::size_t size, gsl::not_null<nupm::registry_memory_mapped *> mh) = 0;
+  virtual region_access region_get(string_view id) = 0;
+  virtual region_access region_create(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh, std::size_t size) = 0;
   /* It is unknown whether region_erase may be used on an open region.
    * arena_fs assumes that it may, just as ::unlink can be used against
    * an open file.
    */
-  virtual void region_erase(string_view uuid) = 0;
+  virtual void region_erase(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh) = 0;
   virtual std::size_t get_max_available() = 0;
+  virtual bool is_file_backed() const = 0;
 protected:
   using common::log_source::debug_level;
 };

@@ -23,6 +23,7 @@
 #define __NUPM_DAX_MANAGER_H__
 
 #include "nd_utils.h"
+#include "space_opened.h"
 #include <common/fd_open.h>
 #include <common/logging.h>
 #include <common/memory_mapped.h>
@@ -76,49 +77,14 @@ public:
   ~path_use();
 };
 
-struct range_use
-{
-private:
-  common::moveable_ptr<dax_manager> _dm;
-  /* Note: arena_fs may someday use multiple ranges */
-  std::vector<common::memory_mapped> _iovm;
-
-  std::vector<common::memory_mapped> address_coverage_check(std::vector<common::memory_mapped> &&iovm);
-public:
-  ::iovec iov(std::size_t i) { return _iovm[i].iov(); }
-  range_use(dax_manager *dm_, std::vector<common::memory_mapped> &&);
-  range_use(const range_use &) = delete;
-  range_use &operator=(const range_use &) = delete;
-  range_use(range_use &&) noexcept = default;
-  ~range_use();
-};
-
-struct opened_space : private common::log_source
-{
-  common::Fd_open _fd_open;
-  /* Note: arena_fs may someday use multiple ranges */
-  range_use _range;
-
-  /* owns the file mapping */
-  std::vector<common::memory_mapped> map_dev(int fd, const addr_t base_addr);
-  std::vector<common::memory_mapped> map_fs(int fd, const std::vector<::iovec> &mapping);
-public:
-  opened_space(const common::log_source &, dax_manager * dm_, const std::string &path, const addr_t base_addr);
-  opened_space(const common::log_source &, dax_manager * dm_, const std::string &path, const std::vector<::iovec> &mapping);
-  opened_space(opened_space &&) noexcept = default;
-#if 0
-  opened_space &operator=(opened_space &&) noexcept = default;
-#endif
-};
-
-struct registered_opened_space
+struct space_registered
 {
 private:
   path_use _pu;
 public:
-  opened_space _or;
+  space_opened _or;
 public:
-  registered_opened_space(
+  space_registered(
     const common::log_source &ls_
     , dax_manager * dm_
     , const std::string &path_
@@ -126,8 +92,10 @@ public:
   )
     : _pu(path_)
     , _or(ls_, dm_, path_, base_addr_)
-  {}
-  registered_opened_space(
+  {
+  }
+
+  space_registered(
     const common::log_source &ls_
     , dax_manager * dm_
     , const std::string &path_
@@ -135,21 +103,36 @@ public:
   )
     : _pu(path_)
     , _or(ls_, dm_, path_, mapping_)
-  {}
-  registered_opened_space(const registered_opened_space &) = delete;
-  registered_opened_space &operator=(const registered_opened_space &) = delete;
-  registered_opened_space(registered_opened_space &&) noexcept = default;
-#if 0
-  registered_opened_space &operator=(registered_opened_space &&) noexcept = default;
-#endif
+  {
+  }
+
+  space_registered(
+    const common::log_source &ls_
+    , dax_manager * dm_
+    , common::fd_locked &&fd_
+    , const std::string &path_
+    , const std::vector<::iovec> &mapping_
+  )
+    : _pu(path_)
+    , _or(ls_, dm_, std::move(fd_), path_, mapping_)
+  {
+  }
+
+  space_registered(const space_registered &) = delete;
+  space_registered &operator=(const space_registered &) = delete;
+  space_registered(space_registered &&) noexcept = default;
+  ~space_registered()
+  {
+  }
 };
 
 struct registry_memory_mapped
 {
+  using path = std::experimental::filesystem::path;
   virtual ~registry_memory_mapped() {}
-  virtual bool enter(void *, std::vector<common::memory_mapped> &&) = 0;
-  virtual void remove(void *) = 0;
-  virtual void * allocate_address_range(std::size_t size) = 0;
+  virtual bool enter(common::fd_locked &&fd, const path & p, const std::vector<::iovec> &m) = 0;
+  virtual void remove(const path & p) = 0;
+  virtual void * locate_free_address_range(std::size_t size) = 0;
 };
 
 /**
@@ -205,12 +188,13 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * @param arena_id Arena identifier
    * @param out_length Out length of region in bytes
    *
-   * @return (pointer, length) pairs to the mapped memory, or empty vector
-   * if not found.
-   * Until fsdax supports extending a region, the vector will not be more
-    * than one element long.
+   * @return backing file name (empty string if none);
+   *   (pointer, length) pairs to the mapped memory, or empty vector
+   *   if not found.
+   *   Until fsdax supports extending a region, the vector will not be more
+   *   than one element long.
    */
-  std::vector<::iovec> open_region(string_view id, arena_id_t arena_id);
+  std::pair<std::string, std::vector<::iovec>> open_region(string_view id, arena_id_t arena_id);
 
   /**
    * Create a new region of memory
@@ -219,9 +203,10 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * @param arena_id Arena identifier
    * @param size Size of the region requested in bytes
    *
-   * @return Pointer to mapped memory
+   * @return backing file name (empty string if none);
+   *   Pointer to and size of mapped memory
    */
-  void *create_region(string_view id, arena_id_t arena_id, const size_t size);
+  std::pair<std::string, std::vector<::iovec>> create_region(string_view id, arena_id_t arena_id, const size_t size);
 
   /**
    * Erase a previously allocated region
@@ -240,6 +225,14 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   size_t get_max_available(arena_id_t arena_id);
 
   /**
+   * Increase the size of a region
+   *
+   *
+   * @return new location and added size
+   */
+  ::iovec extend_region(string_view id, arena_id_t arena_id, const size_t size);
+
+  /**
    * Debugging information
    *
    * @param arena_id Arena identifier
@@ -248,16 +241,16 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
 
   void register_range(const void *begin, std::size_t size);
   void deregister_range(const void *begin, std::size_t size);
-  void * allocate_address_range(std::size_t size) override;
+  void * locate_free_address_range(std::size_t size) override;
  private:
-  opened_space map_space(const std::string &path, addr_t base_addr);
+  space_opened map_space(const std::string &path, addr_t base_addr);
   DM_region_header *recover_metadata(
                          ::iovec iov,
                          bool    force_rebuild = false);
   arena *lookup_arena(arena_id_t arena_id);
   /* callback for arena_dax to register mapped memory */
-  bool enter(void *, std::vector<common::memory_mapped> &&) override;
-  void remove(void *) override;
+  bool enter(common::fd_locked &&fd, const path & path_, const std::vector<::iovec> &m) override;
+  void remove(const path & p) override;
   using path = std::experimental::filesystem::path;
   using directory_entry = std::experimental::filesystem::directory_entry;
   void data_map_remove(const directory_entry &e);
@@ -265,10 +258,11 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   void files_scan(const path &p, void (dax_manager::*action)(const directory_entry &));
   std::unique_ptr<arena> make_arena_fs(const path &p, addr_t base, bool force_reset);
   std::unique_ptr<arena> make_arena_dev(const path &p, addr_t base, bool force_reset);
+  std::unique_ptr<arena> make_arena_none(const path &p, addr_t base, bool force_reset);
 
  private:
   using guard_t = std::lock_guard<std::mutex>;
-  using mapped_spaces = std::map<std::string, registered_opened_space>;
+  using mapped_spaces = std::map<std::string, space_registered>;
 
   ND_control                                _nd;
   using AC = boost::icl::interval_set<char *>;
@@ -277,8 +271,6 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   mapped_spaces                             _mapped_spaces;
   std::map<arena_id_t, std::unique_ptr<arena>> _arenas;
   std::mutex                                _reentrant_lock;
-  using memory_mapped = std::map<void *, std::vector<common::memory_mapped>>;
-  memory_mapped _memory_mapped;
  public:
   friend struct nupm::range_use; /* access to _address_coverage */
 };

@@ -133,13 +133,15 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       throw Logic_exception("no XPMEM kernel module");
     }
     else if (!nupm::check_mcas_kernel_module()) {
-      PERR("%s with ADO requires MCAS kernel module", _backend.c_str());
+      PWRN("%s with ADO may need MCAS kernel module", _backend.c_str());
+#if 0
       throw Logic_exception("no MCAS kernel module");
+#endif
     }
 
     /* exchange memory mapping information */
     {
-      std::vector<::iovec> regions;
+      std::pair<std::string, std::vector<::iovec>> regions;
       auto                 rc = _i_kvstore->get_pool_regions(pool_id, regions);
 
       if (rc != S_OK) {
@@ -147,7 +149,8 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
         return rc;
       }
 
-      for (auto& r : regions) {
+      std::size_t offset = 0;
+      for (auto& r : regions.second) {
         r.iov_len = round_up_page(r.iov_len);
 
         // Don't think we need this - DW
@@ -160,19 +163,28 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
           ado->send_memory_map(std::uint64_t(seg_id), r.iov_len, r.iov_base);
         }
         else {
-          /* uses MCAS kernel module */
-          /* generate a token for the mapping - TODO: remove exposed memory */
-          uint64_t token = reinterpret_cast<uint64_t>(r.iov_base);
+          if ( regions.first.size() != 0 )
+          {
+            ado->send_memory_map_named(0, regions.first, offset, r);
+          }
+          else
+          {
+            /* uses MCAS kernel module */
+            /* generate a token for the mapping - TODO: remove exposed memory */
+            uint64_t token = reinterpret_cast<uint64_t>(r.iov_base);
 
-          nupm::revoke_memory(token); /* move any prior registration; TODO clean up when ADO goes */
+            nupm::revoke_memory(token); /* move any prior registration; TODO clean up when ADO goes */
 
-          if (nupm::expose_memory(token, r.iov_base, r.iov_len) != S_OK)
-            throw Logic_exception("nupm::expose_memory failed unexpectedly");
+            if (nupm::expose_memory(token, r.iov_base, r.iov_len) != S_OK)
+              throw Logic_exception("nupm::expose_memory failed unexpectedly");
 
-          ado->send_memory_map(token, r.iov_len, r.iov_base);
+            ado->send_memory_map(token, r.iov_len, r.iov_base);
+          }
         }
 
         CPLOG(2, "Shard_ado: exposed region: %p %lu", r.iov_base, r.iov_len);
+
+        offset += r.iov_len;
       }
     }
 

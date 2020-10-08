@@ -216,6 +216,23 @@ void ADO_protocol_builder::send_memory_map(uint64_t memory_token,
   PLOG("%s", "ADO_protocol_builder::send_memory_map OK");
 }
 
+void ADO_protocol_builder::send_memory_map_named(unsigned region_id,
+  string_view pool_name,
+  std::size_t offset,
+  ::iovec iov)
+{
+  auto buffer = get_buffer().release();
+
+  new (buffer) Map_memory_named(MAX_MESSAGE_SIZE,
+                          region_id,
+                          pool_name,
+                          offset,
+                          iov);
+
+  send(buffer);
+  PLOG("ADO_protocol_builder::%s OK", __func__);
+}
+
 bool ADO_protocol_builder::recv_index_op_request(const Buffer_header * buffer,
                                                  std::string& key_expression,
                                                  offset_t& begin_pos,

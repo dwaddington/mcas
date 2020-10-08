@@ -15,11 +15,12 @@
 #include "arena.h"
 #include "arena_dev.h"
 #include "arena_fs.h"
+#include "arena_none.h"
 #include "dax_data.h"
 #include "nd_utils.h"
 
 #include <common/exceptions.h>
-#include <common/fd_open.h>
+#include <common/fd_locked.h>
 #include <common/memory_mapped.h>
 #include <common/utils.h>
 
@@ -28,7 +29,6 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
-#include <unistd.h> /* ::open, ::lockf */
 #include <boost/scope_exit.hpp>
 #include <boost/icl/split_interval_map.hpp>
 #include <gsl/pointers>
@@ -40,7 +40,6 @@
 #include <sstream>
 #include <stdexcept>
 
-//#define REGION_NAME "mcas-dax-pool"
 #define DEBUG_PREFIX "dax_manager: "
 
 static constexpr unsigned MAP_LOG_GRAIN = 21U;
@@ -92,50 +91,6 @@ namespace
 const int nupm::dax_manager::effective_map_locked = init_map_lock_mask();
 constexpr const char *nupm::dax_manager::_cname;
 
-std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::vector<common::memory_mapped> &&iovm_)
-{
-	using AC = boost::icl::interval_set<char *>;
-	AC this_coverage;
-	for ( const auto &e : iovm_ )
-	{
-		auto c = static_cast<char *>(e.iov_base);
-		auto i = boost::icl::interval<char *>::right_open(c, c+e.iov_len);
-		if ( intersects(_dm->_address_coverage, i) )
-		{
-			const void *end = c+e.iov_len;
-			std::ostringstream o;
-			o << "range " << e.iov_base << ".." << end << " overlaps existing mapped storage";
-			PLOG("%s: %s", __func__, o.str().c_str());
-			throw std::domain_error(o.str().c_str());
-		}
-		this_coverage.insert(i);
-	}
-	_dm->_address_coverage += this_coverage;
-	_dm->_address_fs_available -= this_coverage;
-
-	return std::move(iovm_);
-}
-
-nupm::range_use::range_use(dax_manager *dm_, std::vector<common::memory_mapped> &&iovm_)
-  : _dm(dm_)
-  , _iovm(address_coverage_check(std::move(iovm_)))
-{
-}
-
-nupm::range_use::~range_use()
-{
-	if ( bool(_dm) )
-	{
-		for ( const auto &e : _iovm )
-		{
-			auto c = static_cast<char *>(e.iov_base);
-			auto i = boost::icl::interval<char *>::right_open(c, c+e.iov_len);
-			_dm->_address_coverage.erase(i);
-			_dm->_address_fs_available.insert(i);
-		}
-	}
-}
-
 nupm::path_use::path_use(path_use &&other_) noexcept
   : _path(other_._path)
 {
@@ -153,7 +108,7 @@ nupm::path_use::path_use(const std::string &path_)
     o << __func__ << ": instance already managing path (" << path_ << ")";
     throw std::range_error(o.str());
   }
-  PLOG("%s dax mgr instance: %s", __func__, path_.c_str());
+  PLOG("%si%p): path: %s", __func__, static_cast<const void *>(this), _path.c_str());
 }
 
 nupm::path_use::~path_use()
@@ -256,7 +211,6 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 		if ( p.extension().string() == ".data" )
 		{
 			CPLOG(1, "%s %s", __func__, p.c_str());
-			common::Fd_open fd(::open(p.c_str(), O_RDWR));
 
 			auto pm = p.replace_extension(".map");
 			/* first: mapping. second: mapping size */
@@ -269,7 +223,7 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 				_mapped_spaces.insert(
 					mapped_spaces::value_type(
 						p.string()
-						, registered_opened_space(*this, this, p.string(), r.first)
+						, space_registered(*this, this, p.string(), r.first)
 					)
 				);
 			if ( ! itb.second )
@@ -323,11 +277,25 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_fs(
 		);
 }
 
+std::unique_ptr<arena> nupm::dax_manager::make_arena_none(
+	const path &p
+	, addr_t // base
+	, bool // force_reset
+)
+{
+	PLOG("%s: %s is unsuitable as an arena: neither a character file nor a directory", __func__, p.c_str());
+	return
+		std::make_unique<arena_none>(
+			static_cast<log_source &>(*this)
+			, p
+		);
+}
+
 std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t base, bool force_reset)
 {
-	/* Create and insert a registered_open_space.
+	/* Create and insert a space_registered.
 	 *   path_use : tracks usage of the path name to ensure no duplicate uses
-	 *   opened_space : tracks opened file descriptors, and the iov each represents
+	 *   space_opened : tracks opened file descriptors, and the iov each represents
 	 *     Note: areana_fs may eventually have multiple iov's opened space.
 	 *   range_use : tracks vitutal address ranges to ensure no duplicate addresses
 	 *     Note: areana_fs may eventually have multiple iov's opened space.
@@ -336,7 +304,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
 				p.string()
-				, registered_opened_space(*this, this, p.string(), base)
+				, space_registered(*this, this, p.string(), base)
 			)
 		);
 	if ( ! itb.second )
@@ -353,14 +321,39 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		);
 }
 
-bool nupm::dax_manager::enter(void *p, std::vector<common::memory_mapped> &&m)
+bool nupm::dax_manager::enter(
+	common::fd_locked && fd_
+	, const path & path_
+	, const std::vector<::iovec> &m_
+)
 {
-	return _memory_mapped.emplace(p, std::move(m)).second;
+	auto itb =
+		_mapped_spaces.insert(
+			mapped_spaces::value_type(
+				path_.string()
+				, space_registered(*this, this, std::move(fd_), path_.string(), m_)
+			)
+		);
+	if ( ! itb.second )
+	{
+		PLOG("%s: failed to insert %s (duplicate instance?)", __func__, path_.c_str());
+	}
+	return itb.second;
 }
 
-void nupm::dax_manager::remove(void *p)
+void nupm::dax_manager::remove(const path & path_)
 {
-	_memory_mapped.erase(p);
+	auto it = _mapped_spaces.find(path_.string());
+	if ( it != _mapped_spaces.end() )
+	{
+		CPLOG(2, "%s: _mapped_spaces found %s at %p", __func__, path_.c_str(), static_cast<const void *>(&it->second));
+	}
+	else
+	{
+		CPLOG(2, "%s: _mapped_spaces does not contain %s", __func__, path_.c_str());
+	}
+	auto ct = _mapped_spaces.erase(path_.string());
+	CPLOG(2, "%s: _mapped_spaces erase count %zu", __func__, ct);
 }
 
 namespace nupm
@@ -379,8 +372,6 @@ dax_manager::dax_manager(
   , _mapped_spaces()
   , _arenas()
   , _reentrant_lock()
-  /* memory mapped by fsdax */
-  , _memory_mapped()
 {
   /* Maximum expected need is about 6 TiB (12 515GiB DIMMs */
   char *free_address_begin = reinterpret_cast<char *>(uintptr_t(1) << 40);
@@ -397,19 +388,22 @@ dax_manager::dax_manager(
      * If the path names a directory it is fsdax, else is it devdax.
      *
      * The startup behavior of devdax paths controlled by _mapped_spaces is:
-     *   opened_space opens the path and maps the resulting fd
+     *   space_opened opens the path and maps the resulting fd
      * The shutdown behavior of devdax controlled by _mapped_spaces is:
      *   path_use calls nupm_dax_manager_mapped.erase(_path), a registry if files opened by this process
      *
      * The startup behavior of fsdax paths controlled by _mapped_spaces is:
-     *   opened_space (None. Mapping are not attempted until open_region or create_region)
+     *   space_opened (None. Mapping are not attempted until open_region or create_region)
      * The shutdown behavior of devdax controlled by _mapped_spaces is:
-     *   (None. Files are not opened untion open_region or create_region)
+     *   (None. Files are not opened until open_region or create_region)
      */
 
     path p(config.path);
 
-    auto arena_make = fs::is_character_file(p) ? &dax_manager::make_arena_dev : &dax_manager::make_arena_fs;
+    auto arena_make =
+      fs::is_character_file(p) ? &dax_manager::make_arena_dev
+      : fs::is_directory(p) ? &dax_manager::make_arena_fs
+      : &dax_manager::make_arena_none;
 
     auto itc =
       _arenas.insert(
@@ -430,19 +424,16 @@ dax_manager::~dax_manager()
   CPLOG(0, "%s::%s", _cname, __func__);
 }
 
-void * dax_manager::allocate_address_range(std::size_t size_)
+void * dax_manager::locate_free_address_range(std::size_t size_)
 {
 	for ( auto i : _address_fs_available )
 	{
 		if ( ptrdiff_t(size_) <= i.upper() - i.lower() )
 		{
-			auto j = boost::icl::interval<char *>::right_open(i.lower(), i.lower() + size_ );
-			_address_fs_available.erase(j);
-			_address_coverage.insert(j);
 			return i.lower();
 		}
 	}
-	throw std::runtime_error(__func__ + std::string(" out of address ramnges"));
+	throw std::runtime_error(__func__ + std::string(" out of address ranges"));
 }
 
 auto dax_manager::lookup_arena(arena_id_t arena_id) -> arena *
@@ -463,26 +454,40 @@ void dax_manager::debug_dump(arena_id_t arena_id)
   it->debug_dump();
 }
 
-std::vector<::iovec> dax_manager::open_region(string_view name,
-                                  unsigned arena_id)
+auto dax_manager::open_region(
+  string_view name
+  , unsigned arena_id
+) -> std::pair<std::string, std::vector<::iovec>>
 {
   guard_t           g(_reentrant_lock);
   return lookup_arena(arena_id)->region_get(name);
 }
 
-void *dax_manager::create_region(string_view name, arena_id_t arena_id, const size_t size)
+auto dax_manager::create_region(
+  string_view name
+  , arena_id_t arena_id
+  , const size_t size
+) -> std::pair<std::string, std::vector<::iovec>>
 {
   guard_t           g(_reentrant_lock);
   auto arena = lookup_arena(arena_id);
   CPLOG(1, "%s: %s size %zu", __func__, name.begin(), size);
-  /* No way for the user to get the actual length, except to shut down and then call open_region */
-  return arena->region_create(name, size, this).iov_base;
+  auto r = arena->region_create(name, this, size);
+  if ( r.second.empty() )
+  {
+    CPLOG(2, "%s: %.*s size req 0x%zx create failed", __func__, int(name.size()), name.begin(), size);
+  }
+  else
+  {
+    CPLOG(2, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name.size()), name.begin(), size, r.second[0].iov_base, r.second[0].iov_len);
+  }
+  return r;
 }
 
 void dax_manager::erase_region(string_view name, arena_id_t arena_id)
 {
   guard_t           g(_reentrant_lock);
-  lookup_arena(arena_id)->region_erase(name);
+  lookup_arena(arena_id)->region_erase(name, this);
 }
 
 size_t dax_manager::get_max_available(arena_id_t arena_id)
@@ -508,131 +513,6 @@ auto dax_manager::recover_metadata(const ::iovec iov_,
   }
 
   return rh;
-}
-
-std::vector<common::memory_mapped> opened_space::map_dev(int fd, const addr_t base_addr)
-{
-  /* cannot map if the map grain exceeds the region grain */
-  assert(base_addr);
-  assert(check_aligned(base_addr, MAP_GRAIN));
-
-  const auto base_ptr = reinterpret_cast<void *>(base_addr);
-
-  std::ostringstream o;
-  o << std::hex << std::showbase << std::this_thread::get_id();
-
-  /* Protection against using the same /dev/dax file in different processes */
-  if ( ::lockf(fd, F_TLOCK, 0) != 0 )
-  {
-    auto e = errno;
-    CPLOG(0, DEBUG_PREFIX "thread %s fd %i exclusive lock failed %s", o.str().c_str(), fd, ::strerror(errno));
-    throw std::runtime_error(std::string(__func__) + " exclusive lock failed: " + ::strerror(e));
-  }
-
-  CPLOG(0, DEBUG_PREFIX "thread %s region opened ok", o.str().c_str());
-
-  std::size_t len;
-  /* get length of device */
-  {
-    struct stat statbuf;
-    int         rc = fstat(fd, &statbuf);
-    if (rc == -1) throw ND_control_exception("fstat call failed");
-    if ( S_ISREG(statbuf.st_mode) )
-    {
-      len = size_t(statbuf.st_size);
-    }
-    else if ( S_ISCHR(statbuf.st_mode) )
-    {
-      len = get_dax_device_size(statbuf);
-    }
-    else
-    {
-      throw General_exception("dax_map excpects a regular file or a char device; file %s is neither");
-    }
-  }
-
-  PLOG(DEBUG_PREFIX "fd %i size=%lu", fd, len);
-
-  /* mmap it in */
-  common::memory_mapped iovm(
-    base_ptr
-    , len /* length = 0 means whole device (contrary to man 3 mmap??) */
-    , PROT_READ | PROT_WRITE
-    , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE | dax_manager::effective_map_locked
-    , fd
-  );
-  CPLOG(1, "%s: %p = mmap(%p, 0x%zx, %s", __func__, iovm.iov_base, base_ptr, iovm.iov_len, dax_manager::effective_map_locked ? "MAP_SYNC|locked" : "MAP_SYNC|not locked");
-
-  if ( iovm.iov_base == MAP_FAILED ) {
-    iovm =
-      common::memory_mapped(
-        base_ptr
-        , len /* length = 0 means whole device (contrary to man 3 mmap??) */
-        , PROT_READ | PROT_WRITE
-        , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_HUGE | dax_manager::effective_map_locked
-        , fd
-      );
-
-    CPLOG(1, "%s: %p = mmap(%p, 0x%zx, %s", __func__, iovm.iov_base, base_ptr, iovm.iov_len, dax_manager::effective_map_locked ? "locked" : "not locked");
-  }
-
-  if ( iovm.iov_base == MAP_FAILED ) {
-    throw General_exception("mmap failed on fd %i (request %p): %s", fd, base_ptr, ::strerror(errno));
-  }
-  if (iovm.iov_base != base_ptr) {
-    throw General_exception("mmap failed on fd %i (request %p, got %p)", fd, base_ptr, iovm.iov_base);
-  }
-
-  /* ERROR: throw after resource acquired */
-  if ( madvise(iovm.iov_base, iovm.iov_len, MADV_DONTFORK) != 0 )
-    throw General_exception("madvise 'don't fork' failed unexpectedly (%p %lu)",
-        iovm.iov_base, iovm.iov_len);
-  std::vector<common::memory_mapped> v;
-  v.push_back(std::move(iovm));
-  return v;
-}
-
-std::vector<common::memory_mapped> opened_space::map_fs(int fd, const std::vector<::iovec> &mapping)
-{
-  return arena_fs::fd_mmap(fd, mapping, MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE);
-}
-
-/* opened_space constructor for eevdax: filename, single address, unknown size */
-opened_space::opened_space(
-  const common::log_source & ls_
-  , dax_manager * dm_
-  , const std::string &p
-  , const addr_t base_addr
-)
-try
-  : common::log_source(ls_)
-  , _fd_open(::open(p.c_str(), O_RDWR, 0666))
-  , _range(dm_, map_dev(_fd_open.fd(), base_addr))
-{
-}
-catch ( std::exception &e )
-{
-	PLOG("%s: path %s exception %s", __func__, p.c_str(), e.what());
-	throw;
-}
-
-/* opened_space constructor for fsdax: filename, multiple mappings, unknown size */
-opened_space::opened_space(
-  const common::log_source & ls_
-  , dax_manager * dm_
-  , const std::string &p
-  , const std::vector<::iovec> &mapping
-)
-try
-  : common::log_source(ls_)
-  , _fd_open(::open(p.c_str(), O_RDWR, 0666))
-  , _range(dm_, map_fs(_fd_open.fd(), mapping))
-{
-}
-catch ( std::exception &e )
-{
-	PLOG("%s: path %s exception %s", __func__, p.c_str(), e.what());
-	throw;
 }
 
 }  // namespace nupm

@@ -56,6 +56,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
       , std::size_t size_
       , std::size_t expected_obj_count
       , unsigned numa_node_
+      , const std::string & backing_file_
     )
       : magic(0)
       , _uuid(uuid_)
@@ -67,9 +68,10 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
         , (&_persist_data.aspk())
         , &_persist_data.asx()
 #endif
-        , this+1
-        , adjust_size(size_)
+        , ::iovec{this, size_}
+        , ::iovec{this+1, adjust_size(size_)}
         , numa_node_
+        , backing_file_
       )
       , _persist_data(
         AK_REF
@@ -89,12 +91,14 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
     region(
       unsigned debug_level
       , const std::unique_ptr<dax_manager> & dax_manager_
+      , const std::string & backing_file_
     )
       : magic(0)
       , _uuid(this->_uuid)
       , _heap(
         debug_level
         , dax_manager_
+        , backing_file_
 #if USE_CC_HEAP == 4
         , &this->_persist_data.ase()
         , &this->_persist_data.aspd()
@@ -134,7 +138,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
     bool is_initialized() const noexcept { return magic == magic_value; }
     unsigned percent_used() const { return _heap.percent_used(); }
     void quiesce() { _heap.quiesce(); }
-    std::vector<::iovec> get_regions() const
+    std::pair<std::string, std::vector<::iovec>> get_regions() const
     {
       return _heap.regions();
     }

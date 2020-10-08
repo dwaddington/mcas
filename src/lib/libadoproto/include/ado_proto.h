@@ -24,6 +24,7 @@
 #include <api/kvindex_itf.h>
 #include <api/ado_itf.h>
 #include <unistd.h>
+#include <experimental/string_view>
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -51,6 +52,8 @@ public:
   static constexpr size_t POLL_RETRY_LIMIT  = 1000000;
 
   static_assert(MAX_MESSAGE_SIZE > 64, "MAX_MESSAGE_SIZE too small");
+
+  using string_view = std::experimental::string_view;
 
 private:
   const unsigned option_DEBUG = 0;
@@ -140,6 +143,12 @@ public:
   void send_memory_map(uint64_t token,
                        size_t size,
                        void * value_vaddr);
+
+  /* shard-side, must not block */
+  void send_memory_map_named(unsigned region,
+                       string_view pool_name,
+                       std::size_t offset,
+                       ::iovec iov);
 
   /* shard-side, must not block */
   void send_work_request(const uint64_t work_request_key,

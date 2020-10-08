@@ -63,8 +63,10 @@ Itf_ref<IMCAS> init(const std::string &server_hostname, int port)
 
 TEST_F(ADO_test, BasicInvokeAdo)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "BasicInvokeAdo";
+  const std::string poolname = testname;
+  mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MB(256), /* size */
                                 0,                 /* flags */
@@ -81,13 +83,17 @@ TEST_F(ADO_test, BasicInvokeAdo)
   ASSERT_TRUE(rc == S_OK);
 
   ASSERT_OK(mcas->close_pool(pool));
+
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
 
 
 TEST_F(ADO_test, BasicAdoResponse)
 {
-  const std::string poolname = "pool0BasicAdoResponse";
   const std::string testname = "BasicAdoResponse";
+  const std::string poolname = testname;
+  mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,                 /* flags */
@@ -110,16 +116,16 @@ TEST_F(ADO_test, BasicAdoResponse)
   ASSERT_TRUE(r == testname);
 
   ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
-
-
 
 TEST_F(ADO_test, BasicInvokePutAdo)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "BasicInvokePutAdo";
-
+  const std::string poolname = testname;
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
+
   auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,            /* flags */
                                 1000);        /* obj count */
@@ -144,15 +150,17 @@ TEST_F(ADO_test, BasicInvokePutAdo)
   }
 
   ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
 
 
 TEST_F(ADO_test, InvokeAdoCreateOnDemand)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "InvokeAdoCreateOnDemand";
-
+  const std::string poolname = testname;
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
+
   auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,                 /* flags */
                                 100);              /* obj count */
@@ -165,15 +173,17 @@ TEST_F(ADO_test, InvokeAdoCreateOnDemand)
 
   ASSERT_TRUE(rc == S_OK);
   ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
 
 
 TEST_F(ADO_test, AdoKeyReference)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "AdoKeyReference";
-
+  const std::string poolname = testname;
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
+
   auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,                 /* flags */
                                 500);              /* obj count */
@@ -189,15 +199,17 @@ TEST_F(ADO_test, AdoKeyReference)
   ASSERT_TRUE(rc == S_OK);
 
   ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
 
 
 TEST_F(ADO_test, FindKeyCallback)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "FindKeyCallback";
-
+  const std::string poolname = testname;
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
+
   auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,            /* flags */
                                 100);         /* obj count */
@@ -214,15 +226,16 @@ TEST_F(ADO_test, FindKeyCallback)
   ASSERT_TRUE(rc == S_OK);
 
   ASSERT_TRUE(mcas->close_pool(pool) == S_OK);
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
-
 
 TEST_F(ADO_test, BasicAllocatePoolMemory)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "BasicAllocatePoolMemory";
-
+  const std::string poolname = testname;
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
+
   auto pool = mcas->create_pool(poolname, GB(1), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
@@ -243,15 +256,16 @@ TEST_F(ADO_test, BasicAllocatePoolMemory)
 
   ASSERT_TRUE(rc == S_OK);
   ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
-
 
 TEST_F(ADO_test, BasicDetachedMemory)
 {
-  const std::string poolname = "pool0";
   const std::string testname = "BasicDetachedMemory";
-
+  const std::string poolname = testname;
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
+
   auto pool = mcas->create_pool(poolname, GB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
@@ -277,15 +291,15 @@ TEST_F(ADO_test, BasicDetachedMemory)
   ASSERT_TRUE(rc == S_OK);
 
   ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
-
 
 TEST_F(ADO_test, GetReferenceVector)
 {
   const std::string testname = "GetReferenceVector";
   const std::string poolname = testname;
-
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, GB(1), /* size */
                                 0,               /* flags */
@@ -311,8 +325,8 @@ TEST_F(ADO_test, GetReferenceVectorByTime)
 {
   const std::string testname = "GetReferenceVectorByTime";
   const std::string poolname = testname;
-
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MB(32), /* size */
                                 0,               /* flags */
@@ -344,8 +358,8 @@ TEST_F(ADO_test, Iterator)
 {
   const std::string testname = "Iterator";
   const std::string poolname = testname;
-
-  mcas->delete_pool(testname);
+  mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MB(32),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
@@ -374,8 +388,8 @@ TEST_F(ADO_test, IteratorTS)
 {
   const std::string testname = "IteratorTS";
   const std::string poolname = testname;
-
-  mcas->delete_pool(testname);
+  mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MB(32),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
@@ -441,8 +455,8 @@ TEST_F(ADO_test, Erase)
 {
   const std::string testname = "Erase";
   const std::string poolname = testname;
-
   mcas->delete_pool(poolname);
+::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, GB(1),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
@@ -469,6 +483,7 @@ TEST_F(ADO_test, BasicAsyncInvokeAdo)
 {
   const std::string poolname = "pool0";
 
+::system("ls -l /mnt/pmem1");
   auto pool = mcas->create_pool(poolname, MB(1), /* size */
                                 0,                 /* flags */
                                 50);              /* obj count */

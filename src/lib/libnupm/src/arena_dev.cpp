@@ -35,7 +35,7 @@ void arena_dev::debug_dump() const
   _hdr->debug_dump();
 }
 
-auto arena_dev::region_get(const string_view id_) -> std::vector<::iovec>
+auto arena_dev::region_get(const string_view id_) -> region_access
 {
   ::iovec iov;
   iov.iov_base = _hdr->get_region(make_uuid(id_), &iov.iov_len);
@@ -44,19 +44,26 @@ auto arena_dev::region_get(const string_view id_) -> std::vector<::iovec>
   {
     v.push_back(iov);
   }
-  return v;
+  return region_access{std::string(), v};
 }
 
-::iovec arena_dev::region_create(const string_view id_, const std::size_t size, gsl::not_null<nupm::registry_memory_mapped *>)
+auto arena_dev::region_create(const string_view id_, gsl::not_null<nupm::registry_memory_mapped *>, const std::size_t size) -> region_access
 {
   auto size_in_grains = boost::numeric_cast<nupm::DM_region::grain_offset_t>(div_round_up(size, _hdr->grain_size()));
 
   PLOG("%s::%s: rounding up to %" PRIu32 " grains (%" PRIu64 " MiB)", _cname, __func__,
        size_in_grains, REDUCE_MiB((1UL << DM_REGION_LOG_GRAIN_SIZE)*size_in_grains));
 
-  return {_hdr->allocate_region(make_uuid(id_), size_in_grains), size_in_grains * _hdr->grain_size()}; /* allocates n grains */
+  return
+    region_access(
+      region_access::first_type()
+      , region_access::second_type(1, ::iovec{_hdr->allocate_region(make_uuid(id_), size_in_grains), size_in_grains * _hdr->grain_size()})
+    ); /* allocates n grains */
 }
 
-void arena_dev::region_erase(const string_view id_) { _hdr->erase_region(make_uuid(id_)); }
+void arena_dev::region_erase(const string_view id_, gsl::not_null<nupm::registry_memory_mapped *>)
+{
+  _hdr->erase_region(make_uuid(id_));
+}
 
 std::size_t arena_dev::get_max_available() { return _hdr->get_max_available(); }

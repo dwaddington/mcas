@@ -89,6 +89,12 @@ public:
   status_t send_memory_map(uint64_t token, size_t size,
                            void *value_vaddr) override;
 
+  status_t send_memory_map_named(
+    unsigned region_id,
+    string_view pool_name,
+    std::size_t offset,
+    ::iovec iov) override;
+
   status_t send_work_request(const uint64_t work_request_key,
                              const char * key,
                              const size_t key_len,

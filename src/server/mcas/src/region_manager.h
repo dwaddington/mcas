@@ -50,23 +50,14 @@ class Region_manager : private common::log_source {
   inline memory_region_t ondemand_register(const void* target, size_t target_len)
   {
     /* transport will now take care of repeat registrations */
-#if 0
-    auto mr = _conn->register_memory(target, target_len, 0, 0);
-    _reg.insert(mr);
-#else
     auto it = _reg.emplace(debug_level(), _conn, target, target_len, 0, 0);
-#endif
     CPLOG(2, "%s registered %p 0x%zx (total %zu)", __func__, target, target_len, _reg.size());
     return it->mr();
   }
 
  private:
   Connection*                    _conn;
-#if 0
-  std::multiset<memory_region_t> _reg;
-#else
   std::multiset<memory_registered<Connection>> _reg;
-#endif
 };
 }  // namespace mcas
 

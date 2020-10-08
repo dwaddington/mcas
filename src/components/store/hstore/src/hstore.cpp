@@ -151,15 +151,13 @@ try
 
   auto path = pool_path(name_);
 
-  auto vsu = _pool_manager->pool_create_1(path, size_);
+  auto rac = _pool_manager->pool_create_1(path, size_);
   auto s =
     std::static_pointer_cast<session_t>(
       std::shared_ptr<open_pool_t>(
         _pool_manager->pool_create_2(
           AK_INSTANCE
-          std::get<0>(vsu)
-          , std::get<1>(vsu)
-          , std::get<2>(vsu)
+          rac
           , flags_ & ~(FLAGS_CREATE_ONLY|FLAGS_SET_SIZE)
           , expected_obj_count_
         ).release()
@@ -167,9 +165,9 @@ try
     );
 
   std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
-  _pools.emplace(std::get<0>(vsu), s);
+  _pools.emplace(std::get<1>(rac).iov_base, s);
 
-  return to_pool_t(std::get<0>(vsu));
+  return to_pool_t(std::get<1>(rac).iov_base);
 }
 catch ( const pool_error & )
 {
@@ -191,20 +189,28 @@ auto hstore::open_pool(const std::string &name_,
     auto v = _pool_manager->pool_open_1(path);
 
     std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
-    auto it = _pools.find(v);
-    if ( it != _pools.end() )
+    /* open pools are indexed by the base address of their first (contiguous) segment */
+    if ( v.second.empty() )
     {
-      /* already have a session, make a copy of the pointer */
-      _pools.emplace(v, it->second);
+      return component::IKVStore::POOL_ERROR; /* pool not found (by name) */
     }
     else
     {
-      /* no session yet, create one */
-      auto s = _pool_manager->pool_open_2(AK_INSTANCE v, flags);
-      /* explicit conversion to shared_ptr fpr g++ 5 */
-      _pools.emplace(v, std::shared_ptr<open_pool_t>(s.release()));
+      auto it = _pools.find(v.second.front().iov_base);
+      if ( it != _pools.end() )
+      {
+        /* already have a session, make a copy of the pointer */
+        _pools.emplace(v.second.front().iov_base, it->second);
+      }
+      else
+      {
+        /* no session yet, create one */
+        auto s = _pool_manager->pool_open_2(AK_INSTANCE v, flags);
+        /* explicit conversion to shared_ptr fpr g++ 5 */
+        _pools.emplace(v.second.front().iov_base, std::shared_ptr<open_pool_t>(s.release()));
+      }
+      return to_pool_t(v.second.front().iov_base);
     }
-    return to_pool_t(v);
   }
   catch( const pool_error & ) {
     return component::IKVStore::POOL_ERROR;
@@ -348,7 +354,7 @@ auto hstore::put(const pool_t pool,
   }
 }
 
-auto hstore::get_pool_regions(const pool_t pool, std::vector<::iovec>& out_regions) -> status_t
+auto hstore::get_pool_regions(const pool_t pool, std::pair<std::string, std::vector<::iovec>>& out_regions) -> status_t
 {
   const auto session = static_cast<session_t *>(locate_session(pool));
   if ( ! session )
