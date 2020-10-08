@@ -105,7 +105,7 @@ has_devdax () {
 }
 
 has_fsdax () {
- test -d /mnt/pmem0
+ test -d /mnt/pmem1
 }
 
 # Decide whether to use device DAX or FS DAX, depending on whether this system has devdax configured

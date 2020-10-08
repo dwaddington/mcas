@@ -23,6 +23,7 @@ sleep 3
 
 # launch client
 ELEMENT_COUNT=$(scale_by_transport 3000)
+ELEMENT_COUNT=$(scale_by_transport 200) # reduce to fit in 2GB fsdax space
 STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*13/10)) # too small
 STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*20/10)) # sufficient
 CLIENT_LOG="test$TESTID-client.log"

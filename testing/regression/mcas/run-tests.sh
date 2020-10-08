@@ -22,6 +22,9 @@ run_hstore() {
   $DIR/mcas-hstore-cc-get_direct-0.sh $1
   sleep $DELAY
   $DIR/mcas-hstore-cc-put_direct-0.sh $1
+  sleep $DELAY
+  # ADO does not net work with fsdax
+  $DIR/mcas-hstore-ado-0.sh $1
 }
 
 $DIR/mcas-mapstore-basic-0.sh $1
@@ -32,15 +35,12 @@ sleep $DELAY
 if has_devdax
 then DAXTYPE=devdax run_hstore $1
   sleep $DELAY
-  # Conflici, as coded works only for devdax, not fsdax
+  # Conflict test, as coded, works only for devdax, not fsdax
   # Conflict in fsdax occurs when data files exist, not when only arenas exist
   $DIR/mcas-hstore-dax-conflict-0.sh $1
-  sleep $DELAY
-  # ADO does not net work with fsdax
-  $DIR/mcas-hstore-ado-0.sh $1
 fi
 
 if has_fsdax
-then DAXTYPE=fsdax run_hstore $1
+then DAXTYPE=fsdax USE_ODP=1 run_hstore $1
 fi
 
