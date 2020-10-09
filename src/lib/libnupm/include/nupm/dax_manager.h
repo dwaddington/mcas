@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -50,9 +50,8 @@ struct iovec_owned
   iovec_owned &operator=(iovec_owned &&) noexcept = default;
 };
 
-/* Control of the space behind a single dax_config_t entry.
- * The arena key is clled region_id in dax_config_t.
- * One per arena_id. Not called a region because
+/* Control of the space behind a single config_t entry.
+ * No longer called a region because
  * {create,open,erase}region functions use region to mean something else.
  */
 struct arena;
@@ -152,9 +151,8 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   struct config_t {
     std::string path;
     addr_t addr;
-    arena_id_t region_id;
     /* Through no fault of its own, config_t may begin life with no proper values */
-    config_t() : path(), addr(0), region_id(0) {}
+    config_t() : path(), addr(0) {}
   };
 
   struct config_mapped
@@ -269,7 +267,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   AC                                        _address_coverage;
   AC                                        _address_fs_available;
   mapped_spaces                             _mapped_spaces;
-  std::map<arena_id_t, std::unique_ptr<arena>> _arenas;
+  std::vector<std::unique_ptr<arena>>       _arenas;
   std::mutex                                _reentrant_lock;
  public:
   friend struct nupm::range_use; /* access to _address_coverage */

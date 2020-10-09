@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,6 +11,9 @@
    limitations under the License.
 */
 #include "store_map.h"
+
+#include <common/json.h>
+#include <string>
 
 const std::string store_map::impl_default = "hstore-cc";
 const store_map::impl_map_t store_map::impl_map = {
@@ -34,8 +37,16 @@ const store_map::impl_spec *const store_map::impl =
   ? impl_map.find(impl_default)
   : impl_env_it)->second
   ;
+
+namespace c_json = common::json;
+using json = c_json::serializer<c_json::dummy_writer>;
 const std::string store_map::location =
   store_loc
   ? store_loc
-  : "[ { \"region_id\": 0, \"path\" : \"/dev/dax0.0\", \"addr\" : \"0x9000000000\" } ]"
+  : json::array(
+      json::object(
+        json::member("path", "/dev/dax0.0")
+        , json::member("addr", 0x9000000000)
+      )
+    ).str()
   ;

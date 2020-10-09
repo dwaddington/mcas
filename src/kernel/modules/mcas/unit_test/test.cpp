@@ -42,7 +42,6 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
   nupm::dax_manager::config_t c;
   c.path = "/dev/dax0.0";
   c.addr = 0x9000000000;
-  c.region_id = 0;
   conf.push_back(c);
   nupm::dax_manager ddm(common::log_source(0U), conf, true);
 

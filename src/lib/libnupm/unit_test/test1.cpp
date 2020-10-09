@@ -506,7 +506,6 @@ TEST_F(Libnupm_test, DevdaxManager)
   nupm::dax_manager::config_t config;
   config.path = "/dev/dax0.0";
   config.addr = 0x900000000;
-  config.region_id = 0;
 
   {
     nupm::dax_manager ddm(common::log_source(0U), {config},true);

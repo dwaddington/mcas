@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -45,8 +45,7 @@ const std::string store_map::location =
   ? store_loc
   : json::array(
       json::object(
-        json::member("region_id", json::number(0))
-        , json::member("path", "/dev/dax0.0")
+        json::member("path", "/dev/dax0.0")
         , json::member("addr", 0x9000000000)
       )
     ).str()
