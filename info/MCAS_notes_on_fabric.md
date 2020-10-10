@@ -10,13 +10,9 @@ $ ./dist/bin/fi_info
 ```
 
 MCAS requires:
- --provider verbs (for Infiniband)
- or
- --provider sockets (for TCP)
-
- --ep_type==FI_EP_MSG
-
- an interface with an IPv4 address (not IPv6)
+1. a "provider" of type "verbs" (for Infiniband) or "sockets" (for TCP)
+2. an endpoint type of FI_EP_MSG
+3. an interface with an IPv4 address (not IPv6)
 
 You can get a list of feasible interfaces by specifying the desired provider (verbs for InfiniBand; sockets for TCP), required ep_type, and reachable IPv4 address on the desired network:
 
@@ -31,7 +27,7 @@ $ ../debug/dist/bin/fi_info --provider verbs --ep_type FI_EP_MSG --node 10.0.0.1
       protocol: FI_PROTO_RDMA_CM_IB_RC
 ```
 
-If no interface matches the specifications, wou will receive error -61:
+If no interface matches the specifications, you will receive error -61:
 
 ```
 $ ../debug/dist/bin/fi_info --provider verbs --ep_type FI_EP_MSG --node 10.0.1.4
@@ -42,7 +38,7 @@ fi_getinfo: -61
 
 These parameters in the server "configuration file" specify the libfabric interface on which the server will listen:
 
-- net_providers: the provider typei (only one), either verbs or socket
+- net_providers: the provider type (only one, despite the plural key), either verbs or socket
 - addr: the IPv4 address
 - net: the physcical interface
 
@@ -69,3 +65,8 @@ listen: listen failure fabric_runtime_error "Invalid argument"
 The client needs only the server address. The client will try both possible provider modes (verbs and sockets) on the specified address and the port (if no port is specified).
 
 If the server is unreachable or is not listening, The client log will contain an error:
+
+```
+Connection refused (while in open_client)
+```
+
