@@ -49,10 +49,10 @@ mkdir /mnt/pmem1/mystuff
 ```
 
 
-## Referencing files in a configuration
+## Referencing DAX storage in a configuration
 
-In the JSON configuration, you may specify a devdax character special file to an fsdax-backed directory.
-This configuration specifies one of each, although - absent special circumsstances - it would be best to
+In the JSON configuration, you may specify a devdax character special file or an fsdax-backed directory.
+This sample iline from a configuration specifies one of each, although - absent special circumsstances - it would be best to
 stick to an single type, probably fsdax.
 
 ```
