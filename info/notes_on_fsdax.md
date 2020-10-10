@@ -1,57 +1,62 @@
-hstore can be used with devdax, and possibly with fsdax.
+## Establishing devdax of fsdax storage
 
-ndctl, to create or destroy a devdax namespace, is built but not installed by MCAS build.
-The binary is in mcas/build/src/lib/ndctl/ndctl-prefix/src/ndctl/ndctl/ndctl.
+The MCAS server configuration, with backend hstore or hstore-cc, can use either devdax or fsdax for storage.
+A "namespace" amy contain either a dedvax of fsdax device; the ndctl command manages namespaces.
 
-Fedora 31 also provides ndctl:
+The MCAS build process builds but does not install ndecl.
+The binary is under the build directory at ./src/lib/ndctl/ndctl-prefix/src/ndctl/ndctl/ndctl.
+
+Recent versions of Fedora also provide the command, in package ncdtl:
 
 ```
 sudo dnf install ndctl
 ```
 
+
+## Establishing devdax storage
+
+Devdax storage is visible (outside of ndctl) as character device files at /dev/dax\*.\*.
+The MCAS server configuration uses those nmes directly.
+
+Using ndctl, one display all namespaces:
+
 ```
-sudo ndctl create-namespace -m devdax --align 2M --force
+ndctl list --namespaces
+```
+
+Replace namespace 0 with a devdax namespace:
+
+```
 sudo ndctl create-namespace -m devdax -e namespace0.0 --align 2M --force
-sudo chmod ugo+rw /dev/dax0.0
-sudo ndctl destroy-namespace namespace0.0 --force
+sudo chmod go+rw /dev/dax0.0
 ```
 
-ndctl can also create/destroy an fsdax namespace
+
+## Establishing fsdax storage
+
+Fsdax storage is visible (outside ndctl) as block device files /dev/pmem\*.
+The MCAS server configuration does not use these; you must format the files as a file system and mount them for MCAS use.
+Since we have alreadly used namespace0 for devdax, this examples uses namespace1.
+The mount point name need not be pmem1; we could have given it any name.
 
 ```
-sudo ndctl create-namespace --align 2M --force
-sudo ndctl create-namespace -e namespace0.0 --align 2M --force
+sudo ndctl create-namespace -e namespace1.0 --align 2M --force
+sudo mkfs -t ext4 /dev/pmem1
+sudo mkdir /mnt/pmem1
+sudo mount /dev/pmem1 /mnt/pmem1
+sudo chmod go+rw /mnt/pmem1
+mkdir /mnt/pmem1/mystuff
 ```
 
-Following the fsdax namespace create, a "post" at https://pmem.io/2018/05/15/using_persistent_memory_devices_with_the_linux_device_mapper.html proposes (but does not justify the parameters for)
 
-```
-sudo mkfs.ext4 -b 4096 -E stride=512 -F /dev/pmem0
-```
+## Referencing files in a configuration
 
-This also seems to work:
-
-```
-sudo mkfs -t ext4 /dev/pmem0
-```
-
-Then mount, to expose files:
-
-```
-sudo mkdir /mnt/pmem0
-sudo mount /dev/pmem0 /mnt/pmem0
-sudo chmod go+w /mnt/pmem0
-```
-
-Allocate a file of suitable size (in this case, 16 GiB):
-```
-dd if=/dev/zero of=/mnt/pmem0/hstore-test bs=1048576 count=16384
-```
-
-In the JSON configuration, specify a file backed by fsdax, rather than a /dev/dax character device, as the "path:"
+In the JSON configuration, you may specify a devdax character special file to an fsdax-backed directory.
+This configuration specifies one of each, although - absent special circumsstances - it would be best to
+stick to an single type, probably fsdax.
 
 '''
-"dax_config" : [{ "region_id": 0, "path": "/mnt/pmem0/hstore-test", "addr": "0x9000000000" }],
+"dax_config" : [{ "path": "/dev/dax0.0", "addr": "0x8000000000" }, { "path": "/mnt/pmem1/my-stuff", "addr": "0x9000000000" }],
 '''
 
-Code in libnupm will expect fsdax if the path is a regular file, will expect devdax if the path is a character device, and will throw an exception otherwise.
+Code in libnupm will expect fsdax if the path is a directory, will expect devdax if the path is a character device, and will throw an exception otherwise.
