@@ -1,4 +1,4 @@
-## Establishing backing storage for hstorei (or hstore-cc)
+## Establishing backing storage for hstore (or hstore-cc)
 
 The MCAS server configuration, with backend hstore or hstore-cc, can use either devdax or fsdax for storage.
 These stores are contained in "namespaces", which the ndctl command manages.
