@@ -7,7 +7,7 @@
             "net"  : "mlx5_0",
             "default_backend" : "hstore",
             "ado_plugins" : ["libcomponent-adoplugin-testing.so"],
-            "dax_config" : [{ "region_id": 0, "path": "/mnt/pmem0/hstore-test", "addr": "0x9000000000" }],
+            "dax_config" : [{ "path": "/mnt/pmem0/hstore-test", "addr": "0x9000000000" }],
             "ado_core" : "2",
             "ado_core_number" : 1
         }

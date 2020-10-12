@@ -97,13 +97,11 @@ try
       ("daxconfig", po::value<std::string>()->default_value(
         json::array(
           json::object(
-            json::member("region_id", json::number(0))
-            , json::member("path", "/dev/dax0.0")
+            json::member("path", "/dev/dax0.0")
             , json::member("addr", 0x9000000000)
           )
         , json::object(
-            json::member("region_id", json::number(2))
-            , json::member("path", "/dev/dax1.0")
+            json::member("path", "/dev/dax1.0")
 /* Overlapping and non-overlapping mappings, if size of /dev/dax0.0 is 0x5e7e00000 */
 #if 1
             , json::member("addr", 0x95e0000000) /* overlapping, tests for overlap check */

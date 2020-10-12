@@ -26,7 +26,7 @@ class shard_proto_dax(shard_proto):
     """ shard prototype (for dax) """
     def __init__(self, addr, default_backend, path):
         shard_proto.__init__(self, addr, default_backend)
-        p = dm({ "region_id": 0, "addr": 0x9000000000 })
+        p = dm({ "addr": 0x9000000000 })
         p.merge(path)
         self.merge({"dax_config": [ p.value() ]})
 

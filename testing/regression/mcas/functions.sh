@@ -108,6 +108,14 @@ has_fsdax () {
  test -d /mnt/pmem1
 }
 
+has_module_mcasmod () {
+ /usr/sbin/modinfo mcasmod &> /dev/null
+}
+
+has_module_xpmem () {
+ /usr/sbin/modinfo xpmem &> /dev/null
+}
+
 # Decide whether to use device DAX or FS DAX, depending on whether this system has devdax configured
 choose_dax_type() {
  if [[ -n "$DAXTYPE" ]]

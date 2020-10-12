@@ -405,17 +405,7 @@ dax_manager::dax_manager(
       : fs::is_directory(p) ? &dax_manager::make_arena_fs
       : &dax_manager::make_arena_none;
 
-    auto itc =
-      _arenas.insert(
-        std::make_pair(
-          config.region_id
-          , (this->*arena_make)(p, config.addr, force_reset)
-        )
-      );
-    if ( ! itc.second )
-    {
-      throw std::domain_error("multiple instances of region " + std::to_string(config.region_id) + " in configuration");
-    }
+    _arenas.emplace_back((this->*arena_make)(p, config.addr, force_reset));
   }
 }
 
@@ -438,13 +428,12 @@ void * dax_manager::locate_free_address_range(std::size_t size_)
 
 auto dax_manager::lookup_arena(arena_id_t arena_id) -> arena *
 {
-  auto it = _arenas.find(arena_id);
-  if ( it == _arenas.end() )
+  if ( _arenas.size() <= arena_id )
   {
     throw Logic_exception("%s::%s: could not find header for region (%d)", _cname, __func__,
                         arena_id);
   }
-  return it->second.get();
+  return _arenas[arena_id].get();
 }
 
 void dax_manager::debug_dump(arena_id_t arena_id)

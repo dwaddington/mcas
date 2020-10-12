@@ -318,7 +318,6 @@ int Experiment::initialize_store(unsigned core)
       std::size_t dax_stride = round_up_to_pow2(dev_dax_max_size(*_device_name));
       std::size_t dax_node_stride = round_up_to_pow2(dev_dax_max_count_per_node()) * dax_stride;
 
-      unsigned region_id = 0;
       /* stride ignores dax "major" number, so /dev/dax0.n and /dev/dax1.n map to the same memory */
       std::uint64_t addr = dax_base + dax_node_stride * device.first + dax_stride * device.second;
 #if 0
@@ -332,8 +331,7 @@ int Experiment::initialize_store(unsigned core)
 
       auto device_map = json::array(
         json::object(
-          json::member("region_id", region_id)
-          , json::member("path", device_full_name.str())
+          json::member("path", device_full_name.str())
 #if 0
           , json::member("addr", addr_o.str())
 #else

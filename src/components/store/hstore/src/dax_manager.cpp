@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -43,7 +43,7 @@
  *       "path": { "type": "string" },
  *       "addr": { "type": "integer", "minimum": 0 },
  *     },
- *     "required" : [ "region_id", "path", "addr" ]
+ *     "required" : [ "path", "addr" ]
  *   }
  * }
  *
@@ -86,10 +86,10 @@ namespace
 		          ( json::member
 		            ( dax_config::region_id
 		            , json::object
-		              ( json::member(schema::description, "An integer, unique in the array")
+		              ( json::member(schema::description, "An integer, ignored")
 		              , json::member(schema::examples, "0")
 		              , json::member(schema::type, schema::integer)
-		                , json::member(schema::minimum, json::number(0))
+		              , json::member(schema::minimum, json::number(0))
 		              )
 		            )
 		          , json::member
@@ -114,8 +114,7 @@ namespace
 		      , json::member
 		        ( schema::required
 		        , json::array
-		          ( dax_config::region_id
-		          , dax_config::path
+		          ( dax_config::path
 		          , dax_config::addr
 		          )
 		        )
@@ -203,13 +202,19 @@ namespace
 			{
 				s->*M = parse_scalar<V>(v);
 			}
+			template <typename S>
+			static void ignore_scalar(json_value &v, S *)
+			{
+				(void) parse_scalar<V>(v);
+			}
 		};
 
 #define SET_SCALAR(S,M) assignment<decltype(S::M)>::assign_scalar<S, &S::M>
+#define IGNORE_SCALAR(S,T) assignment<T>::ignore_scalar<S>
 
 	parse_map<nupm::dax_manager::config_t> config_t_attr
 	{
-		{ dax_config::region_id, SET_SCALAR(nupm::dax_manager::config_t, region_id) },
+		{ dax_config::region_id, IGNORE_SCALAR(nupm::dax_manager::config_t, unsigned) },
 		{ dax_config::path, SET_SCALAR(nupm::dax_manager::config_t, path) },
 		{ dax_config::addr, SET_SCALAR(nupm::dax_manager::config_t, addr) },
 	};

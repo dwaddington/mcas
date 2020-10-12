@@ -6,6 +6,8 @@
 ## Configuration
 * [Server Configuration Files](./MCAS_server_config_files.md)
 * [Server Configuration Schema](./MCAS_server_config_schema.md)
+* [Configuring DAX files](./MCAS_notes_on_dax.md)
+* [Notes on the Fabric Network](./MCAS_notes_on_fabric.md)
 
 ## APIs
 * [C++](./cpp_api.md)

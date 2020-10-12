@@ -10,7 +10,7 @@
             "NOTE2" : "ado_core and ado_core number should not both exist, as only one can be configured",
             "ado_core" : "1,2",
             "ado_core_number": 2.0,
-            "dax_config" : [{ "region_id": 0, "path": "/dev/dax0.0", "addr": "0x9000000000" }]
+            "dax_config" : [{ "path": "/dev/dax0.0", "addr": "0x9000000000" }]
         }
     ],
     "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
