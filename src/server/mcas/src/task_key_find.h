@@ -1,12 +1,12 @@
 #ifndef __mcas_SERVER_TASK_KEY_FIND_H__
 #define __mcas_SERVER_TASK_KEY_FIND_H__
 
-#include "task.h"
-
+#include <common/logging.h>
 #include <gsl/pointers>
 #include <unistd.h>
-
 #include <string>
+
+#include "task.h"
 
 namespace mcas
 {
@@ -15,25 +15,29 @@ namespace mcas
  * the worst case execution time.
  *
  */
-class Key_find_task : public Shard_task {
+class Key_find_task : public Shard_task,
+                      private common::log_source
+{
   static constexpr unsigned MAX_COMPARES_PER_WORK = 5;
-  static const unsigned _debug_level          = 0;
 
  public:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"  // uninitialized _expr, _out_key, _type
-  Key_find_task(const std::string& expression, offset_t offset, Connection_handler* handler, gsl::not_null<component::IKVIndex*> index)
+  Key_find_task(const std::string& expression,
+                const offset_t offset,
+                Connection_handler* handler,
+                gsl::not_null<component::IKVIndex*> index,
+                const unsigned debug_level)
       : Shard_task(handler),
+        log_source(debug_level),
         _offset(offset),
         _index(index)
   {
     using namespace component;
     _index->add_ref();
 
-    if (_debug_level > 0) {
-      PLOG("offset=%lu", offset);
-      PLOG("expr: (%s)", expression.c_str());
-    }
+    CPLOG(1, "offset=%lu", offset);
+    CPLOG(1,"expr: (%s)", expression.c_str());
 
     if (expression == "next:") {
       _type = IKVIndex::FIND_TYPE_NEXT;
@@ -60,11 +64,6 @@ class Key_find_task : public Shard_task {
   Key_find_task(const Key_find_task&) = delete;
   Key_find_task& operator=(const Key_find_task&) = delete;
 
-  //   case IKVIndex::FIND_TYPE_REGEX:
-  // case IKVIndex::FIND_TYPE_EXACT:
-  // case IKVIndex::FIND_TYPE_PREFIX:
-  // }
-
   status_t do_work() override
   {
     using namespace component;
@@ -72,13 +71,13 @@ class Key_find_task : public Shard_task {
     status_t hr;
     try {
       hr = _index->find(_expr, _offset, _type, _offset, _out_key, MAX_COMPARES_PER_WORK);
-      //      PLOG("OFFSET=%lu", _offset);
+
       if (hr == E_MAX_REACHED) {
         _offset++;
         return component::IKVStore::S_MORE;
       }
       else if (hr == S_OK) {
-        PLOG("matched: (%s)", _out_key.c_str());
+        CPLOG(2, "matched: (%s)", _out_key.c_str());
         return S_OK;
       }
       else {
