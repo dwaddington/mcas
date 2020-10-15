@@ -108,7 +108,7 @@ nupm::path_use::path_use(const std::string &path_)
     o << __func__ << ": instance already managing path (" << path_ << ")";
     throw std::range_error(o.str());
   }
-  PLOG("%si%p): path: %s", __func__, static_cast<const void *>(this), _path.c_str());
+  PLOG("%s (%p): path: %s", __func__, static_cast<const void *>(this), _path.c_str());
 }
 
 nupm::path_use::~path_use()
@@ -460,7 +460,7 @@ auto dax_manager::create_region(
 {
   guard_t           g(_reentrant_lock);
   auto arena = lookup_arena(arena_id);
-  CPLOG(1, "%s: %s size %zu", __func__, name.begin(), size);
+  CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name.begin(), size, arena_id);
   auto r = arena->region_create(name, this, size);
   if ( r.second.empty() )
   {

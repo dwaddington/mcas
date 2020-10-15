@@ -14,6 +14,7 @@
 #ifndef __MCAS_SECURITY_H__
 #define __MCAS_SECURITY_H__
 
+#include <common/logging.h>
 #include <memory>
 #include <string>
 
@@ -21,12 +22,10 @@ namespace mcas
 {
 class Shard_security_state;
 
-class Shard_security {
- private:
-  unsigned debug_level() const { return 3; }
+class Shard_security : private common::log_source {
 
  public:
-  Shard_security(const std::string& certs_path);
+  Shard_security(const std::string& certs_path, const unsigned debug_level);
 
   inline bool auth_enabled() const { return _auth_enabled; }
 

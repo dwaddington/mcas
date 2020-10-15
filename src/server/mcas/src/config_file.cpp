@@ -64,6 +64,7 @@ namespace config
   static constexpr const char *ado_path = "ado_path";
   static constexpr const char *security = "security";
   static constexpr const char *cert = "cert";
+  static constexpr const char *security_level = "security_level";
   static constexpr const char *cluster = "cluster";
   static constexpr const char *core = "core";
   static constexpr const char *group = "group";
@@ -83,6 +84,7 @@ namespace
   };
 
   const char *k_typenames[] = {"Null", "False", "True", "Object", "Array", "String", "Number"};
+
   constexpr unsigned int DEFAULT_CLUSTER_PORT = 11800U;
 
   boost::optional<std::string> init_net_providers(rapidjson::Document &doc_)
@@ -414,7 +416,7 @@ namespace
           , json::member
             ( config::ado_path
             , json::object
-              ( json::member(schema::description, "Full patch to the server ADO plugin manager executable.")
+              ( json::member(schema::description, "Full path to the server ADO plugin manager executable.")
               , json::member(schema::examples, json::array("/opt/mcas/bin/ado"))
               , json::member(schema::type, schema::string))
             )
@@ -463,7 +465,15 @@ namespace
                     ( config::cert
                     , json::object
                       ( json::member(schema::description, "Certificate file path")
-                      , json::member(schema::examples, json::array("/opt/mcas/certs/mcas-cert.pem"))
+                      , json::member(schema::examples, json::array("~/mcas/certs/mcas-cert.pem"))
+                      , json::member(schema::type, schema::string)
+                      )
+                    )
+                    ,json::member
+                    ( config::security_level
+                    , json::object
+                      ( json::member(schema::description, "Securtiy level")
+                        , json::member(schema::examples, json::array("hmac","encrypt"))
                       , json::member(schema::type, schema::string)
                       )
                     )
@@ -621,12 +631,12 @@ void mcas::throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg
   throw ParseException(code, msg, offset);
 }
 
-mcas::Config_file::Config_file(unsigned debug_level_, const std::string &config_spec)
+mcas::Config_file::Config_file(unsigned debug_level_, const std::string& config_spec)
     : Config_file(debug_level_, (config_spec[0] == '{' ? string_to_doc : filename_to_doc)(debug_level_, config_spec))
 {
 }
 
-mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document &&doc)
+mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document&& doc)
     : common::log_source(debug_level_),
       _doc(std::move(doc)),
       _shards(init_shards(_doc)),
@@ -811,10 +821,16 @@ boost::optional<rapidjson::Document> mcas::Config_file::get_shard_dax_config_raw
   return d;
 }
 
-std::string mcas::Config_file::get_cert_path() const
+std::string mcas::Config_file::security_get_cert_path() const
 {
   return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::cert].GetString());
 }
+
+std::string mcas::Config_file::security_get_security_level() const
+{
+  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::security_level].GetString());
+}
+
 
 std::string mcas::Config_file::cluster_group() const
 {
