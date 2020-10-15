@@ -6,7 +6,7 @@ project(component-tls CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-include (../../../../../mk/clang-dev-tools.cmake)
+include (../../../../mk/clang-dev-tools.cmake)
 
 add_subdirectory(./unit_test)
 
