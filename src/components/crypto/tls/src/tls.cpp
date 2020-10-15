@@ -72,22 +72,35 @@ class Crypto_server_state {
                       const std::string& cert_file, /* e.g. cert.pem */
                       const std::string& key_file)  /* e.g. key.pem */
   {
+    int err;
     assert(!cipher_suite.empty());
     assert(!cert_file.empty());
     assert(!key_file.empty());
 
-    // PLOG("Server:%s", cipher_suite.c_str());
+    PLOG("Server:%s", cipher_suite.c_str());
 
     /* initialize credentials amd trust certificates etc. */
-    if (gnutls_certificate_allocate_credentials(&_x509_cred) != GNUTLS_E_SUCCESS)
+    if ((err = gnutls_certificate_allocate_credentials(&_x509_cred)) != GNUTLS_E_SUCCESS) {
+      PERR("%s", gnutls_strerror(err));
       throw General_exception("crypto-engine: gnutls_certificate_allocate_credentials() failed");
+    }
 
-    if (gnutls_certificate_set_x509_trust_file(_x509_cred, CAFILE, GNUTLS_X509_FMT_PEM) != GNUTLS_E_SUCCESS)
+    if ((err = gnutls_certificate_set_x509_trust_file(_x509_cred, CAFILE, GNUTLS_X509_FMT_PEM)) != GNUTLS_E_SUCCESS) {
+      PERR("%s", gnutls_strerror(err));
       throw General_exception("crypto-engine: gnutls_certificate_set_x509_trust_file() failed");
+    }
 
-    if (gnutls_certificate_set_x509_key_file(_x509_cred, cert_file.c_str(), key_file.c_str(), GNUTLS_X509_FMT_PEM) !=
-        GNUTLS_E_SUCCESS)
-      throw General_exception("crypto-engine: gnutls_certificate_set_x509_key_file() failed");
+    if ((err = gnutls_certificate_set_x509_key_file(_x509_cred,
+                                                    cert_file.c_str(),
+                                                    key_file.c_str(),
+                                                    GNUTLS_X509_FMT_PEM)) !=
+        GNUTLS_E_SUCCESS) {
+      PERR("%s", gnutls_strerror(err));
+      throw General_exception("crypto-engine: gnutls_certificate_set_x509_key_file() "
+                              "failed (key file=%s) (cert file=%s)",                              
+                              key_file.c_str(), cert_file.c_str());
+    }
+
 
     /* CRL file defines expired and black listed certificates
        gnutls_certificate_set_x509_crl_file(x509_cred, CRLFILE, GNUTLS_X509_FMT_PEM));

@@ -37,8 +37,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
-install(FILES "mcas-privkey.pem" DESTINATION certs)
-install(FILES "mcas-cert.pem" DESTINATION certs)
-install(FILES "client-privkey.pem" DESTINATION certs)
-install(FILES "client-cert.pem" DESTINATION certs)
+#install(FILES "mcas-privkey.pem" DESTINATION certs)
+#install(FILES "mcas-cert.pem" DESTINATION certs)
+#install(FILES "client-privkey.pem" DESTINATION certs)
+#install(FILES "client-cert.pem" DESTINATION certs)
 
