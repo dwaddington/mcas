@@ -39,7 +39,9 @@ class Crypto : public virtual component::ICrypto {
    * Destructor
    *
    */
-  virtual ~Crypto() {}
+  virtual ~Crypto() {
+    PNOTICE("~Crypto(): %p", reinterpret_cast<void*>(this));
+  }
 
   /**
    * Component/interface management

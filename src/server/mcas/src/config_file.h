@@ -56,7 +56,7 @@ static constexpr const char *default_backend = "default_backend";
 static constexpr const char *index = "index";
 static constexpr const char *addr = "addr";
 static constexpr const char *net = "net";
-static constexpr const char *cert = "cert";
+static constexpr const char *cert_path = "cert_path";
 static constexpr const char *security_mode = "security_mode";
 static constexpr const char *security_port = "security_port";
 

@@ -79,8 +79,6 @@ public:
     assert(!cert_file.empty());
     assert(!key_file.empty());
 
-    PLOG("Server:%s", cipher_suite.c_str());
-
     /* initialize credentials amd trust certificates etc. */
     if ((err = gnutls_certificate_allocate_credentials(&_x509_cred)) != GNUTLS_E_SUCCESS) {
       PERR("%s", gnutls_strerror(err));

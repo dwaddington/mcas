@@ -183,8 +183,8 @@ rapidjson::Value init_security(rapidjson::Document &doc_)
       throw Config_exception("bad JSON: security should be {..}");
     }
     
-    if (!security.HasMember(config::cert) || !security[config::cert].IsString())
-      throw Config_exception("bad JSON: optional %s::%s missing or wrong type", config::security, config::cert);
+    if (!security.HasMember(config::cert_path) || !security[config::cert_path].IsString())
+      throw Config_exception("bad JSON: optional %s::%s missing or wrong type", config::security, config::cert_path);
   }
   return security;
 }
@@ -490,7 +490,7 @@ std::string make_schema_string()
               ( schema::properties
                 , json::object
                 ( json::member
-                  ( config::cert
+                  ( config::cert_path
                     , json::object
                     ( json::member(schema::description, "Default certificate file path")
                       , json::member(schema::examples, json::array("~/mcas/certs/mcas-cert.pem"))
@@ -501,7 +501,7 @@ std::string make_schema_string()
                 )
               , json::member
               ( schema::required
-                , json::array(config::cert)
+                , json::array(config::cert_path)
                 )
               , json::member(schema::additionalProperties, json::boolean(false))
               )
@@ -852,7 +852,7 @@ boost::optional<rapidjson::Document> mcas::Config_file::get_shard_dax_config_raw
 
 std::string mcas::Config_file::security_get_cert_path() const
 {
-  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::cert].GetString());
+  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::cert_path].GetString());
 }
 
 std::string mcas::Config_file::cluster_group() const

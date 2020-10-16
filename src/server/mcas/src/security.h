@@ -14,6 +14,7 @@
 #ifndef __MCAS_SECURITY_H__
 #define __MCAS_SECURITY_H__
 
+#include <api/crypto_itf.h>
 #include <common/logging.h>
 #include <memory>
 #include <string>
@@ -40,16 +41,21 @@ private:
                  const unsigned port,
                  const unsigned debug_level);
 
+  virtual ~Shard_security();
+
   inline bool auth_enabled() const { return _auth_enabled; }
 
  private:
-  const std::string _mcas_cert_path;
-  bool              _auth_enabled;
-  security_mode_t   _mode;
-  std::string       _ipaddr;
-  unsigned          _port;
-  //  std::shared_ptr<Shard_security_state> _state;
+  const std::string   _mcas_cert_path;
+  bool                _auth_enabled;
+  security_mode_t     _mode;
+  std::string         _ipaddr;
+  unsigned            _port;
+
+  component::Itf_ref<component::ICrypto> _crypto;
 };
+
+
 }  // namespace mcas
 
 #endif  // __MCAS_SECURITY_H__

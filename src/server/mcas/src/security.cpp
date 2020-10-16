@@ -1,5 +1,6 @@
 #include "security.h"
 
+#include <api/components.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/net.h>
@@ -10,6 +11,9 @@
 #include <fstream>
 
 #define LOG_PREFIX "Shard_security: "
+#define CIPHER_SUITE \
+  "NORMAL:+AEAD"  // PERFORMANCE:+AEAD"
+                  // //"PERFORMANCE:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:-ARCFOUR-128:-PSK:-DHE-PSK:+AEAD"
 
 namespace mcas
 {
@@ -22,15 +26,13 @@ Shard_security::Shard_security(const boost::optional<std::string> cert_path,
                                const unsigned debug_level)
   : common::log_source(debug_level),
   _mcas_cert_path(cert_path ? *cert_path : ""),
-  _auth_enabled(!_mcas_cert_path.empty()),
+  _auth_enabled(!_mcas_cert_path.empty()), /* if no certificate path is given, then authentication is turned off */
   _mode(security_mode_t::NONE),
   _ipaddr(ipaddr ? *ipaddr : ""),
-  _port(port)
+  _port(port),
+  _crypto(nullptr)
 {
-
-  PLOG("(cert_path:%s)(ipaddr:%s)", _mcas_cert_path.c_str(), _ipaddr.c_str());
   if(_auth_enabled) {
-
     if(_ipaddr.empty()) { /* if no address given, use IP address associated with net device */
       if(!net_device) throw General_exception("ipaddr or net device must be provided");
       _ipaddr = common::get_ip_from_eth_device(common::get_eth_device_from_rdma_device(*net_device));
@@ -40,20 +42,35 @@ Shard_security::Shard_security(const boost::optional<std::string> cert_path,
       CPLOG(1, LOG_PREFIX "security mode TLS HMAC (port=%u)(ipaddr=%s)", port, _ipaddr.c_str());
       _mode = security_mode_t::TLS_HMAC;
     }
-  }
-  asm("int3");
-  //  CPLOG(1,"Shard_security: auth=%s cert path (%s)", _auth_enabled ? "y" : "n", certs_path.c_str());
 
-  // if(_auth_enabled) {
-  //   PLOG("Auth enabled:");
-  //   try {
-  //     std::ifstream ifs(certs_path);
-  //   }
-  //   catch(...) {
-  //     PLOG("unable to load certificate. disabling authentication");
-  //     _auth_enabled = false;
-  //   }
-  // }
+    PLOG(LOG_PREFIX "enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _mcas_cert_path.c_str(), _ipaddr.c_str(), port);
+
+    /* creat crypto component */
+    {
+      using namespace component;
+      IBase *comp = load_component("libcomponent-tls.so", tls_factory);
+
+      assert(comp);
+      auto fact = make_itf_ref(static_cast<ICrypto_factory *>(comp->query_interface(ICrypto_factory::iid())));
+      std::map<std::string, std::string> params;
+      _crypto = make_itf_ref(static_cast<ICrypto *>(fact->create(debug_level, params)));
+      PNOTICE("_crypto component instance: %p", reinterpret_cast<void*>(_crypto.get()));
+
+      if (_crypto->initialize(CIPHER_SUITE,
+                              _mcas_cert_path + "mcas-cert.pem",
+                              _mcas_cert_path + "mcas-privkey.pem") != S_OK)
+        throw General_exception("crypto initialization failed");
+    }
+    /* set up async task to do work of accepting connection */
+    CPLOG(1, LOG_PREFIX "initialization OK");
+  }
+}
+
+Shard_security::~Shard_security()
+{
+  PNOTICE("Shard security object deletion");
+  _crypto->shutdown();
+  PNOTICE("Crypto shutdown OK");
 }
 
 }  // namespace mcas
