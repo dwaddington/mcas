@@ -11,6 +11,7 @@ add_subdirectory(ado)
 add_subdirectory(client)
 add_subdirectory(index)
 add_subdirectory(cluster)
+add_subdirectory(crypto)
 
 if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/enterprise-only")
   add_subdirectory(enterprise-only)

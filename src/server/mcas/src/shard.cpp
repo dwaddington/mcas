@@ -160,7 +160,7 @@ Shard::Shard(const Config_file &config_file,
     _ado_path(config_file.get_ado_path() ? *config_file.get_ado_path() : ""),
     _ado_plugins(config_file.get_shard_ado_plugins(shard_index)),
     _ado_params(config_file.get_shard_ado_params(shard_index)),
-    _security(config_file.get_cert_path()),
+    _security(config_file.security_get_cert_path(), debug_level_),
     _cluster_signal_queue(),
     _backend(config_file.get_shard_required(config::default_backend, shard_index)),
     _thread(std::async(std::launch::async,
@@ -175,7 +175,6 @@ Shard::Shard(const Config_file &config_file,
                        profile_file_,
                        triggered_profile_))
 {
-  mcas::global::debug_level = debug_level_;
 }
 
 void Shard::thread_entry(const std::string &backend,

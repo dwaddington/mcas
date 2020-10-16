@@ -124,7 +124,7 @@ TEST_F(TLS_test, CertClient)
   char        key[8] = {0};
   std::string label  = "SOMELABEL";
   ASSERT_TRUE(_crypto->export_key(session, label, "" /* context is optional */, 8, key) == S_OK);
-  PMAJOR("Got key material:");
+  PMAJOR("Got key material (SOMELABEL):");
   hexdump(key, 8);
 
   std::string key2;
