@@ -85,11 +85,13 @@ public:
   /**
    * @brief      Server-side accept certificate-based session
    *
+   * @param[in]  ip_addr Network interface IP addr
    * @param[in]  port  Network port
    *
    * @return     Session handle (free with close_session)
    */
-  virtual session_t accept_cert_session(const int port) = 0;
+  virtual session_t accept_cert_session(const std::string& ip_addr,
+                                        const int port) = 0;
 
   /**
    * @brief      Client-side open certificate-based session

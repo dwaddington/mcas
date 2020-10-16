@@ -2,12 +2,64 @@
 
 #include <common/exceptions.h>
 #include <common/logging.h>
+#include <common/net.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
 #include <fstream>
 
+#define LOG_PREFIX "Shard_security: "
+
+namespace mcas
+{
+
+Shard_security::Shard_security(const boost::optional<std::string> cert_path,
+                               const boost::optional<std::string> mode,
+                               const boost::optional<std::string> ipaddr,
+                               const boost::optional<std::string> net_device,
+                               const unsigned port,
+                               const unsigned debug_level)
+  : common::log_source(debug_level),
+  _mcas_cert_path(cert_path ? *cert_path : ""),
+  _auth_enabled(!_mcas_cert_path.empty()),
+  _mode(security_mode_t::NONE),
+  _ipaddr(ipaddr ? *ipaddr : ""),
+  _port(port)
+{
+
+  PLOG("(cert_path:%s)(ipaddr:%s)", _mcas_cert_path.c_str(), _ipaddr.c_str());
+  if(_auth_enabled) {
+
+    if(_ipaddr.empty()) { /* if no address given, use IP address associated with net device */
+      if(!net_device) throw General_exception("ipaddr or net device must be provided");
+      _ipaddr = common::get_ip_from_eth_device(common::get_eth_device_from_rdma_device(*net_device));
+    }
+    
+    if(*mode == "tls-hmac") {
+      CPLOG(1, LOG_PREFIX "security mode TLS HMAC (port=%u)(ipaddr=%s)", port, _ipaddr.c_str());
+      _mode = security_mode_t::TLS_HMAC;
+    }
+  }
+  asm("int3");
+  //  CPLOG(1,"Shard_security: auth=%s cert path (%s)", _auth_enabled ? "y" : "n", certs_path.c_str());
+
+  // if(_auth_enabled) {
+  //   PLOG("Auth enabled:");
+  //   try {
+  //     std::ifstream ifs(certs_path);
+  //   }
+  //   catch(...) {
+  //     PLOG("unable to load certificate. disabling authentication");
+  //     _auth_enabled = false;
+  //   }
+  // }
+}
+
+}  // namespace mcas
+
+
+#if 0
 namespace mcas
 {
 class Shard_security_state : private common::log_source {
@@ -71,24 +123,4 @@ class Shard_security_state : private common::log_source {
   std::string _cert_base64;
 };
 
-Shard_security::Shard_security(const std::string &certs_path, const unsigned debug_level_)
-  : common::log_source(debug_level_),
-    _certs_path(certs_path),
-    _auth_enabled(!_certs_path.empty()),      
-    _state(std::make_shared<Shard_security_state>(certs_path, debug_level_))
-{
-  CPLOG(1,"Shard_security: auth=%s cert path (%s)", _auth_enabled ? "y" : "n", certs_path.c_str());
-
-  // if(_auth_enabled) {
-  //   PLOG("Auth enabled:");
-  //   try {
-  //     std::ifstream ifs(certs_path);
-  //   }
-  //   catch(...) {
-  //     PLOG("unable to load certificate. disabling authentication");
-  //     _auth_enabled = false;
-  //   }
-  // }
-}
-
-}  // namespace mcas
+#endif

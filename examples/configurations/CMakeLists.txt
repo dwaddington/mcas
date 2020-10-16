@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-#configure_file(mapstore-basic.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/mapstore-ado0.conf)
+configure_file(example-hstore-devdax-secure-0.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/example-hstore-devdax-secure-0.conf)
 
 install(DIRECTORY ./
   DESTINATION conf

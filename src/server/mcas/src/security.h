@@ -17,6 +17,7 @@
 #include <common/logging.h>
 #include <memory>
 #include <string>
+#include "config_file.h"
 
 namespace mcas
 {
@@ -24,15 +25,30 @@ class Shard_security_state;
 
 class Shard_security : private common::log_source {
 
+private:
+  
+  enum class security_mode_t {
+    NONE,
+    TLS_HMAC,
+  };
+  
  public:
-  Shard_security(const std::string& certs_path, const unsigned debug_level);
+  Shard_security(const boost::optional<std::string> cert_path,
+                 const boost::optional<std::string> mode,
+                 const boost::optional<std::string> ipaddr,
+                 const boost::optional<std::string> net_device,
+                 const unsigned port,
+                 const unsigned debug_level);
 
   inline bool auth_enabled() const { return _auth_enabled; }
 
  private:
-  const std::string                     _certs_path;
-  bool                                  _auth_enabled;
-  std::shared_ptr<Shard_security_state> _state;
+  const std::string _mcas_cert_path;
+  bool              _auth_enabled;
+  security_mode_t   _mode;
+  std::string       _ipaddr;
+  unsigned          _port;
+  //  std::shared_ptr<Shard_security_state> _state;
 };
 }  // namespace mcas
 

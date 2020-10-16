@@ -362,7 +362,10 @@ class Cert_server_session : public Crypto_session_base,
 public:
   Cert_server_session() = delete;
 
-  Cert_server_session(unsigned debug_level, const std::shared_ptr<Crypto_server_state> state, int port)
+  Cert_server_session(unsigned debug_level,
+                      const std::shared_ptr<Crypto_server_state> state,
+                      const std::string& ipaddr,
+                      int port)
     : Crypto_session_base(true, S_OK), common::log_source(debug_level), _state(state)
   {
     struct sockaddr_in sa_serv;
@@ -372,7 +375,12 @@ public:
 
     auto listen_sd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&sa_serv, '\0', sizeof(sa_serv));
-    sa_serv.sin_family      = AF_INET;
+
+    if(ipaddr.empty())
+      sa_serv.sin_family = AF_INET;
+    else
+      sa_serv.sin_family = inet_addr(ipaddr.c_str());
+        
     sa_serv.sin_addr.s_addr = INADDR_ANY;
     sa_serv.sin_port        = boost::numeric_cast<in_port_t>(htons(port));
 
@@ -382,10 +390,12 @@ public:
     if (bind(listen_sd, reinterpret_cast<struct sockaddr*>(&sa_serv), sizeof(sa_serv)) != 0)
       throw General_exception("bind() failed");
 
-    if (listen(listen_sd, 1024) != 0) throw General_exception("list() failed");
+    if (listen(listen_sd, 1024) != 0)
+      throw General_exception("list() failed");
 
     /* initialize session */
-    if (gnutls_init(&_session, GNUTLS_SERVER) != GNUTLS_E_SUCCESS) throw General_exception("gnutls_init() failed");
+    if (gnutls_init(&_session, GNUTLS_SERVER) != GNUTLS_E_SUCCESS)
+      throw General_exception("gnutls_init() failed");
 
     if (gnutls_priority_set(_session, _state->_priority) != GNUTLS_E_SUCCESS) /* set cipher suite */
       throw General_exception("gnutls_priority_set() failed");
@@ -523,9 +533,10 @@ ICrypto::session_t Crypto::open_psk_session(const std::string& server_ip,
   return nullptr;
 }
 
-ICrypto::session_t Crypto::accept_cert_session(const int port)
+ICrypto::session_t Crypto::accept_cert_session(const std::string& ip_addr,
+                                               const int port)
 {
-  auto session = new Cert_server_session(_debug_level, _state, port);
+  auto session = new Cert_server_session(_debug_level, _state, ip_addr, port);
   _sessions.insert(session);
   return session;
 }
