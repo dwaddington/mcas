@@ -2,7 +2,7 @@
 certtool --generate-privkey --sec-param High --outfile=mcas-privkey.pem
 certtool --generate-self-signed --load-privkey mcas-privkey.pem --outfile=mcas-cert.pem
 
-# altenratives
+# alternatives
 #
 #openssl genrsa -out mcas-privkey.pem 1024
 #openssl req -new -x509 -key mcas-privkey.pem -out mcas-cert.pem -days 365
@@ -17,3 +17,7 @@ openssl rsa -noout -modulus -in ./dist/certs/mcas-privkey.pem | openssl md5
 openssl x509 -noout -modulus -in ./dist/certs/mcas-cert.pem | openssl md5
 
 
+
+# view x509 certificate chain
+#
+certtool -i --load-certificate ./dist/certs/client-cert.pem  |less
