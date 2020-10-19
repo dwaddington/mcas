@@ -1,0 +1,23 @@
+{
+    "security" :
+    {
+        "cert_path" : "${CMAKE_INSTALL_PREFIX}/certs/"
+    },
+    "shards" :
+    [
+        {
+            "core" : 0,
+            "port" : 11911,
+            "net"  : "mlx5_0",
+            "default_backend" : "hstore",
+            "dax_config" : [{ "path": "/dev/dax0.0", "addr": "0x9000000000" }],
+            "security_mode" : "tls-hmac",
+            "security_port" : 11912
+        }
+    ],
+    "net_providers" : "verbs",
+    "resources":
+    {
+            "ado_manager_core": 1
+    }
+}
