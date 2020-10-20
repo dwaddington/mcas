@@ -11,6 +11,7 @@
   limitations under the License.
 */
 #include "connection_handler.h"
+#include "connection_state.h"
 #include "security.h"
 #include "mcas_config.h"
 
@@ -23,12 +24,12 @@ Connection_handler::Connection_handler(unsigned debug_level,
                                        gsl::not_null<Connection *> connection)
   : Connection_base(debug_level, factory, connection),
     Region_manager(debug_level, connection),
+    Connection_TLS_session(debug_level, this),
     _mr_vector{},
     _tick_count(0),
     _auth_id(0),
     _pending_msgs{},
     _pending_actions(),
-    _security_options(),
     _pool_manager(),
     _stats{}
 {
@@ -67,7 +68,7 @@ int Connection_handler::tick()
   /* */
   if (check_network_completions() == Fabric_connection_base::Completion_state::CLIENT_DISCONNECT) {
     PMAJOR("Client disconnected.");
-    _state = State::CLIENT_DISCONNECTED;
+    _state = Connection_state::CLIENT_DISCONNECTED;
     return Connection_handler::TICK_RESPONSE_CLOSE;
   }
 
@@ -76,7 +77,7 @@ int Connection_handler::tick()
   }
 
   switch (_state) {
-  case WAIT_NEW_MSG_RECV:
+  case Connection_state::WAIT_NEW_MSG_RECV:
     if (check_for_posted_recv_complete()) /*< check for recv completion */
       {
         auto iob = posted_recv();
@@ -139,7 +140,7 @@ int Connection_handler::tick()
 
     break;
 
-  case INITIAL: {
+  case Connection_state::INITIAL: {
     static int handshakes = 0;
     handshakes++;
     if (option_DEBUG > 2)
@@ -154,21 +155,20 @@ int Connection_handler::tick()
       post_recv_buffer(allocate_recv());
     }
 
-    set_state(WAIT_HANDSHAKE);
+    set_state(Connection_state::WAIT_HANDSHAKE);
     return TICK_RESPONSE_CONTINUE;
   }
 
-  case CLIENT_DISCONNECTED: {
+  case Connection_state::CLIENT_DISCONNECTED: {
     break;
   }
 
-  case WAIT_TLS_SESSION: {
-    PNOTICE("WAIT TLS SESSION");
-    asm("int3");
+  case Connection_state::WAIT_TLS_SESSION: {
+    set_state(process_tls_session());
     break;
   }
 
-  case WAIT_HANDSHAKE:
+  case Connection_state::WAIT_HANDSHAKE:
     static int resp_handshakes = 0;
     if (check_for_posted_recv_complete()) {
       resp_handshakes ++;
@@ -184,45 +184,24 @@ int Connection_handler::tick()
       if (msg->get_status() != S_OK)
         throw General_exception("handshake status != S_OK (%d)", msg->get_status());
 
+      set_auth_id(msg->auth_id());
+      
       /* if security_tls bit is set, then we need to establish a GNU TLS side-channel
          as part of this session. this is triggered by sending the TLS port for the
          client to accept on.
       */
       if(msg->security_tls) {
-        _security_options.tls = true;
-        if(msg->security_hmac)
-          _security_options.hmac = true;
-        set_state(WAIT_TLS_SESSION);
+        set_security_options(true, msg->security_hmac);
+        respond_to_handshake(true);
+        set_state(Connection_state::WAIT_TLS_SESSION);
         return TICK_RESPONSE_WAIT_SECURITY;
       }
       else {
-        set_auth_id(msg->auth_id());
-
-        auto reply_iob = allocate_send();
-        assert(reply_iob);
-
-        auto reply_msg = new (reply_iob->base()) protocol::Message_handshake_reply(iob->length(),
-                                                                                   auth_id(),
-                                                                                   1 /* seq */,
-                                                                                   max_message_size(),
-                                                                                   reinterpret_cast<uint64_t>(this),
-                                                                                   nullptr,  // cert
-                                                                                   0);
-      
-
-
-        if (option_DEBUG > 2) {
-          PINF("RDMA: max message size (%lu)", max_message_size());
-        }
-
-        /* post response */
-        reply_iob->set_length(reply_msg->msg_len());
-        assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
-        post_recv_buffer(allocate_recv());
-        post_send_buffer(reply_iob, reply_msg, __func__);
-        free_buffer(iob);
-        set_state(WAIT_NEW_MSG_RECV);
+        respond_to_handshake(false);
       }
+
+      free_buffer(iob);
+      
     }
     break;
   }  // end switch
@@ -231,14 +210,39 @@ int Connection_handler::tick()
 
 
 void Connection_handler::configure_security(const std::string& bind_ipaddr,
-                                            const unsigned bind_port)
+                                            const unsigned bind_port,
+                                            const std::string& cert_file,
+                                            const std::string& key_file)
 {
   PNOTICE("Config security (addr:%s, port:%u)", bind_ipaddr.c_str(), bind_port);
   if(bind_ipaddr.empty() == false) {
-    assert(bind_port > 0);
+    set_security_binding(bind_ipaddr, bind_port);
+    set_security_params(cert_file, key_file);
   }
 }
   
+void Connection_handler::respond_to_handshake(bool start_tls)
+{
+  auto reply_iob = allocate_send();
+  assert(reply_iob);
+
+  auto reply_msg = new (reply_iob->base()) protocol::Message_handshake_reply(reply_iob->length(),
+                                                                             auth_id(),
+                                                                             1 /* seq */,
+                                                                             max_message_size(),
+                                                                             reinterpret_cast<uint64_t>(this),
+                                                                             start_tls);
+      
+  
+
+  /* post response */
+  reply_iob->set_length(reply_msg->msg_len());
+  assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+  post_recv_buffer(allocate_recv());
+  post_send_buffer(reply_iob, reply_msg, __func__);
+  set_state(Connection_state::WAIT_NEW_MSG_RECV);
+}
+
 
 
 

@@ -1,7 +1,8 @@
 {
     "security" :
     {
-        "cert_path" : "${CMAKE_INSTALL_PREFIX}/certs/"
+        "cert_path" : "${CMAKE_INSTALL_PREFIX}/certs/mcas-cert.pem",
+        "key_path" : "${CMAKE_INSTALL_PREFIX}/certs/mcas-privkey.pem" 
     },
     "shards" :
     [

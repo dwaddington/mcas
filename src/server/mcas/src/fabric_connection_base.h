@@ -114,7 +114,7 @@ class Fabric_connection_base : protected common::log_source {
   Fabric_connection_base(const Fabric_connection_base &) = delete;
   Fabric_connection_base &operator=(const Fabric_connection_base &) = delete;
 
-  ~Fabric_connection_base();
+  virtual ~Fabric_connection_base();
 
   static void static_send_callback(void *cnxn, buffer_t *iob) noexcept
   {

@@ -13,22 +13,21 @@
 #include <fstream>
 
 #define LOG_PREFIX "Shard_security: "
-#define CIPHER_SUITE                            \
-  "NORMAL:+AEAD"  // PERFORMANCE:+AEAD"
-                  // //"PERFORMANCE:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:-ARCFOUR-128:-PSK:-DHE-PSK:+AEAD"
 
 namespace mcas
 {
 
 Shard_security::Shard_security(const boost::optional<std::string> cert_path,
+                               const boost::optional<std::string> key_path,
                                const boost::optional<std::string> mode,
                                const boost::optional<std::string> ipaddr,
                                const boost::optional<std::string> net_device,
                                const unsigned port,
                                const unsigned debug_level)
   : common::log_source(debug_level),
-    _mcas_cert_path(cert_path ? *cert_path : ""),
-    _auth_enabled(!_mcas_cert_path.empty()), /* if no certificate path is given, then authentication is turned off */
+    _cert_path(cert_path ? *cert_path : ""),
+    _key_path(key_path ? *key_path : ""),
+    _auth_enabled(!_cert_path.empty()), /* if no certificate path is given, then authentication is turned off */
     _mode(security_mode_t::NONE),
     _ipaddr(ipaddr ? *ipaddr : ""),
     _port(port),
@@ -44,7 +43,7 @@ Shard_security::Shard_security(const boost::optional<std::string> cert_path,
       CPLOG(1, LOG_PREFIX "security mode TLS HMAC (port=%u)(ipaddr=%s)", port, _ipaddr.c_str());
       _mode = security_mode_t::TLS_HMAC;
 
-      PLOG(LOG_PREFIX "enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _mcas_cert_path.c_str(), _ipaddr.c_str(), port);
+      PLOG(LOG_PREFIX "enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _cert_path.c_str(), _ipaddr.c_str(), port);
 
       // /* create crypto component */
       // {

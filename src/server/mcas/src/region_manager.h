@@ -35,9 +35,7 @@ class Region_manager : private common::log_source {
   Region_manager(const Region_manager&) = delete;
   Region_manager& operator=(const Region_manager&) = delete;
 
-  ~Region_manager()
-  {
-  }
+  virtual ~Region_manager() {}
 
   /**
    * Register memory with network transport for direct IO.  Cache in map.

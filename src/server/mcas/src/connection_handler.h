@@ -1,20 +1,21 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2020] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 #ifndef __SHARD_CONNECTION_H__
 #define __SHARD_CONNECTION_H__
 
 #ifdef __cplusplus
 
+#include "tls_session.h"
 #include "buffer_manager.h"
 #include "fabric_connection_base.h"  // default to fabric transport
 #include "mcas_config.h"
@@ -22,6 +23,7 @@
 #include "protocol.h"
 #include "protocol_ostream.h"
 #include "region_manager.h"
+#include "connection_state.h"
 
 #include <api/components.h>
 #include <api/fabric_itf.h>
@@ -40,48 +42,36 @@ namespace mcas
 {
 using Connection_base = Fabric_connection_base;
 
+
+
 /**
  * Connection handler is instantiated for each "connected" client
  */
 class Connection_handler
-    : public Connection_base
-    , public Region_manager
+  : public Connection_base,
+    public Region_manager,
+    private Connection_TLS_session
 {
 
- protected:
-  enum State {
-    INITIAL,
-    WAIT_HANDSHAKE,
-    WAIT_NEW_MSG_RECV,
-    WAIT_TLS_SESSION,    
-    CLIENT_DISCONNECTED,
-  };
+protected:
 
- public:
+public:
   enum {
-    TICK_RESPONSE_CONTINUE        = 0,
-    TICK_RESPONSE_BOOTSTRAP_SPAWN = 1,
-    TICK_RESPONSE_WAIT_SECURITY   = 2,
-    TICK_RESPONSE_CLOSE           = 0xFF,
+        TICK_RESPONSE_CONTINUE        = 0,
+        TICK_RESPONSE_BOOTSTRAP_SPAWN = 1,
+        TICK_RESPONSE_WAIT_SECURITY   = 2,
+        TICK_RESPONSE_CLOSE           = 0xFF,
   };
 
   enum {
-    ACTION_NONE = 0,
-    ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE,
-    ACTION_POOL_DELETE,
+        ACTION_NONE = 0,
+        ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE,
+        ACTION_POOL_DELETE,
   };
 
-  struct security_options_t {
-    security_options_t() : ipaddr(),port(0),tls(false),hmac(false) {}
-    std::string ipaddr; // interface to bind to
-    unsigned    port; // port to bind to
-    bool        tls  : 1;
-    bool        hmac : 1;
-  };
- 
 
- private:
-  State    _state       = State::INITIAL;
+private:
+  Connection_state    _state       = Connection_state::INITIAL;
   unsigned option_DEBUG = mcas::global::debug_level;
 
   /* list of pre-registered memory regions; normally one region */
@@ -91,7 +81,6 @@ class Connection_handler
   uint64_t                            _auth_id;
   std::queue<buffer_t *>              _pending_msgs;
   std::queue<action_t>                _pending_actions;
-  security_options_t                  _security_options;
   Pool_manager                        _pool_manager; /* instance shared across connections */
 
   
@@ -109,14 +98,14 @@ class Connection_handler
     uint64_t last_count;
     uint64_t next_stamp;
     stats()
-        : response_count(0),
-          recv_msg_count(0),
-          send_msg_count(0),
-          wait_send_value_misses(0),
-          wait_msg_recv_misses(0),
-          wait_respond_complete_misses(0),
-          last_count(0),
-          next_stamp(0)
+      : response_count(0),
+        recv_msg_count(0),
+        send_msg_count(0),
+        wait_send_value_misses(0),
+        wait_msg_recv_misses(0),
+        wait_respond_complete_misses(0),
+        last_count(0),
+        next_stamp(0)
     {
     }
   } _stats alignas(8);
@@ -142,11 +131,15 @@ class Connection_handler
    *
    * @param s
    */
-  inline void set_state(State s)
+  inline void set_state(Connection_state s)
   {
     if (2 < option_DEBUG) {
-      const std::map<int, const char *> m{
-          {INITIAL, "INITIAL"}, {WAIT_HANDSHAKE, "WAIT_HANDSHAKE"}, {WAIT_NEW_MSG_RECV, "WAIT_NEW_MSG_RECV"}};
+      const std::map<Connection_state, const char *> m{
+                                          {Connection_state::INITIAL, "INITIAL"},
+                                          {Connection_state::WAIT_HANDSHAKE, "WAIT_HANDSHAKE"},
+                                          {Connection_state::WAIT_TLS_SESSION, "WAIT_TLS_SESSION"},
+                                          {Connection_state::CLIENT_DISCONNECTED, "CLIENT_DISCONNECTED"},
+                                          {Connection_state::WAIT_NEW_MSG_RECV, "WAIT_NEW_MSG_RECV"}};
       PLOG("state %s -> %s", m.find(_state)->second, m.find(s)->second);
     }
     _state = s; /* we could add transition checking later */
@@ -168,15 +161,23 @@ class Connection_handler
     send_callback(iob);
   }
 
- public:
+  /** 
+   * Send handshake response
+   * 
+   * @param start_tls Set if a TLS handshake needs to be started
+   */
+  void respond_to_handshake(bool start_tls);
+
+
+public:
 
   explicit Connection_handler(unsigned debug_level,
                               gsl::not_null<Factory *> factory,
                               gsl::not_null<Connection *> connection);
 
-  ~Connection_handler();
+  virtual ~Connection_handler();
 
-  inline bool client_connected() { return _state != State::CLIENT_DISCONNECTED; }
+  inline bool client_connected() { return _state != Connection_state::CLIENT_DISCONNECTED; }
 
   auto allocate_send() { return allocate(static_send_callback); }
   auto allocate_recv() { return allocate(static_recv_callback); }
@@ -188,7 +189,9 @@ class Connection_handler
    * @param bind_port 
    */
   void configure_security(const std::string& bind_ipaddr,
-                          const unsigned bind_port);
+                          const unsigned bind_port,
+                          const std::string& cert_file,
+                          const std::string& key_file);
     
 
   /**
@@ -231,7 +234,7 @@ class Connection_handler
   inline mcas::protocol::Message *peek_pending_msg() const
   {
     return _pending_msgs.empty() ? nullptr
-                                 : static_cast<mcas::protocol::Message *>(_pending_msgs.front()->base().get());
+      : static_cast<mcas::protocol::Message *>(_pending_msgs.front()->base().get());
   }
 
   /**

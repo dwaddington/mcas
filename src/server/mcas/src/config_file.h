@@ -57,6 +57,7 @@ static constexpr const char *index = "index";
 static constexpr const char *addr = "addr";
 static constexpr const char *net = "net";
 static constexpr const char *cert_path = "cert_path";
+static constexpr const char *key_path = "key_path";
 static constexpr const char *security_mode = "security_mode";
 static constexpr const char *security_port = "security_port";
 
@@ -106,6 +107,8 @@ public:
   boost::optional<rapidjson::Document> get_shard_dax_config_raw(rapidjson::SizeType i);
 
   std::string security_get_cert_path() const;
+
+  std::string security_get_key_path() const;
 
   std::string cluster_group() const;
 

@@ -37,6 +37,7 @@ private:
   
 public:
   Shard_security(const boost::optional<std::string> cert_path,
+                 const boost::optional<std::string> key_path,
                  const boost::optional<std::string> mode,
                  const boost::optional<std::string> ipaddr,
                  const boost::optional<std::string> net_device,
@@ -48,10 +49,13 @@ public:
   inline bool auth_enabled() const { return _auth_enabled; }
   inline security_mode_t mode() const { return _mode; }
   inline const std::string& ipaddr() const { return _ipaddr; }
+  inline const std::string& cert_path() const { return _cert_path; }
+  inline const std::string& key_path() const { return _key_path; }
   inline unsigned port() const { return _port; }
 
 private:
-  const std::string   _mcas_cert_path;
+  const std::string   _cert_path;
+  const std::string   _key_path;
   bool                _auth_enabled;
   security_mode_t     _mode;
   std::string         _ipaddr;

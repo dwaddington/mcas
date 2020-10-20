@@ -161,6 +161,7 @@ Shard::Shard(const Config_file &config_file,
     _ado_plugins(config_file.get_shard_ado_plugins(shard_index)),
     _ado_params(config_file.get_shard_ado_params(shard_index)),
     _security(config_file.security_get_cert_path(),
+              config_file.security_get_key_path(),
               config_file.get_shard_optional(config::security_mode, shard_index),
               config_file.get_shard_optional(config::addr, shard_index),
               config_file.get_shard_optional(config::net, shard_index),
@@ -437,7 +438,10 @@ void Shard::main_loop(common::profiler &pr_)
 
         if(tick_response == mcas::Connection_handler::TICK_RESPONSE_WAIT_SECURITY) {
           /* first tick, complete initialization */
-          handler->configure_security(_security.ipaddr(), _security.port());
+          handler->configure_security(_security.ipaddr(),
+                                      _security.port(),
+                                      _security.cert_path(),
+                                      _security.key_path());
         }
         /* Close session, this will occur if the client shuts down (cleanly or
          * not). Also close sessions in response to SIGINT */
