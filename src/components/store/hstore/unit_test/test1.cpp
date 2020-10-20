@@ -17,6 +17,8 @@
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
 #include <common/str_utils.h> /* random_string */
+#include <common/utils.h> /* MiB, GiB */
+#include <nupm/region_descriptor.h>
 
 #include <algorithm>
 #include <random>
@@ -162,7 +164,7 @@ const std::size_t KVStore_test::estimated_object_count = pmem_simulated ? estima
 std::string KVStore_test::single_key = "MySingleKeyLongEnoughToForceAllocation";
 std::string KVStore_test::missing_key = "KeyNeverInserted";
 std::string KVStore_test::single_value         = "Hello world!";
-std::size_t KVStore_test::single_value_size    = MB(8);
+std::size_t KVStore_test::single_value_size    = MiB(8);
 std::string KVStore_test::single_value_updated_same_size = "Jello world!";
 std::string KVStore_test::single_value_updated_different_size = "Hello world!";
 std::string KVStore_test::single_value_updated3 = "WeXYZ world!";
@@ -862,22 +864,22 @@ TEST_F(KVStore_test, GetRegions)
 {
   ASSERT_NE(nullptr, _kvstore);
   ASSERT_LT(0, int64_t(pool));
-  std::pair<std::string, std::vector<::iovec>> v;
+  nupm::region_descriptor v;
   auto r = _kvstore->get_pool_regions(pool, v);
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    EXPECT_EQ(1, v.second.size());
-    if ( 1 == v.second.size() )
+    EXPECT_EQ(1, v.address_map.size());
+    if ( 1 == v.address_map.size() )
     {
-      PMAJOR("Pool region at %p len %zu", v.second[0].iov_base, v.second[0].iov_len);
-      auto iov_base = reinterpret_cast<std::uintptr_t>(v.second[0].iov_base);
+      PMAJOR("Pool region at %p len %zu", v.address_map.front().iov_base, v.address_map.front().iov_len);
+      auto iov_base = reinterpret_cast<std::uintptr_t>(v.address_map.front().iov_base);
       /* region no longer needs to be well-aligned, but heap_cc still aligns to a
        * page boundary.
        */
       EXPECT_EQ(iov_base & 0xfff, 0);
-      EXPECT_GT(v.second[0].iov_len, many_count_target * 64U * 3U * 2U);
-      EXPECT_LT(v.second[0].iov_len, GB(512));
+      EXPECT_GT(v.address_map.front().iov_len, many_count_target * 64U * 3U * 2U);
+      EXPECT_LT(v.address_map.front().iov_len, GiB(512));
     }
   }
 }
@@ -1215,7 +1217,7 @@ TEST_F(KVStore_test, Timestamps)
 	(void) KVStore_test::single_value_size;
 	(void) KVStore_test::many_count_actual;
 	(void) KVStore_test::extant_count;
-	pool = _kvstore->create_pool("timestamp-test.pool", MB(32));
+	pool = _kvstore->create_pool("timestamp-test.pool", MiB(32));
 
 	/* if timestamping is enabled */
 	if ( _kvstore->get_capability(IKVStore::Capability::WRITE_TIMESTAMPS) )
@@ -1262,7 +1264,7 @@ TEST_F(KVStore_test, Timestamps)
 		unsigned wait = 5;
 		auto t0_plus_wait = t0;
 		t0_plus_wait.add_seconds(wait);
-		
+
 		/* First two keys should not be listed */
 		PLOG("After %u seconds", wait);
 		key_count = 0;
@@ -1393,7 +1395,7 @@ TEST_F(KVStore_test, Timestamps)
 TEST_F(KVStore_test, Iterator)
 {
   ASSERT_TRUE(_kvstore);
-  pool = _kvstore->create_pool("iterator-test.pool", MB(32));
+  pool = _kvstore->create_pool("iterator-test.pool", MiB(32));
 
   common::epoch_time_t now = 0;
 
@@ -1484,7 +1486,7 @@ TEST_F(KVStore_test, Iterator)
 TEST_F(KVStore_test, KeySwap)
 {
   ASSERT_TRUE(_kvstore);
-  pool = _kvstore->create_pool("keyswap", MB(32));
+  pool = _kvstore->create_pool("keyswap", MiB(32));
 
   std::string left_key = "LeftKey";
   std::string right_key = "RightKey";
@@ -1515,14 +1517,14 @@ TEST_F(KVStore_test, KeySwap)
 TEST_F(KVStore_test, OutOfMemory)
 {
   ASSERT_TRUE(_kvstore);
-  pool = _kvstore->create_pool("oom", MB(32));
+  pool = _kvstore->create_pool("oom", MiB(32));
 
   {
     status_t rc = S_OK;
     while ( rc == S_OK )
     {
       void *p = 0;
-      rc = _kvstore->allocate_pool_memory(pool, MB(1), 8, p);
+      rc = _kvstore->allocate_pool_memory(pool, MiB(1), 8, p);
       (void) p;
     }
     EXPECT_EQ(IKVStore::E_TOO_LARGE, rc);

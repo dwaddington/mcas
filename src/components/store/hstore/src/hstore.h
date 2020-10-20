@@ -274,7 +274,7 @@ public:
 
   status_t get_pool_regions(
     pool_t pool,
-    std::pair<std::string, std::vector<::iovec>>& out_regions) override;
+    nupm::region_descriptor & out_regions) override;
 
   status_t allocate_pool_memory(
     pool_t pool,

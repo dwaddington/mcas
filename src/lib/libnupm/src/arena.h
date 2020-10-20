@@ -14,6 +14,7 @@
 #ifndef _MCAS_NUPM_ARENA_
 #define _MCAS_NUPM_ARENA_
 
+#include <nupm/region_descriptor.h>
 #include <common/logging.h>
 #include <gsl/pointers> /* not_null */
 #include <sys/uio.h> /* ::iovec */
@@ -25,23 +26,28 @@
 namespace nupm
 {
 	struct registry_memory_mapped;
+	struct space_registered;
 }
 
 struct arena
   : private common::log_source
 {
-  using region_access = std::pair<std::string, std::vector<::iovec>>;
+  using region_descriptor = nupm::region_descriptor;
+  using registry_memory_mapped = nupm::registry_memory_mapped;
+  using space_registered = nupm::space_registered;
   using string_view = std::experimental::string_view;
+
   arena(const common::log_source &ls) : common::log_source(ls) {}
   virtual ~arena() {}
   virtual void debug_dump() const = 0;
-  virtual region_access region_get(string_view id) = 0;
-  virtual region_access region_create(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh, std::size_t size) = 0;
+  virtual region_descriptor region_get(const string_view &id) = 0;
+  virtual region_descriptor region_create(const string_view &id, gsl::not_null<registry_memory_mapped *> mh, std::size_t size) = 0;
+  virtual void region_resize(gsl::not_null<space_registered *> mh, std::size_t size) = 0;
   /* It is unknown whether region_erase may be used on an open region.
    * arena_fs assumes that it may, just as ::unlink can be used against
    * an open file.
    */
-  virtual void region_erase(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh) = 0;
+  virtual void region_erase(const string_view &id, gsl::not_null<registry_memory_mapped *> mh) = 0;
   virtual std::size_t get_max_available() = 0;
   virtual bool is_file_backed() const = 0;
 protected:

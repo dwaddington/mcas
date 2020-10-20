@@ -282,18 +282,12 @@ TEST_F(KVStore_test, CreatePools)
         << " estimated objects per second\n";
     }
   );
+
+  std::size_t initial_size = MiB(32);
+
   for ( auto i = std::size_t(); i != pool.size(); ++i )
   {
-#if 0
-    pool[i] =
-    _kvstore->create_pool(
-      pool_name(i)
-      , GB(1) + pool_alloc
-      , 0
-      , estimated_object_count
-    );
-#else
-    pool[i] = _kvstore->create_pool(pool_name(i), GB(1), 0, 1);
+    pool[i] = _kvstore->create_pool(pool_name(i), initial_size, 0, 1);
 
     std::size_t old_size = 0;
     /* zero growth should return current size */
@@ -301,21 +295,20 @@ TEST_F(KVStore_test, CreatePools)
       auto rc = _kvstore->grow_pool(pool[i], 0, old_size);
       EXPECT_EQ(S_OK, rc);
     }
-    /* Not sure hwo much will be reported allocated, but it should be at least
-     * half of what we asked for,
+    /* Not sure how much will be reported allocated, but it should be at least
+     * half of what we asked for.
      */
-    EXPECT_LT(GB(1)/2, old_size);
+    EXPECT_LT(initial_size/2, old_size);
 
-    if ( GB(1) < pool_alloc )
+    if ( initial_size < pool_alloc )
     {
       std::size_t sz = 0;
-      auto rc = _kvstore->grow_pool(pool[i], pool_alloc - GB(1), sz);
+      auto rc = _kvstore->grow_pool(pool[i], pool_alloc - initial_size, sz);
       EXPECT_EQ(S_OK, rc);
       std::cerr << "grow pool" << " from " << old_size << " to " << sz << "\n";
       /* new size should be more than old size */
       EXPECT_LT(old_size, sz);
     }
-#endif
     ASSERT_LT(0, int64_t(pool[i]));
   }
 }
@@ -397,7 +390,8 @@ long unsigned KVStore_test::put_many_threaded(
 {
 
   std::vector<std::future<long unsigned>> v;
-  common::profiler pr("test4-put-" + descr + "-cpu-" + store_map::impl->name + ".profile");
+  /* profile disabled, run with env var PROFILE=1 to enable */
+  common::profiler pr("test4-put-" + descr + "-cpu-" + store_map::impl->name + ".profile", false);
   for ( auto p : pool )
   {
     v.emplace_back(std::async(std::launch::async, put_many, p, kvv, descr));
@@ -504,7 +498,7 @@ void KVStore_test::get_many(
 void KVStore_test::get_many_threaded(const kvv_t &kvv, const std::string &descr)
 {
   std::vector<std::future<void>> v;
-  common::profiler pr("test4-get-" + descr + "-cpu-" + store_map::impl->name + ".profile");
+  common::profiler pr("test4-get-" + descr + "-cpu-" + store_map::impl->name + ".profile", false);
   for ( auto p : pool )
   {
     v.emplace_back(std::async(std::launch::async, get_many, p, kvv, descr));
@@ -559,7 +553,7 @@ TEST_F(KVStore_test, ClosePool)
 
 TEST_F(KVStore_test, OpenPool2)
 {
-  common::profiler p("test4-open-pool-2-cpu-" + store_map::impl->name + ".profile");
+  common::profiler p("test4-open-pool-2-cpu-" + store_map::impl->name + ".profile", false);
   timer t(
     [] (timer::duration_t d) {
       auto seconds = std::chrono::duration<double>(d).count();

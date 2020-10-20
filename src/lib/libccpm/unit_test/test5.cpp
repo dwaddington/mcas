@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <ccpm/value_tracked.h>
 #include <ccpm/container_cc.h>
+#include <common/utils.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -133,11 +134,11 @@ TEST_F(Log_test, CCVectorOfComposite)
  */
 	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
 	ASSERT_TRUE(kvstore.get());
-	auto pool = create_pool(kvstore.get(), pool_name(), MB(10));
+	auto pool = create_pool(kvstore.get(), pool_name(), MiB(10));
 	ASSERT_LT(0, int64_t(pool));
 
 	void *heap_area;
-	std::size_t heap_size = MB(5);
+	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
 		/* An odd "insert or locate" interface. */
@@ -280,11 +281,11 @@ TEST_F(Log_test, CCVector)
  */
 	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
 	ASSERT_TRUE(kvstore.get());
-	auto pool = create_pool(kvstore.get(), pool_name(), MB(10));
+	auto pool = create_pool(kvstore.get(), pool_name(), MiB(10));
 	ASSERT_LT(0, int64_t(pool));
 
 	void *heap_area;
-	std::size_t heap_size = MB(5);
+	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
 		/* An odd "insert or locate" interface. */
@@ -411,11 +412,11 @@ TEST_F(Log_test, CCList)
 {
 	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
 	ASSERT_TRUE(kvstore.get());
-	auto pool = create_pool(kvstore.get(), pool_name(), MB(10));
+	auto pool = create_pool(kvstore.get(), pool_name(), MiB(10));
 	ASSERT_LT(0, int64_t(pool));
 
 	void *heap_area;
-	std::size_t heap_size = MB(5);
+	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
 		/* An odd "insert or locate" interface. */
@@ -535,11 +536,11 @@ TEST_F(Log_test, CCListOfPointer)
 {
 	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
 	ASSERT_TRUE(kvstore.get());
-	auto pool = create_pool(kvstore.get(), pool_name(), MB(10));
+	auto pool = create_pool(kvstore.get(), pool_name(), MiB(10));
 	ASSERT_LT(0, int64_t(pool));
 
 	void *heap_area;
-	std::size_t heap_size = MB(5);
+	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
 		/* An odd "insert or locate" interface. */
@@ -665,11 +666,11 @@ TEST_F(Log_test, CCListOfSharedPointer)
 {
 	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
 	ASSERT_TRUE(kvstore.get());
-	auto pool = create_pool(kvstore.get(), pool_name(), MB(10));
+	auto pool = create_pool(kvstore.get(), pool_name(), MiB(10));
 	ASSERT_LT(0, int64_t(pool));
 
 	void *heap_area;
-	std::size_t heap_size = MB(5);
+	std::size_t heap_size = MiB(5);
 	component::IKVStore::key_t heap_lock{};
 	{
 		/* An odd "insert or locate" interface. */

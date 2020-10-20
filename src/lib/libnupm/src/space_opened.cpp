@@ -13,36 +13,24 @@
 
 #include "space_opened.h"
 #include "dax_manager.h"
-#include "arena.h"
-#include "arena_dev.h"
 #include "arena_fs.h"
-#include "arena_none.h"
-#include "dax_data.h"
-#include "nd_utils.h"
+#include "nd_utils.h" /* get_dax_device_size */
 
-#include <common/exceptions.h>
-#include <common/fd_locked.h>
 #include <common/memory_mapped.h>
-#include <common/utils.h>
+#include <common/utils.h> /* check_aligned */
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/sysmacros.h>
-#include <sys/types.h>
-#include <unistd.h> /* ::open, ::lockf */
-#include <boost/scope_exit.hpp>
+#include <fcntl.h> /* open */
+#include <sys/mman.h> /* mmap */
+#include <sys/stat.h> /* stat, open */
+#include <sys/types.h> /* open */
 #include <boost/icl/split_interval_map.hpp>
-#include <gsl/pointers>
 #include <experimental/filesystem>
 #include <cinttypes>
-#include <fstream>
-#include <mutex>
-#include <set>
+#include <iterator>
+#include <numeric> /* accumulate */
 #include <sstream>
 #include <stdexcept>
 
-//#define REGION_NAME "mcas-dax-pool"
 #define DEBUG_PREFIX "dax_manager: "
 
 static constexpr unsigned MAP_LOG_GRAIN = 21U;
@@ -56,9 +44,6 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #ifndef MAP_SHARED_VALIDATE
 #define MAP_SHARED_VALIDATE 0x03
 #endif
-
-#include <thread>
-#include <sstream>
 
 namespace fs = std::experimental::filesystem;
 
@@ -88,8 +73,13 @@ std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::
 
 nupm::range_use::range_use(dax_manager *dm_, std::vector<common::memory_mapped> &&iovm_)
   : _dm(dm_)
-  , _iovm(address_coverage_check(std::move(iovm_)))
+#if 1
+  , _iovm(address_coverage_check(std::move(iovm_))) // std::vector<common::memory_mapped>())
+#else
+  , _iovm()
+#endif
 {
+	grow(std::move(iovm_));
 }
 
 nupm::range_use::~range_use()
@@ -104,6 +94,48 @@ nupm::range_use::~range_use()
 			_dm->_address_fs_available.insert(i);
 		}
 	}
+}
+
+void nupm::range_use::grow(std::vector<common::memory_mapped> &&iovv_)
+{
+	auto m = address_coverage_check(std::move(iovv_));
+	std::move(m.begin(), m.end(), std::back_inserter(_iovm));
+}
+
+void nupm::range_use::shrink(std::size_t size_)
+{
+	while ( size_ != 0 )
+	{
+		auto &e = _iovm.back();
+		if ( size_ < e.iov_len )
+		{
+			auto end = static_cast<char *>(e.iov_base) + e.iov_len;
+			auto i = boost::icl::interval<char *>::right_open(end - size_, end);
+			_dm->_address_coverage.erase(i);
+			_dm->_address_fs_available.insert(i);
+			_iovm.back().shrink_by(size_);
+			size_ = 0;
+		}
+		else
+		{
+			auto c = static_cast<char *>(e.iov_base);
+			auto i = boost::icl::interval<char *>::right_open(c, c+e.iov_len);
+			_dm->_address_coverage.erase(i);
+			_dm->_address_fs_available.insert(i);
+			size_ -= e.iov_len;
+			_iovm.pop_back();
+		}
+	}
+}
+
+::off_t nupm::range_use::size() const
+{
+	return
+		std::accumulate(
+			_iovm.begin(), _iovm.end()
+			, ::off_t(0)
+			, [] (off_t a_, const common::memory_mapped & m_) { return a_ + m_.iov_len; }
+		);
 }
 
 std::vector<common::memory_mapped> nupm::space_opened::map_dev(int fd, const addr_t base_addr)
@@ -178,46 +210,28 @@ std::vector<common::memory_mapped> nupm::space_opened::map_dev(int fd, const add
   return v;
 }
 
-std::vector<common::memory_mapped> nupm::space_opened::map_fs(int fd, const std::vector<::iovec> &mapping)
+std::vector<common::memory_mapped> nupm::space_opened::map_fs(int fd, const std::vector<::iovec> &mapping, ::off_t offset_)
 {
-  return arena_fs::fd_mmap(fd, mapping, MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE);
+  return arena_fs::fd_mmap(fd, mapping, MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE, offset_);
 }
 
 /* space_opened constructor for devdax: filename, single address, unknown size */
 nupm::space_opened::space_opened(
   const common::log_source & ls_
   , dax_manager * dm_
-  , const std::string &p
+  , common::fd_locked &&fd_
   , const addr_t base_addr
 )
 try
-  : common::log_source((PLOG("%s: %d", __func__, __LINE__), ls_))
-  , _fd_locked(::open(p.c_str(), O_RDWR, 0666))
+  : common::log_source(ls_)
+  , _fd_locked(std::move(fd_))
   , _range(dm_, map_dev(_fd_locked.fd(), base_addr))
 {
 }
 catch ( std::exception &e )
 {
-	PLOG("%s: path %s exception %s", __func__, p.c_str(), e.what());
-	throw;
-}
-
-/* space_opened constructor for fsdax: filename, multiple mappings, unknown size */
-nupm::space_opened::space_opened(
-  const common::log_source & ls_
-  , dax_manager * dm_
-  , const std::string &p
-  , const std::vector<::iovec> &mapping
-)
-try
-  : common::log_source((PLOG("%s: %d", __func__, __LINE__), ls_))
-  , _fd_locked(::open(p.c_str(), O_RDWR, 0666))
-  , _range(dm_, map_fs(_fd_locked.fd(), mapping))
-{
-}
-catch ( std::exception &e )
-{
-	PLOG("%s: path %s exception %s", __func__, p.c_str(), e.what());
+	/* ERROR: should catch and report above, not here, as the name is gone by this time */
+	PLOG("%s: fd %i exception %s", __func__, _fd_locked.fd(), e.what());
 	throw;
 }
 
@@ -226,17 +240,33 @@ nupm::space_opened::space_opened(
   const common::log_source & ls_
   , dax_manager * dm_
   , common::fd_locked &&fd_
-  , const std::string &p
   , const std::vector<::iovec> &mapping
 )
 try
-  : common::log_source((PLOG("%s: %d", __func__, __LINE__), ls_))
+  : common::log_source(ls_)
   , _fd_locked(std::move(fd_))
-  , _range(dm_, map_fs(_fd_locked.fd(), mapping))
+  , _range(dm_, map_fs(_fd_locked.fd(), mapping, 0))
 {
 }
 catch ( std::exception &e )
 {
-	PLOG("%s: path %s exception %s", __func__, p.c_str(), e.what());
+	/* ERROR: should catch and report above, not here, as the name is gone by this time */
+	PLOG("%s: fd %i exception %s", __func__, _fd_locked.fd(), e.what());
 	throw;
+}
+
+void nupm::space_opened::grow(std::vector<::iovec> && mapping)
+try
+{
+  _range.grow(map_fs(_fd_locked.fd(), mapping, _range.size()));
+}
+catch ( std::exception &e )
+{
+	PLOG("%s: exception %s", __func__, e.what());
+	throw;
+}
+
+void nupm::space_opened::shrink(std::size_t size)
+{
+  _range.shrink(size);
 }

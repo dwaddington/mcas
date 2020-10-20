@@ -55,6 +55,20 @@ common::memory_mapped::memory_mapped(::iovec iov_) noexcept
 {
 }
 
+int common::memory_mapped::shrink_by(std::size_t size_)
+{
+  auto discard_base = iov_end() - size_;
+  auto rc = ::munmap(discard_base, size_);
+  int e = errno;
+  PLOG("%s: from %p,:0x%zx, %i = munmap(%p, %zu)", __func__, iov_base, iov_len, rc, static_cast<const void *>(discard_base), size_);
+  if ( rc != 0 )
+  {
+    PLOG("%s: munmap(%p, %zu) failed: %s", __func__, static_cast<const void *>(discard_base), size_, ::strerror(e));
+    errno = e;
+  }
+  return rc;
+}
+
 common::memory_mapped::~memory_mapped()
 {
   if ( iov_base != nullptr )

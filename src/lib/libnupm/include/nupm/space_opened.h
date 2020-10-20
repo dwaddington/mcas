@@ -25,7 +25,9 @@
 #include <common/memory_mapped.h>
 #include <common/moveable_ptr.h>
 #include <common/types.h> /* addr_t */
+#include <gsl/pointers>
 #include <cstddef>
+#include <experimental/string_view>
 #include <string>
 #include <vector>
 #include <sys/uio.h> /* iovec */
@@ -38,7 +40,7 @@ struct range_use
 {
 private:
   common::moveable_ptr<dax_manager> _dm;
-  /* Note: arena_fs may someday use multiple ranges */
+  /* Note: arena_fs used multiple ranges */
   std::vector<common::memory_mapped> _iovm;
 
   std::vector<common::memory_mapped> address_coverage_check(std::vector<common::memory_mapped> &&iovm);
@@ -48,23 +50,31 @@ public:
   range_use(const range_use &) = delete;
   range_use &operator=(const range_use &) = delete;
   range_use(range_use &&) noexcept = default;
+  void grow(std::vector<common::memory_mapped> &&);
+  void shrink(std::size_t size);
   ~range_use();
+  gsl::not_null<dax_manager *> dm() const { return _dm; }
+  ::off_t size() const;
 };
 
 struct space_opened : private common::log_source
 {
+private:
   common::fd_locked _fd_locked;
   /* Note: arena_fs may someday use multiple ranges */
   range_use _range;
 
   /* owns the file mapping */
   std::vector<common::memory_mapped> map_dev(int fd, const addr_t base_addr);
-  std::vector<common::memory_mapped> map_fs(int fd, const std::vector<::iovec> &mapping);
+  std::vector<common::memory_mapped> map_fs(int fd, const std::vector<::iovec> &mapping, ::off_t offset);
 public:
-  space_opened(const common::log_source &, dax_manager * dm_, const std::string &path, const addr_t base_addr);
-  space_opened(const common::log_source &, dax_manager * dm_, const std::string &path, const std::vector<::iovec> &mapping);
-  space_opened(const common::log_source &, dax_manager * dm_, common::fd_locked && fd, const std::string &path, const std::vector<::iovec> &mapping);
+  space_opened(const common::log_source &, dax_manager * dm_, common::fd_locked && fd, const addr_t base_addr);
+  space_opened(const common::log_source &, dax_manager * dm_, common::fd_locked && fd, const std::vector<::iovec> &mapping);
   space_opened(space_opened &&) noexcept = default;
+  void shrink(std::size_t size);
+  void grow(std::vector<::iovec> && iovv);
+  int fd() const { return _fd_locked.fd(); }
+  range_use &range() { return _range; }
 };
 }
 #endif

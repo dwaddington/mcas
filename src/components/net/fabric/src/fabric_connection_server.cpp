@@ -51,17 +51,18 @@ Fabric_connection_server::Fabric_connection_server(
 }
 
 Fabric_connection_server::~Fabric_connection_server()
-try
 {
-  /* "the flags parameter is reserved and must be 0" */
-  ::fi_shutdown(&ep(), 0);
-/* The client may in turn call fi_shutdown, giving us an event. We do not need to see it.
- */
-}
-catch ( const std::exception &e )
-{
-  std::cerr << "SERVER connection shutdown error " << e.what() << "\n";
-  return;
+  try
+  {
+    /* "the flags parameter is reserved and must be 0" */
+    ::fi_shutdown(&ep(), 0);
+  /* The client may in turn call fi_shutdown, giving us an event. We do not need to see it.
+   */
+  }
+  catch ( const std::exception &e )
+  {
+    std::cerr << "SERVER connection shutdown error " << e.what() << "\n";
+  }
 }
 
 /* The server does not need to do anything to solicit an event,

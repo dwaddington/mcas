@@ -19,6 +19,7 @@
 #include <common/delete_copy.h>
 #include <common/logging.h>
 #include <common/moveable_ptr.h>
+#include <common/utils.h> /* MiB, UNLIKELY */
 #include <api/components.h>
 #include <api/fabric_itf.h>
 #include <api/kvstore_itf.h>

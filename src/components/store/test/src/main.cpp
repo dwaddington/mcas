@@ -6,6 +6,7 @@
 #include <cassert>
 #include <common/json.h>
 #include <common/logging.h>
+#include <common/utils.h> /* MiB */
 #include <cmath>
 #include <iostream>
 #include <map>
@@ -37,13 +38,13 @@ namespace
 		: public custom_store
 	{
 		virtual component::uuid_t factory() const override { return component::hstore_factory; }
-		std::size_t presumed_allocation() const override { return MB(32); }
+		std::size_t presumed_allocation() const override { return MiB(32); }
 	};
 
 	struct custom_hstore_cc
 		: public custom_hstore
 	{
-		std::size_t presumed_allocation() const override { return MB(32); }
+		std::size_t presumed_allocation() const override { return MiB(32); }
 	};
 
 	custom_mapstore custom_mapstore_i{};
@@ -145,7 +146,7 @@ using m = std::map<std::string, p>;
 
   for (unsigned i = 0; i < g_options.iteration; i++) {
     PLOG("Running iteration %d", i);
-    auto pool = kvstore->create_pool("test.pool", MB(2));
+    auto pool = kvstore->create_pool("test.pool", MiB(2));
     if (pool == component::IKVStore::POOL_ERROR) pool = kvstore->open_pool("test.pool");
     assert(pool != component::IKVStore::POOL_ERROR);
     unsigned total = 0;

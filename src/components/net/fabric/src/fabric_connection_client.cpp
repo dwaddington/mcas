@@ -108,16 +108,17 @@ catch ( fabric_runtime_error &e )
 }
 
 Fabric_connection_client::~Fabric_connection_client()
-try
 {
-  /* "the flags parameter is reserved and must be 0" */
-  ::fi_shutdown(&ep(), 0);
-  /* The server may in turn give us a shutdown event. We do not need to see it. */
-}
-catch ( const std::exception &e )
-{
-  std::cerr << "CLIENT connection shutdown error " << e.what() << "\n";
-  return;
+  try
+  {
+    /* "the flags parameter is reserved and must be 0" */
+    ::fi_shutdown(&ep(), 0);
+    /* The server may in turn give us a shutdown event. We do not need to see it. */
+  }
+  catch ( const std::exception &e )
+  {
+    std::cerr << "CLIENT connection shutdown error " << e.what() << "\n";
+  }
 }
 
 /* _ev.read_eq() in client, no-op in server */

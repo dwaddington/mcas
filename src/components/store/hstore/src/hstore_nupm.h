@@ -51,13 +51,9 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   public:
     using open_pool_handle = ::open_pool<non_owner<region_type>>;
     using base = pool_manager<open_pool_handle>;
-    using typename base::region_access;
-    using typename base::region_access_create;
   private:
     std::unique_ptr<dax_manager> _dax_manager;
     unsigned _numa_node;
-
-    static std::uint64_t dax_uuid_hash(const pool_path &p);
 
     void map_create(
       region_type *pop_
@@ -77,22 +73,22 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-    ) -> region_access_create override;
+    ) -> nupm::region_descriptor override;
 
     auto pool_create_2(
       AK_FORMAL
-      const region_access_create &rac
+      const nupm::region_descriptor &rac
       , component::IKVStore::flags_t flags
       , std::size_t expected_obj_count
     ) -> std::unique_ptr<open_pool_handle> override;
 
-    region_access pool_open_1(
+    nupm::region_descriptor pool_open_1(
       const pool_path &path_
     ) override;
 
     auto pool_open_2(
       AK_FORMAL
-      const region_access & v_
+      const nupm::region_descriptor & v_
       , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<open_pool_handle> override;
 
@@ -101,7 +97,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     void pool_delete(const pool_path &path_) override;
 
     /* ERROR: want get_pool_regions(<proper type>, std::vector<::iovec>&) */
-    std::pair<std::string, std::vector<::iovec>> pool_get_regions(const open_pool_handle &) const override;
+    nupm::region_descriptor pool_get_regions(const open_pool_handle &) const override;
   };
 #pragma GCC diagnostic pop
 

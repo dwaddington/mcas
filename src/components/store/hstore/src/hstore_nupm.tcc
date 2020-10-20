@@ -49,13 +49,6 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   }
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
-  std::uint64_t hstore_nupm<Region, Table, Allocator, LockType>::dax_uuid_hash(const pool_path &p)
-  {
-    std::string s = p.str();
-    return CityHash64(s.data(), s.size());
-  }
-
-template <typename Region, typename Table, typename Allocator, typename LockType>
   hstore_nupm<Region, Table, Allocator, LockType>::hstore_nupm(unsigned debug_level_, const std::string &, const std::string &name_, std::unique_ptr<dax_manager> mgr_)
     : pool_manager<::open_pool<non_owner<region_type>>>(debug_level_)
     , _dax_manager(std::move(mgr_))
@@ -76,7 +69,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   auto hstore_nupm<Region, Table, Allocator, LockType>::pool_create_1(
     const pool_path &path_
     , std::size_t size_
-  ) -> region_access_create
+  ) -> nupm::region_descriptor
   {
     auto size = size_;
 
@@ -102,17 +95,15 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     /* Attempt to create a new pool. */
     try
     {
-      PLOG(PREFIX "id %s: creating region length 0x%zx", LOCATION, path_.str().c_str(), size);
+      CPLOG(1, PREFIX "id %s: creating region length 0x%zx", LOCATION, path_.str().c_str(), size);
       auto v = _dax_manager->create_region(path_.str(), _numa_node, size);
       /* Guess that nullptr indicate a failure */
-      if ( ! v.second.size() )
+      if ( v.address_map.empty() )
       {
         throw pool_error("create_region fail: " + path_.str(), pool_ec::region_fail);
       }
-      PLOG(PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), v.second.front().iov_base, v.second.front().iov_len);
-      /* Note: uuid required for, well, something in the caller. Consider moving dax_uuid_hash computation to the caller */
-      auto uuid = dax_uuid_hash(path_);
-      return region_access_create(v.first, v.second.front(), uuid);
+      CPLOG(1, PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), v.address_map.front().iov_base, v.address_map.front().iov_len);
+      return v;
     }
     catch ( const General_exception &e )
     {
@@ -131,7 +122,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
 template <typename Region, typename Table, typename Allocator, typename LockType>
   auto hstore_nupm<Region, Table, Allocator, LockType>::pool_create_2(
     AK_ACTUAL
-    const region_access_create & rac_
+    const nupm::region_descriptor & rac_
     , component::IKVStore::flags_t flags_
     , std::size_t expected_obj_count_
   ) -> std::unique_ptr<open_pool_handle>
@@ -145,14 +136,16 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     try
     {
       open_pool_handle h(
-        new (std::get<1>(rac_).iov_base)
+        new (rac_.address_map.front().iov_base)
         region_type(
           AK_REF this->debug_level()
-          , std::get<2>(rac_) // uuid
-          , std::get<1>(rac_).iov_len
+          /* Note: Consider moving dax_uuid_hash computation to the callee */
+          , CityHash64(&*rac_.id.begin(), rac_.id.size())
+          , rac_.address_map.front().iov_len
           , expected_obj_count_
           , _numa_node
-          , std::get<0>(rac_) // backing file
+          , rac_.id // backing file
+          , rac_.data_file // backing file
         )
       );
       return std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(AK_REF std::move(h), construction_mode::create);
@@ -174,11 +167,11 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   template <typename Region, typename Table, typename Allocator, typename LockType>
   auto hstore_nupm<Region, Table, Allocator, LockType>::pool_open_1(
     const pool_path &path_
-  ) -> region_access
+  ) -> nupm::region_descriptor
   {
     auto iovs = _dax_manager->open_region(path_.str(), _numa_node);
 
-    if ( iovs.second.size() != 1 )
+    if ( iovs.address_map.empty() )
     {
       throw pool_error("in Devdax_manger::open_region faili: " + path_.str(), pool_ec::region_fail);
     }
@@ -189,7 +182,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   template <typename Region, typename Table, typename Allocator, typename LockType>
   auto hstore_nupm<Region, Table, Allocator, LockType>::pool_open_2(
     AK_ACTUAL
-    const region_access & ra_
+    const nupm::region_descriptor & ra_
     , component::IKVStore::flags_t flags_
   ) -> std::unique_ptr<open_pool_handle>
   {
@@ -198,9 +191,14 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       throw pool_error("unsupported flags " + std::to_string(flags_), pool_ec::pool_unsupported_mode);
     }
 
-    open_pool_handle h(new (ra_.second.front().iov_base) region_type(this->debug_level(), _dax_manager, ra_.first ));
-
-    PLOG(PREFIX "in open_2 region at %p", LOCATION, ra_.second.front().iov_base);
+    auto iov_first = ra_.address_map.begin();
+    const auto iov_last = ra_.address_map.end();
+    assert(iov_first != iov_last);
+    ++iov_first;
+    open_pool_handle h(new (ra_.address_map.front().iov_base) region_type(this->debug_level(), _dax_manager, ra_.id, ra_.data_file, &*iov_first, &*iov_last));
+#if 0
+    PLOG(PREFIX "in open_2 region at %p", LOCATION, ra_.address_map.front().iov_base);
+#endif
     /* open_pool_handle is a managed region * */
     auto s = std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(AK_REF std::move(h), construction_mode::reconstitute);
     return s;
@@ -219,7 +217,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
   auto hstore_nupm<Region, Table, Allocator, LockType>::pool_get_regions(const open_pool_handle & pool_) const
-  -> std::pair<std::string, std::vector<::iovec>>
+  -> nupm::region_descriptor
   {
     return pool_->get_regions();
   }

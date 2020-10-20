@@ -105,17 +105,18 @@ void remote_memory_client::send_disconnect(component::IFabric_communicator &cnxn
 }
 
 remote_memory_client::~remote_memory_client()
-try
 {
   if ( _cnxn )
   {
-    send_disconnect(cnxn(), rm_out(), _quit_flag);
+    try
+    {
+      send_disconnect(cnxn(), rm_out(), _quit_flag);
+    }
+    catch ( std::exception &e )
+    {
+      std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+    }
   }
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
 }
 
 void remote_memory_client::write(const std::string &msg_, bool force_error_)

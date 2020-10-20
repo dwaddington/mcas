@@ -16,7 +16,8 @@
 #include <boost/program_options.hpp>
 
 #include <common/exceptions.h>
-#include <common/str_utils.h>
+#include <common/str_utils.h> /* random_string */
+#include <common/utils.h> /* MiB */
 #include <api/components.h>
 #include <api/mcas_itf.h>
 
@@ -41,7 +42,7 @@ int main(int argc, char* argv[])
       ("server-addr", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")
       ;
-    
+
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
 
@@ -60,12 +61,12 @@ int main(int argc, char* argv[])
     return -1;
   }
 
-  
+
   /* load component and create factory */
   IBase *comp = load_component("libcomponent-mcasclient.so", mcas_client_factory);
   auto factory = static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid()));
   assert(factory);
-  
+
   /* create instance of MCAS client session */
   auto mcas = factory->mcas_create(1 /* debug level, 0=off */,
                                    Options.patience,
@@ -82,27 +83,27 @@ int main(int argc, char* argv[])
 
   if (pool == IKVStore::POOL_ERROR) {
     /* ok, try to create pool instead */
-    pool = mcas->create_pool(poolname, MB(32));
+    pool = mcas->create_pool(poolname, MiB(32));
   }
   assert(pool != IKVStore::POOL_ERROR);
 
   auto key = common::random_string(8);
   std::string value = "This is my value " + common::random_string(8);
-  
+
   /* add new item to pool */
   if(mcas->put(pool,
                key,
                value) != S_OK)
     throw General_exception("put failed unexpectedly.");
   std::cout << "Put " << key << " [" << value << "]\n";
-  
+
   /* get the item back */
   std::string retrieved_value;
   if(mcas->get(pool, key, retrieved_value) != S_OK)
     throw General_exception("get failed unexpectedly.");
 
   std::cout << "Retrieved [" << retrieved_value << "]\n";
-  
+
   /* close pool */
   mcas->close_pool(pool);
 

@@ -165,9 +165,9 @@ try
     );
 
   std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
-  _pools.emplace(std::get<1>(rac).iov_base, s);
+  _pools.emplace(rac.address_map.front().iov_base, s);
 
-  return to_pool_t(std::get<1>(rac).iov_base);
+  return to_pool_t(rac.address_map.front().iov_base);
 }
 catch ( const pool_error & )
 {
@@ -190,26 +190,26 @@ auto hstore::open_pool(const std::string &name_,
 
     std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
     /* open pools are indexed by the base address of their first (contiguous) segment */
-    if ( v.second.empty() )
+    if ( v.address_map.empty() )
     {
       return component::IKVStore::POOL_ERROR; /* pool not found (by name) */
     }
     else
     {
-      auto it = _pools.find(v.second.front().iov_base);
+      auto it = _pools.find(v.address_map.front().iov_base);
       if ( it != _pools.end() )
       {
         /* already have a session, make a copy of the pointer */
-        _pools.emplace(v.second.front().iov_base, it->second);
+        _pools.emplace(v.address_map.front().iov_base, it->second);
       }
       else
       {
         /* no session yet, create one */
         auto s = _pool_manager->pool_open_2(AK_INSTANCE v, flags);
         /* explicit conversion to shared_ptr fpr g++ 5 */
-        _pools.emplace(v.second.front().iov_base, std::shared_ptr<open_pool_t>(s.release()));
+        _pools.emplace(v.address_map.front().iov_base, std::shared_ptr<open_pool_t>(s.release()));
       }
-      return to_pool_t(v.second.front().iov_base);
+      return to_pool_t(v.address_map.front().iov_base);
     }
   }
   catch( const pool_error & ) {
@@ -250,7 +250,7 @@ status_t hstore::delete_pool(const std::string& name_)
   try {
     _pool_manager->pool_delete(path);
   }
-  catch ( const std::domain_error & )  {
+  catch ( const std::runtime_error & )  {
     return E_POOL_NOT_FOUND;
   }
   catch ( const std::invalid_argument & )  {
@@ -354,7 +354,7 @@ auto hstore::put(const pool_t pool,
   }
 }
 
-auto hstore::get_pool_regions(const pool_t pool, std::pair<std::string, std::vector<::iovec>>& out_regions) -> status_t
+auto hstore::get_pool_regions(const pool_t pool, nupm::region_descriptor & out_regions) -> status_t
 {
   const auto session = static_cast<session_t *>(locate_session(pool));
   if ( ! session )

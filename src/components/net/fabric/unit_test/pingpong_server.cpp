@@ -110,15 +110,16 @@ pingpong_stat pingpong_server::time()
 }
 
 pingpong_server::~pingpong_server()
-try
 {
   if ( _th.valid() )
   {
-    _th.get();
+    try
+    {
+      _th.get();
+    }
+    catch ( std::exception &e )
+    {
+      std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+    }
   }
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
 }

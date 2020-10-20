@@ -70,16 +70,17 @@ catch ( std::exception &e )
 }
 
 remote_memory_client_grouped::~remote_memory_client_grouped()
-try
 {
-  remote_memory_subclient rms(*this, _memory_size, _remote_key_index_for_startup_and_shutdown);
-  auto &cnxn = rms.cnxn();
-  send_disconnect(cnxn, rm_out(), _quit_flag);
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
+  try
+  {
+    remote_memory_subclient rms(*this, _memory_size, _remote_key_index_for_startup_and_shutdown);
+    auto &cnxn = rms.cnxn();
+    send_disconnect(cnxn, rm_out(), _quit_flag);
+  }
+  catch ( std::exception &e )
+  {
+    std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  }
 }
 
 void remote_memory_client_grouped::send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)

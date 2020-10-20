@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -17,35 +17,28 @@
  *
  */
 
-#include "fd_unblock_set_monitor.h"
+#include <nupm/space_registered.h>
 
-#include <iostream> /* cerr */
-
-using guard = std::lock_guard<std::mutex>;
-
-fd_unblock_set_monitor:: fd_unblock_set_monitor(std::mutex &m_, std::set<int> &s_, int fd_)
-  : _m(m_)
-  , _s(s_)
-  , _fd(fd_)
+nupm::space_registered::space_registered(
+  const common::log_source &ls_
+  , dax_manager * dm_
+  , common::fd_locked &&fd_
+  , const string_view &name_
+  , addr_t base_addr_
+)
+  : _pu(ls_, name_)
+ , _or(ls_, dm_, std::move(fd_), base_addr_)
 {
-  guard g{_m};
-  _s.insert(_fd);
 }
 
-fd_unblock_set_monitor::~fd_unblock_set_monitor()
+nupm::space_registered::space_registered(
+  const common::log_source &ls_
+  , dax_manager * dm_
+  , common::fd_locked &&fd_
+  , const string_view &name_
+  , const std::vector<::iovec> &mapping_
+)
+  : _pu(ls_, name_)
+  , _or(ls_, dm_, std::move(fd_), mapping_)
 {
-  try
-  {
-    guard g{_m};
-    _s.erase(_fd);
-  }
-  catch ( const std::exception &e )
-  {
-    try
-    {
-      std::cerr << __func__ << " exception " << e.what() << "\n";
-    }
-    catch ( const std::exception & )
-    {}
-  }
 }
