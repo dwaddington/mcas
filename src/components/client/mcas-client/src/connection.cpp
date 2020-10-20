@@ -16,6 +16,7 @@
 #include "protocol.h"
 #include "range.h"
 
+
 #include <city.h>
 #include <common/cycles.h>
 #include <common/delete_copy.h>
@@ -25,6 +26,22 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+
+
+#include <rapidjson/error/en.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/prettywriter.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
+#include <rapidjson/schema.h>
+#pragma GCC diagnostic pop
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/error/error.h>  // rapidjson::ParseErrorCode
+
+namespace mcas
+{
+[[noreturn]] void throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset);
+}
 
 //#define DEBUG_NPC_RESPONSES
 
@@ -835,10 +852,11 @@ private:
   }
 };
 
-Connection_handler::Connection_handler(unsigned                    debug_level_,
+Connection_handler::Connection_handler(const unsigned              debug_level,
                                        Connection_base::Transport *connection,
-                                       unsigned                    patience_)
-    : Connection_base(debug_level_, connection, patience_),
+                                       const unsigned              patience,
+                                       const std::string           other)
+    : Connection_base(debug_level, connection, patience),
 #ifdef THREAD_SAFE_CLIENT
       _api_lock{},
 #endif
@@ -850,11 +868,35 @@ Connection_handler::Connection_handler(unsigned                    debug_level_,
 {
   char *env = ::getenv("SHORT_CIRCUIT_BACKEND");
   if (env && env[0] == '1') {
-    _options.short_circuit_backend = true;
+    _options.short_circuit_backend = true;    
   }
+
+  if(!other.empty()) {
+    try {
+      rapidjson::Document doc;
+      doc.Parse(other.c_str());
+      auto security = doc.FindMember("security");
+
+      /* set security options */
+      if(security != doc.MemberEnd() && doc["security"].IsString()) {
+        std::string option(doc["security"].GetString());
+        if(option == "tls:hmac") {
+          _options.tls = true;
+          _options.hmac = true;
+        }
+      }
+    }
+    catch (...) {
+      throw API_exception("extra configuration string parse failed");
+    }
+  }
+
 }
 
-Connection_handler::~Connection_handler() { PLOG("%s: (%p)", __func__, static_cast<const void *>(this)); }
+Connection_handler::~Connection_handler()
+{
+  PLOG("%s: (%p)", __func__, static_cast<const void *>(this));
+}
 
 void Connection_handler::send_complete(void *param, buffer_t *iob)
 {
@@ -874,8 +916,7 @@ void Connection_handler::read_complete(void *param, buffer_t *iob)
 }
 
 Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
-                                                         const unsigned int  // flags
-)
+                                                         const unsigned int)  // flags
 {
   API_LOCK();
 
@@ -2327,14 +2368,17 @@ auto Connection_handler::make_iob_ptr_recv() -> iob_ptr
 {
   return make_iob_ptr(recv_complete);
 }
+
 auto Connection_handler::make_iob_ptr_send() -> iob_ptr
 {
   return make_iob_ptr(send_complete);
 }
+
 auto Connection_handler::make_iob_ptr_write() -> iob_ptr
 {
   return make_iob_ptr(write_complete);
 }
+
 auto Connection_handler::make_iob_ptr_read() -> iob_ptr
 {
   return make_iob_ptr(read_complete);
@@ -2354,6 +2398,11 @@ int Connection_handler::tick()
       const auto iob = make_iob_ptr_send();
       auto       msg = new (iob->base()) mcas::protocol::Message_handshake(auth_id(), 1);
       msg->set_status(S_OK);
+
+      /* set security options */
+      msg->security_tls = _options.tls;
+      msg->security_hmac = _options.hmac;
+      
       iob->set_length(msg->msg_len());
       post_send(iob->iov, iob->iov + 1, iob->desc, &*iob, msg, __func__);
 

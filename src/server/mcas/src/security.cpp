@@ -1,9 +1,11 @@
 #include "security.h"
 
+#include <future>
 #include <api/components.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/net.h>
+#include <common/dump_utils.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -11,7 +13,7 @@
 #include <fstream>
 
 #define LOG_PREFIX "Shard_security: "
-#define CIPHER_SUITE \
+#define CIPHER_SUITE                            \
   "NORMAL:+AEAD"  // PERFORMANCE:+AEAD"
                   // //"PERFORMANCE:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:-ARCFOUR-128:-PSK:-DHE-PSK:+AEAD"
 
@@ -25,12 +27,12 @@ Shard_security::Shard_security(const boost::optional<std::string> cert_path,
                                const unsigned port,
                                const unsigned debug_level)
   : common::log_source(debug_level),
-  _mcas_cert_path(cert_path ? *cert_path : ""),
-  _auth_enabled(!_mcas_cert_path.empty()), /* if no certificate path is given, then authentication is turned off */
-  _mode(security_mode_t::NONE),
-  _ipaddr(ipaddr ? *ipaddr : ""),
-  _port(port),
-  _crypto(nullptr)
+    _mcas_cert_path(cert_path ? *cert_path : ""),
+    _auth_enabled(!_mcas_cert_path.empty()), /* if no certificate path is given, then authentication is turned off */
+    _mode(security_mode_t::NONE),
+    _ipaddr(ipaddr ? *ipaddr : ""),
+    _port(port),
+    _crypto(nullptr)
 {
   if(_auth_enabled) {
     if(_ipaddr.empty()) { /* if no address given, use IP address associated with net device */
@@ -41,37 +43,71 @@ Shard_security::Shard_security(const boost::optional<std::string> cert_path,
     if(*mode == "tls-hmac") {
       CPLOG(1, LOG_PREFIX "security mode TLS HMAC (port=%u)(ipaddr=%s)", port, _ipaddr.c_str());
       _mode = security_mode_t::TLS_HMAC;
+
+      PLOG(LOG_PREFIX "enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _mcas_cert_path.c_str(), _ipaddr.c_str(), port);
+
+      // /* create crypto component */
+      // {
+      //   using namespace component;
+      //   IBase *comp = load_component("libcomponent-tls.so", tls_factory);
+
+      //   assert(comp);
+      //   auto fact = make_itf_ref(static_cast<ICrypto_factory *>(comp->query_interface(ICrypto_factory::iid())));
+      //   std::map<std::string, std::string> params;
+      //   _crypto = make_itf_ref(static_cast<ICrypto *>(fact->create(debug_level, params)));
+      //   PNOTICE("_crypto component instance: %p", reinterpret_cast<void*>(_crypto.get()));
+
+      //   if (_crypto->initialize(CIPHER_SUITE,
+      //                           _mcas_cert_path + "mcas-cert.pem",
+      //                           _mcas_cert_path + "mcas-privkey.pem") != S_OK)
+      //     throw General_exception("crypto initialization failed");
+      // }
+
+      // /* set up async task to do work of accepting connection */
+      // _tls_session = std::async(std::launch::async,
+      //                           &Shard_security::tls_session_entry,
+      //                           this);
+
     }
 
-    PLOG(LOG_PREFIX "enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _mcas_cert_path.c_str(), _ipaddr.c_str(), port);
-
-    /* creat crypto component */
-    {
-      using namespace component;
-      IBase *comp = load_component("libcomponent-tls.so", tls_factory);
-
-      assert(comp);
-      auto fact = make_itf_ref(static_cast<ICrypto_factory *>(comp->query_interface(ICrypto_factory::iid())));
-      std::map<std::string, std::string> params;
-      _crypto = make_itf_ref(static_cast<ICrypto *>(fact->create(debug_level, params)));
-      PNOTICE("_crypto component instance: %p", reinterpret_cast<void*>(_crypto.get()));
-
-      if (_crypto->initialize(CIPHER_SUITE,
-                              _mcas_cert_path + "mcas-cert.pem",
-                              _mcas_cert_path + "mcas-privkey.pem") != S_OK)
-        throw General_exception("crypto initialization failed");
-    }
-    /* set up async task to do work of accepting connection */
     CPLOG(1, LOG_PREFIX "initialization OK");
   }
 }
 
 Shard_security::~Shard_security()
 {
-  PNOTICE("Shard security object deletion");
-  _crypto->shutdown();
-  PNOTICE("Crypto shutdown OK");
+  if(_crypto) {
+    PNOTICE("Shard security object deletion");
+    _crypto->shutdown();
+    PNOTICE("Crypto shutdown OK");
+    PNOTICE("interrupting thread");
+
+  }
 }
+
+// void Shard_security::tls_session_entry()
+// {
+//   PNOTICE("GNU TLS accepting session (%s,%u)", _ipaddr.c_str(), _port);
+
+//   try {
+//     auto session = _crypto->accept_cert_session(_ipaddr.c_str(), _port, 100);
+
+//     std::string key3;
+//     _crypto->export_key(session, "SOMELABEL", 0, 8, key3);
+//     hexdump(key3.c_str(), 8);
+
+//   }
+//   catch(General_exception&) {
+//   }
+//   PNOTICE("GNU TLS session accepted");
+
+
+//   // while(1) {
+//   //   PLOG("TLS session");
+//   //   sleep(1);
+//   // }
+  
+// }
 
 }  // namespace mcas
 
@@ -80,7 +116,7 @@ Shard_security::~Shard_security()
 namespace mcas
 {
 class Shard_security_state : private common::log_source {
- public:
+public:
   Shard_security_state(const std::string &certs_path,
                        const unsigned debug_level_)
     : common::log_source(debug_level_), _cert(nullptr), _cert_base64{}
@@ -135,7 +171,7 @@ class Shard_security_state : private common::log_source {
     if (_cert) X509_free(_cert);
   }
 
- private:
+private:
   X509 *      _cert;
   std::string _cert_base64;
 };

@@ -79,7 +79,7 @@ TEST_F(TLS_test, CertServer)
 {
   ASSERT_TRUE(_crypto->initialize(CIPHER_SUITE, Options.cert_file, Options.key_file) == S_OK);
 
-  auto session = _crypto->accept_cert_session("127.0.0.1", 8888);
+  auto session = _crypto->accept_cert_session("127.0.0.1", 8888, 100);
 
   std::string label = "SOMELABEL";
   PMAJOR("Server keys:");

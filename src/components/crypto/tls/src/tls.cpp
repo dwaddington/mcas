@@ -10,9 +10,12 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
+#include <chrono>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -351,6 +354,7 @@ private:
   gnutls_priority_t                _priority;
 };
 
+
 /**
  * @brief      Server-side for cert+key session with a client
  */
@@ -360,35 +364,38 @@ class Cert_server_session : public Crypto_session_base,
 public:
   Cert_server_session() = delete;
 
-  Cert_server_session(unsigned debug_level,
+  Cert_server_session(const unsigned debug_level,
                       const std::shared_ptr<Crypto_server_state> state,
                       const std::string& ipaddr,
-                      int port)
+                      const int port,
+                      const unsigned int timeout_ms)
     : Crypto_session_base(true, S_OK), common::log_source(debug_level), _state(state)
   {
     struct sockaddr_in sa_serv;
-    struct sockaddr_in sa_cli;
-    int                optval = 1, ret = 0;
-    socklen_t          client_len = sizeof(sa_cli);
+    int                optval = 1;
 
-    auto listen_sd = socket(AF_INET, SOCK_STREAM, 0);
+    _listen_sd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&sa_serv, '\0', sizeof(sa_serv));
 
+    sa_serv.sin_family = AF_INET;
+    
     if(ipaddr.empty())
-      sa_serv.sin_family = AF_INET;
+      sa_serv.sin_addr.s_addr = INADDR_ANY;
     else
-      sa_serv.sin_family = inet_addr(ipaddr.c_str());
-        
-    sa_serv.sin_addr.s_addr = INADDR_ANY;
-    sa_serv.sin_port        = boost::numeric_cast<in_port_t>(htons(port));
+      sa_serv.sin_addr.s_addr = inet_addr(ipaddr.c_str());
+    
+    sa_serv.sin_port = boost::numeric_cast<in_port_t>(htons(port));
 
-    if (setsockopt(listen_sd, SOL_SOCKET, SO_REUSEADDR, static_cast<void*>(&optval), sizeof(int)) != 0)
+    if (setsockopt(_listen_sd, SOL_SOCKET, SO_REUSEADDR, static_cast<void*>(&optval), sizeof(int)) != 0)
       throw General_exception("setsockopt() failed");
 
-    if (bind(listen_sd, reinterpret_cast<struct sockaddr*>(&sa_serv), sizeof(sa_serv)) != 0)
-      throw General_exception("bind() failed");
+    if (fcntl(_listen_sd, F_SETFL, fcntl(_listen_sd, F_GETFL, 0) | O_NONBLOCK) == -1)
+      throw General_exception("fcntl() failed");
+    
+    if (bind(_listen_sd, reinterpret_cast<struct sockaddr*>(&sa_serv), sizeof(sa_serv)) != 0)
+      throw General_exception("bind() failed: errno=%d", errno);
 
-    if (listen(listen_sd, 1024) != 0)
+    if (listen(_listen_sd, 1024) != 0)
       throw General_exception("list() failed");
 
     /* initialize session */
@@ -408,10 +415,37 @@ public:
     // gnutls_server_name_set(session, GNUTLS_NAME_DNS, "www.example.com", strlen("www.example.com"))
 
     gnutls_handshake_set_timeout(_session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+    //gnutls_handshake_set_timeout(_session, 100); // normally GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT
+    //    gnutls_transport_set_pull_timeout_function(_session, tls_timeout);
+  }
+
+  status_t try_accept(unsigned int timeout_ms)
+  {
+    using clock = std::chrono::high_resolution_clock;
+    
+    int ret = 0;
+    struct sockaddr_in sa_cli;
+    socklen_t client_len = sizeof(sa_cli);
+
+    
+    PLOG("calling accept ..timeout_ms = %u", timeout_ms);
+
+    auto start_time = clock::now();
+    do {
+      _sd = ::accept(_listen_sd, reinterpret_cast<struct sockaddr*>(&sa_cli), &client_len);
+      if(_sd > 0) break;
+      usleep(10000);
+      auto int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start_time);
+      if(int_ms.count() > timeout_ms) {
+        return E_TIMEOUT;
+      }
+    }
+    while(_sd == -1 && errno == EWOULDBLOCK);
+    
+    if(_sd == -1)
+      throw General_exception("unexpected result from TLS accept");
 
     char topbuf[512];
-    _sd = accept(listen_sd, reinterpret_cast<struct sockaddr*>(&sa_cli), &client_len);
-
     CPLOG(1, "- connection from %s, port %d\n", inet_ntop(AF_INET, &sa_cli.sin_addr, topbuf, sizeof(topbuf)),
           ntohs(sa_cli.sin_port));
 
@@ -423,7 +457,7 @@ public:
       _sd = 0;
       gnutls_deinit(_session);
       PWRN("Client: handshake has failed (%s)\n\n", gnutls_strerror(ret));
-      return;
+      return E_FAIL;
     }
 
     /* examine peer (client) x509 certificate */
@@ -474,6 +508,7 @@ public:
     }
 
     print_info(_session);
+    return S_OK;
   }
 
   status_t shutdown()
@@ -500,6 +535,7 @@ public:
   std::string uuid() const { return _x509_serial_base64; }
 
 private:
+  int _listen_sd;
   const std::shared_ptr<Crypto_server_state> _state;
 };
 
@@ -532,9 +568,12 @@ ICrypto::session_t Crypto::open_psk_session(const std::string& server_ip,
 }
 
 ICrypto::session_t Crypto::accept_cert_session(const std::string& ip_addr,
-                                               const int port)
+                                               const int port,
+                                               const unsigned int timeout)
 {
-  auto session = new Cert_server_session(_debug_level, _state, ip_addr, port);
+  auto session = new Cert_server_session(_debug_level, _state, ip_addr, port, timeout);
+  if(session->try_accept(timeout) == E_TIMEOUT)
+    throw General_exception("accept timeout");
   _sessions.insert(session);
   return session;
 }

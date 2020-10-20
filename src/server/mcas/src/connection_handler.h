@@ -45,7 +45,8 @@ using Connection_base = Fabric_connection_base;
  */
 class Connection_handler
     : public Connection_base
-    , public Region_manager {
+    , public Region_manager
+{
 
  protected:
   enum State {
@@ -59,6 +60,7 @@ class Connection_handler
   enum {
     TICK_RESPONSE_CONTINUE        = 0,
     TICK_RESPONSE_BOOTSTRAP_SPAWN = 1,
+    TICK_RESPONSE_FIRST           = 2,
     TICK_RESPONSE_CLOSE           = 0xFF,
   };
 
@@ -68,6 +70,12 @@ class Connection_handler
     ACTION_POOL_DELETE,
   };
 
+  struct security_options_t {
+    std::string ipaddr; // interface to bind to
+    unsigned port; // port to bind to
+  };
+ 
+
  private:
   State    _state       = State::INITIAL;
   unsigned option_DEBUG = mcas::global::debug_level;
@@ -75,14 +83,14 @@ class Connection_handler
   /* list of pre-registered memory regions; normally one region */
   std::vector<component::IKVStore::memory_handle_t> _mr_vector;
 
-  uint64_t               _tick_count alignas(8);
-  uint64_t               _auth_id;
-  std::queue<buffer_t *> _pending_msgs;
-  std::queue<action_t>   _pending_actions;
-#if 0
-  double                 _freq_mhz;
-#endif
-  Pool_manager _pool_manager; /* instance shared across connections */
+  uint64_t                            _tick_count alignas(8);
+  uint64_t                            _auth_id;
+  std::queue<buffer_t *>              _pending_msgs;
+  std::queue<action_t>                _pending_actions;
+  std::shared_ptr<security_options_t> _security_options;
+  Pool_manager                        _pool_manager; /* instance shared across connections */
+
+  
   /* Adaptor point for different transports */
   using Connection = component::IFabric_server;
   using Factory    = component::IFabric_server_factory;
@@ -157,9 +165,10 @@ class Connection_handler
   }
 
  public:
-  explicit Connection_handler(unsigned debug_level_,
-    gsl::not_null<Factory *> factory,
-    gsl::not_null<Connection *> connection);
+
+  explicit Connection_handler(unsigned debug_level,
+                              gsl::not_null<Factory *> factory,
+                              gsl::not_null<Connection *> connection);
 
   ~Connection_handler();
 

@@ -38,33 +38,21 @@ MCAS_client::MCAS_client(const unsigned                      debug_level,
                          const boost::optional<std::string> &provider,
                          const std::string &                 dest_addr,
                          std::uint16_t                       port,
-                         const unsigned                      patience_)
-    : _debug(debug_level, this, dest_addr, port),
-      _factory(load_factory()),
-      _fabric(make_fabric(*_factory, src_addr, src_device, provider)),
-      _transport(_fabric->open_client(common::json::serializer<common::json::dummy_writer>::object{}.str(), dest_addr, port)),
-      _connection(std::make_unique<mcas::client::Connection_handler>(debug_level, _transport.get(), patience_)),
-      _open_connection(*_connection)
+                         const unsigned                      patience_,
+                         const std::string                   other_)
+: common::log_source(debug_level),
+  _factory(load_factory()),
+  _fabric(make_fabric(*_factory, src_addr, src_device, provider)),
+  _transport(_fabric->open_client(common::json::serializer<common::json::dummy_writer>::object{}.str(), dest_addr, port)),
+  _connection(std::make_unique<mcas::client::Connection_handler>(debug_level, _transport.get(), patience_, other_)),
+  _open_connection(*_connection)
 {
+  CPLOG(1, "Extra config: %s", other_.c_str());
 }
-
-Mcas_client_debug::Mcas_client_debug(const unsigned     debug_level,
-                                     const void *       ths,
-                                     const std::string &ip_addr,
-                                     std::uint16_t      port)
-{
-  mcas::global::debug_level = debug_level;
-  if (debug_level > 1) {
-    PLOG("%s: protocol session: %p (%s) (%d)", __func__, ths, ip_addr.c_str(), port);
-  }
-}
-
-Mcas_client_debug::~Mcas_client_debug() { PLOG("%s: closed fabric transport.", __func__); }
 
 Open_connection::Open_connection(mcas::client::Connection_handler &_connection)
     : _open_cnxn((_connection.bootstrap(), &_connection))
 {
-  PLOG("%s %p", __func__, static_cast<void *>(this));
 }
 
 Open_connection::~Open_connection()
@@ -72,14 +60,14 @@ Open_connection::~Open_connection()
   if (_open_cnxn) {
     _open_cnxn->shutdown();
   }
-  PLOG("%s %p", __func__, static_cast<void *>(this));
 }
 
 auto MCAS_client::load_factory() -> IFabric_factory *
 {
   IBase *comp = load_component("libcomponent-fabric.so", net_fabric_factory);
 
-  if (!comp) throw General_exception("Fabric component not found");
+  if (!comp)
+    throw General_exception("Fabric component not found");
 
   auto factory = static_cast<IFabric_factory *>(comp->query_interface(IFabric_factory::iid()));
   assert(factory);

@@ -87,11 +87,13 @@ public:
    *
    * @param[in]  ip_addr Network interface IP addr
    * @param[in]  port  Network port
+   * @param[in]  timeout  Timeout in milliseconds
    *
    * @return     Session handle (free with close_session)
    */
   virtual session_t accept_cert_session(const std::string& ip_addr,
-                                        const int port) = 0;
+                                        const int port,
+                                        const unsigned int timeout_ms) = 0;
 
   /**
    * @brief      Client-side open certificate-based session

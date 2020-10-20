@@ -435,9 +435,13 @@ void Shard::main_loop(common::profiler &pr_)
         /* issue tick, unless we are stalling */
         auto tick_response = handler->tick();
 
+        if(tick_response == mcas::Connection_handler::TICK_RESPONSE_FIRST) {
+          /* first tick, complete initialization */
+          PNOTICE("First tick!!!");
+        }
         /* Close session, this will occur if the client shuts down (cleanly or
          * not). Also close sessions in response to SIGINT */
-        if ((tick_response == mcas::Connection_handler::TICK_RESPONSE_CLOSE) ||
+        else if ((tick_response == mcas::Connection_handler::TICK_RESPONSE_CLOSE) ||
             (signals::sigint > 0)) {
           idle = 0;
 

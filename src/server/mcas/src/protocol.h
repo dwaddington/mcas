@@ -78,6 +78,13 @@ enum {
   PROTOCOL_V2 = 0x2, /*< Memory-Centric Active Storage */
 };
 
+
+enum {
+  AUTH_NONE = 0x0,
+  AUTH_TLS_HMAC = 0x1,
+  AUTH_TLS_FULL = 0x2,
+};
+
 /* _resvd flags */
 enum {
   MSG_RESVD_SCBE   = 0x2, /* indicates short-circuit function (testing only) */
@@ -767,7 +774,9 @@ struct Message_handshake : public Message {
   Message_handshake(uint64_t auth_id, uint64_t sequence)
       : Message(auth_id, (sizeof *this), id, OP_INVALID),
         seq(sequence),
-        protocol(PROTOCOL_V1)
+        protocol(PROTOCOL_V1),
+        security_tls(0),
+        security_hmac(0)
   {
   }
 
@@ -776,8 +785,12 @@ struct Message_handshake : public Message {
   // fields
   uint64_t seq;
   uint8_t  protocol;
+  bool security_tls  : 1;
+  bool security_hmac : 1;
 
-  void set_as_protocol() { protocol = PROTOCOL_V2; }
+  inline void set_as_protocol() { protocol = PROTOCOL_V2; }
+  inline void set_auth_tls_hmac() { security_tls = true; security_hmac = true; }
+  inline bool is_auth_tls_hmac() const { return security_tls && security_hmac; }
 
 } __attribute__((packed));
 

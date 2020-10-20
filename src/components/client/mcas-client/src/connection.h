@@ -10,8 +10,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __mcas_CLIENT_HANDLER_H__
-#define __mcas_CLIENT_HANDLER_H__
+#ifndef __MCAS_CLIENT_HANDLER_H__
+#define __MCAS_CLIENT_HANDLER_H__
 
 #include "fabric_transport.h"
 #include "mcas_client_config.h"
@@ -45,8 +45,10 @@
 
 namespace mcas
 {
+
 namespace client
 {
+
 struct async_buffer_set_t;
 struct iob_free;
 
@@ -71,12 +73,15 @@ class Connection_handler : public Connection_base {
    *
    * @param debug_level
    * @param connection
-   * @param patience time to wait (in seconds) for single fabric post to
-   * complete
+   * @param patience Time to wait (in seconds) for single fabric post to complete
+   * @param other Additional configuration string
    *
    * @return
    */
-  Connection_handler(unsigned debug_level, Connection_base::Transport *connection, unsigned patience);
+  Connection_handler(const unsigned debug_level,
+                     Connection_base::Transport *connection,
+                     const unsigned patience,
+                     const std::string other);
 
   ~Connection_handler();
 
@@ -88,7 +93,6 @@ class Connection_handler : public Connection_base {
     SHUTDOWN,
     STOPPED,
     READY,
-    //    WAIT_RESPONSE,
   };
 
   State _state = State::INITIALIZE;
@@ -490,7 +494,12 @@ class Connection_handler : public Connection_base {
 
   struct options_s {
     bool short_circuit_backend;
-    options_s() : short_circuit_backend(env_scbe && env_scbe[0] == '1') {}
+    unsigned tls   : 1;
+    unsigned hmac : 1;
+    
+    options_s()
+      : short_circuit_backend(env_scbe && env_scbe[0] == '1'), tls(0), hmac(0)
+    {}
   };
 
   options_s _options;

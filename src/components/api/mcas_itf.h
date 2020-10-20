@@ -668,6 +668,7 @@ public:
   virtual void debug(const IMCAS::pool_t pool, const unsigned cmd, const uint64_t arg) = 0;
 };
 
+
 class IMCAS_factory : public IKVStore_factory {
 public:
   // clang-format off
@@ -685,25 +686,26 @@ public:
    *
    * @return Pointer to IMCAS instance. Use release_ref() to close.
    */
-  virtual IMCAS* mcas_create(unsigned, // debug_level
-                             unsigned, // patience with server (in seconds)
+  virtual IMCAS* mcas_create(const unsigned, // debug_level
+                             const unsigned, // patience with server (in seconds)
                              const std::string&, // owner
                              const boost::optional<std::string>&, // src_nic_device
                              const boost::optional<std::string>&, // src_ip_addr
-                             const std::string& // dest_addr_with_port
-                             )
+                             const std::string&, // dest_addr_with_port
+                             const std::string = "") // other 
   {
     throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,owner,addr_with_port,"
                         "nic_device) not implemented");
   }
   
-  IMCAS* mcas_create(unsigned debug_level,
-                     unsigned patience,
+  IMCAS* mcas_create(const unsigned debug_level,
+                     const unsigned patience,
                      const std::string& owner,
                      const std::string& dest_addr_with_port,
-                     const std::string& nic_device)
+                     const std::string& nic_device,
+                     const std::string other = "")
   {
-    return mcas_create(debug_level, patience, owner, nic_device, boost::optional<std::string>(), dest_addr_with_port);
+    return mcas_create(debug_level, patience, owner, nic_device, boost::optional<std::string>(), dest_addr_with_port, other);
   }
 };
 
