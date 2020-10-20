@@ -18,6 +18,7 @@ endif()
 add_definitions(-DCONFIG_DEBUG) # P{LOG,DEG,INF,WRN,ERR} control
 
 include_directories(../../../../lib/common/include)
+include_directories(../../../../lib/libnupm/include)
 include_directories(../../../)
 
 add_executable(hstore-test1 test1.cpp store_map.cpp)

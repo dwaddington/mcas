@@ -13,13 +13,13 @@
 
 #include "arena_dev.h"
 
+#include "dax_data.h"
 #include <city.h> /* CityHash */
-#include <nupm/dax_data.h>
 #include <cinttypes>
 
 namespace
 {
-	std::uint64_t make_uuid(const arena_dev::string_view id_)
+	std::uint64_t make_uuid(const arena_dev::string_view &id_)
 	{
 		return ::CityHash64(id_.begin(), id_.size());
 	}
@@ -35,7 +35,7 @@ void arena_dev::debug_dump() const
   _hdr->debug_dump();
 }
 
-auto arena_dev::region_get(const string_view id_) -> region_access
+auto arena_dev::region_get(const string_view &id_) -> region_descriptor
 {
   ::iovec iov;
   iov.iov_base = _hdr->get_region(make_uuid(id_), &iov.iov_len);
@@ -44,10 +44,10 @@ auto arena_dev::region_get(const string_view id_) -> region_access
   {
     v.push_back(iov);
   }
-  return region_access{std::string(), v};
+  return region_descriptor(v);
 }
 
-auto arena_dev::region_create(const string_view id_, gsl::not_null<nupm::registry_memory_mapped *>, const std::size_t size) -> region_access
+auto arena_dev::region_create(const string_view &id_, gsl::not_null<registry_memory_mapped *>, const std::size_t size) -> region_descriptor
 {
   auto size_in_grains = boost::numeric_cast<nupm::DM_region::grain_offset_t>(div_round_up(size, _hdr->grain_size()));
 
@@ -55,15 +55,22 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<nupm::registr
        size_in_grains, REDUCE_MiB((1UL << DM_REGION_LOG_GRAIN_SIZE)*size_in_grains));
 
   return
-    region_access(
-      region_access::first_type()
-      , region_access::second_type(1, ::iovec{_hdr->allocate_region(make_uuid(id_), size_in_grains), size_in_grains * _hdr->grain_size()})
+    region_descriptor(
+      region_descriptor::address_map_t(1, ::iovec{_hdr->allocate_region(make_uuid(id_), size_in_grains), size_in_grains * _hdr->grain_size()})
     ); /* allocates n grains */
 }
 
-void arena_dev::region_erase(const string_view id_, gsl::not_null<nupm::registry_memory_mapped *>)
+void arena_dev::region_erase(const string_view &id_, gsl::not_null<registry_memory_mapped *>)
 {
   _hdr->erase_region(make_uuid(id_));
+}
+
+void arena_dev::region_resize(
+  gsl::not_null<space_registered *>  // mh
+  , std::size_t // size
+)
+{
+  /* Dax_manager does not implement resize, although it could support shrinking a region */
 }
 
 std::size_t arena_dev::get_max_available() { return _hdr->get_max_available(); }

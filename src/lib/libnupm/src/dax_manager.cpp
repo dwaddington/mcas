@@ -12,11 +12,12 @@
 */
 
 #include "dax_manager.h"
+
 #include "arena.h"
 #include "arena_dev.h"
 #include "arena_fs.h"
 #include "arena_none.h"
-#include "dax_data.h"
+#include "dax_data.h" /* DM_region_header */
 #include "nd_utils.h"
 
 #include <common/exceptions.h>
@@ -25,13 +26,8 @@
 #include <common/utils.h>
 
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/sysmacros.h>
-#include <sys/types.h>
-#include <boost/scope_exit.hpp>
+#include <sys/mman.h> /* MAP_LOCKED */
 #include <boost/icl/split_interval_map.hpp>
-#include <gsl/pointers>
 #include <experimental/filesystem>
 #include <cinttypes>
 #include <fstream>
@@ -41,21 +37,6 @@
 #include <stdexcept>
 
 #define DEBUG_PREFIX "dax_manager: "
-
-static constexpr unsigned MAP_LOG_GRAIN = 21U;
-static constexpr std::size_t MAP_GRAIN = std::size_t(1) << MAP_LOG_GRAIN;
-static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
-
-#ifndef MAP_SYNC
-#define MAP_SYNC 0x80000
-#endif
-
-#ifndef MAP_SHARED_VALIDATE
-#define MAP_SHARED_VALIDATE 0x03
-#endif
-
-#include <thread>
-#include <sstream>
 
 namespace fs = std::experimental::filesystem;
 
@@ -92,32 +73,35 @@ const int nupm::dax_manager::effective_map_locked = init_map_lock_mask();
 constexpr const char *nupm::dax_manager::_cname;
 
 nupm::path_use::path_use(path_use &&other_) noexcept
-  : _path(other_._path)
+  : common::log_source(other_)
+  , _name()
 {
-  other_._path.clear();
+  using std::swap;
+  swap(_name, other_._name);
 }
 
-nupm::path_use::path_use(const std::string &path_)
-  : _path(path_)
+nupm::path_use::path_use(const common::log_source &ls_, const string_view &name_)
+  : common::log_source(ls_)
+  , _name(name_)
 {
   std::lock_guard<std::mutex> g(nupm_dax_manager_mapped_lock);
-  bool inserted = nupm_dax_manager_mapped.insert(path_).second;
+  bool inserted = nupm_dax_manager_mapped.insert(std::string(name_)).second;
   if ( ! inserted )
   {
     std::ostringstream o;
-    o << __func__ << ": instance already managing path (" << path_ << ")";
+    o << __func__ << ": instance already managing path (" << name_ << ")";
     throw std::range_error(o.str());
   }
-  PLOG("%s (%p): path: %s", __func__, static_cast<const void *>(this), _path.c_str());
+  CPLOG(3, "%s (%p): name: %s", __func__, static_cast<const void *>(this), _name.c_str());
 }
 
 nupm::path_use::~path_use()
 {
-  if ( _path.size() )
+  if ( _name.size() )
   {
     std::lock_guard<std::mutex> g(nupm_dax_manager_mapped_lock);
-    nupm_dax_manager_mapped.erase(_path);
-    PLOG("%s: dax mgr instance: %s", __func__, _path.c_str());
+    nupm_dax_manager_mapped.erase(_name);
+    CPLOG(3, "%s: dax mgr instance: %s", __func__, _name.c_str());
   }
 }
 
@@ -138,7 +122,9 @@ std::pair<std::vector<::iovec>, std::size_t> get_mapping(const fs::path &path_ma
 	{
 		m.push_back(::iovec{reinterpret_cast<void *>(addr), size});
 		covered += size;
+#if 0
 		PLOG("%s %s: %p, 0x%zx", __func__, path_map.c_str(), m.back().iov_base, m.back().iov_len);
+#endif
 		f >> addr >> size;
 	}
 	return { m, covered };
@@ -156,7 +142,7 @@ std::vector<::iovec> get_mapping(const fs::path &path_map, const std::size_t exp
 	return r.first;
 }
 
-void nupm::dax_manager::data_map_remove(const fs::directory_entry &e)
+void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std::string &)
 {
 	if (
 #if __cplusplus < 201703
@@ -192,12 +178,12 @@ void nupm::dax_manager::data_map_remove(const fs::directory_entry &e)
 		fs::remove(p, ec);
 		if ( ec.value() == 0 )
 		{
-			PLOG("%s: removing %s: %s", __func__, p.c_str(), ec.message().c_str());
+			CPLOG(2, "%s: removed %s: %s", __func__, p.c_str(), ec.message().c_str());
 		}
 	}
 }
 
-void nupm::dax_manager::map_register(const fs::directory_entry &e)
+void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::string &origin)
 {
 	if (
 #if __cplusplus < 201703
@@ -212,7 +198,12 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 		{
 			CPLOG(1, "%s %s", __func__, p.c_str());
 
-			auto pm = p.replace_extension(".map");
+			auto pd = p;
+			auto pm = p;
+			pm.replace_extension(".map");
+			p.replace_extension();
+			auto id = p.string();
+			id.erase(0, origin.size()+1); /* Assumes 1-character directory separator */
 			/* first: mapping. second: mapping size */
 			auto r = arena_fs::get_mapping(pm);
 
@@ -222,19 +213,19 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e)
 			auto itb =
 				_mapped_spaces.insert(
 					mapped_spaces::value_type(
-						p.string()
-						, space_registered(*this, this, p.string(), r.first)
+						id
+						, space_registered(*this, this, common::fd_locked(::open(pd.c_str(), O_RDWR, 0666)), id, r.first)
 					)
 				);
 			if ( ! itb.second )
 			{
-				throw std::domain_error("multiple instances of path " + p.string() + " in configuration");
+				throw std::domain_error("multiple instances of path " + pd.string() + " in configuration");
 			}
 		}
 	}
 }
 
-void nupm::dax_manager::files_scan(const path &p, void (dax_manager::*action)(const directory_entry &))
+void nupm::dax_manager::files_scan(const path &p, const std::string &origin, void (dax_manager::*action)(const directory_entry &, const std::string &))
 {
 	std::error_code ec;
 	auto ir = fs::directory_iterator(p, fs::directory_options::skip_permission_denied, ec);
@@ -250,9 +241,9 @@ void nupm::dax_manager::files_scan(const path &p, void (dax_manager::*action)(co
 #endif
 			)
 			{
-				files_scan(e.path(), action);
+				files_scan(e.path(), origin, action);
 			}
-			(this->*action)(e);
+			(this->*action)(e, origin);
 		}
 	}
 }
@@ -269,7 +260,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_fs(
 	/* For all map files in the path, add covered addresses to _address_coverage and remove from
 	 * _address_fs_available
 	 */
-	files_scan(p, force_reset ? &dax_manager::data_map_remove : &dax_manager::map_register);
+	files_scan(p, p.string(), force_reset ? &dax_manager::data_map_remove : &dax_manager::map_register);
 	return
 		std::make_unique<arena_fs>(
 			static_cast<log_source &>(*this)
@@ -300,11 +291,12 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 	 *   range_use : tracks vitutal address ranges to ensure no duplicate addresses
 	 *     Note: areana_fs may eventually have multiple iov's opened space.
 	 */
+	auto id = p.string();
 	auto itb =
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
-				p.string()
-				, space_registered(*this, this, p.string(), base)
+				id
+				, space_registered(*this, this, common::fd_locked(::open(p.c_str(), O_RDWR, 0666)), id, base)
 			)
 		);
 	if ( ! itb.second )
@@ -315,7 +307,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		std::make_unique<arena_dev>(
 			static_cast<log_source &>(*this)
 			, recover_metadata(
-				itb.first->second._or._range.iov(0),
+				itb.first->second._or.range().iov(0),
 				force_reset
 			)
 		);
@@ -323,36 +315,36 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 
 bool nupm::dax_manager::enter(
 	common::fd_locked && fd_
-	, const path & path_
+	, const string_view & id_
 	, const std::vector<::iovec> &m_
 )
 {
 	auto itb =
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
-				path_.string()
-				, space_registered(*this, this, std::move(fd_), path_.string(), m_)
+				std::string(id_)
+				, space_registered(*this, this, std::move(fd_), id_, m_)
 			)
 		);
 	if ( ! itb.second )
 	{
-		PLOG("%s: failed to insert %s (duplicate instance?)", __func__, path_.c_str());
+		PLOG("%s: failed to insert %.*s (duplicate instance?)", __func__, int(id_.size()), id_.begin());
 	}
 	return itb.second;
 }
 
-void nupm::dax_manager::remove(const path & path_)
+void nupm::dax_manager::remove(const string_view & id_)
 {
-	auto it = _mapped_spaces.find(path_.string());
+	auto it = _mapped_spaces.find(std::string(id_));
 	if ( it != _mapped_spaces.end() )
 	{
-		CPLOG(2, "%s: _mapped_spaces found %s at %p", __func__, path_.c_str(), static_cast<const void *>(&it->second));
+		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&it->second));
 	}
 	else
 	{
-		CPLOG(2, "%s: _mapped_spaces does not contain %s", __func__, path_.c_str());
+		CPLOG(2, "%s: _mapped_spaces does not contain %.*s", __func__, int(id_.size()), id_.begin());
 	}
-	auto ct = _mapped_spaces.erase(path_.string());
+	auto ct = _mapped_spaces.erase(std::string(id_));
 	CPLOG(2, "%s: _mapped_spaces erase count %zu", __func__, ct);
 }
 
@@ -444,36 +436,59 @@ void dax_manager::debug_dump(arena_id_t arena_id)
 }
 
 auto dax_manager::open_region(
-  string_view name
+  const string_view & name
   , unsigned arena_id
-) -> std::pair<std::string, std::vector<::iovec>>
+) -> region_descriptor
 {
   guard_t           g(_reentrant_lock);
   return lookup_arena(arena_id)->region_get(name);
 }
 
 auto dax_manager::create_region(
-  string_view name
+  const string_view &name
   , arena_id_t arena_id
   , const size_t size
-) -> std::pair<std::string, std::vector<::iovec>>
+) -> region_descriptor
 {
   guard_t           g(_reentrant_lock);
   auto arena = lookup_arena(arena_id);
   CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name.begin(), size, arena_id);
   auto r = arena->region_create(name, this, size);
-  if ( r.second.empty() )
+  if ( r.address_map.empty() )
   {
     CPLOG(2, "%s: %.*s size req 0x%zx create failed", __func__, int(name.size()), name.begin(), size);
   }
   else
   {
-    CPLOG(2, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name.size()), name.begin(), size, r.second[0].iov_base, r.second[0].iov_len);
+    CPLOG(2, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name.size()), name.begin(), size, r.address_map[0].iov_base, r.address_map[0].iov_len);
   }
   return r;
 }
 
-void dax_manager::erase_region(string_view name, arena_id_t arena_id)
+auto dax_manager::resize_region(
+  const string_view & id_
+  , const arena_id_t arena_id_
+  , const size_t size_
+) -> region_descriptor
+{
+  guard_t           g(_reentrant_lock);
+  auto arena = lookup_arena(arena_id_);
+  CPLOG(1, "%s: %.*s size %zu", __func__, int(id_.size()), id_.begin(), size_);
+  auto it = _mapped_spaces.find(std::string(id_));
+  if ( it == _mapped_spaces.end() )
+  {
+    PLOG("%s: failed to find %.*s", __func__, int(id_.size()), id_.begin());
+    throw std::domain_error(std::string(__func__) + ": failed to find " + std::string(id_));
+  }
+  else
+  {
+    arena->region_resize(&it->second, size_);
+  }
+  return arena->region_get(id_);
+}
+
+
+void dax_manager::erase_region(const string_view & name, arena_id_t arena_id)
 {
   guard_t           g(_reentrant_lock);
   lookup_arena(arena_id)->region_erase(name, this);

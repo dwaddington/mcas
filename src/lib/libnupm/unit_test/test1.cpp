@@ -518,7 +518,7 @@ TEST_F(Libnupm_test, DevdaxManager)
   ddm.debug_dump(0); /* region id 0 */
 
   PLOG("Opening existing region..");
-  auto iovs = ddm.open_region(uuid, 0).second;
+  auto iovs = ddm.open_region(uuid, 0).address_map;
   if (iovs.size() == 1) {
     PLOG("Opened existing region %p OK", iovs.front().iov_base);
     ddm.debug_dump(0);
@@ -528,7 +528,7 @@ TEST_F(Libnupm_test, DevdaxManager)
   }
 
   size_t size = MB(256);
-  auto p_iov = ddm.create_region(uuid, 0, size).second;
+  auto p_iov = ddm.create_region(uuid, 0, size).address_map;
   void * p = nullptr;
   if (p_iov.size())
   {
@@ -544,7 +544,7 @@ TEST_F(Libnupm_test, DevdaxManager)
   ddm.debug_dump(0);
 
   PLOG("Re-create...");
-  auto q_iov = ddm.create_region(uuid, 0, size).second;
+  auto q_iov = ddm.create_region(uuid, 0, size).address_map;
   void * q = nullptr;
   if (q_iov.size())
   {

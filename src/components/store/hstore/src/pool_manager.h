@@ -20,13 +20,13 @@
 #include "alloc_key.h"
 
 #include <common/logging.h> /* log_source */
+#include <nupm/region_descriptor.h>
 #include <gsl/pointers>
 #include <sys/uio.h>
 #include <cstddef>
 #include <functional>
 #include <string>
 #include <system_error>
-#include <utility> /* tuple */
 
 struct pool_path;
 
@@ -89,8 +89,6 @@ template <typename Pool>
   struct pool_manager
     : protected common::log_source
   {
-    using region_access = std::pair<std::string, std::vector<::iovec>>;
-    using region_access_create = std::tuple<std::string, ::iovec, std::uint64_t>;
     pool_manager(unsigned debug_level_) : common::log_source(debug_level_) {}
     virtual ~pool_manager() {}
 
@@ -98,7 +96,7 @@ template <typename Pool>
 
     virtual void pool_close_check(const std::string &) = 0;
 
-    virtual std::pair<std::string, std::vector<::iovec>> pool_get_regions(const Pool &) const = 0;
+    virtual nupm::region_descriptor pool_get_regions(const Pool &) const = 0;
 
     /*
      * throws pool_error if create_region fails
@@ -106,22 +104,22 @@ template <typename Pool>
     virtual auto pool_create_1(
       const pool_path &path_
       , std::size_t size_
-    ) -> region_access_create = 0;
+    ) -> nupm::region_descriptor = 0;
 
     virtual auto pool_create_2(
       AK_FORMAL
-      const region_access_create & rac
+      const nupm::region_descriptor & rac
       , component::IKVStore::flags_t flags
       , std::size_t expected_obj_count
     ) -> std::unique_ptr<Pool> = 0;
 
     virtual auto pool_open_1(
       const pool_path &path_
-    ) -> region_access = 0;
+    ) -> nupm::region_descriptor = 0;
 
     virtual auto pool_open_2(
       AK_FORMAL
-      const region_access & access_
+      const nupm::region_descriptor & access_
       , component::IKVStore::flags_t flags_
     ) -> std::unique_ptr<Pool> = 0;
 

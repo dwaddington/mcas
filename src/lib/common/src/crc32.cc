@@ -163,7 +163,7 @@ bool check_sse4() {
   unsigned int eax, ebx, ecx, edx;
   __get_cpuid(1, &eax, &ebx, &ecx, &edx);
 #pragma GCC diagnostic push
-#ifdef GCC
+#ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
   return (ecx & bit_SSE4_2);

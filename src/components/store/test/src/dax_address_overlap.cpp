@@ -6,6 +6,7 @@
 #include <cassert>
 #include <common/json.h>
 #include <common/logging.h>
+#include <common/utils.h> /* MiB */
 #include <cmath>
 #include <iostream>
 #include <map>
@@ -37,13 +38,13 @@ namespace
 		: public custom_store
 	{
 		virtual component::uuid_t factory() const override { return component::hstore_factory; }
-		std::size_t presumed_allocation() const override { return MB(32); }
+		std::size_t presumed_allocation() const override { return MiB(32); }
 	};
 
 	struct custom_hstore_cc
 		: public custom_hstore
 	{
-		std::size_t presumed_allocation() const override { return MB(32); }
+		std::size_t presumed_allocation() const override { return MiB(32); }
 	};
 
 	custom_mapstore custom_mapstore_i{};

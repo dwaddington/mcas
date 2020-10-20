@@ -31,15 +31,16 @@ server_connection::server_connection(component::IFabric_server_factory &ep_)
 }
 
 server_connection::~server_connection()
-try
 {
   if ( _cnxn )
   {
-    _ep->close_connection(_cnxn);
+    try
+    {
+      _ep->close_connection(_cnxn);
+    }
+    catch ( std::exception &e )
+    {
+      std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+    }
   }
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
 }

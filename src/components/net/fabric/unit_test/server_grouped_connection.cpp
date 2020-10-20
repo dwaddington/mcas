@@ -31,15 +31,16 @@ server_grouped_connection::server_grouped_connection(component::IFabric_server_g
 {
 }
 server_grouped_connection::~server_grouped_connection()
-try
 {
   delete _comm;
-  _ep.close_connection(_cnxn);
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
+  try
+  {
+    _ep.close_connection(_cnxn);
+  }
+  catch ( std::exception &e )
+  {
+    std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  }
 }
 
 component::IFabric_communicator *server_grouped_connection::allocate_group() const

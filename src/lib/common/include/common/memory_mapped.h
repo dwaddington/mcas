@@ -31,6 +31,10 @@ namespace common
   struct memory_mapped : public moveable_struct<::iovec, iovec_moveable_traits>
   {
   public:
+    /* should use std::byte when available */
+    enum class byte : unsigned char {};
+    byte *iov_begin() const { return static_cast<byte *>(iov_base); }
+    byte *iov_end() const { return iov_begin() + iov_len; }
     /* minimalist: argument is pointer and size */
     memory_mapped(::iovec iov) noexcept;
     /* non-minimalist: arguments are input to ::mmap */
@@ -43,6 +47,8 @@ namespace common
     using ::iovec::iov_len;
 	operator bool() const { return iov_base != nullptr; }
     ::iovec iov() const { return *this; }
+    /* shrinks iov_len. iov_base remains constant */
+    int shrink_by(std::size_t size);
   };
 }
 

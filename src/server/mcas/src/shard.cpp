@@ -24,6 +24,7 @@
 #include <pwd.h>
 #include <libpmem.h>
 #include <nupm/mcas_mod.h>
+#include <nupm/region_descriptor.h>
 #include <zlib.h>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -645,10 +646,10 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         CPLOG(2, "OP_CREATE: new pool id: %lx", pool);
 
         /* check for ability to pre-register memory with RDMA stack */
-        std::pair<std::string, std::vector<::iovec>> regions;
+        nupm::region_descriptor regions;
         status_t             hr;
         if ((hr = _i_kvstore->get_pool_regions(pool, regions)) == S_OK) {
-          for (auto &r : regions.second) {
+          for (auto &r : regions.address_map) {
             CPLOG(1, "region: %p %lu MiB", r.iov_base, REDUCE_MB(r.iov_len));
             /* pre-register memory region with RDMA */
             handler->ondemand_register(r.iov_base, r.iov_len);
@@ -1622,10 +1623,10 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
   CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", static_cast<const void *>(this), msg->get_offset(),
        msg->get_size(), msg->request_id());
 
-  std::pair<std::string, std::vector<::iovec>> regions;
+  nupm::region_descriptor regions;
   auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
   if (status == S_OK) {
-    const auto rb = region_breaks(regions.second);
+    const auto rb = region_breaks(regions.address_map);
     auto sgr = offset_to_sg_list(t, rb);
     /* Register the entire range */
     std::uint64_t key = 0;
@@ -1701,10 +1702,10 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
   CPLOG(2, "%s: (%p) offset 0x%zx size %zu request_id=%lu", tag, static_cast<const void *>(this), t.first,
        msg->get_size(), msg->request_id());
 
-  std::pair<std::string, std::vector<::iovec>> regions;
+  nupm::region_descriptor regions;
   auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
   if (status == S_OK) {
-    const auto rb = region_breaks(regions.second);
+    const auto rb = region_breaks(regions.address_map);
 
     auto sgr = offset_to_sg_list(t, rb);
     try {

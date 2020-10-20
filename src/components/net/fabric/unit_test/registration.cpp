@@ -26,15 +26,16 @@ registration::registration(component::IFabric_connection &cnxn_, const void *con
 }
 
 registration::~registration()
-try
 {
   if ( _desc )
   {
-    _cnxn.deregister_memory(_region);
+    try
+    {
+      _cnxn.deregister_memory(_region);
+    }
+    catch ( std::exception &e )
+    {
+      std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+    }
   }
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
 }

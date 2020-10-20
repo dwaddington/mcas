@@ -187,22 +187,22 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			}
 
 			~definite_lock()
-			try
 			{
-				if ( ! perishable_expiry::is_current() )
+				try
 				{
-					/* release lock */
-					const auto &d = data();
-					d.unlock();
+					if ( ! perishable_expiry::is_current() )
+					{
+						/* release lock */
+						const auto &d = data();
+						d.unlock();
+					}
 				}
-			}
-			catch ( const Exception & )
-			{
-				return;
-			}
-			catch ( const std::exception & )
-			{
-				return;
+				catch ( const Exception & )
+				{
+				}
+				catch ( const std::exception & )
+				{
+				}
 			}
 		};
 

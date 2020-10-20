@@ -38,16 +38,16 @@ private:
 
 	void *region_create_inner(
 		common::fd_locked &&fd
-		, const path &path_
-		, gsl::not_null<nupm::registry_memory_mapped *> mh
+		, const string_view &id_
+		, gsl::not_null<registry_memory_mapped *> mh
 		, const std::vector<::iovec> &mapping
 	);
-	path path_data(string_view id) const
+	path path_data(const string_view &id) const
 	{
 		using namespace std::string_literals;
 		return _dir / ( std::string(id) + ".data"s );
 	}
-	path path_map(string_view id) const
+	path path_map(const string_view &id) const
 	{
 		using namespace std::string_literals;
 		return _dir / ( std::string(id) + ".map"s );
@@ -55,14 +55,15 @@ private:
 	static std::vector<::iovec> get_mapping(const path &path_map, const std::size_t expected_size);
 public:
 	arena_fs(const common::log_source &ls, path dir);
-	region_access region_get(string_view id) override;
-	region_access region_create(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh, std::size_t size) override;
-	void region_erase(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh) override;
+	region_descriptor region_get(const string_view &id) override;
+	region_descriptor region_create(const string_view &id, gsl::not_null<registry_memory_mapped *> mh, std::size_t size) override;
+	void region_resize(gsl::not_null<space_registered *> mh, std::size_t size) override;
+	void region_erase(const string_view &id, gsl::not_null<registry_memory_mapped *> mh) override;
 	std::size_t get_max_available() override;
     bool is_file_backed() const override { return true; }
 	void debug_dump() const override;
 	static std::pair<std::vector<::iovec>, std::size_t> get_mapping(const path &path_map);
-	static std::vector<common::memory_mapped> fd_mmap(int fd, const std::vector<::iovec> &map, int flags);
+	static std::vector<common::memory_mapped> fd_mmap(int fd, const std::vector<::iovec> &map, int flags, ::off_t size);
 };
 
 #endif

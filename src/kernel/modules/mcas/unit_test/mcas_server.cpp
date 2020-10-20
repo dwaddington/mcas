@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   nupm::revoke_memory(token);
 
   uint64_t *addr = reinterpret_cast<uint64_t *>
-    (ddm.create_region("1234" /* id */, 0, size).second[0].iov_base); //size*8));
+    (ddm.create_region("1234" /* id */, 0, size).address_map.front().iov_base); //size*8));
 
   auto count = size / sizeof(uint64_t);
   auto count_per_page = PAGE_SIZE /sizeof(uint64_t);

@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <common/str_utils.h>
+#include <common/utils.h> /* MiB */
 #include "example_fb_client.h"
 
 using namespace example_fb;
@@ -9,7 +10,7 @@ int main()
 {
   Client m(0,120,"10.0.0.101:11911","mlx5_0");
 
-  auto pool = m.create_pool("myPets", MB(128));
+  auto pool = m.create_pool("myPets", MiB(128));
 
   m.put(pool, "dog", "Violet");
   m.put(pool, "dog", "MadameFluffFace");

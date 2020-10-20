@@ -135,14 +135,15 @@ component::IFabric &fabric_
 }
 
 remote_memory_server::~remote_memory_server()
-try
 {
-  _th.get();
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
+  try
+  {
+    _th.get();
+  }
+  catch ( std::exception &e )
+  {
+    std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
+  }
 }
 
 std::size_t remote_memory_server::max_message_size() const
