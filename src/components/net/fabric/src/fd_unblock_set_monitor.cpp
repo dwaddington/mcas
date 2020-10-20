@@ -33,18 +33,19 @@ fd_unblock_set_monitor:: fd_unblock_set_monitor(std::mutex &m_, std::set<int> &s
 }
 
 fd_unblock_set_monitor::~fd_unblock_set_monitor()
-try
-{
-  guard g{_m};
-  _s.erase(_fd);
-}
-catch ( const std::exception &e )
 {
   try
   {
-    std::cerr << __func__ << " exception " << e.what() << "\n";
+    guard g{_m};
+    _s.erase(_fd);
   }
-  catch ( const std::exception & )
-  {}
-  return;
+  catch ( const std::exception &e )
+  {
+    try
+    {
+      std::cerr << __func__ << " exception " << e.what() << "\n";
+    }
+    catch ( const std::exception & )
+    {}
+  }
 }

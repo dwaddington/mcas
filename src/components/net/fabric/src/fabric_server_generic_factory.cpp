@@ -67,7 +67,6 @@ Fabric_server_generic_factory::Fabric_server_generic_factory(Fabric &fabric_, ev
 }
 
 Fabric_server_generic_factory::~Fabric_server_generic_factory()
-try
 {
   char c{};
   auto sz = ::write(_end.fd_write(), &c, 1);
@@ -75,12 +74,14 @@ try
   {
     std::cerr << __func__ << ": failed to signal end of connection" << "\n";
   }
-  _listener.get();
-}
-catch ( const std::exception &e )
-{
-  std::cerr << __func__ << ": SERVER connection error: " << e.what() << "\n";
-  return;
+  try
+  {
+    _listener.get();
+  }
+  catch ( const std::exception &e )
+  {
+    std::cerr << __func__ << ": SERVER connection error: " << e.what() << "\n";
+  }
 }
 
 size_t Fabric_server_generic_factory::max_message_size() const noexcept

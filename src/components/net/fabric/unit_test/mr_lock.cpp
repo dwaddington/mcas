@@ -14,6 +14,7 @@
 
 #include "eyecatcher.h"
 #include <sys/mman.h> /* mlock, munlock */
+#include <cstring>
 #include <exception>
 #include <iostream>
 #include <string>
@@ -32,15 +33,14 @@ mr_lock::mr_lock(const void *addr_, std::size_t len_)
 }
 
 mr_lock::~mr_lock()
-try
 {
   if ( _addr )
   {
-    ::munlock(_addr, _len);
+    auto rc = ::munlock(_addr, _len);
+    if ( rc == -1 )
+    {
+      auto e = errno;
+      std::cerr << __func__ << " ::munlock failed " << ::strerror(e) << eyecatcher << std::endl;
+    }
   }
-}
-catch ( std::exception &e )
-{
-  std::cerr << __func__ << " exception " << e.what() << eyecatcher << std::endl;
-  return;
 }

@@ -31,26 +31,27 @@ server_connection_and_memory::server_connection_and_memory(
 }
 
 server_connection_and_memory::~server_connection_and_memory()
-try
 {
   std::vector<::iovec> v;
   ::iovec iv;
   iv.iov_base = &((*this)[0]);
   iv.iov_len = 1;
-  v.emplace_back(iv);
-  cnxn().post_recv(v, this);
-  wait_poll(
-    cnxn()
-    , [this] (void *ctxt_, ::status_t stat_, std::uint64_t, std::size_t len_, void *) -> void
-      {
-        ASSERT_EQ(ctxt_, this);
-        ASSERT_EQ(stat_, S_OK);
-        ASSERT_EQ(len_, 1);
-      }
-  );
-}
-catch ( std::exception &e )
-{
-  std::cerr << "(destructor) " << __func__ << ": " << e.what() << "\n";
-  return;
+  try
+  {
+    v.emplace_back(iv);
+    cnxn().post_recv(v, this);
+    wait_poll(
+      cnxn()
+      , [this] (void *ctxt_, ::status_t stat_, std::uint64_t, std::size_t len_, void *) -> void
+        {
+          ASSERT_EQ(ctxt_, this);
+          ASSERT_EQ(stat_, S_OK);
+          ASSERT_EQ(len_, 1);
+        }
+    );
+  }
+  catch ( std::exception &e )
+  {
+    std::cerr << "(destructor) " << __func__ << ": " << e.what() << "\n";
+  }
 }

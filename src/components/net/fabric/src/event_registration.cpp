@@ -42,16 +42,17 @@ event_registration::event_registration(event_producer &ev_, event_consumer &ec_,
 }
 
 event_registration::~event_registration()
-try
-{
-  _ev.deregister_endpoint(_ep);
-}
-catch ( const std::exception &e )
 {
   try
   {
-    std::cerr << __func__ << " exception " << e.what() << "\n";
+    _ev.deregister_endpoint(_ep);
   }
-  catch ( const std::exception & ) {}
-  return;
+  catch ( const std::exception &e )
+  {
+    try
+    {
+      std::cerr << __func__ << " exception " << e.what() << "\n";
+    }
+    catch ( const std::exception & ) {}
+  }
 }
