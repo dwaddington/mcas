@@ -53,6 +53,7 @@ class Connection_handler
     INITIAL,
     WAIT_HANDSHAKE,
     WAIT_NEW_MSG_RECV,
+    WAIT_TLS_SESSION,    
     CLIENT_DISCONNECTED,
   };
 
@@ -60,7 +61,7 @@ class Connection_handler
   enum {
     TICK_RESPONSE_CONTINUE        = 0,
     TICK_RESPONSE_BOOTSTRAP_SPAWN = 1,
-    TICK_RESPONSE_FIRST           = 2,
+    TICK_RESPONSE_WAIT_SECURITY   = 2,
     TICK_RESPONSE_CLOSE           = 0xFF,
   };
 
@@ -71,8 +72,11 @@ class Connection_handler
   };
 
   struct security_options_t {
+    security_options_t() : ipaddr(),port(0),tls(false),hmac(false) {}
     std::string ipaddr; // interface to bind to
-    unsigned port; // port to bind to
+    unsigned    port; // port to bind to
+    bool        tls  : 1;
+    bool        hmac : 1;
   };
  
 
@@ -87,7 +91,7 @@ class Connection_handler
   uint64_t                            _auth_id;
   std::queue<buffer_t *>              _pending_msgs;
   std::queue<action_t>                _pending_actions;
-  std::shared_ptr<security_options_t> _security_options;
+  security_options_t                  _security_options;
   Pool_manager                        _pool_manager; /* instance shared across connections */
 
   
@@ -176,6 +180,16 @@ class Connection_handler
 
   auto allocate_send() { return allocate(static_send_callback); }
   auto allocate_recv() { return allocate(static_recv_callback); }
+
+  /** 
+   * Initialize security session
+   * 
+   * @param bind_ipaddr 
+   * @param bind_port 
+   */
+  void configure_security(const std::string& bind_ipaddr,
+                          const unsigned bind_port);
+    
 
   /**
    * State machine transition tick.  It is really important that this tick

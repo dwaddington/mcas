@@ -148,18 +148,23 @@ int Connection_handler::tick()
     assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
     post_recv_buffer(allocate_recv());
 
-    /* For an unknown reason, allocating an extra buffer or three makes the
-     * hstore benchmark run about 10% faster */
+    /* allocating an extra buffer or three makes the hstore benchmark run about 10% faster */
     for (auto i = EXTRA_BISCUITS; i != 0; --i) {
       assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
       post_recv_buffer(allocate_recv());
     }
 
     set_state(WAIT_HANDSHAKE);
-    return TICK_RESPONSE_FIRST; /* indicates first tick */
+    return TICK_RESPONSE_CONTINUE;
   }
 
   case CLIENT_DISCONNECTED: {
+    break;
+  }
+
+  case WAIT_TLS_SESSION: {
+    PNOTICE("WAIT TLS SESSION");
+    asm("int3");
     break;
   }
 
@@ -178,45 +183,63 @@ int Connection_handler::tick()
 
       if (msg->get_status() != S_OK)
         throw General_exception("handshake status != S_OK (%d)", msg->get_status());
-        
-      set_auth_id(msg->auth_id());
 
-      auto reply_iob = allocate_send();
-      assert(reply_iob);
-
-      auto reply_msg = new (reply_iob->base()) protocol::Message_handshake_reply(iob->length(),
-                                                                                 auth_id(),
-                                                                                 1 /* seq */,
-                                                                                 max_message_size(),
-                                                                                 reinterpret_cast<uint64_t>(this),
-                                                                                 nullptr,  // cert
-                                                                                 0);
-      
       /* if security_tls bit is set, then we need to establish a GNU TLS side-channel
          as part of this session. this is triggered by sending the TLS port for the
          client to accept on.
       */
       if(msg->security_tls) {
-        if(msg->security_hmac) {
+        _security_options.tls = true;
+        if(msg->security_hmac)
+          _security_options.hmac = true;
+        set_state(WAIT_TLS_SESSION);
+        return TICK_RESPONSE_WAIT_SECURITY;
+      }
+      else {
+        set_auth_id(msg->auth_id());
+
+        auto reply_iob = allocate_send();
+        assert(reply_iob);
+
+        auto reply_msg = new (reply_iob->base()) protocol::Message_handshake_reply(iob->length(),
+                                                                                   auth_id(),
+                                                                                   1 /* seq */,
+                                                                                   max_message_size(),
+                                                                                   reinterpret_cast<uint64_t>(this),
+                                                                                   nullptr,  // cert
+                                                                                   0);
+      
+
+
+        if (option_DEBUG > 2) {
+          PINF("RDMA: max message size (%lu)", max_message_size());
         }
+
+        /* post response */
+        reply_iob->set_length(reply_msg->msg_len());
+        assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
+        post_recv_buffer(allocate_recv());
+        post_send_buffer(reply_iob, reply_msg, __func__);
+        free_buffer(iob);
+        set_state(WAIT_NEW_MSG_RECV);
       }
-
-
-      if (option_DEBUG > 2) {
-        PINF("RDMA: max message size (%lu)", max_message_size());
-      }
-
-      /* post response */
-      reply_iob->set_length(reply_msg->msg_len());
-      assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
-      post_recv_buffer(allocate_recv());
-      post_send_buffer(reply_iob, reply_msg, __func__);
-      free_buffer(iob);
-      set_state(WAIT_NEW_MSG_RECV);
     }
     break;
   }  // end switch
   return response;
 }
+
+
+void Connection_handler::configure_security(const std::string& bind_ipaddr,
+                                            const unsigned bind_port)
+{
+  PNOTICE("Config security (addr:%s, port:%u)", bind_ipaddr.c_str(), bind_port);
+  if(bind_ipaddr.empty() == false) {
+    assert(bind_port > 0);
+  }
+}
+  
+
+
 
 }  // namespace mcas
