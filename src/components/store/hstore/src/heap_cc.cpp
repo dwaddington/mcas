@@ -23,9 +23,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdlib> /* getenv */
-#include <memory>
-#include <numeric>
-#include <stdexcept>
+#include <memory> /* make_unique */
+#include <numeric> /* accumulate */
+#include <stdexcept> /* range_error */
 #include <utility>
 
 constexpr unsigned heap_cc_shared_ephemeral::log_min_alignment;
@@ -186,29 +186,6 @@ std::size_t heap_cc_shared_ephemeral::free(persistent_t<void *> *p_, std::size_t
 
 namespace
 {
-#if 0
-	::iovec align(void *first_, std::size_t sz_, std::size_t alignment_)
-	{
-		auto first = reinterpret_cast<uintptr_t>(first_);
-		auto last = first + sz_;
-		/* It may not even be the case that Rca_LB does not need managed regions
-		 * aligned at all,
-		 * as the allocated slabs are aligned even if the region is not.
-		 * Some part of ado processing, though, map try mmap the area, which means
-		 * that the are must be aligned and sized to page multiples (4K or maybe 2M).
-		 */
-		last = round_down(last, alignment_);
-		auto c = round_up_t(first, alignment_);
-		/* It may not even be the case that managed regions need to be aligned at all,
-		 * as the allocated slabs are aligned even if the region is not.
-		 */
-		if ( last <= c )
-		{
-			throw std::runtime_error("Insufficent size for managed region");
-		}
-		return ::iovec{reinterpret_cast<void *>(c), last - c};
-	}
-#endif
 	::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 	{
 		auto file_and_iov = dax_manager_->open_region(std::to_string(uuid_), numa_node_);

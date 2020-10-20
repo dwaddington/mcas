@@ -15,8 +15,12 @@
 #include "dax_manager.h"
 #include "hstore_config.h"
 #include <common/utils.h>
-#include <algorithm> /* accumulate */
+#include <algorithm> /* max */
 #include <cinttypes>
+#include <memory> /* make_unique */
+#include <numeric> /* acccumulate */
+#include <stdexcept> /* range_error */
+#include <string> /* to_string */
 
 constexpr unsigned heap_rc_shared_ephemeral::log_min_alignment;
 constexpr unsigned heap_rc_shared_ephemeral::hist_report_upper_bound;
@@ -75,33 +79,6 @@ bool heap_rc_shared_ephemeral::is_reconstituted(const void * p_) const
 {
 	return contains(_reconstituted, static_cast<alloc_set_t::element_type>(p_));
 }
-
-#if 0
-namespace
-{
-	::iovec align(void *first_, std::size_t sz_, std::size_t alignment_)
-	{
-		auto first = reinterpret_cast<uintptr_t>(first_);
-		auto last = first + sz_;
-		/* It may not even be the case that Rca_LB does not need managed regions
-		 * aligned at all,
-		 * as the allocated slabs are aligned even if the region is not.
-		 * Some part of ado processing, though, map try mmap the area, which means
-		 * that the are must be aligned and sized to page multiples (4K or maybe 2M).
-		 */
-		last = round_down(last, alignment_);
-		auto c = round_up_t(first, alignment_);
-		/* It may not even be the case that managed regions need to be aligned at all,
-		 * as the allocated slabs are aligned even if the region is not.
-		 */
-		if ( last <= c )
-		{
-			throw std::runtime_error("Insufficent size for managed region");
-		}
-		return ::iovec{reinterpret_cast<void *>(c), last - c};
-	}
-}
-#endif
 
 /* When used with ADO, this space apparently needs a 2MiB alignment.
  * 4 KiB alignment sometimes produces a disagreement between server and ADO mappings,

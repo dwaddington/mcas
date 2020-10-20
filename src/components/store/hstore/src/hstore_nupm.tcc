@@ -95,14 +95,14 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     /* Attempt to create a new pool. */
     try
     {
-      PLOG(PREFIX "id %s: creating region length 0x%zx", LOCATION, path_.str().c_str(), size);
+      CPLOG(1, PREFIX "id %s: creating region length 0x%zx", LOCATION, path_.str().c_str(), size);
       auto v = _dax_manager->create_region(path_.str(), _numa_node, size);
       /* Guess that nullptr indicate a failure */
       if ( v.address_map.empty() )
       {
         throw pool_error("create_region fail: " + path_.str(), pool_ec::region_fail);
       }
-      PLOG(PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), v.address_map.front().iov_base, v.address_map.front().iov_len);
+      CPLOG(1, PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), v.address_map.front().iov_base, v.address_map.front().iov_len);
       return v;
     }
     catch ( const General_exception &e )
