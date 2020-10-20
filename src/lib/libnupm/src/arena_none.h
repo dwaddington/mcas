@@ -28,19 +28,23 @@ private:
 	path _dir;
 public:
 	arena_none(const common::log_source &ls, path dir_) : arena(ls), _dir{dir_} {}
-	region_access region_get(
-		string_view // id
+	region_descriptor region_get(
+		const string_view & // id
 	) override
-	{ return region_access{}; }
-	region_access region_create(
-		string_view // id
-		, gsl::not_null<nupm::registry_memory_mapped *> // mh
+	{ return region_descriptor{}; }
+	region_descriptor region_create(
+		const string_view & // id
+		, gsl::not_null<registry_memory_mapped *> // mh
 		, std::size_t // size
 	) override
-	{ return region_access{}; }
+	{ return region_descriptor{}; }
+	void region_resize(
+      gsl::not_null<space_registered *> // sr
+      , std::size_t // size
+    ) override { }
 	void region_erase(
-		string_view // id
-		, gsl::not_null<nupm::registry_memory_mapped *> // mh
+		const string_view & // id
+		, gsl::not_null<registry_memory_mapped *> // mh
 	) override {};
 	std::size_t get_max_available() override { return 0; }
 	bool is_file_backed() const override { return false; }

@@ -1,7 +1,8 @@
 #include <api/components.h>
 #include <api/mcas_itf.h>
 #include <common/cycles.h>
-#include <common/str_utils.h>
+#include <common/str_utils.h> /* random_string */
+#include <common/utils.h> /* KiB, MiB, GiB */
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <boost/program_options.hpp>
@@ -62,7 +63,7 @@ TEST_F(KV_test, BasicPoolOperations)
 
   const std::string poolname = "pool0";
 
-  auto pool = mcas->create_pool(poolname, MB(1), /* size */
+  auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
 
@@ -79,12 +80,12 @@ TEST_F(KV_test, BasicPoolOperations)
   ASSERT_OK(mcas->delete_pool(poolname));
 
   PLOG("Re-creating pool");
-  pool = mcas->create_pool(poolname, MB(2),             /* size */
+  pool = mcas->create_pool(poolname, MiB(2),             /* size */
                            IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
                            100);                        /* obj count */
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
-  ASSERT_TRUE(mcas->create_pool(poolname, MB(2),             /* size */
+  ASSERT_TRUE(mcas->create_pool(poolname, MiB(2),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
                                 100) == IMCAS::POOL_ERROR);
   ASSERT_OK(mcas->close_pool(pool));
@@ -97,7 +98,7 @@ TEST_F(KV_test, OpenCloseDeletePool)
 
   const std::string poolname = "pool2";
 
-  auto pool = mcas->create_pool(poolname, MB(64), /* size */
+  auto pool = mcas->create_pool(poolname, MiB(64), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
 
@@ -120,7 +121,7 @@ TEST_F(KV_test, DeletePoolOperations)
 
   const std::string poolname = "pool1";
 
-  auto pool = mcas->create_pool(poolname, MB(64), /* size */
+  auto pool = mcas->create_pool(poolname, MiB(64), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
 
@@ -137,7 +138,7 @@ TEST_F(KV_test, BasicPutGetOperations)
 
   const std::string poolname = "BasicPutGetOperations";
 
-  auto pool = mcas->create_pool(poolname, MB(32), /* size */
+  auto pool = mcas->create_pool(poolname, MiB(32), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
 
@@ -220,7 +221,7 @@ using make_handle_t = auto (*)(component::Itf_ref<component::IMCAS> &, void *, s
 std::size_t get_pool_size(component::Itf_ref<component::IMCAS> &mcas_, make_handle_t mh_, component::IMCAS::pool_t pool_, std::size_t max_)
 {
   auto len = max_;
-  auto buffer = aligned_alloc(KB(4), max_);
+  auto buffer = aligned_alloc(KiB(4), max_);
   EXPECT_NE(nullptr, buffer);
   auto mem = mh_(mcas, buffer, max_);
   EXPECT_EQ(S_OK, mcas->get_direct_offset(pool_, 0, len, buffer, mem->get()));
@@ -300,7 +301,7 @@ void put_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t mh_)
 
   const std::string poolname = "PutDirect";
 
-  auto pool = mcas->create_pool(poolname, GB(1), /* size */
+  auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
 
@@ -308,8 +309,8 @@ void put_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t mh_)
 
   //  ASSERT_OK(mcas->put(pool, key0, value0, 0));
 
-  size_t                 user_buffer_len = MB(128);
-  void *                 user_buffer     = aligned_alloc(KB(4), user_buffer_len);
+  size_t                 user_buffer_len = MiB(128);
+  void *                 user_buffer     = aligned_alloc(KiB(4), user_buffer_len);
   auto mem = mh_(mcas, user_buffer, user_buffer_len);
 
   ASSERT_OK(mcas->put_direct(pool, "someLargeObject", user_buffer, user_buffer_len, mem->get()));
@@ -319,8 +320,8 @@ void put_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t mh_)
   ASSERT_OK(mcas->get_attribute(pool, IMCAS::Attribute::COUNT, attrs));
   ASSERT_TRUE(attrs[0] == 2); /* there should be only one object */
 
-  size_t                 user_buffer2_len = MB(128);
-  void *                 user_buffer2     = aligned_alloc(KB(4), user_buffer_len);
+  size_t                 user_buffer2_len = MiB(128);
+  void *                 user_buffer2     = aligned_alloc(KiB(4), user_buffer_len);
   auto mem2 = mh_(mcas, user_buffer2, user_buffer2_len);
 
   ASSERT_OK(mcas->get_direct(pool, "someLargeObject", user_buffer2, user_buffer2_len, mem2->get()));
@@ -347,7 +348,7 @@ void get_put_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_hand
 {
   const std::string poolname = "GetPutDirectOffset";
 
-  auto pool = mcas->create_pool(poolname, GB(1), /* size */
+  auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
 
@@ -364,8 +365,8 @@ void get_put_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_hand
   const char *const key_someLargeObject = "someLargeObject";
   const auto key_size_someLargeObject = std::strlen(key_someLargeObject);
   {
-    size_t               user_buffer_len = MB(128);
-    void *               user_buffer     = aligned_alloc(KB(4), user_buffer_len);
+    size_t               user_buffer_len = MiB(128);
+    void *               user_buffer     = aligned_alloc(KiB(4), user_buffer_len);
     ASSERT_NE(nullptr, user_buffer);
     std::memcpy(user_buffer, data_prefix_someLargeObject, data_prefix_size_someLargeObject);
     auto mem = mh_(mcas, user_buffer, user_buffer_len);
@@ -378,7 +379,7 @@ void get_put_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_hand
    */
 
   std::size_t scan_buffer_len = MiB(128);
-  char *scan_buffer = static_cast<char *>(aligned_alloc(KB(4), scan_buffer_len));
+  char *scan_buffer = static_cast<char *>(aligned_alloc(KiB(4), scan_buffer_len));
   ASSERT_NE(nullptr, scan_buffer);
   std::size_t offset = 0;
 
@@ -447,7 +448,7 @@ void async_get_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_ha
 {
   const std::string poolname = "AsyncGetDirectOffset";
 
-  auto pool = mcas->create_pool(poolname, GB(1), /* size */
+  auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
 
@@ -458,8 +459,8 @@ void async_get_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_ha
   const char *key_someLargeObject = "someLargeObject";
   auto key_size_someLargeObject = std::strlen(key_someLargeObject);
   {
-    size_t                 user_buffer_len = MB(128);
-    void *                 user_buffer     = aligned_alloc(KB(4), user_buffer_len);
+    size_t                 user_buffer_len = MiB(128);
+    void *                 user_buffer     = aligned_alloc(KiB(4), user_buffer_len);
     ASSERT_NE(nullptr, user_buffer);
 
     auto mem = mh_(mcas, user_buffer, user_buffer_len);
@@ -473,7 +474,7 @@ void async_get_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_ha
    */
 
   size_t scan_buffer_len = MiB(128);
-  char *scan_buffer = static_cast<char *>(aligned_alloc(KB(4), scan_buffer_len));
+  char *scan_buffer = static_cast<char *>(aligned_alloc(KiB(4), scan_buffer_len));
   ASSERT_NE(nullptr, scan_buffer);
   std::size_t offset = 0;
   auto mem = mh_(mcas, scan_buffer, scan_buffer_len);
@@ -533,7 +534,7 @@ TEST_F(KV_test, AsyncPutErase)
 
   const std::string poolname = "AsyncPutErase";
 
-  auto pool = mcas->create_pool(poolname, MB(32), /* size */
+  auto pool = mcas->create_pool(poolname, MiB(32), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
 
@@ -610,15 +611,15 @@ void async_put_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t 
 
   const std::string poolname = "AsyncPutDirect";
 
-  auto pool = mcas->create_pool(poolname, GB(1), /* size */
+  auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
 
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   IMCAS::async_handle_t  out_handle      = IMCAS::ASYNC_HANDLE_INIT;
-  size_t                 user_buffer_len = MB(128);
-  void *                 user_buffer     = aligned_alloc(KB(4), user_buffer_len);
+  size_t                 user_buffer_len = MiB(128);
+  void *                 user_buffer     = aligned_alloc(KiB(4), user_buffer_len);
   auto mem = mh_(mcas, user_buffer, user_buffer_len);
   ASSERT_OK(mcas->async_put_direct(pool, "testKey", user_buffer, user_buffer_len, out_handle, mem->get()));
   ASSERT_TRUE(out_handle != nullptr);
@@ -629,7 +630,7 @@ void async_put_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t 
     iterations++;
   }
 
-  void *                 user_buffer2 = aligned_alloc(KB(4), user_buffer_len);
+  void *                 user_buffer2 = aligned_alloc(KiB(4), user_buffer_len);
   auto  mem2 = mh_(mcas, user_buffer2, user_buffer_len);
 
   ASSERT_OK(mcas->get_direct(pool, "testKey", user_buffer2, user_buffer_len, mem2->get()));
@@ -662,31 +663,31 @@ void async_get_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t 
 
   const std::string poolname = "AsyncPutDirect";
 
-  auto pool = mcas->create_pool(poolname, GB(1), /* size */
+  auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
                                 100);            /* obj count */
 
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
-  constexpr size_t user_buffer_len = MB(32);
+  constexpr size_t user_buffer_len = MiB(32);
   constexpr size_t user_buffer_ct = 4;
   std::vector<void *> user_buffer;
   for (auto i = 0; i != user_buffer_ct; ++i)
   {
-    user_buffer.push_back(aligned_alloc(KB(4), user_buffer_len));
+    user_buffer.push_back(aligned_alloc(KiB(4), user_buffer_len));
     auto mem = mh_(mcas, user_buffer.back(), user_buffer_len);
     ASSERT_OK(mcas->put_direct(pool, "testKey" + std::to_string(i), user_buffer[i], user_buffer_len, mem->get()));
   }
 
   /* read buffer slightly large than write buffer, to test reads into a differently-sized buffer */
-  constexpr size_t user_buffer_len2 = MB(33);
+  constexpr size_t user_buffer_len2 = MiB(33);
   std::vector<IMCAS::async_handle_t> out_handle;
   std::vector<void *> user_buffer2;
   std::vector<std::unique_ptr<handle>> mem2;
   for (auto i = 0; i != user_buffer_ct; ++i)
   {
     out_handle.push_back(+IMCAS::ASYNC_HANDLE_INIT);
-    user_buffer2.push_back(aligned_alloc(KB(4), user_buffer_len2));
+    user_buffer2.push_back(aligned_alloc(KiB(4), user_buffer_len2));
     mem2.push_back(mh_(mcas, user_buffer2.back(), user_buffer_len2));
   }
   for (auto i = 0; i != user_buffer_ct; ++i)
@@ -737,7 +738,7 @@ TEST_F(KV_test, MultiPool)
   for (unsigned i = 0; i < COUNT; i++) {
     auto poolname = common::random_string(16);
 
-    auto pool = mcas->create_pool(poolname, KB(32), /* size */
+    auto pool = mcas->create_pool(poolname, KiB(32), /* size */
                                   0,                /* flags */
                                   100);             /* obj count */
 
@@ -758,12 +759,12 @@ TEST_F(KV_test, PoolCapacity)
   auto poolname = common::random_string(16);
 
   const unsigned long OBJ_COUNT = getenv("OBJECT_COUNT") ? std::stoul(getenv("OBJECT_COUNT")) : 6000;
-  auto           pool      = mcas->create_pool(poolname, MB(32), /* size */
+  auto           pool      = mcas->create_pool(poolname, MiB(32), /* size */
                                 0,                /* flags */
                                 OBJ_COUNT);       /* obj count */
 
   for (unsigned i = 0; i < OBJ_COUNT; i++) {
-    ASSERT_EQ(S_OK, mcas->put(pool, common::random_string(16), common::random_string(KB(4))));
+    ASSERT_EQ(S_OK, mcas->put(pool, common::random_string(16), common::random_string(KiB(4))));
   }
 }
 
@@ -773,7 +774,7 @@ TEST_F(KV_test, BadPutGetOperations)
 
   const std::string poolname = "BadPutGetOperations";
 
-  auto pool = mcas->create_pool(poolname, MB(32), /* size */
+  auto pool = mcas->create_pool(poolname, MiB(32), /* size */
                                 0,                /* flags */
                                 100);             /* obj count */
 

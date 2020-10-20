@@ -37,6 +37,7 @@
 #include <ccpm/interfaces.h>
 #include <common/exceptions.h> /* General_exception */
 #include <common/logging.h> /* log_source */
+#include <nupm/region_descriptor.h>
 
 #include <sys/uio.h> /* iovec */
 
@@ -69,10 +70,9 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 struct heap_cc_shared_ephemeral
   : private common::log_source
 {
-	using managed_regions_t = std::pair<std::string, std::vector<::iovec>>;
 private:
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
-	managed_regions_t _managed_regions;
+	nupm::region_descriptor _managed_regions;
 	std::size_t _capacity;
 	std::size_t _allocated;
 	impl::allocation_state_emplace *_ase;
@@ -89,8 +89,9 @@ private:
 	static_assert(sizeof(void *) == 1U << log_min_alignment, "log_min_alignment does not match sizeof(void *)");
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
-
+#if 0
 	void add_managed_region(const ::iovec &r);
+#endif
 	explicit heap_cc_shared_ephemeral(
 		unsigned debug_level_
 		, impl::allocation_state_emplace *ase
@@ -98,11 +99,13 @@ private:
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, std::unique_ptr<ccpm::IHeap_expandable> p
+		, const std::string &id
 		, const std::string &backing_file
 		, const std::vector<::iovec> &rv_full
 		, const ::iovec &pool0_heap
 	);
-	managed_regions_t get_managed_regions() const { return _managed_regions; }
+	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
+	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n) { using std::swap; swap(n, _managed_regions); return n; }
 
 	template <bool B>
 		void write_hist(const ::iovec & pool_) const
@@ -136,6 +139,7 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
+		, const std::string &id
 		, const std::string &backing_file
 		, const std::vector<::iovec> &rv_full
 		, const ::iovec &pool0_heap_
@@ -146,6 +150,7 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
+		, const std::string &id
 		, const std::string &backing_file
 		, const std::vector<::iovec> &rv_full
 		, const ::iovec &pool0_heap
@@ -154,11 +159,11 @@ public:
 	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
 	heap_cc_shared_ephemeral(const heap_cc_shared_ephemeral &) = delete;
 	heap_cc_shared_ephemeral& operator=(const heap_cc_shared_ephemeral &) = delete;
+	void add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, unsigned numa_node);
 };
 
 struct heap_cc_shared
 {
-	using managed_regions_t = std::pair<std::string, std::vector<::iovec>>;
 private:
 	::iovec _pool0_full; /* entire extent of pool 0 */
 	::iovec _pool0_heap; /* portion of pool 0 which can be used for the heap */
@@ -177,13 +182,17 @@ public:
 		, ::iovec pool0_full
 		, ::iovec pool0_heap
 		, unsigned numa_node
-		, const std::string &backing_file
+		, const std::string & id_
+		, const std::string & backing_file_
 	);
 
 	explicit heap_cc_shared(
 		unsigned debug_level
 		, const std::unique_ptr<dax_manager> &dax_manager
+		, const std::string &id
 		, const std::string &backing_file
+		, const ::iovec *iov_addl_first_
+		, const ::iovec *iov_addl_last_
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -235,7 +244,7 @@ public:
 			);
 	}
 
-	managed_regions_t regions() const;
+	nupm::region_descriptor regions() const;
 };
 
 struct heap_cc

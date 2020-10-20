@@ -15,12 +15,8 @@
 #define __API_KVSTORE_ITF__
 
 #include <api/components.h>
-#include <assert.h>
-#include <common/exceptions.h>
-#include <common/types.h>
-#include <common/utils.h>
+#include <common/errors.h> /* ERROR_BASE */
 #include <common/time.h>
-#include <semaphore.h>
 #include <sys/uio.h> /* iovec */
 
 #include <cinttypes> /* PRIx64 */
@@ -29,6 +25,11 @@
 #include <map>
 #include <mutex>
 #include <vector>
+
+namespace nupm
+{
+  struct region_descriptor;
+}
 
 /* print format for the pool type */
 #define PRIxIKVSTORE_POOL_T PRIx64
@@ -270,7 +271,7 @@ class IKVStore : public component::IBase {
    * @return S_OK on success or E_POOL_NOT_FOUND.  Components that do not
    * support this return E_NOT_SUPPORTED.
    */
-  virtual status_t get_pool_regions(const pool_t pool, std::pair<std::string, std::vector<::iovec>>& out_regions)
+  virtual status_t get_pool_regions(const pool_t pool, nupm::region_descriptor & out_regions)
   {
     return E_NOT_SUPPORTED; /* not supported in FileStore */
   }

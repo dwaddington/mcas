@@ -17,6 +17,7 @@
 #include <ccpm/value_tracked.h>
 #include <ccpm/container_cc.h>
 #include <common/profiler.h>
+#include <common/utils.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -131,7 +132,7 @@ TEST_F(Log_test, CCVectorOfPointer)
  *   clear()
  *   assign() - 3 versions
  */
-	std::size_t heap_size = MB(150);
+	std::size_t heap_size = MiB(150);
 	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
 	ASSERT_TRUE(kvstore.get());
 	auto pool = create_pool(kvstore.get(), pool_name(), heap_size * 3);

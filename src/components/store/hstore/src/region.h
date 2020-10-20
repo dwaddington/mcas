@@ -19,6 +19,7 @@
 #include "hstore_config.h"
 #include "persist_data.h"
 
+#include <nupm/region_descriptor.h>
 #include <sys/uio.h>
 #include <memory>
 #include <sstream>
@@ -56,6 +57,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
       , std::size_t size_
       , std::size_t expected_obj_count
       , unsigned numa_node_
+      , const std::string & id_
       , const std::string & backing_file_
     )
       : magic(0)
@@ -71,6 +73,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
         , ::iovec{this, size_}
         , ::iovec{this+1, adjust_size(size_)}
         , numa_node_
+        , id_
         , backing_file_
       )
       , _persist_data(
@@ -91,14 +94,20 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
     region(
       unsigned debug_level
       , const std::unique_ptr<dax_manager> & dax_manager_
+      , const std::string & id_
       , const std::string & backing_file_
+      , const ::iovec *iov_addl_first_
+      , const ::iovec *iov_addl_last_
     )
       : magic(0)
       , _uuid(this->_uuid)
       , _heap(
         debug_level
         , dax_manager_
+        , id_
         , backing_file_
+        , iov_addl_first_
+        , iov_addl_last_
 #if USE_CC_HEAP == 4
         , &this->_persist_data.ase()
         , &this->_persist_data.aspd()
@@ -138,7 +147,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
     bool is_initialized() const noexcept { return magic == magic_value; }
     unsigned percent_used() const { return _heap.percent_used(); }
     void quiesce() { _heap.quiesce(); }
-    std::pair<std::string, std::vector<::iovec>> get_regions() const
+    nupm::region_descriptor get_regions() const
     {
       return _heap.regions();
     }

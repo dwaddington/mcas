@@ -32,9 +32,10 @@ private:
   gsl::not_null<nupm::DM_region_header *> _hdr;
 public:
   arena_dev(const common::log_source &ls, gsl::not_null<nupm::DM_region_header *> hdr);
-  region_access region_get(string_view id) override;
-  region_access region_create(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh, std::size_t size) override;
-  void region_erase(string_view id, gsl::not_null<nupm::registry_memory_mapped *> mh) override;
+  region_descriptor region_get(const string_view & id) override;
+  region_descriptor region_create(const string_view & id, gsl::not_null<registry_memory_mapped *> mh, std::size_t size) override;
+  void region_resize(gsl::not_null<space_registered *> mh, std::size_t size) override;
+  void region_erase(const string_view & id, gsl::not_null<registry_memory_mapped *> mh) override;
   std::size_t get_max_available() override;
   bool is_file_backed() const override { return false; }
   void debug_dump() const override;

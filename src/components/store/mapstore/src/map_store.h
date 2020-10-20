@@ -23,6 +23,11 @@
 
 #include <api/kvstore_itf.h>
 
+namespace nupm
+{
+  struct region_descriptor;
+}
+
 class Map_store : public component::IKVStore /* generic Key-Value store interface */
 {
 public:
@@ -143,7 +148,7 @@ public:
   virtual void debug(const pool_t pool, unsigned cmd, uint64_t arg) override;
   
   virtual status_t get_pool_regions(const pool_t pool,
-                                    std::pair<std::string, std::vector<::iovec>> &out_regions) override;
+                                    nupm::region_descriptor &out_regions) override;
   
   virtual status_t grow_pool(const pool_t pool, const size_t increment_size,
                              size_t &reconfigured_size) override;

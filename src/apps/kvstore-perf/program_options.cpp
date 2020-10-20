@@ -2,7 +2,7 @@
 
 #include <api/kvstore_itf.h>
 #include <common/logging.h>
-#include <common/str_utils.h> /* MB */
+#include <common/utils.h> /* MiB */
 #include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem.hpp>
 #include <algorithm>
@@ -152,7 +152,7 @@ void ProgramOptions::add_program_options(boost::program_options::options_descrip
       ("path", po::value<std::string>()->default_value("./data/"), "Path of directory for pool. Default: \"./data/\"")
       ("pool_name", po::value<std::string>()->default_value("Exp.pool"),
         "Prefix name of pool; will append core number. Default: \"Exp.pool\"")
-      ("size", po::value<unsigned long long>()->default_value(MB(100)), "Size of pool. Default: 100MiB.")
+      ("size", po::value<unsigned long long>()->default_value(MiB(100)), "Size of pool. Default: 100MiB.")
       ("flags", po::value<std::uint32_t>()->default_value(component::IKVStore::FLAGS_SET_SIZE | 0),
         "Flags for pool creation. Default: component::IKVStore::FLAGS_SET_SIZE.")
       ("elements", po::value<std::size_t>()->default_value(100000), "Number of data elements. Default: 100,000.")

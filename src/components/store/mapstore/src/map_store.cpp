@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <nupm/allocator_ra.h>
 #include <nupm/rc_alloc_lb.h>
+#include <nupm/region_descriptor.h>
 #include <stdio.h>
 #include <time.h>
 #include <sys/mman.h>
@@ -1232,11 +1233,12 @@ status_t Map_store::map_keys(const IKVStore::pool_t pool,
 }
 
 status_t Map_store::get_pool_regions(const pool_t pool,
-                                     std::pair<std::string, std::vector<::iovec>> &out_regions) {
+                                     nupm::region_descriptor &out_regions) {
   auto session = get_session(pool);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
-  out_regions.first.clear();
-  return session->pool->get_pool_regions(out_regions.second);
+  out_regions.id.clear();
+  out_regions.data_file.clear();
+  return session->pool->get_pool_regions(out_regions.address_map);
 }
 status_t Map_store::grow_pool(const pool_t pool, const size_t increment_size,
                               size_t &reconfigured_size) {

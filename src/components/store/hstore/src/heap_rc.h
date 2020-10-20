@@ -34,6 +34,7 @@
 #define VALGRIND_MEMPOOL_FREE(pool, size) do { (void) (pool); (void) (size); } while(0)
 #endif
 #include <common/exceptions.h> /* General_exception */
+#include <nupm/region_descriptor.h>
 
 #include <sys/uio.h> /* iovec */
 
@@ -53,10 +54,9 @@ namespace impl
 struct heap_rc_shared_ephemeral
 	: private common::log_source
 {
-	using region_access = std::pair<std::string, std::vector<::iovec>>;
 private:
 	nupm::Rca_LB _heap;
-	region_access _managed_regions;
+	nupm::region_descriptor _managed_regions;
 	std::size_t _allocated;
 	std::size_t _capacity;
 	/* The set of reconstituted addresses. Only needed during recovery.
@@ -75,11 +75,13 @@ private:
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
+	void add_managed_region(const ::iovec &r);
 public:
-	explicit heap_rc_shared_ephemeral(unsigned debug_level, const std::string & backing_file);
+	explicit heap_rc_shared_ephemeral(unsigned debug_level, const std::string & id, const std::string & backing_file);
 
 	void add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, unsigned numa_node);
-	region_access get_managed_regions() const { return _managed_regions; }
+	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
+	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n) { using std::swap; swap(n, _managed_regions); return n; }
 
 	template <bool B>
 		void write_hist(const ::iovec & pool_) const
@@ -114,7 +116,6 @@ public:
 
 struct heap_rc_shared
 {
-	using region_access = std::pair<std::string, std::vector<::iovec>>;
 private:
 	::iovec _pool0_full; /* entire extent of pool 0 */
 	::iovec _pool0_heap; /* portion of pool 0 which can be used for the heap */
@@ -123,11 +124,33 @@ private:
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
 	std::unique_ptr<heap_rc_shared_ephemeral> _eph;
 public:
-	explicit heap_rc_shared(unsigned debug_level, ::iovec pool0_full, ::iovec pool0_heap, unsigned numa_node, const std::string &backing_file);
-	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<dax_manager> &dax_manager, const std::string &backing_file);
+	explicit heap_rc_shared(
+		unsigned debug_level
+		, ::iovec pool0_full
+		, ::iovec pool0_heap
+		, unsigned numa_node
+		, const std::string &id_
+		, const std::string &backing_file
+	);
+	explicit heap_rc_shared(
+		unsigned debug_level
+		, const std::unique_ptr<dax_manager> &dax_manager
+		, const std::string &id_
+		, const std::string &backing_file
+		, const ::iovec *iov_addl_first_
+		, const ::iovec *iov_addl_last_
+	);
 	/* allocation_state_combined offered, but not used */
-	explicit heap_rc_shared(unsigned debug_level, const std::unique_ptr<dax_manager> &dax_manager, const std::string &backing_file, impl::allocation_state_combined *)
-		: heap_rc_shared(debug_level, dax_manager, backing_file)
+	explicit heap_rc_shared(
+		unsigned debug_level
+		, const std::unique_ptr<dax_manager> &dax_manager
+		, const std::string &id
+		, const std::string &backing_file
+		, impl::allocation_state_combined *
+		, const ::iovec *iov_addl_first_
+		, const ::iovec *iov_addl_last_
+	)
+		: heap_rc_shared(debug_level, dax_manager, id, backing_file, iov_addl_first_, iov_addl_last_)
 	{
 	}
 
@@ -166,7 +189,7 @@ public:
 		return _numa_node;
 	}
 
-    region_access regions() const;
+    nupm::region_descriptor regions() const;
 };
 
 struct heap_rc

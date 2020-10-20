@@ -24,6 +24,7 @@
 #include <common/exceptions.h>
 #include <common/cycles.h>
 #include <nupm/mcas_mod.h>
+#include <nupm/region_descriptor.h>
 #include <rapidjson/ostreamwrapper.h>
 #include <rapidjson/writer.h>
 #include <libpmem.h>
@@ -141,7 +142,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
 
     /* exchange memory mapping information */
     {
-      std::pair<std::string, std::vector<::iovec>> regions;
+      nupm::region_descriptor regions;
       auto                 rc = _i_kvstore->get_pool_regions(pool_id, regions);
 
       if (rc != S_OK) {
@@ -150,7 +151,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       }
 
       std::size_t offset = 0;
-      for (auto& r : regions.second) {
+      for (auto& r : regions.address_map) {
         r.iov_len = round_up_page(r.iov_len);
 
         // Don't think we need this - DW
@@ -163,9 +164,9 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
           ado->send_memory_map(std::uint64_t(seg_id), r.iov_len, r.iov_base);
         }
         else {
-          if ( regions.first.size() != 0 )
+          if ( regions.data_file.size() != 0 )
           {
-            ado->send_memory_map_named(0, regions.first, offset, r);
+            ado->send_memory_map_named(0, regions.data_file, offset, r);
           }
           else
           {
