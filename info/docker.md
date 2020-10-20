@@ -17,10 +17,15 @@ Follow [Quick Start](./quick_start.md) for system configuration and instructions
 
 On Docker Hub (https://hub.docker.com/) create an account and a registry.
 
-- Build image:
+- Build image (e.g.):
 ```bash
 docker build -f $MCAS_HOME/deploy/docker/Dockerfile.mcas-ubuntu-18 -t <your-docker-username>/ibm-mcas-runtime:ubuntu18 .
   ```
+
+```bash
+docker build -f $MCAS_HOME/deploy/docker/Dockerfile.mcas-fc-27 -t <your-docker-username>/ibm-mcas-runtime:fc27 .
+  ```
+
 
 - (Optional) Push image to Docker Hub, e.g.:
 ```bash

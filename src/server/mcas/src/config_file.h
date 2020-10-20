@@ -95,7 +95,9 @@ class Config_file : private common::log_source {
 
   boost::optional<rapidjson::Document> get_shard_dax_config_raw(rapidjson::SizeType i);
 
-  std::string get_cert_path() const;
+  std::string security_get_cert_path() const;
+
+  std::string security_get_security_level() const;
 
   std::string cluster_group() const;
 

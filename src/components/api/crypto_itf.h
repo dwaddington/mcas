@@ -58,14 +58,15 @@ public:
   DECLARE_INTERFACE_UUID(0xD7F80DD6,0xBB71,0x48C3,0xAF6E,0x2C,0x2E,0xFD,0x7A,0x3B,0xD7);
 
 public:
-  class Opaque_crypto_session {
+  class Crypto_session {
   public:
     virtual status_t shutdown() = 0;
     virtual bool is_server_side() const = 0;
-    virtual ~Opaque_crypto_session() {}
+    virtual const std::string& client_uuid() const = 0;
+    virtual ~Crypto_session() {}
   };
 
-  using session_t  = Opaque_crypto_session*;
+  using session_t  = Crypto_session*;
 
   /**
    * @brief      Initialize cipher suite, cert and key files
