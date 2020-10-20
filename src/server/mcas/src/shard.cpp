@@ -1733,6 +1733,7 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
 void Shard::process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr_)
 {
   handler->msg_recv_log(msg, __func__);
+  
   if (msg->type() == protocol::INFO_TYPE_FIND_KEY) {
     CPLOG(1, "Shard: INFO request INFO_TYPE_FIND_KEY (%s)", msg->c_str());
 
@@ -1748,7 +1749,11 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
     }
 
     try {
-      add_task_list(new Key_find_task(msg->c_str(), msg->offset, handler, _index_map->at(msg->pool_id()).get()));
+      add_task_list(new Key_find_task(msg->c_str(),
+                                      msg->offset,
+                                      handler,
+                                      _index_map->at(msg->pool_id()).get(),
+                                      debug_level()));
     }
     catch (...) {
       const auto                       iob      = handler->allocate_send();
