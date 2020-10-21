@@ -2542,9 +2542,9 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection, c
 
   base[0] = size; /* prefix with length */
   iobs->set_length(size + sizeof(uint64_t));
+  
   PNOTICE("TLS Trying to send: %lu bytes", size);
   p_this->sync_send(&*iobs, "TLS packet (client send)", __func__);
-  //p_this->sync_inject_send(&*iobs, size + sizeof(uint64_t));
 
   PNOTICE("TLS Sent: %lu bytes (%p)", size, reinterpret_cast<void*>(&*iobs));
   return size;

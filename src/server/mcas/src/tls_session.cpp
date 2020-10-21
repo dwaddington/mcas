@@ -52,9 +52,12 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
                                         void* buffer,
                                         size_t buffer_size)
 {
+  
+    
   assert(connection);
   auto p_this = reinterpret_cast<Connection_handler*>(connection);
-
+  p_this->check_network_completions();
+  
   if(p_this->_tls_buffer.remaining() >= buffer_size) {
     PNOTICE("TLS Pull: taking %lu bytes from remaining (%lu)",
             buffer_size, p_this->_tls_buffer.remaining());
@@ -70,7 +73,7 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
   while(!p_this->check_for_posted_recv_complete()) {
      /* eventually the code gets stuck here */
      PLOG("gnutl_pull is waiting for data...(request for %lu bytes)", buffer_size);
-     sleep(1);
+     p_this->check_network_completions();
   }
   
   auto iob = p_this->posted_recv();
@@ -93,8 +96,9 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
 ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
                                             const giovec_t * iovec,
                                             int iovec_cnt)
-{
+{ 
   auto p_this = reinterpret_cast<Connection_handler*>(connection);
+  p_this->check_network_completions();
 
   /* TODO length check */
   auto iobs = p_this->allocate_send();
@@ -114,7 +118,7 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
   iobs->set_length(size + sizeof(uint64_t));
   p_this->post_send_buffer(&*iobs, "TLS packet (server-send)", __func__);
 
-  PNOTICE("TLS Send: %lu bytes", size);
+  PNOTICE("TLS Sent: %lu bytes", size);
   return size; /* return size of payload */
 }
 

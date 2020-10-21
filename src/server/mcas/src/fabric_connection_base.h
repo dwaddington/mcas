@@ -171,8 +171,9 @@ class Fabric_connection_base : protected common::log_source {
   void free_recv_buffer()
   {
     PLOG("freeing recv buffers");
-    for (auto b : _completed_recv_buffers) {
+    for (auto b : _completed_recv_buffers) {      
       free_buffer(b);
+      PLOG("!!!freed recv buffer %p", reinterpret_cast<void*>(b));
     }
   }
 
