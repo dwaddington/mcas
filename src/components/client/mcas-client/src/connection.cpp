@@ -2572,8 +2572,9 @@ void Connection_handler::start_tls()
   if (gnutls_certificate_allocate_credentials(&_xcred) != GNUTLS_E_SUCCESS)
     throw General_exception("gnutls_certificate_allocate_credentials() failed");
 
-  std::string cert_file("/home/danielwaddington/mcas/build/dist/certs/client-cert.pem");// = ::getenv("CERT");
-  std::string key_file("/home/danielwaddington/mcas/build/dist/certs/client-privkey.pem"); // = ::getenv("KEY");
+  std::string cert_file(::getenv("CERT"));
+  std::string key_file(::getenv("KEY"));
+  
   PLOG("start_tls: cert=%s key=%s", cert_file.c_str(), key_file.c_str());
   
   if (gnutls_certificate_set_x509_key_file(_xcred, cert_file.c_str(), key_file.c_str(), GNUTLS_X509_FMT_PEM) !=
