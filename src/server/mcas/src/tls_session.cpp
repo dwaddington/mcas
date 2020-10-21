@@ -24,7 +24,7 @@ static void print_logs(int level, const char* msg);
 static void __attribute__((constructor)) Global_ctor()
 {
   gnutls_global_init();
-  gnutls_global_set_log_level(2);
+  gnutls_global_set_log_level(5);
   gnutls_global_set_log_function(print_logs);
 }
 
@@ -58,10 +58,11 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
   if(p_this->_tls_buffer.remaining() >= buffer_size) {
     PNOTICE("TLS Pull: taking %lu bytes from remaining (%lu)",
             buffer_size, p_this->_tls_buffer.remaining());
-    p_this->_tls_buffer.pop(buffer, buffer_size);
+    p_this->_tls_buffer.pull(buffer, buffer_size);
     return buffer_size;
   }
 
+  p_this->posted_count_log();
   PNOTICE("TLS Pull posting receive:");
   p_this->post_recv_buffer(p_this->allocate_recv());
   PLOG("gnutls_pull_func: posted recv buffer");
@@ -80,12 +81,12 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
   PNOTICE("TLS Received: iob_len=%lu payload-len=%lu (%p)", iob->length(), base[0], reinterpret_cast<void*>(iob));
 
   /* copy off what is received into Byte_buffer to take piecemeal */
-  p_this->_tls_buffer.set_remaining(reinterpret_cast<void*>(&base[1]), base[0]);
+  p_this->_tls_buffer.push(reinterpret_cast<void*>(&base[1]), base[0]);
 
   /* clean up recv buffer */
   p_this->free_recv_buffer(); 
 
-  p_this->_tls_buffer.pop(buffer, buffer_size);
+  p_this->_tls_buffer.pull(buffer, buffer_size);
   return buffer_size;
 }
 
