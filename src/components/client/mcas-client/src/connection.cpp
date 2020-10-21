@@ -37,6 +37,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/error/error.h>  // rapidjson::ParseErrorCode
 
+static constexpr const unsigned TLS_DEBUG_LEVEL = 3;
+
 /* static constructor called once */
 static void print_logs(int level, const char* msg) { printf("GnuTLS [%d]: %s", level, msg); }
 
@@ -2488,6 +2490,11 @@ int Connection_handler::tick()
   return 1;
 }
 
+unsigned TLS_transport::debug_level()
+{
+  return TLS_DEBUG_LEVEL;
+}
+
 int TLS_transport::gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int ms)
 {
   return 0;
@@ -2501,7 +2508,10 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection, void*
   auto p_this = reinterpret_cast<Connection_handler*>(connection);
 
   if(p_this->_tls_buffer.remaining() >= buffer_size) {
-    PNOTICE("TLS Pull: taking %lu bytes from remaining (%lu)", buffer_size, p_this->_tls_buffer.remaining());
+
+    if(debug_level() > 2)
+      PLOG("TLS pull: taking %lu bytes from remaining (%lu)", buffer_size, p_this->_tls_buffer.remaining());
+    
     p_this->_tls_buffer.pull(buffer, buffer_size);
     return buffer_size;
   }
@@ -2509,13 +2519,14 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection, void*
   auto iobr = p_this->make_iob_ptr_recv();
 
   p_this->post_recv(&*iobr);
-  PLOG("gnutls_pull_func: posted recv buffer (%p)", reinterpret_cast<void*>(&*iobr));
   p_this->wait_for_completion(&*iobr); /* await response */
   
   void * base_v = iobr->base();
   uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
   uint64_t payload_size = base[0];
-  PNOTICE("TLS Received: iob_len=%lu payload-len=%lu", iobr->length(), payload_size);
+
+  if(debug_level() > 2)
+    PLOG("TLS received: iob_len=%lu payload-len=%lu", iobr->length(), payload_size);
 
   p_this->_tls_buffer.push(reinterpret_cast<void*>(&base[1]), payload_size);
   p_this->_tls_buffer.pull(buffer, buffer_size);
@@ -2543,18 +2554,17 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection, c
   base[0] = size; /* prefix with length */
   iobs->set_length(size + sizeof(uint64_t));
   
-  PNOTICE("TLS Trying to send: %lu bytes", size);
   p_this->sync_send(&*iobs, "TLS packet (client send)", __func__);
 
-  PNOTICE("TLS Sent: %lu bytes (%p)", size, reinterpret_cast<void*>(&*iobs));
+  if(debug_level() > 2)
+    PLOG("TLS sent: %lu bytes (%p)", size, reinterpret_cast<void*>(&*iobs));
+  
   return size;
 }
 
 void Connection_handler::start_tls()
 {
-  PNOTICE("Server says: start TLS!");
   if(_options.tls == false) throw Logic_exception("TLS contradiction");
-
 
   if(gnutls_global_init() != GNUTLS_E_SUCCESS)
     throw General_exception("gnutls_global_init() failed");
@@ -2582,7 +2592,7 @@ void Connection_handler::start_tls()
   if (gnutls_credentials_set(_session, GNUTLS_CRD_CERTIFICATE, _xcred) != GNUTLS_E_SUCCESS)
     throw General_exception("gnutls_credentials_set() failed");
 
-  //gnutls_handshake_set_timeout(_session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+  //  gnutls_handshake_set_timeout(_session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
 
   /* hook in TLS transport to use our RDMA connection */
   gnutls_transport_set_ptr(_session, this);

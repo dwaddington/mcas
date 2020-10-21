@@ -61,6 +61,7 @@ namespace client
 
 struct TLS_transport
 {
+  static unsigned debug_level();
   static ssize_t gnutls_pull_func(gnutls_transport_ptr_t, void*, size_t);
   static ssize_t gnutls_vec_push_func(gnutls_transport_ptr_t, const giovec_t * , int );
   static int gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int);

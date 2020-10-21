@@ -20,6 +20,8 @@
 static void print_info(gnutls_session_t session);
 static void print_logs(int level, const char* msg);
 
+static constexpr const unsigned TLS_DEBUG_LEVEL = 3;
+
 /* static constructor called once */
 static void __attribute__((constructor)) Global_ctor()
 {
@@ -43,6 +45,10 @@ Connection_TLS_session::~Connection_TLS_session() {
   }
 }
 
+unsigned TLS_transport::debug_level() {
+  return TLS_DEBUG_LEVEL;
+}
+
 int TLS_transport::gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int)
 {
   return 0;
@@ -51,28 +57,25 @@ int TLS_transport::gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int
 ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
                                         void* buffer,
                                         size_t buffer_size)
-{
-  
-    
+{  
   assert(connection);
   auto p_this = reinterpret_cast<Connection_handler*>(connection);
-  p_this->check_network_completions();
-  
+
   if(p_this->_tls_buffer.remaining() >= buffer_size) {
-    PNOTICE("TLS Pull: taking %lu bytes from remaining (%lu)",
-            buffer_size, p_this->_tls_buffer.remaining());
+    if(debug_level() > 2) {
+      PLOG("TLS pull: taking %lu bytes from remaining (%lu)",
+           buffer_size, p_this->_tls_buffer.remaining());
+    }
     p_this->_tls_buffer.pull(buffer, buffer_size);
     return buffer_size;
   }
 
-  p_this->posted_count_log();
-  PNOTICE("TLS Pull posting receive:");
+  if(debug_level() > 2)
+    PLOG("TLS posting receive:");
+  
   p_this->post_recv_buffer(p_this->allocate_recv());
-  PLOG("gnutls_pull_func: posted recv buffer");
 
   while(!p_this->check_for_posted_recv_complete()) {
-     /* eventually the code gets stuck here */
-     PLOG("gnutl_pull is waiting for data...(request for %lu bytes)", buffer_size);
      p_this->check_network_completions();
   }
   
@@ -81,13 +84,15 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
 
   void * base_v = iob->base();
   uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
-  PNOTICE("TLS Received: iob_len=%lu payload-len=%lu (%p)", iob->length(), base[0], reinterpret_cast<void*>(iob));
+
+  if(debug_level() > 2)
+    PLOG("TLS received: iob_len=%lu payload-len=%lu (%p)", iob->length(), base[0], reinterpret_cast<void*>(iob));
 
   /* copy off what is received into Byte_buffer to take piecemeal */
   p_this->_tls_buffer.push(reinterpret_cast<void*>(&base[1]), base[0]);
 
   /* clean up recv buffer */
-  p_this->free_recv_buffer(); 
+  p_this->free_recv_buffer();
 
   p_this->_tls_buffer.pull(buffer, buffer_size);
   return buffer_size;
@@ -118,7 +123,6 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
   iobs->set_length(size + sizeof(uint64_t));
   p_this->post_send_buffer(&*iobs, "TLS packet (server-send)", __func__);
 
-  PNOTICE("TLS Sent: %lu bytes", size);
   return size; /* return size of payload */
 }
 
@@ -153,37 +157,26 @@ Connection_state Connection_TLS_session::process_tls_session()
     gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func);
 
     /* post buffer for handshake */
-    _posted_handshake_recv_buffer = _connection->allocate_recv();
-    _connection->post_recv_buffer(_posted_handshake_recv_buffer);
+    //    _posted_handshake_recv_buffer = _connection->allocate_recv();
+    //    _connection->post_recv_buffer(_posted_handshake_recv_buffer);
 
     return Connection_state::WAIT_TLS_SESSION;
   }
 
   /* check if handshake recv complete */
   if(_connection->check_for_posted_recv_complete()) {
-    PNOTICE("Got TLS request!");
     /* initiate handshake */
     int rc;
     if ((rc = gnutls_handshake(_session)) < 0)
       throw General_exception("GNU tls handshake has failed (%s)\n\n", gnutls_strerror(rc));
-            
-    PNOTICE("Whooo hoo OK! TLS handshake is done");
-    asm("int3");
+
+    print_info(_session);
+    CPLOG(2, "TLS handshake complete");
+    
     return Connection_state::WAIT_NEW_MSG_RECV; // finally, move to next state
   }
-  else {
-    PNOTICE("Waiting for TLS request..");
-    sleep(1);
-  }
 
-  if(0) print_info(_session);
   return Connection_state::WAIT_TLS_SESSION;
-
-
-  // if(0) {
-  //   
-  // }
-  
 }
 
 void Connection_TLS_session::initialize_certs()

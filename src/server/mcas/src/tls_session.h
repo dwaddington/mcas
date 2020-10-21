@@ -45,6 +45,7 @@ namespace mcas
 
 struct TLS_transport
 {
+  static unsigned debug_level();
   static ssize_t gnutls_pull_func(gnutls_transport_ptr_t connection, void* buffer, size_t buffer_size);
   static ssize_t gnutls_vec_push_func(gnutls_transport_ptr_t, const giovec_t * , int );
   static int gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int ms);
@@ -132,8 +133,8 @@ private:
   gnutls_certificate_credentials_t _x509_cred;
   gnutls_priority_t                _priority;
   
-  Buffer_manager<component::IFabric_server>::buffer_internal *
-  _posted_handshake_recv_buffer;
+  // Buffer_manager<component::IFabric_server>::buffer_internal *
+  // _posted_handshake_recv_buffer;
 
 };
 
