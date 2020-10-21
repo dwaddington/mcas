@@ -125,7 +125,7 @@ class Fabric_connection_base : protected common::log_source {
   {
     --_send_buffer_posted_count;
     posted_count_log();
-    CPLOG(2, "Completed send (%p)", static_cast<const void *>(iob));
+    CPLOG(2, "Completed send (%p) freeing buffer", static_cast<const void *>(iob));
     free_buffer(iob);
   }
 

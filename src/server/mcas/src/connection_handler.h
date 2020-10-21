@@ -392,7 +392,8 @@ public:
   inline size_t         max_message_size() const { return _max_message_size; }
   inline Pool_manager & pool_manager() { return _pool_manager; }
 
-  Byte_buffer _tls_buffer;
+private:
+  common::Byte_buffer _tls_buffer;
 };
 
 }  // namespace mcas

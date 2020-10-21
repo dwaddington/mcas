@@ -15,7 +15,7 @@
 #include "security.h"
 #include "mcas_config.h"
 
-static constexpr unsigned EXTRA_BISCUITS = 0;
+static constexpr unsigned EXTRA_BISCUITS = 3;
 
 namespace mcas
 {

@@ -26,6 +26,7 @@
 #include <api/mcas_itf.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
+#include <common/byte_buffer.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -55,53 +56,14 @@
 namespace mcas
 {
 
-/* TO DO - improve this */
-class Byte_buffer
-{
-public:
-  void pop(void * buffer, size_t buffer_size) {
-    assert(buffer_size <= _remaining_len);
-    memcpy(buffer, _remaining, buffer_size);
-    _remaining_len -= buffer_size;
-    PNOTICE("**: popped %lu (remaining=%lu)", buffer_size, _remaining_len);
-
-    if(_remaining_len > 0) {
-      void * new_buffer = malloc(_remaining_len);
-      memcpy(new_buffer, &_remaining[buffer_size], _remaining_len);
-      free(_remaining);
-      _remaining = reinterpret_cast<byte*>(new_buffer);
-    }
-    else {
-      free(_remaining);
-      _remaining = nullptr;
-      _remaining_len = 0;
-    }
-  }
-  
-  void set_remaining(size_t buffer_size, void * buffer) {
-    assert(_remaining == nullptr);
-    _remaining_len = buffer_size;
-    _remaining = reinterpret_cast<byte*>(malloc(buffer_size));
-    memcpy(_remaining, buffer, buffer_size);
-  }
-
-  inline size_t remaining() const { return _remaining_len; }
-
-private:
-  byte * _remaining = nullptr;
-  size_t _remaining_len = 0;
-  
-};
-
 namespace client
 {
 
 struct TLS_transport
 {
-  static int gnutls_pull_timeout_func(gnutls_transport_ptr_t /*ptr*/, unsigned int ms);
-  static ssize_t gnutls_push_func(gnutls_transport_ptr_t, const void*, size_t);
-  static ssize_t gnutls_pull_func(gnutls_transport_ptr_t connection, void* buffer, size_t buffer_size);
+  static ssize_t gnutls_pull_func(gnutls_transport_ptr_t, void*, size_t);
   static ssize_t gnutls_vec_push_func(gnutls_transport_ptr_t, const giovec_t * , int );
+  static int gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int);
 };
 
 
@@ -123,6 +85,8 @@ class Connection_handler : public Connection_base {
   using locate_element = protocol::Message_IO_response::locate_element;
 
 public:
+  friend struct TLS_transport;
+  
   using memory_region_t = typename Transport::memory_region_t;
 
   /**
@@ -441,6 +405,12 @@ public:
     Connection_base::sync_send(iob);
   }
 
+  void sync_inject_send(buffer_t *iob, std::size_t size)
+  {
+    Connection_base::sync_inject_send(iob, size);
+  } 
+  
+
 private:
   /* unused */
 #if 0
@@ -564,9 +534,8 @@ private:
   gnutls_certificate_credentials_t _xcred;
   gnutls_priority_t                _priority;
   gnutls_session_t                 _session;
-
-public:
-  Byte_buffer                      _tls_buffer;
+  common::Byte_buffer              _tls_buffer;
+  
 };
 
 }  // namespace client

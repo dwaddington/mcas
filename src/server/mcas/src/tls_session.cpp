@@ -24,7 +24,7 @@ static void print_logs(int level, const char* msg);
 static void __attribute__((constructor)) Global_ctor()
 {
   gnutls_global_init();
-  gnutls_global_set_log_level(0);
+  gnutls_global_set_log_level(2);
   gnutls_global_set_log_function(print_logs);
 }
 
@@ -43,71 +43,78 @@ Connection_TLS_session::~Connection_TLS_session() {
   }
 }
 
-
-int TLS_transport::gnutls_pull_timeout_func(gnutls_transport_ptr_t /*ptr*/, unsigned int ms)
+int TLS_transport::gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int)
 {
-  PNOTICE("PULL TIMEOUT Here! ms=%u", ms);
-  //   asm("int3");
-  return 0; /* 0=no data, 1=data, -1 = error */
-}
-
-ssize_t TLS_transport::gnutls_push_func(gnutls_transport_ptr_t connection,
-                                        const void* buffer,
-                                        size_t buffer_size)
-{
-  PNOTICE("PUSH here!: connection=%p buffer=%p buffer_size=%lu", connection, buffer, buffer_size);
-
-  auto p_this = reinterpret_cast<Connection_handler*>(connection);
-
-  /* TODO length check */
-  auto iobs = p_this->allocate_send();
-  void * base_v = iobs->base();
-  uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
-  base[0] = buffer_size; /* prefix buffer with size */
-  memcpy(&base[1], buffer, buffer_size);
-  iobs->set_length(buffer_size + sizeof(uint64_t));
-  p_this->post_send_buffer(&*iobs, "TLS packet", __func__);
-
-  return buffer_size;
+  return 0;
 }
 
 ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
                                         void* buffer,
                                         size_t buffer_size)
 {
-  PNOTICE("PULL here!: connection=%p buffer=%p buffer_size=%lu", connection, buffer, buffer_size);
-
   assert(connection);
   auto p_this = reinterpret_cast<Connection_handler*>(connection);
 
   if(p_this->_tls_buffer.remaining() >= buffer_size) {
+    PNOTICE("TLS Pull: taking %lu bytes from remaining (%lu)",
+            buffer_size, p_this->_tls_buffer.remaining());
     p_this->_tls_buffer.pop(buffer, buffer_size);
     return buffer_size;
   }
 
-  while(!p_this->check_for_posted_recv_complete()) cpu_relax();
+  PNOTICE("TLS Pull posting receive:");
+  p_this->post_recv_buffer(p_this->allocate_recv());
+  PLOG("gnutls_pull_func: posted recv buffer");
+
+  while(!p_this->check_for_posted_recv_complete()) {
+     /* eventually the code gets stuck here */
+     PLOG("gnutl_pull is waiting for data...(request for %lu bytes)", buffer_size);
+     sleep(1);
+  }
   
   auto iob = p_this->posted_recv();
   assert(iob);
 
   void * base_v = iob->base();
   uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
-  PNOTICE("PULL here!: iob_len=%lu prefix-len=%lu", iob->length(), base[0]);
+  PNOTICE("TLS Received: iob_len=%lu payload-len=%lu (%p)", iob->length(), base[0], reinterpret_cast<void*>(iob));
 
-  p_this->_tls_buffer.set_remaining(base[0], reinterpret_cast<void*>(&base[1]));
-  p_this->free_recv_buffer();
+  /* copy off what is received into Byte_buffer to take piecemeal */
+  p_this->_tls_buffer.set_remaining(reinterpret_cast<void*>(&base[1]), base[0]);
+
+  /* clean up recv buffer */
+  p_this->free_recv_buffer(); 
 
   p_this->_tls_buffer.pop(buffer, buffer_size);
   return buffer_size;
 }
-  
-ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t,
-                                            const giovec_t * ,
-                                            int )
+
+ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
+                                            const giovec_t * iovec,
+                                            int iovec_cnt)
 {
-  PNOTICE("PUSH vec Here!");
-  asm("int3");
-  return 0;
+  auto p_this = reinterpret_cast<Connection_handler*>(connection);
+
+  /* TODO length check */
+  auto iobs = p_this->allocate_send();
+  void * base_v = iobs->base();
+  uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
+
+  char * ptr = reinterpret_cast<char*>(&base[1]);
+  size_t size = 0;
+  
+  for(int i=0; i<iovec_cnt; i++) {
+    memcpy(ptr, iovec[i].iov_base, iovec[i].iov_len);
+    size += iovec[i].iov_len;
+    ptr += iovec[i].iov_len;
+  }
+
+  base[0] = size; /* prefix buffer with size */
+  iobs->set_length(size + sizeof(uint64_t));
+  p_this->post_send_buffer(&*iobs, "TLS packet (server-send)", __func__);
+
+  PNOTICE("TLS Send: %lu bytes", size);
+  return size; /* return size of payload */
 }
 
 
@@ -132,15 +139,13 @@ Connection_state Connection_TLS_session::process_tls_session()
     /* request that client provides certificate to identify themselves */
     gnutls_certificate_server_set_request(_session, GNUTLS_CERT_REQUIRE);  // GNUTLS_CERT_IGNORE);
 
-    //    gnutls_handshake_set_timeout(_session, GNUTLS_INDEFINITE_TIMEOUT); // 1ms GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+    //    gnutls_handshake_set_timeout(_session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
 
     /* set up transport over fabric connection (via Connection_handler) */
     gnutls_transport_set_ptr(_session, _connection);
-    PNOTICE("setting gnutls ptr (%p)", static_cast<void*>(_connection));
-    gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func);
-    gnutls_transport_set_push_function(_session, TLS_transport::gnutls_push_func);
-    //    gnutls_transport_set_vec_push_function(_session, TLS_transport::gnutls_vec_push_func);
+    gnutls_transport_set_vec_push_function(_session, TLS_transport::gnutls_vec_push_func);
     gnutls_transport_set_pull_function(_session, TLS_transport::gnutls_pull_func);
+    gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func);
 
     /* post buffer for handshake */
     _posted_handshake_recv_buffer = _connection->allocate_recv();
