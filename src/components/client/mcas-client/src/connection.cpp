@@ -16,7 +16,6 @@
 #include "protocol.h"
 #include "range.h"
 
-
 #include <city.h>
 #include <common/cycles.h>
 #include <common/delete_copy.h>
@@ -37,6 +36,16 @@
 #pragma GCC diagnostic pop
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/error/error.h>  // rapidjson::ParseErrorCode
+
+/* static constructor called once */
+static void __attribute__((constructor)) Global_ctor()
+{
+  gnutls_global_init();
+  gnutls_global_set_log_level(0);
+  //  gnutls_global_set_log_function(print_logs);
+}
+
+static constexpr const char * cipher_suite = "NORMAL:+AEAD";
 
 namespace mcas
 {
@@ -2428,7 +2437,10 @@ int Connection_handler::tick()
       try {
         wait_for_completion(&*iobr);
         const auto response_msg = msg_recv<const mcas::protocol::Message_handshake_reply>(&*iobr, "handshake");
-        (void)response_msg;
+
+        /* server is indicating that it wants to start TLS session */     
+        if(response_msg->start_tls)
+          start_tls();
       }
       catch (...) {
         PERR("%s %s handshake response failed", __FILE__, __func__);
@@ -2437,7 +2449,6 @@ int Connection_handler::tick()
 
       static int recv = 0;
       recv++;
-
 
       set_state(READY);
 
@@ -2473,6 +2484,119 @@ int Connection_handler::tick()
   }  // end switch
 
   return 1;
+}
+
+
+int TLS_transport::custom_gnutls_pull_timeout_func(gnutls_transport_ptr_t /*ptr*/, unsigned int ms)
+{
+  PNOTICE("PULL TIMEOUT Here! ms=%u", ms);
+  //   asm("int3");
+  return 0; /* 0=no data, 1=data, -1 = error */
+}
+
+ssize_t TLS_transport::custom_gnutls_push_func(gnutls_transport_ptr_t connection, const void* buffer, size_t buffer_size)
+{
+  PLOG("custom_gnutls_push_func() SENDING buffer=%p buffer_size=%lu", buffer, buffer_size);
+  assert(connection);
+  auto p_this = reinterpret_cast<Connection_handler*>(connection);
+
+  /* TODO length check */
+  auto iobs = p_this->make_iob_ptr_send();
+  void * base_v = iobs->base();
+  uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
+  base[0] = buffer_size; /* prefix buffer with size */
+  memcpy(&base[1], buffer, buffer_size);
+  iobs->set_length(buffer_size + sizeof(uint64_t));
+  p_this->post_send(&*iobs, "TLS packet", __func__);
+
+  PLOG("custom_gnutls_push_func() SENT buffer=%p buffer_size=%lu", buffer, buffer_size);  
+  return buffer_size;
+}
+
+ssize_t TLS_transport::custom_gnutls_pull_func(gnutls_transport_ptr_t connection, void* buffer, size_t buffer_size)
+{
+  assert(connection);
+
+  auto p_this = reinterpret_cast<Connection_handler*>(connection);
+
+  if(p_this->_tls_buffer.remaining() >= buffer_size) {
+    p_this->_tls_buffer.pop(buffer, buffer_size);
+    return buffer_size;
+  }
+
+  auto iobr = p_this->make_iob_ptr_recv();
+
+  p_this->post_recv(&*iobr);
+  p_this->wait_for_completion(&*iobr); /* await response */
+  
+  void * base_v = iobr->base();
+  uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
+  PNOTICE("PULL here!: iob_len=%lu prefix-len=%lu", iobr->length(), base[0]);
+
+  p_this->_tls_buffer.set_remaining(base[0], reinterpret_cast<void*>(&base[1]));
+
+  p_this->_tls_buffer.pop(buffer, buffer_size);
+  return buffer_size;
+
+}
+
+#if 0
+static ssize_t custom_gnutls_vec_push_func(gnutls_transport_ptr_t connection, const giovec_t * iovec, int iovec_cnt )
+{
+  assert(connection);
+  //  auto p_this = reinterpret_cast<Connection_handler*>(connection);
+  PNOTICE("PUSH vec Here!");
+
+  return 0;
+}
+#endif
+
+void Connection_handler::start_tls()
+{
+  PNOTICE("Server says: start TLS!");
+  if(_options.tls == false) throw Logic_exception("TLS contradiction");
+
+
+  if(gnutls_global_init() != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_global_init() failed");
+
+  if (gnutls_certificate_allocate_credentials(&_xcred) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_certificate_allocate_credentials() failed");
+
+  std::string cert_file("/home/danielwaddington/mcas/build/dist/certs/client-cert.pem");// = ::getenv("CERT");
+  std::string key_file("/home/danielwaddington/mcas/build/dist/certs/client-privkey.pem"); // = ::getenv("KEY");
+  PLOG("start_tls: cert=%s key=%s", cert_file.c_str(), key_file.c_str());
+  
+  if (gnutls_certificate_set_x509_key_file(_xcred, cert_file.c_str(), key_file.c_str(), GNUTLS_X509_FMT_PEM) !=
+      GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_certificate_set_x509_key_file() failed");
+
+  if (gnutls_init(&_session, GNUTLS_CLIENT) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_init() failed");
+
+  if (gnutls_priority_init(&_priority, cipher_suite, NULL) != GNUTLS_E_SUCCESS)
+      throw General_exception("gnutls_priority_init() failed");
+
+  if (gnutls_priority_set(_session, _priority) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_priority_set() failed");
+
+  if (gnutls_credentials_set(_session, GNUTLS_CRD_CERTIFICATE, _xcred) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_credentials_set() failed");
+
+  gnutls_transport_set_ptr(_session, this);
+  gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func);
+  gnutls_transport_set_push_function(_session, TLS_transport::gnutls_push_func);
+  //  gnutls_transport_set_vec_push_function(_session, custom_gnutls_vec_push_func);
+  gnutls_transport_set_pull_function(_session, TLS_transport::gnutls_pull_func);
+
+  /* initiate handshake */
+  int ret;
+  do {
+    ret = gnutls_handshake(_session);
+  } while (ret < 0 && gnutls_error_is_fatal(ret) == 0);
+
+
+  PNOTICE("OK!");
 }
 
 }  // namespace client

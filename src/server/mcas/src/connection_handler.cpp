@@ -31,7 +31,8 @@ Connection_handler::Connection_handler(unsigned debug_level,
     _pending_msgs{},
     _pending_actions(),
     _pool_manager(),
-    _stats{}
+    _stats{},
+    _tls_buffer()
 {
 }
 

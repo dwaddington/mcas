@@ -1,17 +1,21 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2019] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 #ifndef __MCAS_CLIENT_HANDLER_H__
 #define __MCAS_CLIENT_HANDLER_H__
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Weffc++"
 
 #include "fabric_transport.h"
 #include "mcas_client_config.h"
@@ -25,6 +29,9 @@
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+#include <gnutls/crypto.h>
 
 #include <boost/numeric/conversion/cast.hpp>
 #include <map>
@@ -37,6 +44,8 @@
 */
 #define THREAD_SAFE_CLIENT
 
+#define CAFILE "/etc/ssl/certs/ca-bundle.trust.crt"
+
 #ifdef THREAD_SAFE_CLIENT
 #define API_LOCK() std::lock_guard<std::mutex> g(_api_lock);
 #else
@@ -46,8 +55,56 @@
 namespace mcas
 {
 
+/* TO DO - improve this */
+class Byte_buffer
+{
+public:
+  void pop(void * buffer, size_t buffer_size) {
+    assert(buffer_size <= _remaining_len);
+    memcpy(buffer, _remaining, buffer_size);
+    _remaining_len -= buffer_size;
+    PNOTICE("**: popped %lu (remaining=%lu)", buffer_size, _remaining_len);
+
+    if(_remaining_len > 0) {
+      void * new_buffer = malloc(_remaining_len);
+      memcpy(new_buffer, &_remaining[buffer_size], _remaining_len);
+      free(_remaining);
+      _remaining = reinterpret_cast<byte*>(new_buffer);
+    }
+    else {
+      free(_remaining);
+      _remaining = nullptr;
+      _remaining_len = 0;
+    }
+  }
+  
+  void set_remaining(size_t buffer_size, void * buffer) {
+    assert(_remaining == nullptr);
+    _remaining_len = buffer_size;
+    _remaining = reinterpret_cast<byte*>(malloc(buffer_size));
+    memcpy(_remaining, buffer, buffer_size);
+  }
+
+  inline size_t remaining() const { return _remaining_len; }
+
+private:
+  byte * _remaining = nullptr;
+  size_t _remaining_len = 0;
+  
+};
+
 namespace client
 {
+
+struct TLS_transport
+{
+  static int gnutls_pull_timeout_func(gnutls_transport_ptr_t /*ptr*/, unsigned int ms);
+  static ssize_t gnutls_push_func(gnutls_transport_ptr_t, const void*, size_t);
+  static ssize_t gnutls_pull_func(gnutls_transport_ptr_t connection, void* buffer, size_t buffer_size);
+  static ssize_t gnutls_vec_push_func(gnutls_transport_ptr_t, const giovec_t * , int );
+};
+
+
 
 struct async_buffer_set_t;
 struct iob_free;
@@ -65,7 +122,7 @@ class Connection_handler : public Connection_base {
   using iob_ptr        = std::unique_ptr<client::Fabric_transport::buffer_t, iob_free>;
   using locate_element = protocol::Message_IO_response::locate_element;
 
- public:
+public:
   using memory_region_t = typename Transport::memory_region_t;
 
   /**
@@ -85,19 +142,19 @@ class Connection_handler : public Connection_base {
 
   ~Connection_handler();
 
- private:
+private:
   enum State {
-    INITIALIZE,
-    HANDSHAKE_SEND,
-    HANDSHAKE_GET_RESPONSE,
-    SHUTDOWN,
-    STOPPED,
-    READY,
+              INITIALIZE,
+              HANDSHAKE_SEND,
+              HANDSHAKE_GET_RESPONSE,
+              SHUTDOWN,
+              STOPPED,
+              READY,
   };
 
   State _state = State::INITIALIZE;
 
- public:
+public:
   using pool_t = uint64_t;
 
   void bootstrap()
@@ -290,7 +347,7 @@ class Connection_handler : public Connection_base {
 
   bool check_message_size(size_t size) const { return size > _max_message_size; }
 
- private:
+private:
   /**
    * FSM tick call
    *
@@ -306,83 +363,85 @@ class Connection_handler : public Connection_base {
   {
     if (2 < debug_level()) {
       static const std::map<State, const char *> m{
-          {INITIALIZE, "INITIALIZE"},
-          {HANDSHAKE_SEND, "HANDSHAKE_SEND"},
-          {HANDSHAKE_GET_RESPONSE, "HANDSHAKE_GET_RESPONSE"},
-          {SHUTDOWN, "SHUTDOWN"},
-          {STOPPED, "STOPPED"},
-          {READY, "READY"},
+                                                   {INITIALIZE, "INITIALIZE"},
+                                                   {HANDSHAKE_SEND, "HANDSHAKE_SEND"},
+                                                   {HANDSHAKE_GET_RESPONSE, "HANDSHAKE_GET_RESPONSE"},
+                                                   {SHUTDOWN, "SHUTDOWN"},
+                                                   {STOPPED, "STOPPED"},
+                                                   {READY, "READY"},
       };
       PLOG("Client state %s -> %s", m.find(_state)->second, m.find(s)->second);
     }
     _state = s;
   } /* we could add transition checking later */
 
-  template <typename MT>
-    void msg_send_log(const MT *m, const void *context, const char *desc) { msg_send_log(1, m, context, desc); }
+  void start_tls();
 
   template <typename MT>
-    void msg_send_log(const unsigned level, const MT *msg, const void *context, const char *desc)
-    {
-      msg_log(level, msg, context, desc, "SEND");
-    }
+  void msg_send_log(const MT *m, const void *context, const char *desc) { msg_send_log(1, m, context, desc); }
 
   template <typename MT>
-    void msg_log(const unsigned level_, const MT *msg_, const void *context_, const char *desc_, const char *direction_)
-    {
-      if ( level_ < debug_level() )
+  void msg_send_log(const unsigned level, const MT *msg, const void *context, const char *desc)
+  {
+    msg_log(level, msg, context, desc, "SEND");
+  }
+
+  template <typename MT>
+  void msg_log(const unsigned level_, const MT *msg_, const void *context_, const char *desc_, const char *direction_)
+  {
+    if ( level_ < debug_level() )
       {
         std::ostringstream m;
         m << *msg_;
         PLOG("%s (%p) (%s) %s", direction_, context_, desc_, m.str().c_str());
       }
-    }
+  }
 
   template <typename MT>
-    void msg_recv_log(const MT *m, const void *context, const char *desc) { msg_recv_log(1, m, context, desc); }
+  void msg_recv_log(const MT *m, const void *context, const char *desc) { msg_recv_log(1, m, context, desc); }
 
   template <typename MT>
-    void msg_recv_log(const unsigned level, const MT *msg, const void *context, const char *desc)
-    {
-      msg_log(level, msg, context, desc, "RECV");
-    }
+  void msg_recv_log(const unsigned level, const MT *msg, const void *context, const char *desc)
+  {
+    msg_log(level, msg, context, desc, "RECV");
+  }
 
- public:
-
-  template <typename MT>
-    MT *msg_recv(const buffer_t *iob, const char *desc)
-    {
-      /*
-       * First, cast the response buffer to Message (checking version).
-       * Second, cast the Message to a specific message type (checking message type).
-       */
-      const auto *const msg = mcas::protocol::message_cast(iob->base());
-      const auto *const response_msg = msg->ptr_cast<MT>();
-      msg_recv_log(response_msg, iob, desc);
-      return response_msg;
-    }
+public:
 
   template <typename MT>
-    void sync_inject_send(buffer_t *iob, const MT *msg, std::size_t size, const char *desc)
-    {
-      msg_send_log(msg, iob, desc);
-      Connection_base::sync_inject_send(iob, size);
-    }
+  MT *msg_recv(const buffer_t *iob, const char *desc)
+  {
+    /*
+     * First, cast the response buffer to Message (checking version).
+     * Second, cast the Message to a specific message type (checking message type).
+     */
+    const auto *const msg = mcas::protocol::message_cast(iob->base());
+    const auto *const response_msg = msg->ptr_cast<MT>();
+    msg_recv_log(response_msg, iob, desc);
+    return response_msg;
+  }
 
   template <typename MT>
-    void sync_inject_send(buffer_t *iob, const MT *msg, const char *desc)
-    {
-      sync_inject_send(iob, msg, msg->msg_len(), desc);
-    }
+  void sync_inject_send(buffer_t *iob, const MT *msg, std::size_t size, const char *desc)
+  {
+    msg_send_log(msg, iob, desc);
+    Connection_base::sync_inject_send(iob, size);
+  }
 
- private:
   template <typename MT>
-    void sync_send(buffer_t *iob, const MT *msg, const char *desc)
-    {
-      msg_send_log(msg, iob, desc);
-      Connection_base::sync_send(iob);
-    }
+  void sync_inject_send(buffer_t *iob, const MT *msg, const char *desc)
+  {
+    sync_inject_send(iob, msg, msg->msg_len(), desc);
+  }
 
+  template <typename MT>
+  void sync_send(buffer_t *iob, const MT *msg, const char *desc)
+  {
+    msg_send_log(msg, iob, desc);
+    Connection_base::sync_send(iob);
+  }
+
+private:
   /* unused */
 #if 0
   void post_send(buffer_t *iob, const protocol::Message_IO_request *msg, buffer_external *iob_extra, const char *desc)
@@ -392,18 +451,18 @@ class Connection_handler : public Connection_base {
   }
 #endif
   template <typename MT>
-    void post_send(buffer_t *iob, const MT *msg, const char *desc)
-    {
-      msg_send_log(2, msg, iob, desc);
-      Connection_base::post_send(iob);
-    }
+  void post_send(buffer_t *iob, const MT *msg, const char *desc)
+  {
+    msg_send_log(2, msg, iob, desc);
+    Connection_base::post_send(iob);
+  }
 
   template <typename MT>
-    void post_send(const ::iovec *first, const ::iovec *last, void **descriptors, void *context, const MT *msg, const char *desc)
-    {
-      msg_send_log(msg, context, desc);
-      Connection_base::post_send(first, last, descriptors, context);
-    }
+  void post_send(const ::iovec *first, const ::iovec *last, void **descriptors, void *context, const MT *msg, const char *desc)
+  {
+    msg_send_log(msg, context, desc);
+    Connection_base::post_send(first, last, descriptors, context);
+  }
 
   /**
    * Put used when the value exceeds the size of the basic
@@ -446,16 +505,14 @@ class Connection_handler : public Connection_base {
                                                     component::Registrar_memory_direct *rmd,
                                                     void *                              desc,
                                                     unsigned                            flags);
-
+public:
   iob_ptr make_iob_ptr(buffer_t::completion_t);
   iob_ptr make_iob_ptr_recv();
   iob_ptr make_iob_ptr_send();
-
- public:
   iob_ptr make_iob_ptr_write();
   iob_ptr make_iob_ptr_read();
 
- private:
+private:
   static void send_complete(void *, buffer_t *iob);
   static void recv_complete(void *, buffer_t *iob);
   static void write_complete(void *, buffer_t *iob);
@@ -477,7 +534,7 @@ class Connection_handler : public Connection_base {
                                                            component::Registrar_memory_direct *rmd,
                                                            void *                              desc);
 
- private:
+private:
 #ifdef THREAD_SAFE_CLIENT
   std::mutex _api_lock;
 #endif
@@ -485,10 +542,10 @@ class Connection_handler : public Connection_base {
   bool     _exit;
   uint64_t _request_id;
 
- public: /* for async "move_along" processing */
+public: /* for async "move_along" processing */
   uint64_t request_id() { return ++_request_id; }
 
- private:
+private:
   size_t _max_message_size;
   size_t _max_inject_size;
 
@@ -503,9 +560,17 @@ class Connection_handler : public Connection_base {
   };
 
   options_s _options;
+
+  gnutls_certificate_credentials_t _xcred;
+  gnutls_priority_t                _priority;
+  gnutls_session_t                 _session;
+
+public:
+  Byte_buffer                      _tls_buffer;
 };
 
 }  // namespace client
 }  // namespace mcas
 
+#pragma GCC diagnostic pop
 #endif

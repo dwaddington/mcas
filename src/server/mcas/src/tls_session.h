@@ -25,8 +25,10 @@
 #include <gnutls/crypto.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
-#include "connection_state.h"
 #include <boost/numeric/conversion/cast.hpp>
+
+#include "connection_state.h"
+#include "buffer_manager.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -39,6 +41,15 @@
 
 namespace mcas
 {
+
+struct TLS_transport
+{
+  static int gnutls_pull_timeout_func(gnutls_transport_ptr_t /*ptr*/, unsigned int ms);
+  static ssize_t gnutls_push_func(gnutls_transport_ptr_t, const void*, size_t);
+  static ssize_t gnutls_pull_func(gnutls_transport_ptr_t connection, void* buffer, size_t buffer_size);
+  static ssize_t gnutls_vec_push_func(gnutls_transport_ptr_t, const giovec_t * , int );
+};
+
 
 class Connection_handler;
 
@@ -112,6 +123,7 @@ private:
   void initialize_certs();
 
 private:
+
   Connection_handler *             _connection;
   security_options_t               _security_options;
   gnutls_session_t                 _session = nullptr;
@@ -119,7 +131,49 @@ private:
   gnutls_aead_cipher_hd_t          _cipher_handle;
   gnutls_certificate_credentials_t _x509_cred;
   gnutls_priority_t                _priority;
+  
+  Buffer_manager<component::IFabric_server>::buffer_internal *
+  _posted_handshake_recv_buffer;
 
+};
+
+
+/* TO DO - improve this */
+class Byte_buffer
+{
+public:
+  void pop(void * buffer, size_t buffer_size) {
+    assert(buffer_size <= _remaining_len);
+    memcpy(buffer, _remaining, buffer_size);
+    _remaining_len -= buffer_size;
+    PNOTICE("**: popped %lu (remaining=%lu)", buffer_size, _remaining_len);
+
+    if(_remaining_len > 0) {
+      void * new_buffer = malloc(_remaining_len);
+      memcpy(new_buffer, &_remaining[buffer_size], _remaining_len);
+      free(_remaining);
+      _remaining = reinterpret_cast<byte*>(new_buffer);
+    }
+    else {
+      free(_remaining);
+      _remaining = nullptr;
+      _remaining_len = 0;
+    }
+  }
+  
+  void set_remaining(size_t buffer_size, void * buffer) {
+    assert(_remaining == nullptr);
+    _remaining_len = buffer_size;
+    _remaining = reinterpret_cast<byte*>(malloc(buffer_size));
+    memcpy(_remaining, buffer, buffer_size);
+  }
+
+  inline size_t remaining() const { return _remaining_len; }
+
+private:
+  byte * _remaining;
+  size_t _remaining_len = 0;
+  
 };
 
 }

@@ -38,9 +38,9 @@ target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
 if( ${ARCHITECTURE} STREQUAL "x86_64" )
-  target_link_libraries(${PROJECT_NAME} common pthread numa dl rt z) # optional 'profiler'
+  target_link_libraries(${PROJECT_NAME} common pthread numa gnutls dl rt z) # optional 'profiler'
 else()
-  target_link_libraries(${PROJECT_NAME} common pthread numa dl rt z)
+  target_link_libraries(${PROJECT_NAME} common pthread numa gnutls dl rt z)
 endif()
 
 # set the linkage in the install/lib

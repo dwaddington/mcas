@@ -38,11 +38,12 @@
 #include <utility> /* swap */
 #include <vector>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+
 namespace mcas
 {
 using Connection_base = Fabric_connection_base;
-
-
 
 /**
  * Connection handler is instantiated for each "connected" client
@@ -52,9 +53,9 @@ class Connection_handler
     public Region_manager,
     private Connection_TLS_session
 {
-
-protected:
-
+  friend class Connection_TLS_session;
+  friend struct TLS_transport;
+  
 public:
   enum {
         TICK_RESPONSE_CONTINUE        = 0,
@@ -386,13 +387,18 @@ public:
     return mr;
   }
 
-  inline uint64_t      auth_id() const { return _auth_id; }
-  inline void          set_auth_id(uint64_t id) { _auth_id = id; }
-  inline size_t        max_message_size() const { return _max_message_size; }
-  inline Pool_manager &pool_manager() { return _pool_manager; }
+  inline uint64_t       auth_id() const { return _auth_id; }
+  inline void           set_auth_id(uint64_t id) { _auth_id = id; }
+  inline size_t         max_message_size() const { return _max_message_size; }
+  inline Pool_manager & pool_manager() { return _pool_manager; }
+
+  Byte_buffer _tls_buffer;
 };
 
 }  // namespace mcas
+
+#pragma GCC diagnostic pop
+
 #endif
 
 #endif  // __CONNECTION_HANDLER_H__
