@@ -14,55 +14,60 @@
 
 #include <regex>
 
-component::IMCAS *MCAS_client_factory::mcas_create(
-    unsigned debug_level,
-    unsigned patience,
-    const std::string &  // owner
-    ,
-    const boost::optional<std::string> &src_device /* need either a source device or a source ip address */
-    ,
-    const boost::optional<std::string> &src_addr,
-    const std::string &                 dest_addr_port_str)
-try {
-  std::smatch m;
-
+component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
+                                                    const unsigned patience,
+                                                    const std::string &,  // owner
+                                                    const boost::optional<std::string> & src_device,
+                                                    const boost::optional<std::string> & src_addr,
+                                                    const std::string & dest_addr_port_str,
+                                                    const std::string other)
+{
   try {
-    /*
-     * The mcas server uses JSON to pass complex structures. The mcas client
-     * uses, well, not JSON
-     *
-     * e.g. 10.0.0.21:11911 (verbs)
-     * 9.1.75.6:11911:sockets (sockets)
-     */
-    std::regex r("([[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+)[:]([[:"
-                 "digit:]]+)(?:[:]([[:alnum:]]+))?");
-    std::regex_search(dest_addr_port_str, m, r);
-  }
-  catch (...) {
-    throw API_exception("invalid parameter");
-  }
+    std::smatch m;
 
-  const std::string                  dst_addr = m[1].str();
-  char *                             end;
-  const auto                         port = std::uint16_t(strtoul(m[2].str().c_str(), &end, 10));
-  const boost::optional<std::string> provider =
+    try {
+      /*
+       * The mcas server uses JSON to pass complex structures. The mcas client
+       * uses, well, not JSON
+       *
+       * e.g. 10.0.0.21:11911 (verbs)
+       * 9.1.75.6:11911:sockets (sockets)
+       */
+      std::regex r("([[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+)[:]([[:"
+                   "digit:]]+)(?:[:]([[:alnum:]]+))?");
+      std::regex_search(dest_addr_port_str, m, r);
+    }
+    catch (...) {
+      throw API_exception("invalid parameter");
+    }
+
+    const std::string                  dst_addr = m[1].str();
+    char *                             end;
+    const auto                         port = std::uint16_t(strtoul(m[2].str().c_str(), &end, 10));
+    const boost::optional<std::string> provider =
       m[3].matched ? boost::optional<std::string>(m[3].str()) : boost::optional<std::string>();
-  component::IMCAS *obj =
-      static_cast<component::IMCAS *>(new MCAS_client(debug_level, src_device, src_addr, provider, dst_addr, port,
-                                                      patience  // seconds to wait for single fabric completion
+    component::IMCAS *obj =
+      static_cast<component::IMCAS *>(new MCAS_client(debug_level,
+                                                      src_device,
+                                                      src_addr,
+                                                      provider,
+                                                      dst_addr,
+                                                      port,
+                                                      patience,  // seconds to wait for single fabric completion
+                                                      other
                                                       ));
-  obj->add_ref();
-  return obj;
-}
-catch (const std::exception &e) {
-  PLOG("failed to build IMCAS (mcas client): %s", e.what());
-  /* callers expect nullptr to be the sole indication of failure */
-  return nullptr;
+    obj->add_ref();
+    return obj;
+  }
+  catch (const std::exception &e) {
+    PLOG("failed to build IMCAS (mcas client): %s", e.what());
+    /* callers expect nullptr to be the sole indication of failure */
+    return nullptr;
+  }
 }
 
 component::IKVStore *MCAS_client_factory::create(unsigned debug_level,
-                                                 const std::string &  // owner
-                                                 ,
+                                                 const std::string &,  // owner
                                                  const std::string &addr,
                                                  const std::string &device)
 {
@@ -88,8 +93,13 @@ component::IKVStore *MCAS_client_factory::create(unsigned debug_level,
   char *               end;
   const auto           port     = uint16_t(strtoul(m[2].str().c_str(), &end, 10));
   const std::string    provider = m[3].matched ? m[3].str() : "verbs"; /* default provider */
-  component::IKVStore *obj      = static_cast<component::IKVStore *>(
-      new MCAS_client(debug_level, device, boost::optional<std::string>(), provider, ip_addr, port, 60));
+  component::IKVStore *obj      = static_cast<component::IKVStore *>(new MCAS_client(debug_level,
+                                                                                     device,
+                                                                                     boost::optional<std::string>(),
+                                                                                     provider,
+                                                                                     ip_addr,
+                                                                                     port,
+                                                                                     60));
   /* at least one caller (kvstore-perf) expects a valid pointer or an exception
    * (and not a null pointer). */
   obj->add_ref();
@@ -120,8 +130,14 @@ component::IKVStore *MCAS_client_factory::create(unsigned debug_level, const IKV
   auto           patience_it = p.find(k_patience);
   const unsigned patience    = patience_it == p.end() ? 120 : unsigned(std::stoul(patience_it->second));
 
-  component::IKVStore *obj = static_cast<component::IKVStore *>(
-      new MCAS_client(debug_level, src_nic_device, src_addr, provider, dest_addr_it->second, port, patience));
+  component::IKVStore *obj = static_cast<component::IKVStore *>(new MCAS_client(debug_level,
+                                                                                src_nic_device,
+                                                                                src_addr,
+                                                                                provider,
+                                                                                dest_addr_it->second,
+                                                                                port,
+                                                                                patience));
+  
   /* at least one caller (kvstore-perf) expects a valid pointer or an exception
    * (and not a null pointer). */
   obj->add_ref();

@@ -1,14 +1,14 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2020] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 #ifndef __MCAS_CONFIG_FILE_H__
 #define __MCAS_CONFIG_FILE_H__
@@ -26,14 +26,14 @@
 #include <vector>
 
 class Config_exception : public Exception {
- public:
+public:
   Config_exception(int err) : Exception("Config exception"), _err_code(err) {}
 
   Config_exception() : _err_code(E_FAIL) {}
 
   __attribute__((__format__(__printf__, 2, 0))) Config_exception(const char *fmt, ...)
-      : Exception("Config exception"),
-        _err_code(E_FAIL)
+    : Exception("Config exception"),
+      _err_code(E_FAIL)
   {
     va_list args;
     va_start(args, fmt);
@@ -43,22 +43,31 @@ class Config_exception : public Exception {
   }
   status_t error_code() const { return _err_code; }
 
- private:
+private:
   status_t _err_code;
 };
 
+/* optional configuration items */
+
 namespace config
 {
-  static constexpr const char *default_backend = "default_backend";
-  static constexpr const char *index = "index";
-  static constexpr const char *addr = "addr";
-  static constexpr const char *net = "net";
+
+static constexpr const char *default_backend = "default_backend";
+static constexpr const char *index = "index";
+static constexpr const char *addr = "addr";
+static constexpr const char *net = "net";
+static constexpr const char *cert_path = "cert_path";
+static constexpr const char *key_path = "key_path";
+static constexpr const char *security_mode = "security_mode";
+static constexpr const char *security_port = "security_port";
+
 }
 
 namespace mcas
 {
-class Config_file : private common::log_source {
- public:
+class Config_file : private common::log_source
+{
+public:
   Config_file(unsigned debug_level_, const std::string &config_spec);
 
   Config_file(unsigned debug_level_, rapidjson::Document &&doc);
@@ -79,6 +88,8 @@ class Config_file : private common::log_source {
 
   unsigned int get_shard_port(rapidjson::SizeType i) const;
 
+  unsigned int get_shard_security_port(rapidjson::SizeType i) const;
+
   boost::optional<std::string> get_shard_optional(std::string field, rapidjson::SizeType i) const;
 
   std::string get_shard_required(std::string field, rapidjson::SizeType i) const;
@@ -97,7 +108,7 @@ class Config_file : private common::log_source {
 
   std::string security_get_cert_path() const;
 
-  std::string security_get_security_level() const;
+  std::string security_get_key_path() const;
 
   std::string cluster_group() const;
 
@@ -109,7 +120,7 @@ class Config_file : private common::log_source {
 
   unsigned int debug_level() const;
 
- private:
+private:
   rapidjson::Document          _doc;
   rapidjson::Value             _shards;
   boost::optional<std::string> _net_providers;

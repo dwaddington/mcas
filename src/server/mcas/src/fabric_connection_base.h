@@ -114,7 +114,7 @@ class Fabric_connection_base : protected common::log_source {
   Fabric_connection_base(const Fabric_connection_base &) = delete;
   Fabric_connection_base &operator=(const Fabric_connection_base &) = delete;
 
-  ~Fabric_connection_base();
+  virtual ~Fabric_connection_base();
 
   static void static_send_callback(void *cnxn, buffer_t *iob) noexcept
   {
@@ -125,7 +125,7 @@ class Fabric_connection_base : protected common::log_source {
   {
     --_send_buffer_posted_count;
     posted_count_log();
-    CPLOG(2, "Completed send (%p)", static_cast<const void *>(iob));
+    CPLOG(2, "Completed send (%p) freeing buffer", static_cast<const void *>(iob));
     free_buffer(iob);
   }
 
@@ -170,10 +170,13 @@ class Fabric_connection_base : protected common::log_source {
 
   void free_recv_buffer()
   {
-    PLOG("freeing recv buffers");
-    for (auto b : _completed_recv_buffers) {
+    for (auto b : _completed_recv_buffers) {      
       free_buffer(b);
     }
+  }
+
+  size_t recv_buffer_posted_count() const {
+    return _recv_buffer_posted_count;
   }
 
   void post_recv_buffer(buffer_t *buffer)

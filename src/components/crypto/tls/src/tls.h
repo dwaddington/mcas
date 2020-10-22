@@ -39,7 +39,9 @@ class Crypto : public virtual component::ICrypto {
    * Destructor
    *
    */
-  virtual ~Crypto() {}
+  virtual ~Crypto() {
+    PNOTICE("~Crypto(): %p", reinterpret_cast<void*>(this));
+  }
 
   /**
    * Component/interface management
@@ -72,7 +74,9 @@ class Crypto : public virtual component::ICrypto {
                              const std::string& username,
                              const std::string& key) override;
 
-  session_t accept_cert_session(const int port) override;
+  session_t accept_cert_session(const std::string& ip_addr,
+                                const int port,
+                                const unsigned int timeout_ms) override;
 
   session_t open_cert_session(const std::string& cipher_suite,
                               const std::string& server_ip,

@@ -78,6 +78,13 @@ enum {
   PROTOCOL_V2 = 0x2, /*< Memory-Centric Active Storage */
 };
 
+
+enum {
+  AUTH_NONE = 0x0,
+  AUTH_TLS_HMAC = 0x1,
+  AUTH_TLS_FULL = 0x2,
+};
+
 /* _resvd flags */
 enum {
   MSG_RESVD_SCBE   = 0x2, /* indicates short-circuit function (testing only) */
@@ -767,7 +774,9 @@ struct Message_handshake : public Message {
   Message_handshake(uint64_t auth_id, uint64_t sequence)
       : Message(auth_id, (sizeof *this), id, OP_INVALID),
         seq(sequence),
-        protocol(PROTOCOL_V1)
+        protocol(PROTOCOL_V1),
+        security_tls(0),
+        security_hmac(0)
   {
   }
 
@@ -776,8 +785,12 @@ struct Message_handshake : public Message {
   // fields
   uint64_t seq;
   uint8_t  protocol;
+  bool security_tls  : 1;
+  bool security_hmac : 1;
 
-  void set_as_protocol() { protocol = PROTOCOL_V2; }
+  inline void set_as_protocol() { protocol = PROTOCOL_V2; }
+  inline void set_auth_tls_hmac() { security_tls = true; security_hmac = true; }
+  inline bool is_auth_tls_hmac() const { return security_tls && security_hmac; }
 
 } __attribute__((packed));
 
@@ -796,8 +809,6 @@ struct Message_handshake_reply : public Message {
   using data_t = uint8_t;
   auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
-  auto x509_cert() const { return data(); }
-  auto x509_cert() { return data(); }
 
  public:
   Message_handshake_reply(size_t         buffer_size,
@@ -805,27 +816,22 @@ struct Message_handshake_reply : public Message {
                           uint64_t       sequence,
                           uint64_t       session_id_,
                           size_t         max_message_size_,
-                          unsigned char* x509_cert_ptr,
-                          uint32_t       x509_cert_len_)
+                          bool           start_tls_)
       : Message(auth_id, (sizeof *this), id, OP_INVALID),
         seq(sequence),
         session_id(session_id_),
         max_message_size(max_message_size_),
-        x509_cert_len(x509_cert_len_)
+        start_tls(start_tls_)
   {
-    increase_msg_len(x509_cert_len_);
     if (msg_len() > buffer_size)
       throw Logic_exception("%s::%s - insufficient buffer for Message_handshake_reply", +description, __func__);
-    if (x509_cert_ptr && (x509_cert_len_ > 0)) {
-      std::memcpy(x509_cert(), x509_cert_ptr, x509_cert_len_);
-    }
   }
 
   // fields
   uint64_t seq;
   uint64_t session_id;
   size_t   max_message_size; /* RDMA max message size in bytes */
-  uint32_t x509_cert_len;
+  bool     start_tls : 1;
   /* x509_cert innediately follows */
 } __attribute__((packed));
 

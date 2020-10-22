@@ -30,6 +30,7 @@
 #include <api/kvstore_itf.h>
 #include <api/mcas_itf.h>
 #include <api/itf_ref.h>
+#include <common/logging.h>
 #include <common/moveable_ptr.h>
 
 #include <boost/optional.hpp>
@@ -37,13 +38,6 @@
 #include <cstdint> /* uint16_t */
 #include <memory>  /* unique_ptr */
 #include <string>
-
-class Mcas_client_debug {
- public:
-  Mcas_client_debug() {}
-  Mcas_client_debug(unsigned debug_level, const void *ths, const std::string &ip_addr, std::uint16_t port);
-  ~Mcas_client_debug();
-};
 
 class Open_connection {
   common::moveable_ptr<mcas::client::Connection_handler> _open_cnxn;
@@ -57,11 +51,13 @@ class Open_connection {
 
 class MCAS_client
     : public virtual component::IKVStore
-    , public virtual component::IMCAS {
+    , public virtual component::IMCAS
+    , private common::log_source
+{
   friend class MCAS_client_factory;
 
  private:
-  static constexpr bool option_DEBUG = true;
+  //  static constexpr bool option_DEBUG = true;
 
  protected:
   /**
@@ -75,13 +71,14 @@ class MCAS_client
    *
    */
  public:
-  MCAS_client(unsigned                            debug_level,  // temp srd/dest devider
+  MCAS_client(unsigned                            debug_level,
               const boost::optional<std::string> &src_device,
               const boost::optional<std::string> &src_addr,
               const boost::optional<std::string> &provider,
               const std::string &                 dest_addr,
               std::uint16_t                       port,
-              unsigned                            patience);
+              unsigned                            patience,
+              const std::string                   other = "");
 
   MCAS_client(const MCAS_client &) = delete;
   MCAS_client &operator=(const MCAS_client &) = delete;
@@ -264,7 +261,7 @@ class MCAS_client
                                   std::vector<IMCAS::ADO_response> &out_response) override;
 
  private:
-  Mcas_client_debug                                 _debug;
+
   component::Itf_ref<component::IFabric_factory>    _factory;
   std::unique_ptr<component::IFabric>               _fabric;
   std::unique_ptr<component::IFabric_client>        _transport;
@@ -316,11 +313,12 @@ class MCAS_client_factory : public component::IMCAS_factory {
   void unload() override { delete this; }
 
   component::IMCAS *mcas_create(unsigned                            debug_level,
-      unsigned patience,
+                                unsigned                            patience,
                                 const std::string &                 owner,
                                 const boost::optional<std::string> &src_nic_device,
                                 const boost::optional<std::string> &src_ip_addr,
-                                const std::string &                 dest_addr_with_port) override;
+                                const std::string &                 dest_addr_with_port,
+                                const std::string                   other) override;
 
   component::IKVStore *create(unsigned           debug_level,
                               const std::string &owner,

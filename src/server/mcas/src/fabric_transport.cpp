@@ -119,7 +119,9 @@ auto Fabric_transport::get_new_connection() -> Connection_handler *
   auto connection = _server_factory->get_new_connection();
   return
     connection
-    ? new Connection_handler(mcas::global::debug_level, _server_factory.get(), connection)
+    ? new Connection_handler(mcas::global::debug_level,
+                             _server_factory.get(),
+                             connection)
     : nullptr;
 }
 

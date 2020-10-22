@@ -1,14 +1,14 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2020] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 #include "config_file.h"
@@ -16,7 +16,7 @@
 #include "rapidjson/error/error.h"  // rapidjson::ParseErrorCode
 namespace mcas
 {
-  [[noreturn]] void throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset);
+[[noreturn]] void throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset);
 }
 
 #include <common/json.h>
@@ -46,319 +46,350 @@ namespace mcas
 
 #include <iostream>
 
+
+
 namespace config
 {
-  static constexpr const char *debug_level = "debug_level";
+static constexpr const char *debug_level = "debug_level";
 
-  static constexpr const char *shards = "shards";
-  static constexpr const char *port = "port";
-  static constexpr const char *net_providers = "net_providers";
-  static constexpr const char *dax_config = "dax_config";
-  static constexpr const char *resources = "resources";
-  /* There are ado_cores in two places: under shard and under resources. Are both used? */
-  static constexpr const char *ado_cores = "ado_cores";
-  static constexpr const char *ado_manager_core = "ado_manager_core";
-  static constexpr const char *ado_core_count = "ado_core_count";
-  static constexpr const char *ado_plugins = "ado_plugins";
-  static constexpr const char *ado_params = "ado_params";
-  static constexpr const char *ado_path = "ado_path";
-  static constexpr const char *security = "security";
-  static constexpr const char *cert = "cert";
-  static constexpr const char *security_level = "security_level";
-  static constexpr const char *cluster = "cluster";
-  static constexpr const char *core = "core";
-  static constexpr const char *group = "group";
-  static constexpr const char *name = "name";
+static constexpr const char *shards = "shards";
+static constexpr const char *port = "port";
+static constexpr const char *net_providers = "net_providers";
+static constexpr const char *dax_config = "dax_config";
+static constexpr const char *resources = "resources";
+/* There are ado_cores in two places: under shard and under resources. Are both used? */
+static constexpr const char *ado_cores = "ado_cores";
+static constexpr const char *ado_manager_core = "ado_manager_core";
+static constexpr const char *ado_core_count = "ado_core_count";
+static constexpr const char *ado_plugins = "ado_plugins";
+static constexpr const char *ado_params = "ado_params";
+static constexpr const char *ado_path = "ado_path";
+static constexpr const char *security = "security";
+static constexpr const char *cluster = "cluster";
+static constexpr const char *core = "core";
+static constexpr const char *group = "group";
+static constexpr const char *name = "name";
 }
 
 namespace
 {
-  struct ParseException
-      : std::runtime_error
-      , private rapidjson::ParseResult {
-    ParseException(rapidjson::ParseErrorCode code, const char *msg, size_t offset)
-        : std::runtime_error(msg),
-          ParseResult(code, offset)
-    {
-    }
-  };
-
-  const char *k_typenames[] = {"Null", "False", "True", "Object", "Array", "String", "Number"};
-
-  constexpr unsigned int DEFAULT_CLUSTER_PORT = 11800U;
-
-  boost::optional<std::string> init_net_providers(rapidjson::Document &doc_)
+struct ParseException
+  : std::runtime_error
+  , private rapidjson::ParseResult {
+  ParseException(rapidjson::ParseErrorCode code, const char *msg, size_t offset)
+    : std::runtime_error(msg),
+    ParseResult(code, offset)
   {
-    auto nit = doc_.FindMember(config::net_providers);
-    if (nit != doc_.MemberEnd()) {
-      /* Note rapidjson.org says that a missing operator[] will assert.
-       * If true, the catch may not do much good.
-       */
-      auto &net_provider = nit->value;
-
-      if (!net_provider.IsString()) {
-        const auto &np_type = k_typenames[net_provider.GetType()];
-        PLOG("%s type:%s", config::net_providers, np_type);
-        throw Config_exception("bad JSON: %s is %s but should be string", config::net_providers, np_type);
-      }
-      return std::string(net_provider.GetString());
-    }
-    else {
-      return boost::optional<std::string>();
-    }
   }
+};
 
-  rapidjson::Value init_shards(rapidjson::Document &doc_)
-  {
-    rapidjson::Value shards;
-    if (!doc_.HasMember(config::shards)) throw Config_exception("invalid configuration (missing %s)", config::shards);
-    try {
-      shards = doc_[config::shards];
-      return shards;
+const char *k_typenames[] = {"Null", "False", "True", "Object", "Array", "String", "Number"};
+
+constexpr unsigned int DEFAULT_CLUSTER_PORT = 11800U;
+
+boost::optional<std::string> init_net_providers(rapidjson::Document &doc_)
+{
+  auto nit = doc_.FindMember(config::net_providers);
+  if (nit != doc_.MemberEnd()) {
+    /* Note rapidjson.org says that a missing operator[] will assert.
+     * If true, the catch may not do much good.
+     */
+    auto &net_provider = nit->value;
+
+    if (!net_provider.IsString()) {
+      const auto &np_type = k_typenames[net_provider.GetType()];
+      PLOG("%s type:%s", config::net_providers, np_type);
+      throw Config_exception("bad JSON: %s is %s but should be string", config::net_providers, np_type);
     }
-    catch (...) {
-      throw Config_exception("bad JSON in configuration (%s))", config::shards);
-    }
+    return std::string(net_provider.GetString());
   }
-
-  rapidjson::Value init_resources(rapidjson::Document &doc_)
-  {
-    rapidjson::Value resources;
-    if (doc_.HasMember(config::resources)) { /* optional */
-      try {
-        resources = std::move(doc_[config::resources]);
-      }
-      catch (...) {
-        throw Config_exception("bad JSON in configuration file (%s))", config::resources);
-      }
-
-      if (!resources.IsObject()) {
-        const auto &res_type = k_typenames[resources.GetType()];
-        PLOG("resource type:%s", res_type);
-        throw Config_exception("bad JSON: %s is a %s, should be {..}", config::resources, res_type);
-      }
-      if (resources.HasMember(config::ado_cores) && !resources[config::ado_cores].IsString())
-        throw Config_exception("bad JSON: %s::%s members not string", config::resources, config::ado_cores);
-      if (resources.HasMember(config::ado_manager_core) & !resources[config::ado_manager_core].IsInt())
-        throw Config_exception("bad JSON: optional resources::ado manager core member not int");
-    }
-    return resources;
-  }
-
-  rapidjson::Value init_cluster(rapidjson::Document &doc_)
-  {
-    rapidjson::Value cluster;
-    if (doc_.HasMember(config::cluster)) {
-      try {
-          cluster = doc_[config::cluster];
-      }
-      catch (...) {
-        throw Config_exception("bad JSON in configuration file (%s))", config::cluster);
-      }
-      if (!cluster.IsObject()) {
-        const auto &res_type = k_typenames[cluster.GetType()];
-        PLOG("resource type:%s", res_type);
-        throw Config_exception("bad JSON: %s should be {..}", config::cluster);
-      }
-    }
-    return cluster;
-  }
-
-  rapidjson::Value init_security(rapidjson::Document &doc_)
-  {
-    rapidjson::Value security;
-    if (doc_.HasMember(config::security)) {
-      try {
-        security = doc_[config::security];
-      }
-      catch (...) {
-        throw Config_exception("bad JSON in configuration file (security))");
-      }
-      if (!security.IsObject()) {
-        const auto &res_type = k_typenames[security.GetType()];
-        PLOG("resource type:%s", res_type);
-        throw Config_exception("bad JSON: security should be {..}");
-      }
-      if (!security.HasMember(config::cert) || !security[config::cert].IsString())
-        /* And odd exception: An option element is missing! Is it really optional? */
-        throw Config_exception("bad JSON: optional %s::%s missing or wrong type", config::security, config::cert);
-    }
-    return security;
-  }
-
-  boost::optional<std::string> init_ado_path(rapidjson::Document &doc_)
-  {
-    auto ado_path = doc_.FindMember(config::ado_path);
-    if (ado_path != doc_.MemberEnd()) {
-      rapidjson::Value &ap = ado_path->value;
-      if (!ap.IsString()) {
-        throw Config_exception("bad JSON: ado_path should be string");
-      }
-      return std::string(ap.GetString());
-    }
-
+  else {
     return boost::optional<std::string>();
   }
+}
 
-  std::string error_report(const std::string &prefix, const std::string &text, const rapidjson::Document &doc)
-  {
-    return prefix + " '" + text + "': " + rapidjson::GetParseError_En(doc.GetParseError()) + " at " + std::to_string(doc.GetErrorOffset());
+rapidjson::Value init_shards(rapidjson::Document &doc_)
+{
+  rapidjson::Value shards;
+  if (!doc_.HasMember(config::shards))
+    throw Config_exception("invalid configuration (missing %s)", config::shards);
+  
+  try {
+    shards = doc_[config::shards];
+    return shards;
+  }
+  catch (...) {
+    throw Config_exception("bad JSON in configuration (%s))", config::shards);
+  }
+}
+
+rapidjson::Value init_resources(rapidjson::Document &doc_)
+{
+  rapidjson::Value resources;
+  if (doc_.HasMember(config::resources)) { /* optional */
+    try {
+      resources = std::move(doc_[config::resources]);
+    }
+    catch (...) {
+      throw Config_exception("bad JSON in configuration file (%s))", config::resources);
+    }
+
+    if (!resources.IsObject()) {
+      const auto &res_type = k_typenames[resources.GetType()];
+      PLOG("resource type:%s", res_type);
+      throw Config_exception("bad JSON: %s is a %s, should be {..}", config::resources, res_type);
+    }
+    if (resources.HasMember(config::ado_cores) && !resources[config::ado_cores].IsString())
+      throw Config_exception("bad JSON: %s::%s members not string", config::resources, config::ado_cores);
+    if (resources.HasMember(config::ado_manager_core) & !resources[config::ado_manager_core].IsInt())
+      throw Config_exception("bad JSON: optional resources::ado manager core member not int");
+  }
+  return resources;
+}
+
+rapidjson::Value init_cluster(rapidjson::Document &doc_)
+{
+  rapidjson::Value cluster;
+  if (doc_.HasMember(config::cluster)) {
+    try {
+      cluster = doc_[config::cluster];
+    }
+    catch (...) {
+      throw Config_exception("bad JSON in configuration file (%s))", config::cluster);
+    }
+    if (!cluster.IsObject()) {
+      const auto &res_type = k_typenames[cluster.GetType()];
+      PLOG("resource type:%s", res_type);
+      throw Config_exception("bad JSON: %s should be {..}", config::cluster);
+    }
+  }
+  return cluster;
+}
+
+rapidjson::Value init_security(rapidjson::Document &doc_)
+{
+  rapidjson::Value security;
+  if (doc_.HasMember(config::security)) {
+    try {
+      security = doc_[config::security];
+    }
+    catch (...) {
+      throw Config_exception("bad JSON in configuration file (security))");
+    }
+    
+    if (!security.IsObject()) {
+      const auto &res_type = k_typenames[security.GetType()];
+      PLOG("resource type:%s", res_type);
+      throw Config_exception("bad JSON: security should be {..}");
+    }
+    
+    if (!security.HasMember(config::cert_path) || !security[config::cert_path].IsString())
+      throw Config_exception("bad JSON: optional %s::%s missing or wrong type", config::security, config::cert_path);
+
+    if (!security.HasMember(config::key_path) || !security[config::key_path].IsString())
+      throw Config_exception("bad JSON: optional %s::%s missing or wrong type", config::security, config::key_path);
+  }
+  return security;
+}
+
+boost::optional<std::string> init_ado_path(rapidjson::Document &doc_)
+{
+  auto ado_path = doc_.FindMember(config::ado_path);
+  if (ado_path != doc_.MemberEnd()) {
+    rapidjson::Value &ap = ado_path->value;
+    if (!ap.IsString()) {
+      throw Config_exception("bad JSON: ado_path should be string");
+    }
+    return std::string(ap.GetString());
   }
 
-  using PrettyWriter = rapidjson::PrettyWriter<rapidjson::StringBuffer>;
+  return boost::optional<std::string>();
+}
 
-  auto make_schema_cores_list(const std::string &desc_)
-  {
-    namespace c_json = common::json;
-    namespace schema = c_json::schema;
-    using json = c_json::serializer<PrettyWriter>;
-    return
-      json::object
-      ( json::member(schema::description, desc_ + " A comma-separated list of CPU core numbers or ranges, or both")
+std::string error_report(const std::string &prefix, const std::string &text, const rapidjson::Document &doc)
+{
+  return prefix + " '" + text + "': " +
+    rapidjson::GetParseError_En(doc.GetParseError()) +
+    " at " + std::to_string(doc.GetErrorOffset());
+}
+
+using PrettyWriter = rapidjson::PrettyWriter<rapidjson::StringBuffer>;
+
+auto make_schema_cores_list(const std::string &desc_)
+{
+  namespace c_json = common::json;
+  namespace schema = c_json::schema;
+  using json = c_json::serializer<PrettyWriter>;
+  return
+    json::object
+    ( json::member(schema::description, desc_ + " A comma-separated list of CPU core numbers or ranges, or both")
       , json::member(schema::examples, json::array("0:3,5,7-10", "0-2,5,7:4") )
       , json::member
-        ( schema::type
+      ( schema::type
         , schema::string
         )
       , json::member
-        ( schema::pattern
+      ( schema::pattern
         , "([0-9]+([-:][0-9]+)?)(,[0-9]+([-:][0-9]+)?)*"
         )
       );
-  }
+}
 
-  auto make_schema_port(const std::string &desc_, std::uint16_t dflt_)
-  {
-    namespace c_json = common::json;
-    namespace schema = c_json::schema;
-    using json = c_json::serializer<PrettyWriter>;
-    return
-      json::object
-      ( json::member(schema::description, desc_ + " An IP port number")
+auto make_schema_port(const std::string &desc_, std::uint16_t dflt_)
+{
+  namespace c_json = common::json;
+  namespace schema = c_json::schema;
+  using json = c_json::serializer<PrettyWriter>;
+  return
+    json::object
+    ( json::member(schema::description, desc_ + " An IP port number")
       , json::member(schema::examples, json::array(11911, 19000))
       , json::member
-        (  schema::type
-        , schema::integer
-        )
+      (  schema::type
+         , schema::integer
+         )
       , json::member
-        ( schema::minimum
+      ( schema::minimum
         , json::number(0)
         )
       , json::member
-        ( schema::maximum
+      ( schema::maximum
         , std::numeric_limits<std::uint16_t>::max()
         )
       , json::member
-        ( schema::k_default /* informational only */
+      ( schema::k_default /* informational only */
         , json::number(dflt_)
         )
       );
-  }
+}
 
-  /* The schema for a single shard */
-  auto make_schema_shard()
-  {
-    namespace c_json = common::json;
-    namespace schema = c_json::schema;
-    using json = c_json::serializer<PrettyWriter>;
-    return
-      json::object
-      ( json::member(schema::type, schema::object)
+/* The schema for a single shard */
+auto make_schema_shard()
+{
+  namespace c_json = common::json;
+  namespace schema = c_json::schema;
+  using json = c_json::serializer<PrettyWriter>;
+  return
+    json::object
+    ( json::member(schema::type, schema::object)
       , json::member(schema::additionalProperties, json::boolean(false))
       , json::member
-        ( schema::properties
+      ( schema::properties
         , json::object
-          ( json::member( config::port, make_schema_port("When the value of netproviders is 'verbs', the default is 11911. When 'sockets', 11921", 11911) )
+        ( json::member( config::port, make_schema_port("When the value of netproviders is 'verbs', the default is 11911. When 'sockets', 11921", 11911) )
           , json::member
-            ( config::core
+          ( config::core
             , json::object
-              ( json::member(schema::description, "CPU core to which the shard thread should be assigned")
+            ( json::member(schema::description, "CPU core to which the shard thread should be assigned")
               , json::member(schema::examples, json::array(json::number(0), json::number(5)))
               , json::member
-                ( schema::type
+              ( schema::type
                 , schema::integer
                 )
               , json::member
-                ( schema::minimum
+              ( schema::minimum
                 , json::number(0)
                 )
               )
             )
           , json::member
-            ( config::index
-              , json::object
-                ( json::member(schema::description, "Unused.")
-                , json::member(schema::type, schema::string)
-                )
-            )
-          , json::member
-            ( config::net
-              , json::object
-                ( json::member(schema::description, "Device on which to listen for clients (alternative to addr).")
-                , json::member(schema::examples, json::array("mlx5_0", "mlx4_1"))
-                , json::member(schema::type, schema::string)
-                )
-            )
-          , json::member
-            ( config::addr
-              , json::object
-                ( json::member(schema::description, "IPv4 address on which to listen for clients (alternative to net).")
-                , json::member(schema::examples, json::array("10.0.0.1", "14.4.0.25"))
-                , json::member(schema::type, schema::string)
-                )
-            )
-          , json::member
-            ( config::default_backend
-              , json::object
-                ( json::member(schema::description, "Key/value store implementation to use.")
-                , json::member(schema::examples, json::array("hstore", "hstore-cc", "mapstore"))
-                , json::member(schema::type, schema::string)
-                , json::member(schema::type, schema::string)
-                )
-            )
-          , json::member
-            ( config::dax_config
+          ( config::index
             , json::object
-              ( json::member(schema::description, "An array. The schema for items is up to dax_map. See the DAX Configuration Schema.")
+            ( json::member(schema::description, "Unused.")
+              , json::member(schema::type, schema::string)
+              )
+            )
+          , json::member
+          ( config::net
+            , json::object
+            ( json::member(schema::description, "Device on which to listen for clients (alternative to addr).")
+              , json::member(schema::examples, json::array("mlx5_0", "mlx4_1"))
+              , json::member(schema::type, schema::string)
+              )
+            )
+          , json::member
+          ( config::addr
+            , json::object
+            ( json::member(schema::description, "IPv4 address on which to listen for clients (alternative to net).")
+              , json::member(schema::examples, json::array("10.0.0.1", "14.4.0.25"))
+              , json::member(schema::type, schema::string)
+              )
+            )
+          , json::member
+          ( config::security_mode
+            , json::object
+            ( json::member(schema::description, "Security mode")
+              , json::member(schema::examples, json::array("none", "tls-hmac"))
+              , json::member(schema::type, schema::string)
+              )
+            )
+          , json::member
+          ( config::security_port
+            , json::object
+            ( json::member(schema::description, "Port for security channel")
+              , json::member(schema::examples, json::array(json::number(0), json::number(11922)))
+              , json::member
+              ( schema::type
+                , schema::integer
+                )
+              , json::member
+              ( schema::minimum
+                , json::number(0)
+                )
+              )
+            )
+          , json::member
+          ( config::default_backend
+            , json::object
+            ( json::member(schema::description, "Key/value store implementation to use.")
+              , json::member(schema::examples, json::array("hstore", "hstore-cc", "mapstore"))
+              , json::member(schema::type, schema::string)
+              , json::member(schema::type, schema::string)
+              )
+            )
+          , json::member
+          ( config::dax_config
+            , json::object
+            ( json::member(schema::description, "An array. The schema for items is up to dax_map. See the DAX Configuration Schema.")
               , json::member(schema::type, schema::array)
               )
             )
           , json::member
-            ( config::ado_plugins
+          ( config::ado_plugins
             , json::object
-              ( json::member(schema::description, "An array of ADO shared libraries to load.")
+            ( json::member(schema::description, "An array of ADO shared libraries to load.")
               , json::member(schema::examples, json::array( json::array("libcomponent-adoplugin-testing.so")))
               , json::member(schema::type, schema::array)
               , json::member
-                ( schema::items
+              ( schema::items
                 , schema::string
                 )
               )
             )
           , json::member
-            ( config::ado_params
+          ( config::ado_params
             , json::object
-              ( json::member(schema::description, "Key/value pairs passed to ADO. The values must be strings")
+            ( json::member(schema::description, "Key/value pairs passed to ADO. The values must be strings")
               , json::member(schema::examples, json::array(json::array("Country", "Italy", "City", "Turin")))
               , json::member(schema::type, schema::object)
               , json::member
-                ( schema::additionalProperties
+              ( schema::additionalProperties
                 , json::object(json::member(schema::type, schema::string))
                 )
               , json::member
-                ( schema::description
+              ( schema::description
                 , "Key/value pairs. The values must be strings"
                 )
               )
             )
           , json::member
-            ( config::ado_cores
+          ( config::ado_cores
             , make_schema_cores_list("Cores to use for ADO processes.")
             )
           , json::member
-            ( config::ado_core_count
+          ( config::ado_core_count
             , json::object
-              ( json::member(schema::description, "A scheduling parameter for ADO. Perhaps it indicates the expected CPU load, relative to other AOO prcoesses.")
+            ( json::member(schema::description, "A scheduling parameter for ADO. Perhaps it indicates the expected CPU load, relative to other AOO prcoesses.")
               , json::member(schema::examples, json::array(json::number("0", "2"), json::number("1", "4")))
               , json::member(schema::type, schema::number)
               )
@@ -366,84 +397,84 @@ namespace
           )
         )
       , json::member
-        ( schema::required
-          , json::array(config::core)
+      ( schema::required
+        , json::array(config::core)
         )
       );
-  }
+}
 
-  auto make_schema_shard_array()
-  {
-    namespace c_json = common::json;
-    namespace schema = c_json::schema;
-    using json = c_json::serializer<PrettyWriter>;
-    return
-      json::object
-      ( json::member(schema::description, "Zero or more 'shards', addressable by client through their IP/port addresses")
+auto make_schema_shard_array()
+{
+  namespace c_json = common::json;
+  namespace schema = c_json::schema;
+  using json = c_json::serializer<PrettyWriter>;
+  return
+    json::object
+    ( json::member(schema::description, "Zero or more 'shards', addressable by client through their IP/port addresses")
       , json::member(schema::type, schema::array)
       , json::member
-        ( schema::items
+      ( schema::items
         , make_schema_shard()
         )
       );
-  }
+}
 
-  std::string make_schema_string()
-  {
-    namespace c_json = common::json;
-    namespace schema = c_json::schema;
-    using json = c_json::serializer<PrettyWriter>;
+std::string make_schema_string()
+{
+  namespace c_json = common::json;
+  namespace schema = c_json::schema;
+  using json = c_json::serializer<PrettyWriter>;
 
-    auto schema_object =
-      json::object
-      ( json::member(schema::type, schema::object)
+  auto schema_object =
+    json::object
+    ( json::member(schema::type, schema::object)
       , json::member(schema::additionalProperties, json::boolean(false))
       , json::member
-        ( schema::properties
+      ( schema::properties
         , json::object
-          ( json::member
-            ( config::debug_level
-              , json::object
-                ( json::member(schema::description, "Amount of debugging information to be emitted. Higher numbers may produce more debug messages")
-                , json::member(schema::examples, json::array(json::number(0),json::number(1)))
-                , json::member(schema::type, schema::integer)
-                )
+        ( json::member
+          ( config::debug_level
+            , json::object
+            ( json::member(schema::description, "Amount of debugging information to be emitted. Higher numbers may produce more debug messages")
+              , json::member(schema::examples, json::array(json::number(0),json::number(1)))
+              , json::member(schema::type, schema::integer)
+              )
             )
           , json::member
-            ( config::shards
+          ( config::shards
             , make_schema_shard_array()
             )
           , json::member
-            ( config::ado_path
+          ( config::ado_path
             , json::object
-              ( json::member(schema::description, "Full path to the server ADO plugin manager executable.")
+            ( json::member(schema::description, "Full path to the ADO plugin executable.")
               , json::member(schema::examples, json::array("/opt/mcas/bin/ado"))
               , json::member(schema::type, schema::string))
             )
           , json::member
-            ( config::net_providers
+          ( config::net_providers
             , json::object
-              ( json::member(schema::description, "ilibfabric net provider ('verbs' or 'sockets')")
+            ( json::member(schema::description, "libfabric net provider ('verbs' or 'sockets')")
               , json::member(schema::examples, json::array("verbs", "sockets"))
               , json::member(schema::type, schema::string))
             )
           , json::member
-            ( config::resources
+          ( config::resources
             , json::object
-              ( json::member(schema::description, "ADO(?) resources")
+            ( json::member(schema::description, "ADO resources")
               , json::member(schema::type, schema::object)
               , json::member(schema::additionalProperties, json::boolean(false))
               , json::member
-                ( schema::properties
+              ( schema::properties
                 , json::object
-                  ( json::member
-                    ( config::ado_cores
+                ( json::member
+                  ( config::ado_cores
                     , make_schema_cores_list("Cores which may be used for non shard-specific ADO threads?")
                     )
                   , json::member
-                    ( config::ado_manager_core
+                  ( config::ado_manager_core
                     , json::object
-                      ( json::member(schema::description, "ADO manager core")
+                    ( json::member(schema::description, "ADO manager core")
                       , json::member(schema::examples, json::array(json::number(0),json::number(3)))
                       , json::member(schema::type, schema::integer)
                       , json::member(schema::minimum, json::number(0))
@@ -454,69 +485,69 @@ namespace
               )
             )
           , json::member
-            ( config::security
+          ( config::security
             , json::object
-              ( json::member(schema::description, "Security parameters")
+            ( json::member(schema::description, "Security parameters")
               , json::member(schema::type, schema::object)
               , json::member
-                ( schema::properties
+              ( schema::properties
                 , json::object
-                  ( json::member
-                    ( config::cert
+                ( json::member
+                  ( config::cert_path
                     , json::object
-                      ( json::member(schema::description, "Certificate file path")
+                    ( json::member(schema::description, "Default certificate file path")
                       , json::member(schema::examples, json::array("~/mcas/certs/mcas-cert.pem"))
                       , json::member(schema::type, schema::string)
                       )
                     )
-                    ,json::member
-                    ( config::security_level
+                  , json::member
+                  ( config::key_path
                     , json::object
-                      ( json::member(schema::description, "Securtiy level")
-                        , json::member(schema::examples, json::array("hmac","encrypt"))
+                    ( json::member(schema::description, "Default key file path")
+                      , json::member(schema::examples, json::array("~/mcas/certs/mcas-privkey.pem"))
                       , json::member(schema::type, schema::string)
                       )
                     )
                   )
                 )
               , json::member
-                ( schema::required
-                , json::array(config::cert)
+              ( schema::required
+                , json::array(config::cert_path)
                 )
               , json::member(schema::additionalProperties, json::boolean(false))
               )
             )
           , json::member
-            ( config::cluster
+          ( config::cluster
             , json::object
-              ( json::member(schema::description, "Some sort of cluster identificaton")
+            ( json::member(schema::description, "Clustering parameters")
               , json::member(schema::type, schema::object)
               , json::member
-                ( schema::properties
+              ( schema::properties
                 , json::object
-                  ( json::member
-                    ( config::group
-                      , json::object
-                        ( json::member(schema::description, "Zyre cluster group to which the server will belong")
-                        , json::member(schema::type, schema::string)
-                        )
-                    )
-                  , json::member
-                    ( config::name
+                ( json::member
+                  ( config::group
                     , json::object
-                      ( json::member(schema::description, "local node name in Zyre cluster")
+                    ( json::member(schema::description, "Zyre cluster group to which the server will belong")
                       , json::member(schema::type, schema::string)
                       )
                     )
                   , json::member
-                    ( config::addr
+                  ( config::name
                     , json::object
-                      ( json::member(schema::description, "local IPv4 address for Zyre cluster communication")
+                    ( json::member(schema::description, "local node name in Zyre cluster")
                       , json::member(schema::type, schema::string)
                       )
                     )
                   , json::member
-                    ( config::port
+                  ( config::addr
+                    , json::object
+                    ( json::member(schema::description, "local IPv4 address for Zyre cluster communication")
+                      , json::member(schema::type, schema::string)
+                      )
+                    )
+                  , json::member
+                  ( config::port
                     , make_schema_port("local port for Zyre cluster communication", DEFAULT_CLUSTER_PORT)
                     )
                   )
@@ -529,40 +560,40 @@ namespace
         )
 
       , json::member
-        ( schema::required
+      ( schema::required
         , json::array(config::shards)
         )
       );
 
-    rapidjson::StringBuffer buffer;
-    PrettyWriter writer(buffer);
-    schema_object.serialize(writer);
-    return buffer.GetString();
-  }
+  rapidjson::StringBuffer buffer;
+  PrettyWriter writer(buffer);
+  schema_object.serialize(writer);
+  return buffer.GetString();
+}
 
-  rapidjson::SchemaDocument make_schema_doc(unsigned debug_level_)
-  {
-    auto config_schema = make_schema_string();
+rapidjson::SchemaDocument make_schema_doc(unsigned debug_level_)
+{
+  auto config_schema = make_schema_string();
 
-    rapidjson::Document doc;
+  rapidjson::Document doc;
 	if ( 4 < debug_level_ )
-	{
-		std::cerr << config_schema << "\n";
-	}
-    doc.Parse(config_schema.c_str());
-    if ( doc.HasParseError() )
     {
-      throw std::logic_error(error_report("Bad JSONi config schema", config_schema.c_str(), doc));
+      std::cerr << config_schema << "\n";
     }
-    return rapidjson::SchemaDocument(doc);
-  }
+  doc.Parse(config_schema.c_str());
+  if ( doc.HasParseError() )
+    {
+      throw std::logic_error(error_report("Bad JSON config schema", config_schema.c_str(), doc));
+    }
+  return rapidjson::SchemaDocument(doc);
+}
 
-  rapidjson::Document validate(unsigned debug_level_, rapidjson::Document &&doc)
-  {
-    auto schema_doc(make_schema_doc(debug_level_));
-    rapidjson::SchemaValidator validator(schema_doc);
+rapidjson::Document validate(unsigned debug_level_, rapidjson::Document &&doc)
+{
+  auto schema_doc(make_schema_doc(debug_level_));
+  rapidjson::SchemaValidator validator(schema_doc);
 
-    if ( ! doc.Accept(validator) )
+  if ( ! doc.Accept(validator) )
     {
       std::string why;
       {
@@ -579,51 +610,51 @@ namespace
       }
       throw std::domain_error(error_report("JSON config failed validation", why, doc));
     }
-    return std::move(doc);
+  return std::move(doc);
+}
+
+rapidjson::Document string_to_doc(unsigned debug_level_, const std::string &config)
+{
+  if (0 < debug_level_) PLOG("config: (%s)", config.c_str());
+
+  try {
+    rapidjson::Document doc;
+    doc.Parse(config.c_str());
+    return validate(debug_level_, std::move(doc));
   }
-
-  rapidjson::Document string_to_doc(unsigned debug_level_, const std::string &config)
-  {
-    if (0 < debug_level_) PLOG("config: (%s)", config.c_str());
-
-    try {
-      rapidjson::Document doc;
-      doc.Parse(config.c_str());
-      return validate(debug_level_, std::move(doc));
-    }
-    catch (...) {
-      throw Config_exception("configuration string parse failed");
-    }
+  catch (...) {
+    throw Config_exception("configuration string parse failed");
   }
+}
 
-  rapidjson::Document filename_to_doc(unsigned debug_level_, const std::string &filename)
-  {
-    if (0 < debug_level_) PLOG("config_file: (%s)", filename.c_str());
+rapidjson::Document filename_to_doc(unsigned debug_level_, const std::string &filename)
+{
+  if (0 < debug_level_) PLOG("config_file: (%s)", filename.c_str());
 
-    using namespace rapidjson;
+  using namespace rapidjson;
 
-    /* use file stream instead of istreamwrapper because of older Ubuntu 16.04
-     */
-    FILE *fp = ::fopen(filename.c_str(), "rb");
-    if (fp == nullptr) throw Config_exception("configuration file open/parse failed");
+  /* use file stream instead of istreamwrapper because of older Ubuntu 16.04
+   */
+  FILE *fp = ::fopen(filename.c_str(), "rb");
+  if (fp == nullptr) throw Config_exception("configuration file open/parse failed");
 
-    struct stat st;
-    stat(filename.c_str(), &st);
-    auto file_size = std::size_t(st.st_size);
-    auto buffer    = std::make_unique<char[]>(file_size);
+  struct stat st;
+  stat(filename.c_str(), &st);
+  auto file_size = std::size_t(st.st_size);
+  auto buffer    = std::make_unique<char[]>(file_size);
 
-    try {
-      FileReadStream      is(fp, buffer.get(), file_size);
-      rapidjson::Document doc;
-      doc.ParseStream(is);
-      ::fclose(fp);
+  try {
+    FileReadStream      is(fp, buffer.get(), file_size);
+    rapidjson::Document doc;
+    doc.ParseStream(is);
+    ::fclose(fp);
 
-      return validate(debug_level_, std::move(doc));
-    }
-    catch (...) {
-      throw Config_exception("configuration file open/parse failed");
-    }
+    return validate(debug_level_, std::move(doc));
   }
+  catch (...) {
+    throw Config_exception("configuration file open/parse failed");
+  }
+}
 }
 
 void mcas::throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset)
@@ -632,19 +663,19 @@ void mcas::throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg
 }
 
 mcas::Config_file::Config_file(unsigned debug_level_, const std::string& config_spec)
-    : Config_file(debug_level_, (config_spec[0] == '{' ? string_to_doc : filename_to_doc)(debug_level_, config_spec))
+  : Config_file(debug_level_, (config_spec[0] == '{' ? string_to_doc : filename_to_doc)(debug_level_, config_spec))
 {
 }
 
 mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document&& doc)
-    : common::log_source(debug_level_),
-      _doc(std::move(doc)),
-      _shards(init_shards(_doc)),
-      _net_providers(init_net_providers(_doc)),
-      _ado_path(init_ado_path(_doc)),
-      _resources(init_resources(_doc)),
-      _security(init_security(_doc)),
-      _cluster(init_cluster(_doc))
+  : common::log_source(debug_level_),
+  _doc(std::move(doc)),
+  _shards(init_shards(_doc)),
+  _net_providers(init_net_providers(_doc)),
+  _ado_path(init_ado_path(_doc)),
+  _resources(init_resources(_doc)),
+  _security(init_security(_doc)),
+  _cluster(init_cluster(_doc))
 {
   if (!_shards.IsArray()) {
     const auto &shard_type = k_typenames[_shards.GetType()];
@@ -739,6 +770,15 @@ unsigned int mcas::Config_file::get_shard_port(rapidjson::SizeType i) const
   return m == shard.MemberEnd() ? 0 : m->value.GetUint();
 }
 
+unsigned int mcas::Config_file::get_shard_security_port(rapidjson::SizeType i) const
+{
+  if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
+  assert(_shards[i].IsObject());
+  auto shard = _shards[i].GetObject();
+  auto m     = shard.FindMember(config::security_port);
+  return m == shard.MemberEnd() ? 0 : m->value.GetUint();
+}
+
 boost::optional<std::string> mcas::Config_file::get_shard_optional(std::string field, rapidjson::SizeType i) const
 {
   if (field.empty()) throw Config_exception("%s invalid field", __func__);
@@ -780,14 +820,14 @@ std::map<std::string, std::string> mcas::Config_file::get_shard_ado_params(rapid
 
   auto shard = get_shard(i);
   if (shard.HasMember(config::ado_params)) {
-    auto obj = shard[config::ado_params].GetObject();  //.GetObject();
+    auto obj = shard[config::ado_params].GetObject();
     for (auto itr = obj.MemberBegin(); itr != obj.MemberEnd(); ++itr) {
       result[itr->name.GetString()] = itr->value.GetString();
     }
 #if 0
     if (!shard[config::ado_params].IsArray()) throw Config_exception("%s should be an array", config::ado_params);
     auto array = shard[config::ado_params].GetArray();
-     for (auto itr = array.Begin(); itr != array.End(); ++itr) {
+    for (auto itr = array.Begin(); itr != array.End(); ++itr) {
       result.push_back(itr->GetString());
     }
 #endif
@@ -823,14 +863,13 @@ boost::optional<rapidjson::Document> mcas::Config_file::get_shard_dax_config_raw
 
 std::string mcas::Config_file::security_get_cert_path() const
 {
-  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::cert].GetString());
+  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::cert_path].GetString());
 }
 
-std::string mcas::Config_file::security_get_security_level() const
+std::string mcas::Config_file::security_get_key_path() const
 {
-  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::security_level].GetString());
+  return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::key_path].GetString());
 }
-
 
 std::string mcas::Config_file::cluster_group() const
 {
@@ -859,7 +898,7 @@ unsigned int mcas::Config_file::cluster_net_port() const
 unsigned int mcas::Config_file::debug_level() const
 {
   return std::max(
-    common::log_source::debug_level()
-    , _doc.HasMember(config::debug_level) ? _doc[config::debug_level].GetUint() : 0U
-  );
+                  common::log_source::debug_level()
+                  , _doc.HasMember(config::debug_level) ? _doc[config::debug_level].GetUint() : 0U
+                  );
 }
