@@ -22,8 +22,9 @@ enum class Connection_state
    INITIAL,
    WAIT_HANDSHAKE,
    WAIT_NEW_MSG_RECV,
-   WAIT_TLS_SESSION,
-   CLIENT_DISCONNECTED,              
+   WAIT_TLS_HANDSHAKE,
+   CLOSE_CONNECTION,
+   CLIENT_DISCONNECTED,
   };
 
 }

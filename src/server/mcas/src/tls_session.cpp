@@ -26,7 +26,7 @@ static constexpr const unsigned TLS_DEBUG_LEVEL = 3;
 static void __attribute__((constructor)) Global_ctor()
 {
   gnutls_global_init();
-  gnutls_global_set_log_level(5);
+  gnutls_global_set_log_level(0); /* 0-9 higher more verbose */
   gnutls_global_set_log_function(print_logs);
 }
 
@@ -59,27 +59,27 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
                                         size_t buffer_size)
 {  
   assert(connection);
-  auto p_this = reinterpret_cast<Connection_handler*>(connection);
+  auto p_connection = reinterpret_cast<Connection_handler*>(connection);
 
-  if(p_this->_tls_buffer.remaining() >= buffer_size) {
+  if(p_connection->_tls_buffer.remaining() >= buffer_size) {
     if(debug_level() > 2) {
       PLOG("TLS pull: taking %lu bytes from remaining (%lu)",
-           buffer_size, p_this->_tls_buffer.remaining());
+           buffer_size, p_connection->_tls_buffer.remaining());
     }
-    p_this->_tls_buffer.pull(buffer, buffer_size);
+    p_connection->_tls_buffer.pull(buffer, buffer_size);
     return buffer_size;
   }
 
   if(debug_level() > 2)
     PLOG("TLS posting receive:");
   
-  p_this->post_recv_buffer(p_this->allocate_recv());
+  p_connection->post_recv_buffer(p_connection->allocate_recv());
 
-  while(!p_this->check_for_posted_recv_complete()) {
-     p_this->check_network_completions();
+  while(!p_connection->check_for_posted_recv_complete()) {
+     p_connection->check_network_completions();
   }
   
-  auto iob = p_this->posted_recv();
+  auto iob = p_connection->posted_recv();
   assert(iob);
 
   void * base_v = iob->base();
@@ -89,12 +89,12 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
     PLOG("TLS received: iob_len=%lu payload-len=%lu (%p)", iob->length(), base[0], reinterpret_cast<void*>(iob));
 
   /* copy off what is received into Byte_buffer to take piecemeal */
-  p_this->_tls_buffer.push(reinterpret_cast<void*>(&base[1]), base[0]);
+  p_connection->_tls_buffer.push(reinterpret_cast<void*>(&base[1]), base[0]);
 
   /* clean up recv buffer */
-  p_this->free_recv_buffer();
+  p_connection->free_recv_buffer();
 
-  p_this->_tls_buffer.pull(buffer, buffer_size);
+  p_connection->_tls_buffer.pull(buffer, buffer_size);
   return buffer_size;
 }
 
@@ -102,11 +102,11 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
                                             const giovec_t * iovec,
                                             int iovec_cnt)
 { 
-  auto p_this = reinterpret_cast<Connection_handler*>(connection);
-  p_this->check_network_completions();
+  auto p_connection = reinterpret_cast<Connection_handler*>(connection);
+  p_connection->check_network_completions();
 
   /* TODO length check */
-  auto iobs = p_this->allocate_send();
+  auto iobs = p_connection->allocate_send();
   void * base_v = iobs->base();
   uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
 
@@ -121,7 +121,7 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
 
   base[0] = size; /* prefix buffer with size */
   iobs->set_length(size + sizeof(uint64_t));
-  p_this->post_send_buffer(&*iobs, "TLS packet (server-send)", __func__);
+  p_connection->post_send_buffer(&*iobs, "TLS packet (server-send)", __func__);
 
   return size; /* return size of payload */
 }
@@ -129,8 +129,6 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection,
 
 Connection_state Connection_TLS_session::process_tls_session()
 {
-  _security_options.print();
-  
   if(!_session) {
 
     initialize_certs();
@@ -156,27 +154,47 @@ Connection_state Connection_TLS_session::process_tls_session()
     gnutls_transport_set_pull_function(_session, TLS_transport::gnutls_pull_func);
     gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func);
 
-    /* post buffer for handshake */
-    //    _posted_handshake_recv_buffer = _connection->allocate_recv();
-    //    _connection->post_recv_buffer(_posted_handshake_recv_buffer);
-
-    return Connection_state::WAIT_TLS_SESSION;
+    return Connection_state::WAIT_TLS_HANDSHAKE;
   }
 
   /* check if handshake recv complete */
   if(_connection->check_for_posted_recv_complete()) {
     /* initiate handshake */
     int rc;
-    if ((rc = gnutls_handshake(_session)) < 0)
-      throw General_exception("GNU tls handshake has failed (%s)\n\n", gnutls_strerror(rc));
+    if ((rc = gnutls_handshake(_session)) < 0) {
+
+      if (rc == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR) {
+        /* check certificate verification status */
+        gnutls_datum_t out;
+        auto           type   = gnutls_certificate_type_get(_session);
+        auto           status = gnutls_session_get_verify_cert_status(_session);
+        if (gnutls_certificate_verification_status_print(status, type, &out, 0) != GNUTLS_E_SUCCESS)
+          throw General_exception("gnutls_certificate_verification_status_print() failed");
+
+        CPLOG(1, "TLS: bad certificate; closing client session");
+
+        /* send error result */
+        auto result = GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR;
+        gnutls_record_send(_session, &result, sizeof(result));
+
+        gnutls_deinit(_session);
+        gnutls_free(out.data);
+
+        return Connection_state::CLOSE_CONNECTION;
+      }
+      else throw General_exception("GNU tls handshake has failed (%s)\n\n", gnutls_strerror(rc));
+    }
 
     print_info(_session);
+    /* send success result */
+    auto result = 0;
+    gnutls_record_send(_session, &result, sizeof(result));
     CPLOG(2, "TLS handshake complete");
-    
+
     return Connection_state::WAIT_NEW_MSG_RECV; // finally, move to next state
   }
 
-  return Connection_state::WAIT_TLS_SESSION;
+  return Connection_state::WAIT_TLS_HANDSHAKE;
 }
 
 void Connection_TLS_session::initialize_certs()

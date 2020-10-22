@@ -105,7 +105,7 @@ public:
       , magic(0xC0FFEE)
     {
       assert(length_);
-      CPLOG(2, "%s::%s %p transport %p region %p", _cname, __func__, static_cast<void *>(this),
+      CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, static_cast<void *>(this),
             static_cast<void *>(transport()), static_cast<void *>(region()));
     }
 
@@ -116,7 +116,7 @@ public:
   protected:
     ~buffer_base()
     {
-      CPLOG(2, "%s::%s %p transport %p region %p", _cname, __func__, static_cast<void *>(this),
+      CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, static_cast<void *>(this),
             static_cast<void *>(transport()), static_cast<void *>(region()));
     }
 

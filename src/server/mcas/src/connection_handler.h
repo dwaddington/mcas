@@ -138,8 +138,9 @@ private:
       const std::map<Connection_state, const char *> m{
                                           {Connection_state::INITIAL, "INITIAL"},
                                           {Connection_state::WAIT_HANDSHAKE, "WAIT_HANDSHAKE"},
-                                          {Connection_state::WAIT_TLS_SESSION, "WAIT_TLS_SESSION"},
+                                          {Connection_state::WAIT_TLS_HANDSHAKE, "WAIT_TLS_HANDSHAKE"},
                                           {Connection_state::CLIENT_DISCONNECTED, "CLIENT_DISCONNECTED"},
+                                          {Connection_state::CLOSE_CONNECTION, "CLOSE_CONNECTION"},
                                           {Connection_state::WAIT_NEW_MSG_RECV, "WAIT_NEW_MSG_RECV"}};
       PLOG("state %s -> %s", m.find(_state)->second, m.find(s)->second);
     }

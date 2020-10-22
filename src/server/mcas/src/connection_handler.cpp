@@ -164,7 +164,12 @@ int Connection_handler::tick()
     break;
   }
 
-  case Connection_state::WAIT_TLS_SESSION: {
+  case Connection_state::CLOSE_CONNECTION: {
+    PNOTICE("### closing connection");
+    return TICK_RESPONSE_CLOSE;
+  }
+
+  case Connection_state::WAIT_TLS_HANDSHAKE: {
     set_state(process_tls_session());
     break;
   }
@@ -194,7 +199,7 @@ int Connection_handler::tick()
       if(msg->security_tls) {
         set_security_options(true, msg->security_hmac);
         respond_to_handshake(true);
-        set_state(Connection_state::WAIT_TLS_SESSION);
+        set_state(Connection_state::WAIT_TLS_HANDSHAKE);
         return TICK_RESPONSE_WAIT_SECURITY;
       }
       else {
