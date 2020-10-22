@@ -46,16 +46,10 @@ component::IFabric_op_completer::cb_acceptance Fabric_transport::completion_call
   }
 
   if (*(static_cast<void **>(param)) == context) {
-    if (1 < mcas::global::debug_level) {
-      PLOG("COMPletion %p(wanted/got) accept", context);
-    }
     *static_cast<void **>(param) = nullptr; /* signals completion */
     return component::IFabric_op_completer::cb_acceptance::ACCEPT;
   }
   else {
-    if (1 < mcas::global::debug_level) {
-      PLOG("COMPletion got %p(want) != %p(got)  defer", *static_cast<void **>(param), context);
-    }
     return component::IFabric_op_completer::cb_acceptance::DEFER;
   }
 }
