@@ -909,9 +909,6 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
 Connection_handler::~Connection_handler()
 {
   PLOG("%s: (%p)", __func__, static_cast<const void *>(this));
-  if(_session) {
-    gnutls_deinit(_session);
-  }
 }
 
 void Connection_handler::send_complete(void *param, buffer_t *iob)
