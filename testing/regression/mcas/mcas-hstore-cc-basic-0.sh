@@ -41,7 +41,7 @@ wait $SERVER_PID; SERVER_RC=$?
 
 # check result
 if [ "$1" == "release" ]; then
-    GOAL=175000 # was 220K
+    GOAL=190000 # test machine
 else
     GOAL=45000
 fi

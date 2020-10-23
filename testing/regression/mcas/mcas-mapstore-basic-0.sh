@@ -37,7 +37,7 @@ wait $SERVER_PID; SERVER_RC=$?
 # check result
 
 if [ "$1" == "release" ]; then
-    GOAL=165000 # was 220K
+    GOAL=180000 # test machine threshold
 else
     GOAL=50000
 fi
