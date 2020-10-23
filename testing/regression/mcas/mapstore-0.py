@@ -10,4 +10,5 @@ class mapstore_0(config_0):
 
 from sys import argv
 
+
 print(mapstore_0(argv[1]).json())

@@ -24,7 +24,7 @@ ELEMENT_COUNT=$(scale_by_transport 2000000)
 #STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*84/10)) # too small - mapstore?
 STORE_SIZE=$((ELEMENT_COUNT*2000)) # shouldn't need this - efficiency issue?
 CLIENT_LOG="test$TESTID-client.log"
-./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
+./dist/bin/kvstore-perf --cores "$(clamp_cpu 3)" --src_addr $NODE_IP --server $NODE_IP --test put --component mcas --elements $ELEMENT_COUNT --port 11911 --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 
 # arm cleanup

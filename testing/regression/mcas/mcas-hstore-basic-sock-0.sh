@@ -29,7 +29,10 @@ SOCKET_SCALE=1000
 ELEMENT_COUNT=$(scale_by_transport 2000000 $SOCKET_SCALE)
 STORE_SIZE=$((ELEMENT_COUNT*VALUE_LENGTH*24/10))
 CLIENT_LOG="test$TESTID-client.log"
-./dist/bin/kvstore-perf --provider sockets --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
+./dist/bin/kvstore-perf --provider sockets --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
+                        --test put --component mcas --elements $ELEMENT_COUNT \
+                        --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH \
+                        --debug_level $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 
 # arm cleanup
