@@ -17,6 +17,8 @@
 
 #include "hstore_config.h" /* USE_CC_HEAP */
 #include "logging.h"
+#include "perishable_expiry.h"
+#include "test_flags.h"
 
 template <typename Pool>
 	struct monitor_pin_data

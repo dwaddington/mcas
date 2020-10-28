@@ -15,6 +15,8 @@
 #ifndef _COMANCHE_HSTORE_ROOT_H
 #define _COMANCHE_HSTORE_ROOT_H
 
+#include <libpmemobj.h> /* PMEMoid */
+
 struct store_root_t
 {
   /* A pointer so that null value can indicate no allocation.

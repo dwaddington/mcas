@@ -162,9 +162,9 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 						/* convert value to lockable */
 #if 0
 						using monitor = monitor_pin<session::allocator_type>;
-						using monitor = monitor_pin<hstore_alloc_type<Persister>::heap_alloc_t>;
+						using monitor = monitor_pin<hstore_alloc_type<Persister>::heap_alloc_access_t>;
 #endif
-						monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_t> mp(d, al_.pool());
+						monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_access_t> mp(d, al_.pool());
 						/* convert d to immovable data */
 						d.pin(AK_REF mp.get_cptr(), al_);
 					}
@@ -255,7 +255,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			, common::log_source(debug_level_)
 			, _heap(
 				Allocator(
-					this->pool()->locate_heap()
+					this->pool()->make_heap_access()
 				)
 			)
 			, _pin_seq(undo_redo_pin_data(AK_REF _heap) || undo_redo_pin_key(AK_REF _heap))
@@ -617,7 +617,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				if ( ! k.is_fixed() )
 				{
 					auto &km = const_cast<typename std::remove_const<key_t>::type &>(k);
-					monitor_pin_key<hstore_alloc_type<Persister>::heap_alloc_t> mp(km, _heap.pool());
+					monitor_pin_key<hstore_alloc_type<Persister>::heap_alloc_access_t> mp(km, _heap.pool());
 					/* convert k to a immovable data */
 					km.pin(AK_REF mp.get_cptr(), this->allocator());
 				}
@@ -630,7 +630,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				 */
 				if( ! d.is_fixed() )
 				{
-					monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_t> mp(d, _heap.pool());
+					monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_access_t> mp(d, _heap.pool());
 					/* convert d to a immovable data */
 					d.pin(AK_REF mp.get_cptr(), this->allocator());
 				}
@@ -884,10 +884,8 @@ PLOG("%s", s.str().c_str());
 			}
 
 			persistent_t<char *> p = nullptr;
-#if USE_CC_HEAP == 4
 			/* ERROR: leaks memory on a crash */
-#endif
-			allocator().allocate(AK_REF p, size, alignment);
+			allocator().allocate_tracked(AK_REF p, size, alignment);
 			return p;
 		}
 
@@ -900,7 +898,7 @@ PLOG("%s", s.str().c_str());
 #if USE_CC_HEAP == 4
 			/* ERROR: leaks memory on a crash */
 #endif
-			allocator().deallocate(p, size);
+			allocator().deallocate_tracked(p, size);
 		}
 
 		void flush_memory(

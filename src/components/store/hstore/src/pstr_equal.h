@@ -15,6 +15,7 @@
 #define _MCAS_PSTR_EQUAL_H_
 
 #include <cstring>
+#include <string>
 
 template <typename Key>
   struct pstr_equal

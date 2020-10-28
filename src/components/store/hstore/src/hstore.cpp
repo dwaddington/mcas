@@ -52,8 +52,6 @@ template<typename T>
 
 template<> struct type_number<char> { static constexpr uint64_t value = 2; };
 
-unsigned hstore::debug_level() const { return 1; }
-
 #if USE_CC_HEAP == 3 /* reconstituting allocator */
 template<> struct type_number<impl::mod_control> { static constexpr std::uint64_t value = 4; };
 #endif /* USE_CC_HEAP */
@@ -90,9 +88,11 @@ auto hstore::move_pool(const component::IKVStore::pool_t p) -> std::shared_ptr<o
   std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
   auto ps = _pools.find(v);
   if ( ps == _pools.end() )
-    {
-      throw API_exception(PREFIX "invalid pool identifier %p", LOCATION, v);
-    }
+  {
+    std::ostringstream o;
+    o << "invalid pool identifier " << v;
+    throw std::invalid_argument(o.str());
+  }
 
   tls_cache.erase(v);
   auto s2 = ps->second;
@@ -100,8 +100,9 @@ auto hstore::move_pool(const component::IKVStore::pool_t p) -> std::shared_ptr<o
   return s2;
 }
 
-hstore::hstore(const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr_)
-  : _pool_manager(std::make_shared<pm>(debug_level(), owner, name, std::move(mgr_)))
+hstore::hstore(unsigned debug_level_, const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr_)
+  : common::log_source(debug_level_)
+  , _pool_manager(std::make_shared<pm>(debug_level(), owner, name, std::move(mgr_)))
   , _pools_mutex{}
   , _pools{}
 {
@@ -233,7 +234,7 @@ status_t hstore::close_pool(const pool_t p)
     CPLOG(1, PREFIX "closed pool (%" PRIxIKVSTORE_POOL_T ")", LOCATION, p);
     _pool_manager->pool_close_check(path);
   }
-  catch ( const std::domain_error & )  {
+  catch ( const std::runtime_error & )  {
     return E_POOL_NOT_FOUND;
   }
   catch ( const std::invalid_argument & )  {

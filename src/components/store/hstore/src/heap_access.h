@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,11 +12,34 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_RC_ALLOC_WRAPPER_H
-#define COMANCHE_HSTORE_RC_ALLOC_WRAPPER_H
+#ifndef MCAS_HSTORE_HEAP_ACCESS_H
+#define MCAS_HSTORE_HEAP_ACCESS_H
 
-#pragma GCC system_header
+template <typename T>
+	struct heap_access
+	{
+		using shared_t = T;
+	private:
+		shared_t *_heap;
 
-#include <nupm/rc_alloc_avl.h>
+	public:
+		explicit heap_access(shared_t *area)
+			: _heap(area)
+		{
+		}
+
+		~heap_access()
+		{
+		}
+
+		heap_access(const heap_access &) noexcept = default;
+
+		heap_access & operator=(const heap_access &) = default;
+
+		shared_t *operator->() const
+		{
+			return _heap;
+		}
+	};
 
 #endif

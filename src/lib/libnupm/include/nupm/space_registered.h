@@ -21,6 +21,7 @@
 #define _NUPM_SPACE_REGISTERED_H_
 
 #include "space_opened.h"
+#include "path_use.h"
 #include <common/logging.h>
 #include <experimental/string_view>
 #include <string>
@@ -30,24 +31,6 @@
 namespace nupm
 {
 struct dax_manager;
-
-struct path_use
-  : public common::log_source
-{
-  using string_view = std::experimental::string_view;
-private:
-  /* Would include a common::moveable_ptr<dax_manager>, except that the
-   * registry is static, potentially covering multiple dax_manager instances.
-   */
-  std::string _name;
-public:
-  path_use(const common::log_source &ls, const string_view &name);
-  path_use(const path_use &) = delete;
-  path_use &operator=(const path_use &) = delete;
-  path_use(path_use &&) noexcept;
-  ~path_use();
-  const std::string & path_name() const { return _name; }
-};
 
 struct space_registered
 {
@@ -60,22 +43,10 @@ public:
   space_registered(
     const common::log_source &ls
     , dax_manager * dm
-#if 0
-    , const std::string& file
-#endif
     , common::fd_locked &&fd
     , const string_view &path
     , addr_t base_addr
   );
-#if 0
-  space_registered(
-    const common::log_source &ls
-    , dax_manager * dm
-    , const std::string& file
-    , const string_view &name
-    , const std::vector<::iovec> &mapping
-  );
-#endif
   space_registered(
     const common::log_source &ls
     , dax_manager * dm

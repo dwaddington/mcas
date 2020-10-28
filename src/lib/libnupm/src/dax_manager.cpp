@@ -219,8 +219,9 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::st
 				);
 			if ( ! itb.second )
 			{
-				throw std::domain_error("multiple instances of path " + pd.string() + " in configuration");
+				throw std::runtime_error("multiple instances of path " + pd.string() + " in configuration");
 			}
+			CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
 		}
 	}
 }
@@ -301,13 +302,14 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		);
 	if ( ! itb.second )
 	{
-		throw std::domain_error("multiple instances of path " + p.string() + " in configuration");
+		throw std::runtime_error("multiple instances of path " + p.string() + " in configuration");
 	}
+	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
 	return
 		std::make_unique<arena_dev>(
 			static_cast<log_source &>(*this)
 			, recover_metadata(
-				itb.first->second._or.range().iov(0),
+				itb.first->second._or.range()[0],
 				force_reset
 			)
 		);
@@ -330,22 +332,23 @@ bool nupm::dax_manager::enter(
 	{
 		PLOG("%s: failed to insert %.*s (duplicate instance?)", __func__, int(id_.size()), id_.begin());
 	}
+	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
 	return itb.second;
 }
 
 void nupm::dax_manager::remove(const string_view & id_)
 {
-	auto it = _mapped_spaces.find(std::string(id_));
-	if ( it != _mapped_spaces.end() )
+	auto itb = _mapped_spaces.find(std::string(id_));
+	if ( itb != _mapped_spaces.end() )
 	{
-		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&it->second));
+		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&itb->second));
 	}
 	else
 	{
 		CPLOG(2, "%s: _mapped_spaces does not contain %.*s", __func__, int(id_.size()), id_.begin());
 	}
-	auto ct = _mapped_spaces.erase(std::string(id_));
-	CPLOG(2, "%s: _mapped_spaces erase count %zu", __func__, ct);
+	CPLOG(1, "%s: region %s at %p", __func__, itb->first.c_str(), itb->second._or.range()[0].iov_base);
+	_mapped_spaces.erase(itb);
 }
 
 namespace nupm
@@ -478,7 +481,7 @@ auto dax_manager::resize_region(
   if ( it == _mapped_spaces.end() )
   {
     PLOG("%s: failed to find %.*s", __func__, int(id_.size()), id_.begin());
-    throw std::domain_error(std::string(__func__) + ": failed to find " + std::string(id_));
+    throw std::runtime_error(std::string(__func__) + ": failed to find " + std::string(id_));
   }
   else
   {

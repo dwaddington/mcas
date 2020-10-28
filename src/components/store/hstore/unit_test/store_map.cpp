@@ -24,6 +24,9 @@ const store_map::impl_map_t store_map::impl_map = {
 namespace
 {
   static auto store_env = ::getenv("STORE");
+  /* example of a STORE_LOCATION string:
+   *   [{"path", "/mnt/pmem1", "addr", 618475290624}]
+   */
   static auto store_loc = ::getenv("STORE_LOCATION");
 }
 
@@ -32,21 +35,39 @@ const store_map::impl_map_t::const_iterator store_map::impl_env_it =
   ? impl_map.find(store_env)
   : impl_map.end()
   ;
+
 const store_map::impl_spec *const store_map::impl =
-  &( impl_env_it == impl_map.end()
-  ? impl_map.find(impl_default)
-  : impl_env_it)->second
+  & (
+      impl_env_it == impl_map.end()
+      ? impl_map.find(impl_default)
+      : impl_env_it
+    )->second
   ;
 
 namespace c_json = common::json;
 using json = c_json::serializer<c_json::dummy_writer>;
+
+const auto devdax_location =
+  json::array
+  ( json::object
+    ( json::member("path", "/dev/dax0.0")
+    , json::member("addr", 0x9000000000)
+    )
+  );
+
+const auto fsdax_location =
+  json::array
+  ( json::object
+    ( json::member("path", "/mnt/pmem1")
+    , json::member("addr", 0x9000000000)
+    )
+  );
+
 const std::string store_map::location =
-  store_loc
-  ? store_loc
-  : json::array(
-      json::object(
-        json::member("path", "/dev/dax0.0")
-        , json::member("addr", 0x9000000000)
-      )
-    ).str()
+  /* If a custom store location was specified, use it */
+  store_loc           ? store_loc
+  /* if USE_ODP was set, probably using fsdax. Use the default fsdax location */
+  : getenv("USE_ODP") ? fsdax_location.str()
+  /* Use the default devdax location */
+  :                     devdax_location.str()
   ;

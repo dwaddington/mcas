@@ -67,12 +67,14 @@ auto hstore_factory::create(
   namespace c_json = common::json;
   using json = c_json::serializer<c_json::dummy_writer>;
   unsigned map_debug_level = unsigned(debug_it == mc.end() ? 0 : std::stoul(debug_it->second));
+  unsigned effective_debug_level = std::max(debug_level_, map_debug_level);
   component::IKVStore *obj =
     new hstore(
-      owner_it == mc.end() ? "owner" : owner_it->second
+      effective_debug_level
+      , owner_it == mc.end() ? "owner" : owner_it->second
       , name_it == mc.end() ? "name" : name_it->second
       , std::make_unique<dax_manager>(
-          common::log_source(std::max(debug_level_, map_debug_level))
+          common::log_source(effective_debug_level)
           , dax_config_it == mc.end() ? json::array().str() : dax_config_it->second
           , bool(std::getenv("DAX_RESET"))
         )

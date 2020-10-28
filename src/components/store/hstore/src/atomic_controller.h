@@ -15,11 +15,9 @@
 #ifndef MCAS_HSTORE_ATOMIC_CTL_H_
 #define MCAS_HSTORE_ATOMIC_CTL_H_
 
+#include "alloc_key.h" /* AK_FORMAL */
 #include "construction_mode.h"
 #include "mod_control.h"
-#if 0
-#include "persist_fixed_string.h"
-#endif
 #include <api/kvstore_itf.h> /* component */
 
 #include <tuple> /* tuple_element */

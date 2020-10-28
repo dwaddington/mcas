@@ -11,14 +11,15 @@
    limitations under the License.
 */
 
-#include <type_traits> /* is_base_of */
-
 #include "hstore_config.h"
+#include "construction_mode.h"
 #include "perishable.h"
 #include "segment_layout.h"
 #if 1
 #include "logging.h"
 #endif
+
+#include <type_traits> /* is_base_of */
 
 template <typename Allocator>
 	struct monitor_extend

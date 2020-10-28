@@ -77,7 +77,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     /* The first part of pool space is the header, which is described by a Region.
      * In order to give the heap a well-aligned space, the size actually allocated
      * to a heap may be as little as 3/4 of the area provided to the heap.
-     * The constant 3/4 is embedded in the heap_rc_shared class.
+     * The constant 3/4 is embedded in the heap_rc class.
      *
      * Ask for enough space to contain the header and to compensate for inefficiency
      * due to heap alignment.
@@ -195,12 +195,26 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     const auto iov_last = ra_.address_map.end();
     assert(iov_first != iov_last);
     ++iov_first;
-    open_pool_handle h(new (ra_.address_map.front().iov_base) region_type(this->debug_level(), _dax_manager, ra_.id, ra_.data_file, &*iov_first, &*iov_last));
+    open_pool_handle
+      h(
+        new (ra_.address_map.front().iov_base)
+          region_type(
+            this->debug_level()
+            , _dax_manager
+            , ra_.id
+            , ra_.data_file
+            , &*iov_first, &*iov_last
+          )
+      );
 #if 0
     PLOG(PREFIX "in open_2 region at %p", LOCATION, ra_.address_map.front().iov_base);
 #endif
     /* open_pool_handle is a managed region * */
-    auto s = std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(AK_REF std::move(h), construction_mode::reconstitute);
+    auto s =
+      std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(
+        AK_REF std::move(h)
+        , construction_mode::reconstitute
+      );
     return s;
   }
 

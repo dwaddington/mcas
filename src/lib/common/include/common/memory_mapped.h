@@ -46,7 +46,7 @@ namespace common
     using ::iovec::iov_base;
     using ::iovec::iov_len;
 	operator bool() const { return iov_base != nullptr; }
-    ::iovec iov() const { return *this; }
+    const ::iovec &iov() const { return *this; }
     /* shrinks iov_len. iov_base remains constant */
     int shrink_by(std::size_t size);
   };

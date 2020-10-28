@@ -11,13 +11,13 @@
    limitations under the License.
 */
 
-#include "hstore_config.h"
 #include "heap_cc.h"
 
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
 #include "dax_manager.h"
+#include "heap_cc_ephemeral.h"
 #include <ccpm/cca.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>
@@ -28,160 +28,12 @@
 #include <stdexcept> /* range_error */
 #include <utility>
 
-constexpr unsigned heap_cc_shared_ephemeral::log_min_alignment;
-constexpr unsigned heap_cc_shared_ephemeral::hist_report_upper_bound;
-
 namespace
 {
 #if USE_CC_HEAP == 4
 	auto leak_check_str = std::getenv("LEAK_CHECK");
 	bool leak_check = bool(leak_check_str);
 #endif
-}
-
-heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	unsigned debug_level_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, std::unique_ptr<ccpm::IHeap_expandable> p
-	, const std::string & id_
-	, const std::string & backing_file_
-	, const std::vector<::iovec> &rv_full_
-	, const ::iovec &pool0_heap_
-)
-	: common::log_source(debug_level_)
-	, _heap(std::move(p))
-	, _managed_regions(id_, backing_file_, rv_full_)
-	, _capacity(
-		pool0_heap_.iov_len
-		+
-		std::accumulate(
-/* Note: rv_full_ must contain at least the first element, representing pool 0 */
-			rv_full_.begin() + 1
-			, rv_full_.end()
-			, ::iovec{nullptr, 0}
-			, [] (const auto &a, const auto &b) -> ::iovec
-				{
-					return {nullptr, a.iov_len + b.iov_len};
-				}
-		).iov_len
-	)
-	, _allocated(
-		[this] ()
-		{
-			std::size_t r;
-			auto rc = _heap->remaining(r);
-			return _capacity - (rc == S_OK ? r : 0);
-		} ()
-	)
-	, _ase(ase_)
-	, _aspd(aspd_)
-	, _aspk(aspk_)
-	, _asx(asx_)
-	, _hist_alloc()
-	, _hist_inject()
-	, _hist_free()
-{
-
-  for ( const auto &r : rv_full_ )
-  {
-    CPLOG(2, "%s : %p.%zx", __func__, r.iov_base, r.iov_len);
-  }
-  CPLOG(2, "%s : pool0_heap: %p.%zx", __func__, pool0_heap_.iov_base, pool0_heap_.iov_len);
-}
-
-heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	unsigned debug_level_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, const std::string & id_
-	, const std::string & backing_file_
-	, const std::vector<::iovec> &rv_full_
-	, const ::iovec &pool0_heap_
-)
-	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(ccpm::region_vector_t(pool0_heap_)), id_, backing_file_, rv_full_, pool0_heap_)
-{}
-
-heap_cc_shared_ephemeral::heap_cc_shared_ephemeral(
-	unsigned debug_level_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, const std::string & id_
-	, const std::string & backing_file_
-	, const std::vector<::iovec> &rv_full_
-	, const ::iovec &pool0_heap_
-	, ccpm::ownership_callback_t f
-)
-	: heap_cc_shared_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(ccpm::region_vector_t(pool0_heap_), f), id_, backing_file_, rv_full_, pool0_heap_)
-{}
-
-#if 0
-void heap_cc_shared_ephemeral::add_managed_region(const ::iovec &r_)
-{
-	ccpm::region_vector_t rv(r_);
-	_heap->add_regions(rv);
-	_capacity += r_.iov_len;
-	PLOG("%s : %p.%zx", __func__, r_.iov_base, r_.iov_len);
-	_managed_regions.address_map.push_back(r_);
-}
-#endif
-
-void heap_cc_shared_ephemeral::add_managed_region(
-	const ::iovec &r_full
-	, const ::iovec &r_heap
-	, const unsigned // numa_node
-)
-{
-	_heap->add_regions(ccpm::region_vector_t(r_heap));
-	CPLOG(2, "%s : %p.%zx", __func__, r_heap.iov_base, r_heap.iov_len);
-	_managed_regions.address_map.push_back(r_full);
-	_capacity += r_heap.iov_len;
-}
-
-std::size_t heap_cc_shared_ephemeral::free(persistent_t<void *> *p_, std::size_t sz_)
-{
-	/* Our free does not know the true size, because alignment is not known.
-	 * But the pool free will know, as it can see how much has been allocated.
-	 *
-	 * The free, however, does not return a size. Pretend that it does.
-	 */
-#if USE_CC_HEAP == 4
-	/* Note: order of testing is important. An extend arm+allocate) can occur while
-	 * emplace is armed, but not vice-versa
-	 */
-	if ( _asx->is_armed() )
-	{
-		CPLOG(1, PREFIX "unexpected segment deallocation of %p of %zu", LOCATION, persistent_ref(*p_), sz_);
-		abort();
-#if 0
-		_asx->record_deallocation(&persistent_ref(*p_), persister_nupm());
-#endif
-	}
-	else if ( _ase->is_armed() )
-	{
-		_ase->record_deallocation(&persistent_ref(*p_), persister_nupm());
-	}
-	else
-	{
-		CPLOG(1, PREFIX "leaky deallocation of %p of %zu", LOCATION, persistent_ref(*p_), sz_);
-	}
-#endif
-	/* IHeap interface does not support abstract pointers. Cast to regular pointer */
-	auto sz = (_heap->free(*reinterpret_cast<void **>(p_), sz_), sz_);
-	/* We would like to carry the persistent_t through to the crash-conssitent allocator,
-	 * but for now just assume that the allocator has modifed p_, and call tick to indicate that.
-	 */
-	perishable::tick();
-	assert(sz <= _allocated);
-	_allocated -= sz;
-	_hist_free.enter(sz);
-	return sz;
 }
 
 namespace
@@ -237,7 +89,7 @@ namespace
  * 4 KiB produces sometimes produces a disagreement between server and AOo mappings
  * which manifest as incorrect key and data values as seen on the ADO side.
  */
-heap_cc_shared::heap_cc_shared(
+heap_cc::heap_cc(
 	unsigned debug_level_
 	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
@@ -256,7 +108,7 @@ heap_cc_shared::heap_cc_shared(
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _eph(
-		std::make_unique<heap_cc_shared_ephemeral>(
+		std::make_unique<heap_cc_ephemeral>(
 			debug_level_
 			, ase_
 			, aspd_
@@ -279,32 +131,10 @@ heap_cc_shared::heap_cc_shared(
 	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, false);
 }
 
-#if 0
-heap_cc_shared::heap_cc_shared(unsigned debug_level_, uint64_t pool0_uuid_, const std::unique_ptr<dax_manager> &dax_manager_, unsigned numa_node_)
-	: _pool0(align(open_region(dax_manager_, pool0_uuid_, numa_node_)))
-	, _more_region_uuids_size(0)
-	, _more_region_uuids()
-	, _eph(
-		std::make_unique<heap_cc_shared_ephemeral>(
-			debug_level_, add_regions(ccpm::region_vector_t(_pool0.iov_base, _pool0.iov_len), dax_manager_, numa_node_, nullptr, nullptr)
-		)
-	)
-{
-	/* cursor now locates the best-aligned region */
-	hop_hash_log<trace_heap_summary>::write(
-		LOG_LOCATION
-		, " pool ", _pool0.iov_base, " .. ", iov_limit(_pool0)
-		, " size ", _pool0.iov_len
-		, " new"
-	);
-	VALGRIND_CREATE_MEMPOOL(_pool0.iov_base, 0, false);
-}
-#endif
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
-heap_cc_shared::heap_cc_shared(
+heap_cc::heap_cc(
 	unsigned debug_level_
 	, const std::unique_ptr<dax_manager> &dax_manager_
 	, const std::string & id_
@@ -322,7 +152,7 @@ heap_cc_shared::heap_cc_shared(
 	, _more_region_uuids_size(this->_more_region_uuids_size)
 	, _more_region_uuids(this->_more_region_uuids)
 	, _eph(
-		std::make_unique<heap_cc_shared_ephemeral>(
+		std::make_unique<heap_cc_ephemeral>(
 			debug_level_
 			, ase_
 			, aspd_
@@ -364,17 +194,17 @@ heap_cc_shared::heap_cc_shared(
 }
 #pragma GCC diagnostic pop
 
-heap_cc_shared::~heap_cc_shared()
+heap_cc::~heap_cc()
 {
 	quiesce();
 }
 
-auto heap_cc_shared::regions() const -> nupm::region_descriptor
+auto heap_cc::regions() const -> nupm::region_descriptor
 {
 	return _eph->get_managed_regions();
 }
 
-void *heap_cc_shared::iov_limit(const ::iovec &r)
+void *heap_cc::iov_limit(const ::iovec &r)
 {
 	return static_cast<char *>(r.iov_base) + r.iov_len;
 }
@@ -396,7 +226,7 @@ namespace
 	}
 }
 
-auto heap_cc_shared::grow(
+auto heap_cc::grow(
 	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
@@ -495,7 +325,7 @@ auto heap_cc_shared::grow(
 	return _eph->_capacity;
 }
 
-void heap_cc_shared::quiesce()
+void heap_cc::quiesce()
 {
 	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", _pool0_heap.iov_len, " allocated ", _eph->_allocated);
 	VALGRIND_DESTROY_MEMPOOL(_pool0_heap.iov_base);
@@ -504,7 +334,7 @@ void heap_cc_shared::quiesce()
 	_eph.reset(nullptr);
 }
 
-void heap_cc_shared::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t alignment_)
+void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t alignment_)
 {
 	alignment_ = std::max(alignment_, sizeof(void *));
 
@@ -564,24 +394,40 @@ void heap_cc_shared::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_
 	}
 }
 
-void heap_cc_shared::free(persistent_t<void *> *p_, std::size_t sz_)
+void heap_cc::free(persistent_t<void *> *p_, std::size_t sz_)
 {
 	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p_);
 	auto sz = _eph->free(p_, sz_);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz_, "->", sz);
 }
 
-void heap_cc_shared::extend_arm() const
+unsigned heap_cc::percent_used() const
+{
+	return
+		unsigned(
+			_eph->_capacity
+			? _eph->_allocated * 100U / _eph->_capacity
+			: 100U
+		);
+}
+
+void heap_cc::extend_arm() const
 {
 	_eph->_asx->arm(persister_nupm());
 }
 
-void heap_cc_shared::extend_disarm() const
+void heap_cc::extend_disarm() const
 {
 	_eph->_asx->disarm(persister_nupm());
 }
 
-void heap_cc_shared::pin_data_arm(
+void heap_cc::emplace_arm() const { _eph->_ase->arm(persister_nupm()); }
+void heap_cc::emplace_disarm() const { _eph->_ase->disarm(persister_nupm()); }
+
+impl::allocation_state_pin &heap_cc::aspd() const { return *_eph->_aspd; }
+impl::allocation_state_pin &heap_cc::aspk() const { return *_eph->_aspk; }
+
+void heap_cc::pin_data_arm(
 	cptr &cptr_
 ) const
 {
@@ -592,7 +438,7 @@ void heap_cc_shared::pin_data_arm(
 #endif
 }
 
-void heap_cc_shared::pin_key_arm(
+void heap_cc::pin_key_arm(
 	cptr &cptr_
 ) const
 {
@@ -603,7 +449,7 @@ void heap_cc_shared::pin_key_arm(
 #endif
 }
 
-char *heap_cc_shared::pin_data_get_cptr() const
+char *heap_cc::pin_data_get_cptr() const
 {
 #if USE_CC_HEAP == 4
 	assert(_eph->_aspd->is_armed());
@@ -612,7 +458,7 @@ char *heap_cc_shared::pin_data_get_cptr() const
 	return nullptr;
 #endif
 }
-char *heap_cc_shared::pin_key_get_cptr() const
+char *heap_cc::pin_key_get_cptr() const
 {
 #if USE_CC_HEAP == 4
 	assert(_eph->_aspk->is_armed());
@@ -622,12 +468,12 @@ char *heap_cc_shared::pin_key_get_cptr() const
 #endif
 }
 
-void heap_cc_shared::pin_data_disarm() const
+void heap_cc::pin_data_disarm() const
 {
 	_eph->_aspd->disarm(persister_nupm());
 }
 
-void heap_cc_shared::pin_key_disarm() const
+void heap_cc::pin_key_disarm() const
 {
 	_eph->_aspk->disarm(persister_nupm());
 }

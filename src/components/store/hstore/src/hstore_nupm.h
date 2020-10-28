@@ -29,7 +29,7 @@
 
 struct dax_manager;
 
-template <typename PersistData, typename Heap, typename HeapAllocator>
+template <typename PersistData, typename Heap>
   struct region;
 
 #pragma GCC diagnostic push

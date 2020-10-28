@@ -17,9 +17,13 @@
 
 #include "hstore_config.h"
 
+#if USE_CC_HEAP == 2
 #include "allocator_co.h"
+#elif USE_CC_HEAP == 3
 #include "allocator_rc.h"
+#elif USE_CC_HEAP == 4
 #include "allocator_cc.h"
+#endif
 
 template <typename Persister>
 	struct hstore_alloc_type
@@ -29,13 +33,12 @@ template <typename Persister>
 		using heap_alloc_t = heap_co;
 #elif USE_CC_HEAP == 3
 		using alloc_t = allocator_rc<char, Persister>;
-		using heap_alloc_shared_t = heap_rc_shared;
-		using heap_alloc_t = heap_rc;
+		using heap_alloc_shared_t = heap_rc;
 #elif USE_CC_HEAP == 4
 		using alloc_t = allocator_cc<char, Persister>;
-		using heap_alloc_shared_t = heap_cc_shared;
-		using heap_alloc_t = heap_cc;
+		using heap_alloc_shared_t = heap_cc;
 #endif
+		using heap_alloc_access_t = heap_access<heap_alloc_shared_t>;
 	};
 
 #endif
