@@ -42,19 +42,22 @@ namespace ccpm
 	 *  ---------------------------------------------------------==========-----------
 	 *
 	 * area_ctl:
-	 *  ----------------------------------------------------------------------------------------
-	 * | _full_height | _level | _element_count | _doubt | _alloc_bits | element_state | _magic |
-	 *  ----------------------------------------------------------------------------------------
+	 *  ----------------------------------------------------------------------------------------------------
+	 * | list_item | _full_height | _level | _element_count | _doubt | _alloc_bits | element_state | _magic |
+	 *  ----------------------------------------------------------------------------------------------------
 	 *
-	 *   Note: The "elements" orgin is the beginning of the *first descendants*
-	 *   of an area_ctl. But the array pf area_ctls (from the most distant first
+	 *   Note: The "elements" orgin is the beginning of the *first descendant*
+	 *   of an area_ctl. But the array of area_ctls (from the most distant first
 	 *   descendant of an area_ctl to the area_ctl itself) is overhead, and is not
-	 *   available for allocaion. The element_alloc layout is one bit per element,
-	 *   and includes bits for the overhead area. (These overhead bits are 1,
-	 *   meaning "allocated", and never change.) The element_state is one byte per
-	 *   element, and also includes bytes for the overhead elements. An element
-	 *   state state is meaningful only if its corresponding alloc bit is true
-	 *   (allocated, not free).
+	 *   available for allocation.
+	 *
+	 *   The _alloc_bits layout is one bit per element, and includes bits for the
+	 *   overhead area. (These overhead bits are 1, meaning "allocated", and never
+	 *   change.)
+	 *
+	 *   The element_state is one byte per element, and also includes bytes for the
+	 *   overhead elements. An element state state is meaningful only if its
+	 *   corresponding alloc bit is true (allocated, not free).
 	 *
 	 * element_alloc_map:
 	 *  ------------------------------------------------------------------------
@@ -398,6 +401,7 @@ namespace ccpm
 		 */
 		auto restore_all(
 			area_top *top
+            , std::ostream *o
 			, level_ix_t current_level_ix
 		) -> std::size_t;
 

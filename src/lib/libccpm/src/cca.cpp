@@ -111,7 +111,7 @@ auto ccpm::cca::allocate(
 {
 	assert(ptr_ == nullptr);
 	/* Try all regions, round robin.
-	 * When ranges are available, this can be done by a concatenation
+	 * In C++20 this can be done by a concatenation
 	 * of the ranges [i .. end) and [begin .. i)
 	 * Until then, use two loops.
 	 */
@@ -174,7 +174,7 @@ auto ccpm::cca::free(
 		this->print(std::cerr);
 	}
 
-	/* Change when ranges appear (see note for allocate) */
+	/* Change for C++20 ranges (see note for allocate) */
 	auto split = _top.begin() + _last_top_free;
 
 	for ( auto it = split; it != _top.end(); ++it )

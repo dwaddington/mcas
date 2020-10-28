@@ -19,7 +19,7 @@
 #include <ccpm/interfaces.h>
 #include <array>
 #include <cstddef>
-#include <ios> // ios_base::fmtflags
+#include <ios> // ios_base::fmtflags, ostream
 #include <vector>
 
 struct iovec;
@@ -168,7 +168,7 @@ namespace ccpm
 			, std::ios_base::fmtflags size_format
 		) const;
 		void print_ctls(
-			std::ostream &o_
+			std::ostream *o_
 			, std::ios_base::fmtflags format_
 		) const;
 		level_ix_t height() const { return level_ix_t(_level.size()); }
@@ -178,6 +178,7 @@ namespace ccpm
 		 * free run (consecutive free elements) of free_run, to _level, which is the
 		 * non-persistent catalog of area_ctl items.
 		 */
+		void remove_from_chain(area_ctl *a, level_ix_t level_ix, unsigned longest_run);
 		void restore_to_chain(area_ctl *a, level_ix_t level_ix, unsigned run_length);
 
 		bool contains(const void *p) const;

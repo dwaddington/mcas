@@ -96,22 +96,22 @@ ccpm::area_top::~area_top()
 	if ( bool(std::getenv("CCA_SUBDIVISION_REPORT")) )
 	{
 		try {
-		std::cout << "Allocations " << _ct_allocation << "\n";
-		std::size_t sz = 8;
-		for ( const auto &lv : _level )
-		{
-			try
+			std::cout << "Allocations " << _ct_allocation << "\n";
+			std::size_t sz = 8;
+			for ( const auto &lv : _level )
 			{
-			std::cout << "probes at size " << sz
-				<< " probe success " << lv._ct_alloc_probe_success
-				<< " probe failures " << lv._ct_alloc_probe_failure
-				<< " subdivisions " << lv._ct_subdivision
-				<< "\n";
+				try
+				{
+					std::cout << "probes at size " << sz
+						<< " probe success " << lv._ct_alloc_probe_success
+						<< " probe failures " << lv._ct_alloc_probe_failure
+						<< " subdivisions " << lv._ct_subdivision
+						<< "\n";
+				}
+				catch ( const std::exception & )
+				{}
+				sz *= alloc_states_per_word;
 			}
-			catch ( const std::exception & )
-			{}
-			sz *= alloc_states_per_word;
-		}
 		}
 		catch ( const std::exception & )
 		{}
@@ -137,6 +137,28 @@ ccpm::area_top::area_top(
 auto ccpm::area_top::bytes_free() const -> std::size_t
 {
 	return _ctl ? _ctl->bytes_free() : 0;
+}
+
+void ccpm::area_top::remove_from_chain(
+	area_ctl *a_
+	, level_ix_t level_ix_
+	, unsigned longest_run_
+)
+{
+	if ( longest_run_ != 0 )
+	{
+		assert(level_ix_ < _level.size());
+		auto &level = _level[level_ix_];
+		auto free_ctl = level.tier_from_run_length(longest_run_);
+		if ( free_ctl->contains(a_) )
+		{
+			a_->remove();
+		}
+		else
+		{
+			a_->force_reset();
+		}
+	}
 }
 
 void ccpm::area_top::restore_to_chain(
@@ -273,7 +295,7 @@ void ccpm::area_top::allocate_strategy_1(
 			{
 				PLOG("cache level %d, needed run length %u, max available was %zu", level_ix, run_length_, ix-1);
 			}
-			print_ctls(std::cerr, std::ios_base::hex);
+			print_ctls(&std::cerr, std::ios_base::hex);
 		}
 	}
 }
@@ -284,11 +306,16 @@ void ccpm::area_top::allocate_strategy_1(
  */
 bool ccpm::area_top::allocate_recovery_1()
 {
+	if ( _o && trace_fine() )
+	{
+		*_o << __func__ << " for " << static_cast<const void *>(this) << ", ctl at " << static_cast<const void *>(_ctl) << "\n";
+	}
 	auto ct =
 		_all_restored
 		? 0U
 		: _ctl->restore_all(
 				this
+				, trace_fine() ? _o : nullptr
 				, level_ix_t(_level.size()-1)
 			)
 		;
@@ -564,20 +591,23 @@ void ccpm::area_top::print(
 	}
 }
 
-void ccpm::area_top::print_ctls(std::ostream &o_, std::ios_base::fmtflags format_) const
+void ccpm::area_top::print_ctls(std::ostream *o_, std::ios_base::fmtflags format_) const
 {
-	auto indent = 0;
-  const auto si = std::string(static_cast<std::size_t>(indent * 2), ' ');
-  
-	auto ix = 0;
-	o_ << si << "area_top levels:\n";
-	for ( const auto & lv : _level )
+	if ( o_ )
 	{
-		o_ << si << " level " << ix << ": ";
-		lv.print(o_, level_ix_t(indent + 1), format_);
-		++ix;
+		auto indent = 0;
+		const auto si = std::string(static_cast<std::size_t>(indent * 2), ' ');
+
+		auto ix = 0;
+		*o_ << si << "area_top levels:\n";
+		for ( const auto & lv : _level )
+		{
+			*o_ << si << " level " << ix << ": ";
+			lv.print(*o_, level_ix_t(indent + 1), format_);
+			++ix;
+		}
+		*o_ << si << "area_top levels end\n";
 	}
-	o_ << si << "area_top levels end\n";
 }
 
 bool ccpm::area_top::contains(const void *p) const
@@ -595,7 +625,8 @@ void ccpm::level_hints::print(
 	o_ << si;
 	for ( const auto &fc : _free_ctls )
 	{
-		o_ << ( fc.empty() ? '_' : '!' );
+		auto ct = fc.count();
+		o_ << ( ct == 0 ? '-' : ct < 10 ? char('0'+ct) : '!' );
 	}
 	o_ << "\n";
 }
