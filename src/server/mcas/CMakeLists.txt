@@ -35,9 +35,9 @@ configure_file(example-ado.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/example-ado.conf)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
-add_executable(mcas src/main.cpp src/shard.cpp src/shard_ado.cpp src/connection_handler.cpp src/ado_manager.cpp src/security.cpp src/fabric_connection_base.cpp src/fabric_transport.cpp src/config_file.cpp)
+add_executable(mcas src/main.cpp src/shard.cpp src/shard_ado.cpp src/connection_handler.cpp src/ado_manager.cpp src/security.cpp src/fabric_connection_base.cpp src/fabric_transport.cpp src/config_file.cpp src/tls_session.cpp)
 
-target_link_libraries(mcas ${ASAN_LIB} threadipc common numa pthread dl nupm boost_program_options crypto z ado-proto xpmem ${PROFILER} )
+target_link_libraries(mcas ${ASAN_LIB} threadipc common numa pthread dl nupm boost_program_options crypto z ado-proto xpmem gnutls ${PROFILER} )
 
 #add_subdirectory(unit_test)
 

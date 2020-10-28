@@ -1,8 +1,9 @@
-Regression Tests
-----------------
+# Regression Tests
 
-This directory contains a set of scripts for regresssion tests.  The tests are run with the
-following command from the build directory.
+This directory contains a set of scripts for regresssion tests.  Regression
+tests our run on an IBM internal server in response to github Pull Requests.
+
+The tests are run locally with the following command from the build directory.
 
 ./dist/testing/run-tests.sh
 
@@ -14,7 +15,7 @@ To run tests with release build do:
 
 They can also be run individually. For example,
 
-./dist/testing/test1.sh
+./dist/testing/mcas-hstore-basic-0.sh
 
 
 NOTE: Be careful not to interept tests and leave processes hanging.

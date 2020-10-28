@@ -62,31 +62,30 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   static const char *kwlist[] = {"ip",
                                  "port",
                                  "device",
+                                 "extra",
                                  "debug",
                                  NULL};
 
   const char * p_ip = nullptr;
   const char * p_device = nullptr;
+  const char * p_ext = nullptr;
   int port = DEFAULT_PORT;
   int debug_level = 0;
-  
+
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|isi",
+                                    "s|issi",
                                     const_cast<char**>(kwlist),
                                     &p_ip,
                                     &port,
                                     &p_device,
+                                    &p_ext,
                                     &debug_level)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
     return -1;
   }
 
-  PLOG("Session: debug_level=%d", debug_level);
-
-  std::string device = DEFAULT_DEVICE;
-  if(p_device)
-    device = p_device;
+  std::string device = p_device ? p_device : DEFAULT_DEVICE;
 
   std::stringstream addr;
   addr << p_ip << ":" << port;
@@ -115,11 +114,21 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   std::string user_name;
   if(p_env_user_name) user_name = p_env_user_name;
   else user_name = "unknown";
-  
-  self->_mcas = fact->mcas_create(debug_level, 30,
-                                  user_name,
-                                  addr.str(),
-                                  device);
+
+  if(p_ext) {
+    self->_mcas = fact->mcas_create(debug_level, 30,
+                                    user_name,
+                                    addr.str(),
+                                    device,
+                                    p_ext);
+  }
+  else {
+    self->_mcas = fact->mcas_create(debug_level, 30,
+                                    user_name,
+                                    addr.str(),
+                                    device);
+  }
+    
   self->_port = port;
 
   PLOG("session: (%s)(%s) %p", addr.str().c_str(), device.c_str(), self->_mcas);

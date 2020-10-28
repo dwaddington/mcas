@@ -26,6 +26,36 @@
 #include <iostream>
 #include <memory>
 
+
+#include <rapidjson/error/en.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/prettywriter.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
+#include <rapidjson/schema.h>
+#pragma GCC diagnostic pop
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/error/error.h>  // rapidjson::ParseErrorCode
+
+static constexpr const unsigned TLS_DEBUG_LEVEL = 3;
+
+/* static constructor called once */
+static void print_logs(int level, const char* msg) { printf("GnuTLS [%d]: %s", level, msg); }
+
+static void __attribute__((constructor)) Global_ctor()
+{
+  gnutls_global_init();
+  gnutls_global_set_log_level(0); /* 0-9 higher more verbose */
+  gnutls_global_set_log_function(print_logs);
+}
+
+static constexpr const char * cipher_suite = "NORMAL:+AEAD";
+
+namespace mcas
+{
+[[noreturn]] void throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset);
+}
+
 //#define DEBUG_NPC_RESPONSES
 
 using namespace component;
@@ -835,10 +865,11 @@ private:
   }
 };
 
-Connection_handler::Connection_handler(unsigned                    debug_level_,
+Connection_handler::Connection_handler(const unsigned              debug_level,
                                        Connection_base::Transport *connection,
-                                       unsigned                    patience_)
-    : Connection_base(debug_level_, connection, patience_),
+                                       const unsigned              patience,
+                                       const std::string           other)
+    : Connection_base(debug_level, connection, patience),
 #ifdef THREAD_SAFE_CLIENT
       _api_lock{},
 #endif
@@ -850,11 +881,35 @@ Connection_handler::Connection_handler(unsigned                    debug_level_,
 {
   char *env = ::getenv("SHORT_CIRCUIT_BACKEND");
   if (env && env[0] == '1') {
-    _options.short_circuit_backend = true;
+    _options.short_circuit_backend = true;    
   }
+
+  if(!other.empty()) {
+    try {
+      rapidjson::Document doc;
+      doc.Parse(other.c_str());
+      auto security = doc.FindMember("security");
+
+      /* set security options */
+      if(security != doc.MemberEnd() && doc["security"].IsString()) {
+        std::string option(doc["security"].GetString());
+        if(option == "tls:hmac") {
+          _options.tls = true;
+          _options.hmac = true;
+        }
+      }
+    }
+    catch (...) {
+      throw API_exception("extra configuration string parse failed");
+    }
+  }
+
 }
 
-Connection_handler::~Connection_handler() { PLOG("%s: (%p)", __func__, static_cast<const void *>(this)); }
+Connection_handler::~Connection_handler()
+{
+  PLOG("%s: (%p)", __func__, static_cast<const void *>(this));
+}
 
 void Connection_handler::send_complete(void *param, buffer_t *iob)
 {
@@ -874,8 +929,7 @@ void Connection_handler::read_complete(void *param, buffer_t *iob)
 }
 
 Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
-                                                         const unsigned int  // flags
-)
+                                                         const unsigned int)  // flags
 {
   API_LOCK();
 
@@ -2327,14 +2381,17 @@ auto Connection_handler::make_iob_ptr_recv() -> iob_ptr
 {
   return make_iob_ptr(recv_complete);
 }
+
 auto Connection_handler::make_iob_ptr_send() -> iob_ptr
 {
   return make_iob_ptr(send_complete);
 }
+
 auto Connection_handler::make_iob_ptr_write() -> iob_ptr
 {
   return make_iob_ptr(write_complete);
 }
+
 auto Connection_handler::make_iob_ptr_read() -> iob_ptr
 {
   return make_iob_ptr(read_complete);
@@ -2354,6 +2411,11 @@ int Connection_handler::tick()
       const auto iob = make_iob_ptr_send();
       auto       msg = new (iob->base()) mcas::protocol::Message_handshake(auth_id(), 1);
       msg->set_status(S_OK);
+
+      /* set security options */
+      msg->security_tls = _options.tls;
+      msg->security_hmac = _options.hmac;
+      
       iob->set_length(msg->msg_len());
       post_send(iob->iov, iob->iov + 1, iob->desc, &*iob, msg, __func__);
 
@@ -2379,7 +2441,10 @@ int Connection_handler::tick()
       try {
         wait_for_completion(&*iobr);
         const auto response_msg = msg_recv<const mcas::protocol::Message_handshake_reply>(&*iobr, "handshake");
-        (void)response_msg;
+
+        /* server is indicating that it wants to start TLS session */     
+        if(response_msg->start_tls)
+          start_tls();
       }
       catch (...) {
         PERR("%s %s handshake response failed", __FILE__, __func__);
@@ -2388,7 +2453,6 @@ int Connection_handler::tick()
 
       static int recv = 0;
       recv++;
-
 
       set_state(READY);
 
@@ -2424,6 +2488,148 @@ int Connection_handler::tick()
   }  // end switch
 
   return 1;
+}
+
+unsigned TLS_transport::debug_level()
+{
+  return TLS_DEBUG_LEVEL;
+}
+
+int TLS_transport::gnutls_pull_timeout_func(gnutls_transport_ptr_t, unsigned int ms)
+{
+  return 0;
+}
+
+
+ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection, void* buffer, size_t buffer_size)
+{
+  assert(connection);
+
+  auto p_connection = reinterpret_cast<Connection_handler*>(connection);
+
+  if(p_connection->_tls_buffer.remaining() >= buffer_size) {
+
+    if(debug_level() > 2)
+      PLOG("TLS pull: taking %lu bytes from remaining (%lu)", buffer_size, p_connection->_tls_buffer.remaining());
+    
+    p_connection->_tls_buffer.pull(buffer, buffer_size);
+    return buffer_size;
+  }
+
+  auto iobr = p_connection->make_iob_ptr_recv();
+
+  p_connection->post_recv(&*iobr);
+  p_connection->wait_for_completion(&*iobr); /* await response */
+  
+  void * base_v = iobr->base();
+  uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
+  uint64_t payload_size = base[0];
+
+  if(debug_level() > 2)
+    PLOG("TLS received: iob_len=%lu payload-len=%lu", iobr->length(), payload_size);
+
+  p_connection->_tls_buffer.push(reinterpret_cast<void*>(&base[1]), payload_size);
+  p_connection->_tls_buffer.pull(buffer, buffer_size);
+  return buffer_size;
+}
+
+ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection, const giovec_t * iovec, int iovec_cnt )
+{
+  assert(connection);
+  auto p_connection = reinterpret_cast<Connection_handler*>(connection);
+  auto iobs = p_connection->make_iob_ptr_send();
+
+  void * base_v = iobs->base();
+  uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
+
+  char * ptr = reinterpret_cast<char*>(&base[1]);
+  size_t size = 0;
+  
+  for(int i=0; i<iovec_cnt; i++) {
+    memcpy(ptr, iovec[i].iov_base, iovec[i].iov_len);
+    size += iovec[i].iov_len;
+    ptr += iovec[i].iov_len;
+  }
+
+  base[0] = size; /* prefix with length */
+  iobs->set_length(size + sizeof(uint64_t));
+  
+  p_connection->sync_send(&*iobs, "TLS packet (client send)", __func__);
+
+  if(debug_level() > 2)
+    PLOG("TLS sent: %lu bytes (%p)", size, reinterpret_cast<void*>(&*iobs));
+  
+  return size;
+}
+
+void Connection_handler::start_tls()
+{
+  if(_options.tls == false) throw Logic_exception("TLS contradiction");
+
+  if(gnutls_global_init() != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_global_init() failed");
+
+  if (gnutls_certificate_allocate_credentials(&_xcred) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_certificate_allocate_credentials() failed");
+
+  std::string cert_file(::getenv("CERT"));
+  std::string key_file(::getenv("KEY"));
+  
+  PLOG("start_tls: cert=%s key=%s", cert_file.c_str(), key_file.c_str());
+  
+  if (gnutls_certificate_set_x509_key_file(_xcred, cert_file.c_str(), key_file.c_str(), GNUTLS_X509_FMT_PEM) !=
+      GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_certificate_set_x509_key_file() failed");
+
+  if (gnutls_init(&_session, GNUTLS_CLIENT) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_init() failed");
+
+  if (gnutls_priority_init(&_priority, cipher_suite, NULL) != GNUTLS_E_SUCCESS)
+      throw General_exception("gnutls_priority_init() failed");
+
+  if (gnutls_priority_set(_session, _priority) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_priority_set() failed");
+
+  if (gnutls_credentials_set(_session, GNUTLS_CRD_CERTIFICATE, _xcred) != GNUTLS_E_SUCCESS)
+    throw General_exception("gnutls_credentials_set() failed");
+
+  //  gnutls_handshake_set_timeout(_session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+
+  /* hook in TLS transport to use our RDMA connection */
+  gnutls_transport_set_ptr(_session, this);
+  gnutls_transport_set_vec_push_function(_session, TLS_transport::gnutls_vec_push_func);
+  gnutls_transport_set_pull_function(_session, TLS_transport::gnutls_pull_func);
+  gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func); 
+
+  /* initiate handshake */
+  int rc;
+  if ((rc = gnutls_handshake(_session)) < 0) {
+    if (rc == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR) {
+
+      PERR("TLS certificate verification error");
+      /* check certificate verification status */
+      gnutls_datum_t out;
+      auto           type   = gnutls_certificate_type_get(_session);
+      auto           status = gnutls_session_get_verify_cert_status(_session);
+      if (gnutls_certificate_verification_status_print(status, type, &out, 0) != GNUTLS_E_SUCCESS)
+        throw General_exception("gnutls_certificate_verification_status_print() failed");
+      
+      gnutls_deinit(_session);
+      gnutls_free(out.data);
+    }
+    throw General_exception("Client: handshake failed: %s\n", gnutls_strerror(rc));
+  }
+
+  /* get final result */
+  gnutls_alert_description_t result;
+  gnutls_record_recv(_session, &result, sizeof(result));
+
+  if(result == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR)
+    throw API_exception("server rejected certificate because verification failed");
+  else if(result > 0)
+    throw API_exception("TLS handshake rejected");
+
+  PLOG("TLS handshake complete");
 }
 
 }  // namespace client

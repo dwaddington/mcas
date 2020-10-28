@@ -19,6 +19,7 @@ class shard_proto(dm):
         dm.__init__(self, {
             "core" : 0,
             "addr" : addr,
+            "port" : 11911,
         })
         self.merge(default_backend)
 

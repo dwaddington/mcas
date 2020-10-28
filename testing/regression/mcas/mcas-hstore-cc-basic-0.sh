@@ -15,7 +15,7 @@ NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
 # launch MCAS server
-DAX_RESET=1 ./dist/bin/mcas --config "$("./dist/testing/hstore-0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP")" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+DAX_RESET=1 ./dist/bin/mcas --config "$("./dist/testing/hstore-0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" 11911)" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
 sleep 3
@@ -25,7 +25,11 @@ ELEMENT_COUNT=$(scale_by_transport 2000000)
 STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*120/10)) # too small
 STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*128/10)) # sufficient
 CLIENT_LOG="test$TESTID-client.log"
-./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
+
+./dist/bin/kvstore-perf --cores "$(clamp_cpu 3)" --src_addr $NODE_IP --server $NODE_IP --port 11911 \
+                        --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting \
+                        --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
+
 CLIENT_PID=$!
 
 # arm cleanup
@@ -37,7 +41,7 @@ wait $SERVER_PID; SERVER_RC=$?
 
 # check result
 if [ "$1" == "release" ]; then
-    GOAL=175000 # was 220K
+    GOAL=180000 # test machine
 else
     GOAL=45000
 fi

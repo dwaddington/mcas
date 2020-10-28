@@ -39,7 +39,7 @@ private:
         _t(transport_),
         _r(_t->register_memory(base_, len_, key_, flags_))
   {
-    CPLOG(2, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
+    CPLOG(3, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
   }
 
   memory_registered(const memory_registered &) = delete;
@@ -49,7 +49,7 @@ private:
   ~memory_registered()
   {
     if (_t) {
-      CPLOG(2, "%s %p", __func__, static_cast<const void *>(_r));
+      CPLOG(3, "%s %p", __func__, static_cast<const void *>(_r));
       _t->deregister_memory(_r);
     }
   }
