@@ -24,9 +24,9 @@
 #include "fabric_ptr.h" /* FABRIC_TACE_FID */
 #include "fabric_runtime_error.h"
 #include "fabric_util.h" /* make_fi_infodup */
-#include "pointer_cast.h"
 
 #include <common/logging.h> /* PLOG */
+#include <common/pointer_cast.h>
 #include <sys/uio.h> /* iovec */
 #include <sys/time.h> /* rusage */
 #include <sys/resource.h> /* rusage */
@@ -129,7 +129,7 @@ namespace
     {
       if ( i < limit )
       {
-        std::cerr << "Token " << pointer_cast<component::IFabric_memory_region>(&*j.second) << " mr " << j.second->mr << " " << j.second->v << "\n";
+        std::cerr << "Token " << common::pointer_cast<component::IFabric_memory_region>(&*j.second) << " mr " << j.second->mr << " " << j.second->v << "\n";
       }
       else
       {
@@ -168,16 +168,16 @@ auto Fabric_memory_control::register_memory(const void * addr_, std::size_t size
    */
   if ( mr_trace )
   {
-    std::cerr << "Registered token " << pointer_cast<component::IFabric_memory_region>(&*it->second) << " mr " << it->second->mr << " " << it->second->v << "\n";
+    std::cerr << "Registered token " << common::pointer_cast<component::IFabric_memory_region>(&*it->second) << " mr " << it->second->mr << " " << it->second->v << "\n";
     print_registry(_mr_addr_to_mra);
   }
-  return pointer_cast<component::IFabric_memory_region>(&*it->second);
+  return common::pointer_cast<component::IFabric_memory_region>(&*it->second);
 }
 
 void Fabric_memory_control::deregister_memory(const memory_region_t mr_)
 {
   /* recover the memory region as a unique ptr */
-  auto mra = pointer_cast<mr_and_address>(mr_);
+  auto mra = common::pointer_cast<mr_and_address>(mr_);
 
   guard g{_m};
 
@@ -217,7 +217,7 @@ void Fabric_memory_control::deregister_memory(const memory_region_t mr_)
 std::uint64_t Fabric_memory_control::get_memory_remote_key(const memory_region_t mr_) const noexcept
 {
   /* recover the memory region */
-  auto mr = &*pointer_cast<mr_and_address>(mr_)->mr;
+  auto mr = &*common::pointer_cast<mr_and_address>(mr_)->mr;
   /* ask fabric for the key */
   return ::fi_mr_key(mr);
 }
@@ -225,7 +225,7 @@ std::uint64_t Fabric_memory_control::get_memory_remote_key(const memory_region_t
 void *Fabric_memory_control::get_memory_descriptor(const memory_region_t mr_) const noexcept
 {
   /* recover the memory region */
-  auto mr = &*pointer_cast<mr_and_address>(mr_)->mr;
+  auto mr = &*common::pointer_cast<mr_and_address>(mr_)->mr;
   /* ask fabric for the descriptor */
   return ::fi_mr_desc(mr);
 }

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,13 +12,18 @@
 */
 
 
-#ifndef _POINTER_CAST_H_
-#define _POINTER_CAST_H_
+#ifndef _MCAS_COMMON_POINTER_CAST_H_
+#define _MCAS_COMMON_POINTER_CAST_H_
 
-template <typename T>
-  T *pointer_cast(void *p)
-  {
-    return static_cast<T *>(p);
-  }
+/* Unsafe conversion from U* to T* without reniterpret_cast */
+
+namespace common
+{
+  template <typename T>
+    T *pointer_cast(void *p)
+    {
+      return static_cast<T *>(p);
+    }
+}
 
 #endif

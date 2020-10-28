@@ -21,11 +21,11 @@
 #include "fabric_op_control.h"
 #include "fabric_util.h" /* get_name */
 #include "fd_control.h"
-#include "pointer_cast.h"
 #include "system_fail.h"
 
 #include "rdma-fi_cm.h" /* fi_listen */
 
+#include <common/pointer_cast.h>
 #include <unistd.h> /* write */
 #include <netinet/in.h> /* sockaddr_in */
 #include <sys/select.h> /* fd_set, pselect */
@@ -151,7 +151,7 @@ Fd_socket Fabric_server_generic_factory::make_listener(std::uint32_t ip_addr, st
     addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(ip_addr);
 
-    if ( -1 == ::bind(fd.fd(), pointer_cast<sockaddr>(&addr), sizeof addr) )
+    if ( -1 == ::bind(fd.fd(), common::pointer_cast<sockaddr>(&addr), sizeof addr) )
     {
       auto e = errno;
       system_fail(e, "bind for port " + std::to_string(port));
