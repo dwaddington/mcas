@@ -342,13 +342,13 @@ void nupm::dax_manager::remove(const string_view & id_)
 	if ( itb != _mapped_spaces.end() )
 	{
 		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&itb->second));
+		CPLOG(1, "%s: region %s at %p", __func__, itb->first.c_str(), itb->second._or.range()[0].iov_base);
+		_mapped_spaces.erase(itb);
 	}
 	else
 	{
 		CPLOG(2, "%s: _mapped_spaces does not contain %.*s", __func__, int(id_.size()), id_.begin());
 	}
-	CPLOG(1, "%s: region %s at %p", __func__, itb->first.c_str(), itb->second._or.range()[0].iov_base);
-	_mapped_spaces.erase(itb);
 }
 
 namespace nupm
