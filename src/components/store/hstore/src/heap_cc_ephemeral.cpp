@@ -27,14 +27,6 @@
 constexpr unsigned heap_cc_ephemeral::log_min_alignment;
 constexpr unsigned heap_cc_ephemeral::hist_report_upper_bound;
 
-namespace
-{
-#if USE_CC_HEAP == 4
-	auto leak_check_str = std::getenv("LEAK_CHECK");
-	bool leak_check = bool(leak_check_str);
-#endif
-}
-
 heap_cc_ephemeral::heap_cc_ephemeral(
 	unsigned debug_level_
 	, impl::allocation_state_emplace *ase_
