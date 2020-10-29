@@ -45,15 +45,15 @@ namespace
 	std::set<std::string> nupm_dax_manager_mapped;
 	std::mutex nupm_dax_manager_mapped_lock;
 
-	int init_map_lock_mask()
+	bool init_have_odp()
 	{
-		/* env variable USE_ODP to indicate On Demand Paging may be used and therefore mapped memory need not be pinned */
+		/* env variable USE_ODP to indicate On Demand Paging */
 		char* p = ::getenv("USE_ODP");
 		bool odp = false;
 		if ( p != nullptr )
 		{
 			errno = 0;
-			odp = bool(std::strtoul(p,nullptr,10));
+			odp = bool(std::strtoul(p,nullptr,0));
 
 			auto e = errno;
 			if ( e == 0 )
@@ -65,10 +65,17 @@ namespace
 				PLOG("USE_ODP specification %s failed to parse: %s", p, ::strerror(e));
 			}
 		}
-		return odp ? 0 : MAP_LOCKED;
+		return odp;
+	}
+
+	int init_map_lock_mask()
+	{
+		/* On Demand Paging iimplies that mapped memory need not be pinned */
+		return nupm::dax_manager::have_odp ? 0 : MAP_LOCKED;
 	}
 }
 
+const bool nupm::dax_manager::have_odp = init_have_odp();
 const int nupm::dax_manager::effective_map_locked = init_map_lock_mask();
 constexpr const char *nupm::dax_manager::_cname;
 
@@ -219,8 +226,9 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::st
 				);
 			if ( ! itb.second )
 			{
-				throw std::domain_error("multiple instances of path " + pd.string() + " in configuration");
+				throw std::runtime_error("multiple instances of path " + pd.string() + " in configuration");
 			}
+			CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
 		}
 	}
 }
@@ -254,6 +262,10 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_fs(
 	, bool force_reset
 )
 {
+	if ( ! have_odp )
+	{
+		PWRN("%s arena %s is a directory but On Demand Paging is disabled. Run with USE_ODP=1 to enable ODP", __func__, p.c_str());
+	}
 	/* No checking. Although specifying a path twice would be odd, it causes no harm.
 	 * But perhaps we will scan all address maps to develop a free address interval set.
 	 */
@@ -301,13 +313,14 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		);
 	if ( ! itb.second )
 	{
-		throw std::domain_error("multiple instances of path " + p.string() + " in configuration");
+		throw std::runtime_error("multiple instances of path " + p.string() + " in configuration");
 	}
+	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
 	return
 		std::make_unique<arena_dev>(
 			static_cast<log_source &>(*this)
 			, recover_metadata(
-				itb.first->second._or.range().iov(0),
+				itb.first->second._or.range()[0],
 				force_reset
 			)
 		);
@@ -330,22 +343,23 @@ bool nupm::dax_manager::enter(
 	{
 		PLOG("%s: failed to insert %.*s (duplicate instance?)", __func__, int(id_.size()), id_.begin());
 	}
+	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
 	return itb.second;
 }
 
 void nupm::dax_manager::remove(const string_view & id_)
 {
-	auto it = _mapped_spaces.find(std::string(id_));
-	if ( it != _mapped_spaces.end() )
+	auto itb = _mapped_spaces.find(std::string(id_));
+	if ( itb != _mapped_spaces.end() )
 	{
-		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&it->second));
+		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&itb->second));
+		CPLOG(1, "%s: region %s at %p", __func__, itb->first.c_str(), itb->second._or.range()[0].iov_base);
+		_mapped_spaces.erase(itb);
 	}
 	else
 	{
 		CPLOG(2, "%s: _mapped_spaces does not contain %.*s", __func__, int(id_.size()), id_.begin());
 	}
-	auto ct = _mapped_spaces.erase(std::string(id_));
-	CPLOG(2, "%s: _mapped_spaces erase count %zu", __func__, ct);
 }
 
 namespace nupm
@@ -478,7 +492,7 @@ auto dax_manager::resize_region(
   if ( it == _mapped_spaces.end() )
   {
     PLOG("%s: failed to find %.*s", __func__, int(id_.size()), id_.begin());
-    throw std::domain_error(std::string(__func__) + ": failed to find " + std::string(id_));
+    throw std::runtime_error(std::string(__func__) + ": failed to find " + std::string(id_));
   }
   else
   {

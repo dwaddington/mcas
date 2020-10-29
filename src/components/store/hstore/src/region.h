@@ -27,11 +27,15 @@
 
 struct dax_manager;
 
-template <typename PersistData, typename Heap, typename HeapAllocator>
+template <
+  typename PersistData /* persistent data for the hash table impl::persist_data<allocator_segment_t, table_t::value_type> */
+  , typename Heap /* heap_[cr]c */
+>
   struct region
   {
+    using heap_access_t = heap_access<Heap>;
   private:
-    static constexpr std::uint64_t magic_value = HeapAllocator::magic_value; // 0xc74892d72eed493a;
+    static constexpr std::uint64_t magic_value = Heap::magic_value(); // 0xc74892d72eed493a;
   public:
     using heap_type = Heap;
     using persist_data_type = PersistData;
@@ -39,8 +43,8 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
   private:
     std::uint64_t magic;
     /* The hashed value of the string which names the region.
-     * Preserved only form the basis for new strings generated
-     * for grow.
+     * Preserved only to form the basis for new strings generated
+     * for devdax grow.
      */
     std::uint64_t _uuid;
     heap_type _heap;
@@ -79,7 +83,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
       , _persist_data(
         AK_REF
         expected_obj_count
-        , typename PersistData::allocator_type(locate_heap())
+        , typename PersistData::allocator_type(make_heap_access())
     )
     {
       magic = magic_value;
@@ -142,7 +146,7 @@ template <typename PersistData, typename Heap, typename HeapAllocator>
       return sz_ - sizeof *this;
     }
 
-    HeapAllocator locate_heap() { return HeapAllocator(&_heap); }
+    heap_access_t make_heap_access() { return heap_access_t(&_heap); }
     persist_data_type &persist_data() { return _persist_data; }
     bool is_initialized() const noexcept { return magic == magic_value; }
     unsigned percent_used() const { return _heap.percent_used(); }

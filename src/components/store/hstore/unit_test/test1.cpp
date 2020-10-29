@@ -141,12 +141,17 @@ class KVStore_test : public ::testing::Test {
 
   std::string pool_name() const
   {
-    return "/mnt/pmem0/pool/0/test-" + store_map::impl->name + store_map::numa_zone() + ".pool";
+    return "pool/" + store_map::numa_zone() + "/test-" + store_map::impl->name;
   }
   static std::set<std::string> many_insert_set;
   static std::set<std::string> many_erase_okay;
   static std::set<std::string> many_erase_fail;
+  static std::string debug_level()
+  {
+    return std::getenv("DEBUG") ? std::getenv("DEBUG") : "0";
+  }
 };
+
 
 constexpr std::size_t KVStore_test::estimated_object_count_small;
 constexpr std::size_t KVStore_test::estimated_object_count_large;
@@ -198,6 +203,7 @@ TEST_F(KVStore_test, Instantiate)
       , {
           { +component::IKVStore_factory::k_name, "numa0"}
           , { +component::IKVStore_factory::k_dax_config, store_map::location }
+          , { +component::IKVStore_factory::k_debug, debug_level() }
         }
     );
 }
@@ -1119,6 +1125,15 @@ TEST_F(KVStore_test, AllocDealloc4K)
     EXPECT_EQ(1, allocations.count(v));
   }
 
+  /* close and reopen the pool */
+  {
+    auto rc = _kvstore->close_pool(pool);
+    EXPECT_EQ(S_OK, rc);
+
+    pool = _kvstore->open_pool(pool_name());
+    ASSERT_LT(0, int64_t(pool));
+  }
+
   /* Many 4K frees */
   for ( auto v : allocations )
   {
@@ -1172,6 +1187,15 @@ TEST_F(KVStore_test, AllocDealloc)
   EXPECT_EQ(S_OK, r);
   EXPECT_NE(v0, nullptr);
 
+  /* close and reopen the pool */
+  {
+    auto rc = _kvstore->close_pool(pool);
+    EXPECT_EQ(S_OK, rc);
+
+    pool = _kvstore->open_pool(pool_name());
+    ASSERT_LT(0, int64_t(pool));
+  }
+
   r = _kvstore->free_pool_memory(pool, v0, 0);
   EXPECT_EQ(S_OK, r);
   r = _kvstore->free_pool_memory(pool, v2048, 2048);
@@ -1222,7 +1246,7 @@ TEST_F(KVStore_test, Timestamps)
 	/* if timestamping is enabled */
 	if ( _kvstore->get_capability(IKVStore::Capability::WRITE_TIMESTAMPS) )
 	{
-	        auto t0 = common::epoch_now();
+		auto t0 = common::epoch_now();
 		unsigned delay = 2;
 
 		std::vector<std::string> keys;
@@ -1531,6 +1555,7 @@ TEST_F(KVStore_test, OutOfMemory)
   }
   ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
 }
+
 
 } // namespace
 

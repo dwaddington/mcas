@@ -143,7 +143,11 @@ class KVStore_test : public ::testing::Test {
 
   std::string pool_name() const
   {
-    return "/mnt/pmem0/pool/0/test-" + store_map::impl->name + store_map::numa_zone() + ".pool";
+    return "pool/" + store_map::numa_zone() + "/test-" + store_map::impl->name;
+  }
+  static std::string debug_level()
+  {
+    return std::getenv("DEBUG") ? std::getenv("DEBUG") : "0";
   }
   static std::set<std::string> many_insert_set;
   static std::set<std::string> many_erase_okay;
@@ -199,6 +203,7 @@ TEST_F(KVStore_test, Instantiate)
       , {
           { +component::IKVStore_factory::k_name, "numa0"}
           , { +component::IKVStore_factory::k_dax_config, store_map::location }
+          , { +component::IKVStore_factory::k_debug, debug_level() }
         }
     );
 }

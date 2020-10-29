@@ -25,21 +25,17 @@
 #include "dummy_shared_mutex.h"
 #endif
 
-#include "allocator_co.h"
-#include "allocator_rc.h"
-#include "allocator_cc.h"
+#include "hstore_alloc_type.h"
 
-#if __GNUC__ > 7
 #pragma GCC diagnostic push
+#if __GNUC__ > 7
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
 
 #include "hop_hash.h"
 #include "hstore_nupm.h"
 
-#if __GNUC__ > 7
 #pragma GCC diagnostic pop
-#endif
 
 #include "region.h"
 
@@ -49,6 +45,7 @@
 #include "pstr_hash.h"
 
 #include <api/kvstore_itf.h>
+#include <common/logging.h>
 #include <map>
 #include <memory>
 #include <string>
@@ -61,11 +58,11 @@ template <typename Handle, typename Allocator, typename Table, typename Lock>
 
 struct hstore
   : public component::IKVStore
+  , private common::log_source
 {
 private:
   using alloc_t = typename hstore_alloc_type<Persister>::alloc_t;
   using heap_alloc_shared_t = typename hstore_alloc_type<Persister>::heap_alloc_shared_t;
-  using heap_alloc_t = typename hstore_alloc_type<Persister>::heap_alloc_t;
   using dealloc_t = typename alloc_t::deallocator_type;
   using key_t = typename hstore_kv_types<dealloc_t>::key_t;
   using mapped_t = typename hstore_kv_types<dealloc_t>::mapped_t;
@@ -93,7 +90,7 @@ private:
     >;
 public:
   using persist_data_t = typename impl::persist_data<allocator_segment_t, table_t::value_type>;
-  using pm = hstore_nupm<region<persist_data_t, heap_alloc_shared_t, heap_alloc_t>, table_t, table_t::allocator_type, lock_type_t>;
+  using pm = hstore_nupm<region<persist_data_t, heap_alloc_shared_t>, table_t, table_t::allocator_type, lock_type_t>;
   using open_pool_t = pm::open_pool_handle;
 private:
   using session_t = session<open_pool_t, alloc_t, table_t, lock_type_t>;
@@ -105,14 +102,13 @@ private:
   pools_map _pools;
   auto locate_session(component::IKVStore::pool_t pid) -> open_pool_t *;
   auto move_pool(IKVStore::pool_t pid) -> std::shared_ptr<open_pool_t>;
-  unsigned debug_level() const;
 
 public:
   /**
    * Constructor
    *
    */
-  hstore(const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr);
+  hstore(unsigned debug_level, const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr);
 
   /**
    * Destructor

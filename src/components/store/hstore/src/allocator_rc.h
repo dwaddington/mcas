@@ -58,7 +58,7 @@ template <typename T, typename Persister = persister>
 			: deallocator_rc<T, Persister>(area_, p_)
 		{}
 
-		allocator_rc(const heap_rc &pool_, Persister p_ = Persister()) noexcept
+		allocator_rc(const heap_access<heap_rc> &pool_, Persister p_ = Persister()) noexcept
 			: deallocator_rc<T, Persister>(pool_, (p_))
 		{}
 
@@ -85,6 +85,20 @@ template <typename T, typename Persister = persister>
 			return static_cast<value_type *>(ptr);
 		}
 
+		auto allocate_tracked(
+			AK_ACTUAL
+			size_type s
+			, size_type alignment = alignof(T)
+		) -> value_type *
+		{
+			auto ptr = this->pool()->alloc_tracked(s * sizeof(T), alignment);
+			if ( ptr == 0 )
+			{
+				throw bad_alloc_cc(AK_REF 0, s, sizeof(T));
+			}
+			return static_cast<value_type *>(ptr);
+		}
+
 		void allocatep(
 			AK_ACTUAL
 			persistent<value_type *> &ptr
@@ -93,6 +107,16 @@ template <typename T, typename Persister = persister>
 		)
 		{
 			allocate(AK_REF ptr, sz, alignment);
+		}
+
+		void allocate_tracked(
+			AK_ACTUAL
+			value_type * &ptr
+			, size_type sz
+			, size_type alignment = alignof(T)
+		)
+		{
+			ptr = allocate_tracked(AK_REF sz, alignment);
 		}
 
 		void allocate(

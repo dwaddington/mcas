@@ -48,10 +48,17 @@ sudo chmod go+rw /mnt/pmem1
 mkdir /mnt/pmem1/mystuff
 ```
 
+MCAS use of fsdax requires On Demand Paging (ODP), an experimental feature of libfabric.
+The feature in turn requires a Mellanox OFED.
+(See `man fi_verbs` in the libfabric package for a description of the requirement.)
+
+MCAS use of ODP is disabled by default.i
+Set evironment variable USE_ODP to a non-zero integer to enable ODP.
+Specifying an fsdax directory in the storage configuration without ODP disabled will generate a warning message in the server log, and may cause failure when writing to fsdax storage.
 
 ## Referencing DAX storage in a configuration
 
-In the JSON configuration, you may specify a devdax character special file or an fsdax-backed directory.
+In the JSON storage configuration, you may specify a devdax character special file or an fsdax-backed directory.
 This sample iline from a configuration specifies one of each, although - absent special circumsstances - it would be best to
 stick to an single type, probably fsdax.
 

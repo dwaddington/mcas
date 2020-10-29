@@ -26,6 +26,7 @@
 #include <common/moveable_ptr.h>
 #include <common/types.h> /* addr_t */
 #include <gsl/pointers>
+#include <cassert>
 #include <cstddef>
 #include <experimental/string_view>
 #include <string>
@@ -45,7 +46,7 @@ private:
 
   std::vector<common::memory_mapped> address_coverage_check(std::vector<common::memory_mapped> &&iovm);
 public:
-  ::iovec iov(std::size_t i) { return _iovm[i].iov(); }
+  const ::iovec & operator[](std::size_t i) const { return _iovm.at(i).iov(); }
   range_use(dax_manager *dm_, std::vector<common::memory_mapped> &&);
   range_use(const range_use &) = delete;
   range_use &operator=(const range_use &) = delete;

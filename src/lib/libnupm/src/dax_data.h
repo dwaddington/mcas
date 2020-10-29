@@ -188,7 +188,9 @@ class DM_region_header {
     for (uint16_t r = 0; r < _region_count; r++) {
       auto reg = region_table_base()[r];
       if (reg.region_id == region_id) {
-        PLOG("found matching region (%lx)", region_id);
+#if 0
+        PLOG("%s: found matching region (%lx)", __func__, region_id);
+#endif
         if (out_size) *out_size = grain_to_bytes(reg.length_grain);
         return arena_base() + grain_to_bytes(reg.offset_grain);
       }
@@ -208,7 +210,7 @@ class DM_region_header {
         return;
       }
     }
-    throw std::domain_error("region not found");
+    throw std::runtime_error("region not found");
   }
 
   void *allocate_region(uint64_t region_id, DM_region::grain_offset_t size_in_grain)

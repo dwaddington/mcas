@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,14 +11,4 @@
    limitations under the License.
 */
 
-
-#ifndef _POINTER_CAST_H_
-#define _POINTER_CAST_H_
-
-template <typename T>
-  T *pointer_cast(void *p)
-  {
-    return static_cast<T *>(p);
-  }
-
-#endif
+#include "fixed_string.h"

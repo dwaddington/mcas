@@ -61,7 +61,7 @@ std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::
 			std::ostringstream o;
 			o << "range " << e.iov_base << ".." << end << " overlaps existing mapped storage";
 			PLOG("%s: %s", __func__, o.str().c_str());
-			throw std::domain_error(o.str().c_str());
+			throw std::runtime_error(o.str().c_str());
 		}
 		this_coverage.insert(i);
 	}

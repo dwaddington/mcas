@@ -24,6 +24,7 @@
 #pragma GCC diagnostic pop
 
 #include <array>
+#include <cassert>
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <sstream> /* ostringstream */
 #include <string>

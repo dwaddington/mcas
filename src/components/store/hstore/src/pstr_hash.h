@@ -15,6 +15,8 @@
 #define _MCAS_PSTR_HASH_H_
 
 #include <city.h>
+#include <cstdint>
+#include <string>
 
 template <typename Key>
   struct pstr_hash

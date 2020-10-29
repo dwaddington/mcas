@@ -12,6 +12,7 @@
 */
 
 #include "hstore_config.h"
+#include "hstore_kv_types.h"
 #include "monitor_emplace.h"
 #include <algorithm> /* copy, move */
 #include <stdexcept> /* out_of_range */
