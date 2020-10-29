@@ -60,8 +60,6 @@ private:
   security_mode_t     _mode;
   std::string         _ipaddr;
   unsigned            _port;
-
-  component::Itf_ref<component::ICrypto> _crypto;
 };
 
 
