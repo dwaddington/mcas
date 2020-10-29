@@ -32,6 +32,7 @@ private:
   enum class security_mode_t
     {
      NONE,
+     TLS_AUTH,
      TLS_HMAC,
     };
   
@@ -47,7 +48,7 @@ public:
   virtual ~Shard_security();
 
   inline bool auth_enabled() const { return _auth_enabled; }
-  inline security_mode_t mode() const { return _mode; }
+  inline security_mode_t security_mode() const { return _mode; }
   inline const std::string& ipaddr() const { return _ipaddr; }
   inline const std::string& cert_path() const { return _cert_path; }
   inline const std::string& key_path() const { return _key_path; }

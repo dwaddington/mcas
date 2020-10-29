@@ -40,9 +40,9 @@ Shard_security::Shard_security(const boost::optional<std::string> cert_path,
     
     if(*mode == "tls-auth") {
       PMAJOR("security mode TLS authentication (port=%u)(ipaddr=%s)", port, _ipaddr.c_str());
-      _mode = security_mode_t::TLS_HMAC;
+      _mode = security_mode_t::TLS_AUTH;
 
-      CPLOG(1, LOG_PREFIX "TLS enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _cert_path.c_str(), _ipaddr.c_str(), port);
+      CPLOG(1, LOG_PREFIX "TLS authentication enabled (cert_path:%s)(ipaddr:%s)(port:%u)", _cert_path.c_str(), _ipaddr.c_str(), port);
     }
   }
   else {
