@@ -1,6 +1,8 @@
 # Security
 
 MCAS currently supports authentication through TLS x509 certificates.
+The authentication ID for the session is extracted as a
+64-bit hash on the certificate's DN record (we may look at alternatives later).
 
 To use TLS authentication the client should define the current environment variables:
 
