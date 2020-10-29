@@ -107,7 +107,7 @@ protected:
     _security_options.key_file = key_file;
   }
 
-  inline uint64_t client_auth_id() const { return _x509_auth_id; }
+  inline uint64_t tls_auth_id() const { return _x509_auth_id; }
 
 private:
   void initialize_cipher(gnutls_cipher_algorithm_t cipher, const std::string& key_str)

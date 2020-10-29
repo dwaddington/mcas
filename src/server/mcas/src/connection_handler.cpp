@@ -170,7 +170,14 @@ int Connection_handler::tick()
   }
 
   case Connection_state::WAIT_TLS_HANDSHAKE: {
-    set_state(process_tls_session());
+    auto next = process_tls_session();
+
+    if(next == Connection_state::WAIT_NEW_MSG_RECV) {
+      /* authentication ID becomes that from TLS session */
+      set_auth_id(tls_auth_id());
+    }
+    
+    set_state(next);
     break;
   }
 
@@ -180,7 +187,8 @@ int Connection_handler::tick()
       resp_handshakes ++;
 
       if (option_DEBUG > 2)
-        PLOG("Shard State: %lu %p WAIT_HANDSHAKE complete (%d)", _tick_count, static_cast<const void *>(this), resp_handshakes);
+        PLOG("Shard State: %lu %p WAIT_HANDSHAKE complete (%d)",
+             _tick_count, static_cast<const void *>(this), resp_handshakes);
 
       const auto iob = posted_recv();
       assert(iob);
