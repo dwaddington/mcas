@@ -80,7 +80,7 @@ Trouble shooting RDMA info at [Mellanox Documentation](https://community.mellano
 
 ## QEMU TAP Networking
 
-QEMU's TAP networking allows a VM to be routable from an external host.  For Dawn, this is necessary so as to make the Dawn/MCAS service accessible from other nodes.  Note, this is normally done on the non-RDMA NIC.
+QEMU's TAP networking allows a VM to be routable from an external host.  For MCAS, this is necessary so as to make the service accessible from other nodes.  Note, this is normally done on the non-RDMA NIC.
 
 On the host side, a network bridge must be set up.  On Centos, this is done as following:
 
