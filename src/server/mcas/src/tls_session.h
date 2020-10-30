@@ -84,6 +84,7 @@ protected:
                          Connection_handler * handler)
     : common::log_source(debug_level),
       _connection(handler)
+      , _aead_key{}
   {}
  
   Connection_state process_tls_session();

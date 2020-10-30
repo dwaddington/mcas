@@ -510,7 +510,7 @@ auto ccpm::area_ctl::max_free_element_count(const level_ix_t level) -> index_t
 {
 	return
 		alloc_states_per_word
-		- 
+		-
 		( ct_atomic_words == 1 ? front_pad_count(1, sub_size(level)) : 0 )
 		;
 }
@@ -695,15 +695,14 @@ void ccpm::area_ctl::deallocate_local(
 	PERSIST(ptr_);
 	dt_.clear(__func__);
 	/* Need to move or add this area in the chains, but do not know whether the
-	 * element is currently in a chain. Remove if it is a chain, then add.
+	 * element is currently in a chain. Remove if it is in a chain, then add.
 	 */
 	auto new_run = el_max_free_run();
-	if ( new_run != old_run && this->is_in_list() )
+	if ( new_run != old_run )
 	{
-		this->remove();
-	}
-	if ( ! this->is_in_list() )
-	{
+		/* remove from old list, if in one. */
+		top_->remove_from_chain(this, _level, old_run);
+		/* add to new list */
 		top_->restore_to_chain(this, _level, new_run);
 	}
 }
@@ -837,9 +836,12 @@ void ccpm::area_ctl::allocate(
  * area_top chain */
 auto ccpm::area_ctl::restore_all(
 	area_top *const top_
+	, std::ostream *o_
 	, const level_ix_t current_level_ix_
 ) -> std::size_t
 {
+	top_->print_ctls(o_, std::ios_base::fmtflags{});
+
 	verifier v(this);
 	std::size_t count = 0;
 	/*
@@ -850,7 +852,7 @@ auto ccpm::area_ctl::restore_all(
 	if ( longest_run > 0 )
 	{
 		/* reset linked list element, which is left over from previous chain */
-		force_reset();
+		top_->remove_from_chain(this, current_level_ix_, longest_run);
 		/* place in chain */
 		top_->restore_to_chain(this, current_level_ix_, longest_run);
 		++count;
@@ -868,6 +870,7 @@ auto ccpm::area_ctl::restore_all(
 				count +=
 					area_child(e_ix)->restore_all(
 						top_
+						, o_
 						, level_ix_t(current_level_ix_ - 1U)
 					);
 			}
@@ -940,7 +943,7 @@ void ccpm::area_ctl::print(std::ostream &o_, level_ix_t indent_, std::ios_base::
 
 auto ccpm::area_ctl::restore(const ownership_callback_t &resolver_) -> area_ctl &
 {
-	PLOG(PREFIX "restore %p", LOCATION, static_cast<void *>(this));
+	PLOG(PREFIX "restore", LOCATION);
 	verifier v(this);
 	/* Address of the region transitioning to/from client allocated
 	 * during a crash, if any

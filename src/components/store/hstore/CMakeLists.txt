@@ -12,11 +12,71 @@ add_definitions(-DCONFIG_DEBUG) # P{LOG,DEG,INF,WRN,ERR} control
 add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
 set(SOURCES
+	src/allocator_cc.cpp
+	src/allocator_co.cpp
+	src/alloc_key.cpp
+	src/allocator_rc.cpp
+	src/as_pin.cpp
+	src/atomic_controller.cpp
+	src/bad_alloc_cc.cpp
+	src/bits_to_ints.cpp
+	src/bucket_aligned.cpp
+	src/bucket_control_unlocked.cpp
+	src/cond_print.cpp
+	src/construction_mode.cpp
+	src/content.cpp
+	src/cptr.cpp
+	src/dummy_shared_mutex.cpp
+	src/fixed_string.cpp
+	src/hash_bucket.cpp
+	src/heap_co.cpp
+	src/heap_access.cpp
+	src/histogram_log2.cpp
+	src/hop_hash_debug.cpp
+	src/hstore_alloc_type.cpp
+	src/hstore_config.cpp
+	src/hstore_kv_types.cpp
+	src/hstore_nupm.cpp
+	src/hstore_nupm_types.cpp
+	src/hstore_open_pool.cpp
+	src/is_locked.cpp
+	src/key_not_found.cpp
+	src/logging.cpp
+	src/mod_control.cpp
+	src/monitor_emplace.cpp
+	src/monitor_pin.cpp
+	src/persist_fixed_string.cpp
+	src/persist_map.cpp
+	src/pobj_bad_alloc.cpp
+	src/persist_atomic.cpp
+	src/persist_controller.cpp
+	src/persist_data.cpp
+	src/persistent.cpp
+	src/persister_cc.cpp
+	src/persister_nupm.cpp
+	src/pointer_pobj.cpp
+	src/pool_path.cpp
+	src/pool_pobj.cpp
+	src/pool_manager.cpp
+	src/pstr_equal.cpp
+	src/pstr_hash.cpp
+	src/region.cpp
+	src/rc_alloc_wrapper_lb.cpp
+	src/segment_and_bucket.cpp
+	src/segment_count.cpp
+	src/segment_layout.cpp
+	src/store_root.cpp
+	src/test_flags.cpp
+	src/trace_flags.cpp
+	src/value_unstable.cpp
+
 	src/as_emplace.cpp
 	src/as_extend.cpp
 	src/dax_manager.cpp
 	src/heap_cc.cpp
+	src/heap_cc_ephemeral.cpp
 	src/heap_rc.cpp
+	src/heap_rc_ephemeral.cpp
 	src/hop_hash_log.cpp
 	src/hstore.cpp
 	src/hstore_factory.cpp
@@ -24,6 +84,8 @@ set(SOURCES
 	src/owner.cpp
 	src/perishable.cpp
 	src/perishable_expiry.cpp
+	src/session.cpp
+	src/tracked_header.cpp
 )
 
 #add_custom_target(format-hstore

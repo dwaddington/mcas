@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -18,11 +18,13 @@
 #include "deallocator_cc.h"
 
 #include "bad_alloc_cc.h"
-#include "heap_cc.h"
+#include "heap_access.h"
 #include "persister_cc.h"
 #include "persistent.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
+
+struct heap_cc;
 
 template <typename T, typename Persister>
 	struct allocator_cc;
@@ -52,7 +54,7 @@ template <typename T, typename Persister = persister>
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::pointer_type;
 
-		allocator_cc(const heap_cc &pool_, Persister p_ = Persister()) noexcept
+		allocator_cc(const heap_access<heap_cc> &pool_, Persister p_ = Persister()) noexcept
 			: deallocator_cc<T, Persister>(pool_, (p_))
 		{}
 
@@ -89,6 +91,17 @@ template <typename T, typename Persister = persister>
 			{
 				throw bad_alloc_cc(AK_REF s_, sizeof(T), alignment_);
 			}
+		}
+
+		/* allocate and remember the allocation. heap_access<heap_cc> does this for every allocation */
+		void allocate_tracked(
+			AK_ACTUAL
+			pointer_type & p_
+			, size_type s_
+			, size_type alignment_
+		)
+		{
+			allocate(AK_REF p_, s_, alignment_);
 		}
 	};
 

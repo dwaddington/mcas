@@ -1,5 +1,5 @@
 /*
-   Copyright [2019-2020] [IBM Corporation]
+   Copyright [2019, 2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,6 +15,8 @@
 #define CCPM_LIST_ITEM_H
 
 #include <cassert>
+
+#define MCAS_CCPM_LIST_CHECK 0
 
 namespace ccpm
 {
@@ -38,28 +40,76 @@ namespace ccpm
 			_next = this;
 		}
 
+		std::size_t count_next() const
+		{
+			std::size_t ct = 0;
+			for ( auto i = this; i->_next != this; ++ct, i = i->_next )
+			{
+				assert(ct < 10000);
+			}
+			return ct;
+		}
+		std::size_t count_prev() const
+		{
+			std::size_t ct = 0;
+			for ( auto i = this; i->_prev != this && ct < 10000; ++ct, i = i->_prev )
+			{
+			}
+			assert(ct < 10000);
+			return ct;
+		}
+		std::size_t count() const
+		{
+			auto cn = count_next();
+			auto cp = count_prev();
+			assert(cn == cp);
+			return cn;
+		}
+
 		/* insert i after this item */
 		void insert_after(list_item *i)
 		{
 			assert( ! i->is_in_list() );
+#if MCAS_CCPM_LIST_CHECK
+			this->count();
+#endif
 			const auto n = this->_next;
 			i->_next = n;
 			i->_prev = this;
 			this->_next = i;
 			n->_prev = i;
 			assert( i->is_in_list() );
+			assert(this->count() == i->count());
+		}
+
+		/* true iff list contains i */
+		bool contains(list_item *i) const
+		{
+#if MCAS_CCPM_LIST_CHECK
+			this->count();
+#endif
+			auto e = this;
+			while ( e != i && e->_next != this )
+			{
+				e = e->_next;
+			}
+			return e == i;
 		}
 
 		/* insert this item before i */
 		void insert_before(list_item *i)
 		{
-			assert( ! i->is_in_list() );
+			assert( ! is_in_list() );
+#if MCAS_CCPM_LIST_CHECK
+			i->count();
+#endif
 			const auto p = this->_prev;
 			i->_prev = p;
 			i->_next = this;
 			this->_prev = i;
 			p->_next = i;
 			assert( i->is_in_list() );
+			assert(this->count() == i->count());
 		}
 
 		void remove()
@@ -67,6 +117,7 @@ namespace ccpm
 			assert( is_in_list() );
 			_prev->_next = _next;
 			_next->_prev = _prev;
+			assert(_next->count() == _prev->count());
 			_prev = this;
 			_next = this;
 			assert( ! is_in_list() );
@@ -79,8 +130,8 @@ namespace ccpm
 
 		/* for list head: empty check */
 		bool empty() const { return this == _next; }
-		/* for a list item: "empty" means it is not in a list */
-		bool is_in_list() const { return ! empty(); }
+		/* inefficient function, for assert use only */
+		bool is_in_list() const { return count() != 0; }
 
 		/* returns true if element e is in the list.
 		 * "this" is assumed to be a list anchor;

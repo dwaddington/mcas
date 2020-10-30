@@ -15,6 +15,7 @@
 #ifndef _MCAS_HSTORE_MOD_CONTROL_H
 #define _MCAS_HSTORE_MOD_CONTROL_H
 
+#include "persistent.h" /* persistent_t */
 #include <cstddef> /* size_t */
 
 namespace impl

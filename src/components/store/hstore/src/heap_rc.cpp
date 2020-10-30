@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,12 @@
 */
 
 #include "heap_rc.h"
+
 #include "dax_manager.h"
+#include "heap_rc_ephemeral.h"
 #include "hstore_config.h"
+#include "tracked_header.h"
+#include "valgrind_memcheck.h"
 #include <common/utils.h>
 #include <algorithm> /* max */
 #include <cinttypes>
@@ -22,69 +26,11 @@
 #include <stdexcept> /* range_error */
 #include <string> /* to_string */
 
-constexpr unsigned heap_rc_shared_ephemeral::log_min_alignment;
-constexpr unsigned heap_rc_shared_ephemeral::hist_report_upper_bound;
-
-heap_rc_shared_ephemeral::heap_rc_shared_ephemeral(
-	unsigned debug_level_
-	, const std::string & id_
-	, const std::string & backing_file_
-)
-	: common::log_source(debug_level_)
-	, _heap()
-	, _managed_regions(id_, backing_file_, {})
-	, _allocated(0)
-	, _capacity(0)
-	, _reconstituted()
-	, _hist_alloc()
-	, _hist_inject()
-	, _hist_free()
-{}
-
-void heap_rc_shared_ephemeral::add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, const unsigned numa_node)
-{
-	_heap.add_managed_region(r_heap.iov_base, r_heap.iov_len, int(numa_node));
-	CPLOG(2, "%s : %p.%zx", __func__, r_heap.iov_base, r_heap.iov_len);
-	_managed_regions.address_map.push_back(r_full);
-	_capacity += r_heap.iov_len;
-}
-
-void heap_rc_shared_ephemeral::inject_allocation(void *p_, std::size_t sz_, unsigned numa_node_)
-{
-	_heap.inject_allocation(p_, sz_, int(numa_node_));
-	{
-		auto pc = static_cast<alloc_set_t::element_type>(p_);
-		_reconstituted.add(alloc_set_t::segment_type(pc, pc + sz_));
-	}
-	_allocated += sz_;
-	_hist_alloc.enter(sz_);
-}
-
-void *heap_rc_shared_ephemeral::allocate(std::size_t sz_, unsigned _numa_node_, std::size_t alignment_)
-{
-	auto p = _heap.alloc(sz_, int(_numa_node_), alignment_);
-	_allocated += sz_;
-	_hist_alloc.enter(sz_);
-	return p;
-}
-
-void heap_rc_shared_ephemeral::free(void *p_, std::size_t sz_, unsigned numa_node_)
-{
-	_heap.free(p_, int(numa_node_), sz_);
-	_allocated -= sz_;
-	_hist_free.enter(sz_);
-}
-
-bool heap_rc_shared_ephemeral::is_reconstituted(const void * p_) const
-{
-	return contains(_reconstituted, static_cast<alloc_set_t::element_type>(p_));
-}
-
 /* When used with ADO, this space apparently needs a 2MiB alignment.
  * 4 KiB alignment sometimes produces a disagreement between server and ADO mappings,
  * which manifests as incorrect key and data values as seen on the ADO side.
  */
-heap_rc_shared::heap_rc_shared(
+heap_rc::heap_rc(
 	unsigned debug_level_, ::iovec pool0_full_, ::iovec pool0_heap_, unsigned numa_node_, const std::string & id_, const std::string & backing_file_
 )
 	: _pool0_full(pool0_full_)
@@ -92,16 +38,14 @@ heap_rc_shared::heap_rc_shared(
 	, _numa_node(numa_node_)
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
-	, _eph(std::make_unique<heap_rc_shared_ephemeral>(debug_level_, id_, backing_file_))
+	, _tracked_anchor(debug_level_, &_tracked_anchor, &_tracked_anchor, sizeof(_tracked_anchor), sizeof(_tracked_anchor))
+	, _eph(std::make_unique<heap_rc_ephemeral>(debug_level_, id_, backing_file_))
 {
 	void *last = static_cast<char *>(pool0_heap_.iov_base) + pool0_heap_.iov_len;
 	if ( 0 < debug_level_ )
 	{
 		PLOG("%s: split %p .. %p) into segments", __func__, pool0_heap_.iov_base, last);
-	}
 
-	if ( 0 < debug_level_ )
-	{
 		PLOG("%s: pool0 full %p: 0x%zx", __func__, _pool0_full.iov_base, _pool0_full.iov_len);
 		PLOG("%s: pool0 heap %p: 0x%zx", __func__, _pool0_heap.iov_base, _pool0_heap.iov_len);
 	}
@@ -114,12 +58,13 @@ heap_rc_shared::heap_rc_shared(
 		, " new"
 	);
 	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, false);
+	persister_nupm::persist(this, sizeof(*this));
 }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
-heap_rc_shared::heap_rc_shared(
+heap_rc::heap_rc(
 	unsigned debug_level_
 	, const std::unique_ptr<dax_manager> &dax_manager_
 	, const std::string & id_
@@ -132,7 +77,8 @@ heap_rc_shared::heap_rc_shared(
 	, _numa_node(this->_numa_node)
 	, _more_region_uuids_size(this->_more_region_uuids_size)
 	, _more_region_uuids(this->_more_region_uuids)
-	, _eph(std::make_unique<heap_rc_shared_ephemeral>(debug_level_, id_, backing_file_))
+	, _tracked_anchor(this->_tracked_anchor)
+	, _eph(std::make_unique<heap_rc_ephemeral>(debug_level_, id_, backing_file_))
 {
 	_eph->add_managed_region(_pool0_full, _pool0_heap, _numa_node);
 	hop_hash_log<trace_heap_summary>::write(
@@ -157,15 +103,16 @@ heap_rc_shared::heap_rc_shared(
 		VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
 		VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
 	}
+	_tracked_anchor.recover(debug_level_, _eph.get(), _numa_node);
 }
 #pragma GCC diagnostic pop
 
-heap_rc_shared::~heap_rc_shared()
+heap_rc::~heap_rc()
 {
 	quiesce();
 }
 
-::iovec heap_rc_shared::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
+::iovec heap_rc::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 {
 	auto iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_).address_map;
 	if ( iovs.size() != 1 )
@@ -175,12 +122,12 @@ heap_rc_shared::~heap_rc_shared()
 	return iovs.front();
 }
 
-auto heap_rc_shared::regions() const -> nupm::region_descriptor
+auto heap_rc::regions() const -> nupm::region_descriptor
 {
 	return _eph->get_managed_regions();
 }
 
-void *heap_rc_shared::iov_limit(const ::iovec &r)
+void *heap_rc::iov_limit(const ::iovec &r)
 {
 	return static_cast<char *>(r.iov_base) + r.iov_len;
 }
@@ -202,7 +149,7 @@ namespace
 	}
 }
 
-auto heap_rc_shared::grow(
+auto heap_rc::grow(
 	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
@@ -301,7 +248,7 @@ auto heap_rc_shared::grow(
 	return _eph->capacity();
 }
 
-void heap_rc_shared::quiesce()
+void heap_rc::quiesce()
 {
 	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", _pool0_heap.iov_len, " allocated ", _eph->allocated());
 	_eph->write_hist<trace_heap_summary>(_pool0_heap);
@@ -329,7 +276,7 @@ namespace
 	}
 }
 
-void *heap_rc_shared::alloc(const std::size_t sz_, const std::size_t alignment_)
+void *heap_rc::alloc(const std::size_t sz_, const std::size_t alignment_)
 {
 	auto alignment = std::max(alignment_, sizeof(void *));
 
@@ -384,7 +331,68 @@ void *heap_rc_shared::alloc(const std::size_t sz_, const std::size_t alignment_)
 	}
 }
 
-void heap_rc_shared::inject_allocation(const void * p, std::size_t sz_)
+void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
+{
+	if ( align_ != 0 && (align_ & (align_ - 1U)) != 0 )
+	{
+		throw std::invalid_argument("alignment is not a power of 2");
+	}
+
+	/* alignment: enough for tracked_header prefix, and a power of 2 */
+	auto align = clp2(std::max(align_, sizeof(tracked_header)));
+
+	/* size: a multiple of alignment */
+	auto sz = round_up(sz_ + align, align);
+
+	try {
+		auto p = _eph->allocate(sz, _numa_node, align);
+		/* Note: allocation exception from Rca_LB is General_exception, which does not derive
+		 * from std::bad_alloc.
+		 */
+
+		VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p, sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_full.iov_base, " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
+		tracked_header *h = new (static_cast<char *>(p) + align - sizeof(tracked_header))
+			tracked_header(_eph->debug_level(), &_tracked_anchor, _tracked_anchor._next, sz, align);
+		persister_nupm::persist(h, sizeof *h);
+
+		_tracked_anchor._next->_prev = h; /* _prev, need not flush */
+		_tracked_anchor._next = h; /* _next, must flush */
+		persister_nupm::persist(&_tracked_anchor._next, sizeof _tracked_anchor._next);
+
+#if 0
+		PLOG(
+			"%s: TH %p prev %p next %p size %zu align %zu"
+			, __func__
+			, static_cast<const void *>(h)
+			, static_cast<const void *>(h->_prev)
+			, static_cast<const void *>(h->_next)
+			, h->_size
+			, h->_align
+		);
+#endif
+		return h + 1;
+	}
+	catch ( const std::bad_alloc & )
+	{
+		_eph->write_hist<true>(_pool0_heap);
+		/* Sometimes lack of space will cause heap to throw a bad_alloc. */
+		throw;
+	}
+	catch ( const General_exception &e )
+	{
+		_eph->write_hist<true>(_pool0_heap);
+		/* Sometimes lack of space will cause heap to throw a General_exception with this explanation. */
+		/* Convert to bad_alloc. */
+		if ( e.cause() == std::string("region allocation out-of-space") )
+		{
+			throw std::bad_alloc();
+		}
+		throw;
+	}
+}
+
+void heap_rc::inject_allocation(const void * p, std::size_t sz_)
 {
 	auto alignment = sizeof(void *);
 	sz_ = std::max(sz_, alignment);
@@ -395,7 +403,7 @@ void heap_rc_shared::inject_allocation(const void * p, std::size_t sz_)
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p, " size ", sz);
 }
 
-void heap_rc_shared::free(void *p_, std::size_t sz_, std::size_t alignment_)
+void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
 {
 	alignment_ = std::max(alignment_, sizeof(void *));
 	sz_ = std::max(sz_, alignment_);
@@ -405,7 +413,42 @@ void heap_rc_shared::free(void *p_, std::size_t sz_, std::size_t alignment_)
 	return _eph->free(p_, sz, _numa_node);
 }
 
-bool heap_rc_shared::is_reconstituted(const void * p_) const
+void heap_rc::free_tracked(void *p_, std::size_t sz_, std::size_t alignment_)
+{
+	auto align = std::max(alignment_, sizeof(void *));
+	sz_ = std::max(sz_, align);
+	auto sz = sz_ + sizeof(tracked_header);
+	sz = (sz_ + align - 1U)/align * align;
+	tracked_header *h = static_cast<tracked_header *>(p_)-1;
+	if ( 3 < _eph->debug_level() )
+	{
+		PLOG(
+			"%s: TH %p prev %p next %p size %zu align %zu"
+			, __func__
+			, static_cast<const void *>(h)
+			, static_cast<const void *>(h->_prev)
+			, static_cast<const void *>(h->_next)
+			, h->_size
+			, h->_align
+		);
+	}
+	h->_next->_prev = h->_prev; /* _prev, need not flush */
+	h->_prev->_next = h->_next; /* _next, must flush */
+	persister_nupm::persist(&h->_prev->_next, sizeof h->_prev->_next);
+
+	auto p = static_cast<char *>(p_) - h->_align;
+	assert(sz = h->_size);
+	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p);
+	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p, " size ", sz);
+	return _eph->free(p, sz, _numa_node);
+}
+
+unsigned heap_rc::percent_used() const
+{
+    return _eph->capacity() == 0 ? 0xFFFFU : unsigned(_eph->allocated() * 100U / _eph->capacity());
+}
+
+bool heap_rc::is_reconstituted(const void * p_) const
 {
 	return _eph->is_reconstituted(p_);
 }

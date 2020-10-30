@@ -71,6 +71,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
  public:
   using arena_id_t = unsigned;
   using string_view = std::experimental::string_view;
+  static const bool have_odp;
   static const int effective_map_locked;
 
   struct config_t {

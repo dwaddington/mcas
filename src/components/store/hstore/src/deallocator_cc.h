@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,6 +15,7 @@
 #ifndef MCAS_HSTORE_DEALLOCATOR_CC_H
 #define MCAS_HSTORE_DEALLOCATOR_CC_H
 
+#include "heap_access.h"
 #include "heap_cc.h"
 #include "persistent.h"
 #include "persister_cc.h"
@@ -42,7 +43,7 @@ template <typename T, typename Persister = persister>
 		: public Persister
 	{
 	private:
-		heap_cc _pool;
+		heap_access<heap_cc> _pool;
 	public:
 		using value_type = T;
 		using persister_type = Persister;
@@ -51,7 +52,7 @@ template <typename T, typename Persister = persister>
 		using propagate_on_container_move_assignment = std::true_type;
 		using is_always_equal = std::false_type;
 
-		explicit deallocator_cc(const heap_cc &pool_, Persister p_ = Persister()) noexcept
+		explicit deallocator_cc(const heap_access<heap_cc> &pool_, Persister p_ = Persister()) noexcept
 			: Persister(p_)
 			, _pool(pool_)
 		{}
@@ -91,6 +92,15 @@ template <typename T, typename Persister = persister>
 			 * _pool->free(static_pointer_cast<void *>(&p), sizeof(T) * sz_);
 			 */
 			_pool->free(reinterpret_cast<persistent_t<void *> *>(&p_), sizeof(T) * sz_);
+		}
+
+		/* Deallocate a "tracked" allocation */
+		void deallocate_tracked(
+			pointer_type & p_
+			, size_type sz_
+		)
+		{
+			deallocate(p_, sz_);
 		}
 
 		void persist(const void *ptr, size_type len, const char * = nullptr) const
