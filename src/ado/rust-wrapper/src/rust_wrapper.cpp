@@ -35,13 +35,21 @@ extern "C"
                        const uint8_t * request,
                        const size_t request_len);
 
-  Value callback_allocate_memory(void * callback_ptr, size_t size) {
+  Value callback_allocate_pool_memory(void * callback_ptr, size_t size) {
+    assert(callback_ptr);
     auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
     void *ptr = nullptr;
     auto result = p_this->cb_allocate_pool_memory(size, 4096, ptr);
-    if(result != S_OK) throw General_exception("eek");
+    if(result != S_OK) throw General_exception("allocate_pool_memory_failed");
     return {ptr, size};
   }
+
+  status_t callback_free_pool_memory(void * callback_ptr, Value value) {
+    assert(callback_ptr);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    return p_this->cb_free_pool_memory(value.size, value.data);
+  }
+  
 }
 
 

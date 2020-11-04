@@ -10,6 +10,7 @@ use crate::c_void;
 
 /* callback services */
 use crate::allocate_pool_memory;
+use crate::free_pool_memory;
 
 pub fn do_work(_callback_ptr: *const c_void,
                _work_id: u64,
@@ -26,6 +27,9 @@ pub fn do_work(_callback_ptr: *const c_void,
 
     let newmem = allocate_pool_memory(_callback_ptr, 128);
     println!("[RUST]: newly allocated mem {:?},{:?}", newmem.data, newmem.size);
+
+    free_pool_memory(_callback_ptr, newmem);
+    println!("[RUST]: freed memory");
     return 0;
 }
 

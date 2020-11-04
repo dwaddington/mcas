@@ -31,10 +31,14 @@ impl Value {
     }
 }
 
+/* callback functions provided by C++-side */
 extern {
-    fn callback_allocate_memory(_callback_ptr : *const c_void,
-                                _size: size_t) -> Value;
-    
+    fn callback_allocate_pool_memory(_callback_ptr : *const c_void,
+                                     _size: size_t) -> Value;
+
+    fn callback_free_pool_memory(_callback_ptr : *const c_void,
+                                 _value : Value) -> Status;
+
     fn callback_create_key(_work_id : u64,
                            _key : *const c_char,
                            _value_size : size_t,
@@ -58,9 +62,13 @@ fn ado_create_key(_work_id : u64,
 fn allocate_pool_memory(_callback_ptr : *const c_void,
                         _size: size_t) -> Value
 {
-    let v;
-    unsafe { v = callback_allocate_memory(_callback_ptr, _size) };
-    return v;
+    return unsafe { callback_allocate_pool_memory(_callback_ptr, _size) };
+}
+
+fn free_pool_memory(_callback_ptr : *const c_void,
+                    _value : Value) -> Status
+{
+    return unsafe { callback_free_pool_memory(_callback_ptr, _value) };
 }
 
 
