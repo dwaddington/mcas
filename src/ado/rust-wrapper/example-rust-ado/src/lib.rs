@@ -4,7 +4,7 @@
 extern crate alloc;
 extern crate libc;
 
-use libc::{c_int, c_char, size_t};
+use libc::{c_int, c_char, c_void, size_t};
 use std::ffi::CString;
 use std::ffi::CStr;
 use std::ptr;
@@ -30,8 +30,10 @@ impl Value {
 }
 
 extern {
-    fn callback_allocate_memory(_size: size_t) -> Status;
-    fn callback_create_key(_work_id : i64,
+    fn callback_allocate_memory(_callback_ptr : *const c_void,
+                                _size: size_t) -> Value;
+    
+    fn callback_create_key(_work_id : u64,
                            _key : *const c_char,
                            _value_size : size_t,
                            _out_value: &mut Value) -> Status;
@@ -39,7 +41,7 @@ extern {
 
 
 /* ADO call back functions available to RUST side */
-fn ado_create_key(_work_id : i64,
+fn ado_create_key(_work_id : u64,
                   _key : String,
                   _value_size : size_t) -> Status
 {
@@ -50,16 +52,19 @@ fn ado_create_key(_work_id : i64,
                                         _value_size,
                                         &mut out_value) };
 }
-    
-fn ado_allocate_memory(_size: size_t) -> Status
+
+fn allocate_pool_memory(_callback_ptr : *const c_void,
+                        _size: size_t) -> Value
 {
-    unsafe { callback_allocate_memory(9) };
-    return 0;
+    let v;
+    unsafe { v = callback_allocate_memory(_callback_ptr, _size) };
+    return v;
 }
 
 
 #[no_mangle]
-pub extern fn ffi_do_work(_work_id: i64,
+pub extern fn ffi_do_work(_callback_ptr : *const c_void,
+                          _work_id: u64,
                           _key : *const c_char,
                           _attached_value : &Value,
                           _detached_value : &Value,
@@ -70,7 +75,8 @@ pub extern fn ffi_do_work(_work_id: i64,
     let rstr = unsafe { CStr::from_ptr(_key).to_str().unwrap() };
     let slice = unsafe { std::slice::from_raw_parts_mut(_work_request, _work_request_len) };
     
-    return ado_plugin::do_work(_work_id,
+    return ado_plugin::do_work(_callback_ptr,
+                               _work_id,
                                rstr.to_string(),
                                _attached_value,
                                _detached_value,
@@ -80,8 +86,8 @@ pub extern fn ffi_do_work(_work_id: i64,
 
 
 #[no_mangle]
-pub extern fn ffi_register_mapped_memory(_shard_base: i64,
-                                         _local_base: i64,
+pub extern fn ffi_register_mapped_memory(_shard_base: u64,
+                                         _local_base: u64,
                                          _size: size_t) -> Status
 {
     return ado_plugin::register_mapped_memory(_shard_base, _local_base, _size);
@@ -95,8 +101,12 @@ mod ado_plugin {
     use crate::Status;
     use crate::Value;
     use crate::size_t;
-    
-    pub fn do_work(_work_id: i64,
+    use crate::c_void;
+
+    use crate::allocate_pool_memory;
+
+    pub fn do_work(_callback_ptr: *const c_void,
+                   _work_id: u64,
                    _key: String,
                    _attached_value : &Value,
                    _detached_value : &Value,
@@ -107,10 +117,13 @@ mod ado_plugin {
                  _work_id, _key, _attached_value.data, _new_root);
         println!("[RUST]: request={:?}", _work_request);
         println!("[RUST]: request={:?}", std::str::from_utf8(_work_request).unwrap());
+
+        let newmem = allocate_pool_memory(_callback_ptr, 128);
+        println!("[RUST]: newly allocated mem {:?},{:?}", newmem.data, newmem.size);
         return 0;
     }
 
-    pub fn register_mapped_memory(_shard_base: i64, _local_base: i64, _size: size_t) -> Status
+    pub fn register_mapped_memory(_shard_base: u64, _local_base: u64, _size: size_t) -> Status
     {
         println!("[RUST]: register_mapped_memory (shard@{:#X} local@{:#X} size={})", _shard_base, _local_base, _size);
         return 0;

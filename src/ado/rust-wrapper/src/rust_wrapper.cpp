@@ -27,15 +27,33 @@ extern "C"
   };
   
   status_t ffi_register_mapped_memory(uint64_t shard_vaddr, uint64_t local_vaddr, size_t len);
-  status_t ffi_do_work(uint64_t work_id,
+  status_t ffi_do_work(void* callback_ptr,
+                       uint64_t work_id,
                        const char * key,
                        const Value * attached_value,
                        const Value * detached_value,
                        const uint8_t * request,
                        const size_t request_len);
+
+  Value callback_allocate_memory(void * callback_ptr, size_t size) {
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    void *ptr = nullptr;
+    auto result = p_this->cb_allocate_pool_memory(size, 4096, ptr);
+    if(result != S_OK) throw General_exception("eek");
+    return {ptr, size};
+  }
 }
 
-status_t ADO_go_wrapper_plugin::register_mapped_memory(void *shard_vaddr,
+
+// extern "C"
+// {
+//   status_t allocate_pool_memory(const size_t size, const size_t alignment_hint, void*& out_new_addr)
+//   {
+//     return _cb.allocate_pool_memory(size, alignment_hint, out_new_addr);
+//   }
+
+
+status_t ADO_rust_wrapper_plugin::register_mapped_memory(void *shard_vaddr,
                                                        void *local_vaddr,
                                                        size_t len) {
 
@@ -44,14 +62,14 @@ status_t ADO_go_wrapper_plugin::register_mapped_memory(void *shard_vaddr,
                                     len);
 }
 
-status_t ADO_go_wrapper_plugin::do_work(uint64_t work_key,
-                                        const char * key,
-                                        size_t key_len,
-                                        IADO_plugin::value_space_t& values,
-                                        const void *in_work_request, /* don't use iovec because of non-const */
-                                        const size_t in_work_request_len,
-                                        bool new_root,
-                                        response_buffer_vector_t& response_buffers) {
+status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
+                                          const char * key,
+                                          size_t key_len,
+                                          IADO_plugin::value_space_t& values,
+                                          const void *in_work_request, /* don't use iovec because of non-const */
+                                          const size_t in_work_request_len,
+                                          bool new_root,
+                                          response_buffer_vector_t& response_buffers) {
 
   
   (void)key_len; // unused
@@ -66,17 +84,19 @@ status_t ADO_go_wrapper_plugin::do_work(uint64_t work_key,
 
   if(values.size() > 1) {
     Value detached_value{values[1].ptr, values[1].len};
-    return ffi_do_work(work_key, key, &attached_value, &detached_value,
+    return ffi_do_work(reinterpret_cast<void*>(this),
+                       work_key, key, &attached_value, &detached_value,
                        reinterpret_cast<const uint8_t*>(in_work_request), in_work_request_len);    
   }
   else {
     Value detached_value{nullptr, 0};
-    return ffi_do_work(work_key, key, &attached_value, &detached_value,
+    return ffi_do_work(reinterpret_cast<void*>(this),
+                       work_key, key, &attached_value, &detached_value,
                        reinterpret_cast<const uint8_t*>(in_work_request), in_work_request_len);
   }
 }
 
-status_t ADO_go_wrapper_plugin::shutdown() {
+status_t ADO_rust_wrapper_plugin::shutdown() {
   /* here you would put graceful shutdown code if any */
   return S_OK;
 }
@@ -86,9 +106,9 @@ status_t ADO_go_wrapper_plugin::shutdown() {
  *
  */
 extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
-  PLOG("instantiating ADO_go_wrapper_plugin");
+  PLOG("instantiating ADO_rust_wrapper_plugin");
   if (interface_iid == interface::ado_plugin)
-    return static_cast<void *>(new ADO_go_wrapper_plugin());
+    return static_cast<void *>(new ADO_rust_wrapper_plugin());
   else
     return NULL;
 }

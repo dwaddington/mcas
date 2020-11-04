@@ -19,13 +19,13 @@
  *
  */
 
-#ifndef __GO_ADO_WRAPPER_COMPONENT_H__
-#define __GO_ADO_WRAPPER_COMPONENT_H__
+#ifndef __RUST_ADO_WRAPPER_COMPONENT_H__
+#define __RUST_ADO_WRAPPER_COMPONENT_H__
 
 #include <api/ado_itf.h>
 
 
-class ADO_go_wrapper_plugin : public component::IADO_plugin
+class ADO_rust_wrapper_plugin : public component::IADO_plugin
 {
 private:
   static constexpr bool option_DEBUG = true;
@@ -37,13 +37,13 @@ public:
    * @param block_device Block device interface
    *
    */
-  ADO_go_wrapper_plugin() {}
+  ADO_rust_wrapper_plugin() {}
 
   /**
    * Destructor
    *
    */
-  virtual ~ADO_go_wrapper_plugin() {}
+  virtual ~ADO_rust_wrapper_plugin() {}
 
   /**
    * Component/interface management
