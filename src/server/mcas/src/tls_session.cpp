@@ -10,7 +10,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
-
+#include <city.h>
 #include "tls_session.h"
 #include "connection_state.h"
 #include "connection_handler.h"
@@ -70,7 +70,7 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection,
     return buffer_size;
   }
 
-  if(debug_level() > 2)
+  if(debug_level() > 4)
     PLOG("TLS posting receive:");
   
   p_connection->post_recv_buffer(p_connection->allocate_recv());
@@ -186,6 +186,66 @@ Connection_state Connection_TLS_session::process_tls_session()
     }
 
     print_info(_session);
+
+    /* extra client identifier - see https://www.gnutls.org/manual/gnutls.html#X509-certificate-API */
+    {
+      unsigned              list_size = 0;
+      const gnutls_datum_t* der_data  = gnutls_certificate_get_peers(_session, &list_size);
+      assert(der_data);
+
+      gnutls_x509_crt_t cert;
+      gnutls_x509_crt_init(&cert);
+      /* first in list is the peer's certificate, we need to convert from raw DER  */
+      if (gnutls_x509_crt_import(cert, der_data, GNUTLS_X509_FMT_DER) != GNUTLS_E_SUCCESS)
+        throw General_exception("Client: gnutls_x509_crt_import() failed");
+
+      char   dn[128];
+      size_t dn_len = sizeof(dn);
+      if (gnutls_x509_crt_get_dn(cert, dn, &dn_len) != GNUTLS_E_SUCCESS)
+        throw General_exception("gnutls_x509_crt_get_dn() failed");
+      
+      CPLOG(1, "Client Cert DN:%s", dn);
+
+      /* for now, do a 64-bit hash on DN as the identifier. Something
+         more secure means we may have to increase auth_id field
+       */
+      _x509_auth_id = CityHash64(dn, dn_len);
+      CPLOG(1, "Client ID: %lX", _x509_auth_id);
+      
+      /* for reference, other possible extractions */
+
+      /* email extraction */
+      // std::string dn_str(dn, dn_len);
+      // std::smatch m;
+      // std::regex expr("EMAIL=([^,]+)");
+
+      // if(std::regex_search(dn_str, m, expr) &&
+      //    gnutls_x509_crt_check_email(cert, m[1].str().c_str(), 0)) {
+      //   CPLOG(1, "email extracted as authentication ID (%s)", m[1].str().c_str());
+
+      //     _client_auth_id = m[1].str();
+      // }
+      // else {
+      //   PWRN("unable to extract EMAIL from certificate");
+      //   _client_auth_id = "invalid";
+      // }
+
+      /* fingerprint extraction */
+      // char fingerprint[256];
+      // size_t fingerprint_len = sizeof(fingerprint);
+      // if(gnutls_x509_crt_get_fingerprint(cert,
+      //                                    GNUTLS_DIG_SHA256,
+      //                                    fingerprint, &fingerprint_len) != GNUTLS_E_SUCCESS)
+      //   throw General_exception("gnutls_x509_crt_get_fingerprint() failed");
+      // PINF("Fingerpint: %lu bytes long (%s)", fingerprint_len, fingerprint);
+
+      // /* serial number extraction */
+      // if(gnutls_x509_crt_get_serial(cert, serial, &serial_len) != GNUTLS_E_SUCCESS)
+      //   throw General_exception("gnutls_x509_crt_get_serial() failed");
+      // assert(serial_len < 40);
+      // serial[serial_len] = '\0';
+    }
+    
     /* send success result */
     auto result = 0;
     gnutls_record_send(_session, &result, sizeof(result));

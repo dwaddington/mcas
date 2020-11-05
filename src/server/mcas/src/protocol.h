@@ -775,8 +775,7 @@ struct Message_handshake : public Message {
       : Message(auth_id, (sizeof *this), id, OP_INVALID),
         seq(sequence),
         protocol(PROTOCOL_V1),
-        security_tls(0),
-        security_hmac(0)
+        security_tls_auth(0)
   {
   }
 
@@ -785,12 +784,12 @@ struct Message_handshake : public Message {
   // fields
   uint64_t seq;
   uint8_t  protocol;
-  bool security_tls  : 1;
-  bool security_hmac : 1;
+  bool security_tls_auth  : 1;
+  /* add more fields for HMAC, encryption etc. */
 
   inline void set_as_protocol() { protocol = PROTOCOL_V2; }
-  inline void set_auth_tls_hmac() { security_tls = true; security_hmac = true; }
-  inline bool is_auth_tls_hmac() const { return security_tls && security_hmac; }
+  inline void set_tls_auth() {  security_tls_auth = true; }
+  inline bool is_tls_auth() const { return security_tls_auth; }
 
 } __attribute__((packed));
 

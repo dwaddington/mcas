@@ -170,7 +170,14 @@ int Connection_handler::tick()
   }
 
   case Connection_state::WAIT_TLS_HANDSHAKE: {
-    set_state(process_tls_session());
+    auto next = process_tls_session();
+
+    if(next == Connection_state::WAIT_NEW_MSG_RECV) {
+      /* authentication ID becomes that from TLS session */
+      set_auth_id(tls_auth_id());
+    }
+    
+    set_state(next);
     break;
   }
 
@@ -180,7 +187,8 @@ int Connection_handler::tick()
       resp_handshakes ++;
 
       if (option_DEBUG > 2)
-        PLOG("Shard State: %lu %p WAIT_HANDSHAKE complete (%d)", _tick_count, static_cast<const void *>(this), resp_handshakes);
+        PLOG("Shard State: %lu %p WAIT_HANDSHAKE complete (%d)",
+             _tick_count, static_cast<const void *>(this), resp_handshakes);
 
       const auto iob = posted_recv();
       assert(iob);
@@ -192,18 +200,21 @@ int Connection_handler::tick()
 
       set_auth_id(msg->auth_id());
       
-      /* if security_tls bit is set, then we need to establish a GNU TLS side-channel
-         as part of this session. this is triggered by sending the TLS port for the
-         client to accept on.
+      /* if security_tls_auth bit is set, then we need to establish a
+         GNU TLS side-channel as part of this session. this is
+         triggered by sending the TLS port for the client to accept
+         on.
       */
-      if(msg->security_tls) {
-        set_security_options(true, msg->security_hmac);
+      if(msg->is_tls_auth()) {
+        PNOTICE("TLS is ON (auth)");
+        set_security_options(true, false /* hmac */);
         respond_to_handshake(true);
         set_state(Connection_state::WAIT_TLS_HANDSHAKE);
         return TICK_RESPONSE_WAIT_SECURITY;
       }
       else {
         respond_to_handshake(false);
+        PNOTICE("TLS is OFF");
       }
 
       free_buffer(iob);
@@ -220,7 +231,9 @@ void Connection_handler::configure_security(const std::string& bind_ipaddr,
                                             const std::string& cert_file,
                                             const std::string& key_file)
 {
-  PNOTICE("Config security (addr:%s, port:%u)", bind_ipaddr.c_str(), bind_port);
+  if(Connection_base::debug_level() > 1)
+    PLOG("config security (addr:%s, port:%u)", bind_ipaddr.c_str(), bind_port);
+  
   if(bind_ipaddr.empty() == false) {
     set_security_binding(bind_ipaddr, bind_port);
     set_security_params(cert_file, key_file);

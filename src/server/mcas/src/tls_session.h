@@ -107,8 +107,8 @@ protected:
     _security_options.cert_file = cert_file;
     _security_options.key_file = key_file;
   }
-    
 
+  inline uint64_t tls_auth_id() const { return _x509_auth_id; }
 
 private:
   void initialize_cipher(gnutls_cipher_algorithm_t cipher, const std::string& key_str)
@@ -133,10 +133,8 @@ private:
   gnutls_aead_cipher_hd_t          _cipher_handle;
   gnutls_certificate_credentials_t _x509_cred;
   gnutls_priority_t                _priority;
+  uint64_t                         _x509_auth_id = 0; /* extracted client identifier */
   
-  // Buffer_manager<component::IFabric_server>::buffer_internal *
-  // _posted_handshake_recv_buffer;
-
 };
 
 
