@@ -39,6 +39,11 @@
 
 static constexpr const unsigned TLS_DEBUG_LEVEL = 3;
 
+/* environment variables */
+static constexpr const char* ENVIRONMENT_VARIABLE_CERT = "CERT";
+static constexpr const char* ENVIRONMENT_VARIABLE_KEY = "KEY";
+static constexpr const char* ENVIRONMENT_VARIABLE_SC = "SHORT_CIRCUIT_BACKEND";
+
 /* static constructor called once */
 static void print_logs(int level, const char* msg) { printf("GnuTLS [%d]: %s", level, msg); }
 
@@ -879,10 +884,13 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
       _max_inject_size(connection->max_inject_size()),
       _options()
 {
-  char *env = ::getenv("SHORT_CIRCUIT_BACKEND");
+  char *env = ::getenv(ENVIRONMENT_VARIABLE_SC);
   if (env && env[0] == '1') {
     _options.short_circuit_backend = true;    
   }
+
+  if(::getenv(ENVIRONMENT_VARIABLE_KEY) && ::getenv(ENVIRONMENT_VARIABLE_CERT))
+    _options.tls = true;
 
   if(!other.empty()) {
     try {
@@ -893,9 +901,11 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
       /* set security options */
       if(security != doc.MemberEnd() && doc["security"].IsString()) {
         std::string option(doc["security"].GetString());
-        if(option == "tls:hmac") {
+
+        PNOTICE("!!!!! option=%s", option.c_str());
+        /* tls:auth indicates TLS authentication */
+        if(option == "tls:auth") {
           _options.tls = true;
-          _options.hmac = true;
         }
       }
     }
@@ -2413,9 +2423,8 @@ int Connection_handler::tick()
       msg->set_status(S_OK);
 
       /* set security options */
-      msg->security_tls = _options.tls;
-      msg->security_hmac = _options.hmac;
-      
+      msg->security_tls_auth = _options.tls;
+      PNOTICE("TLS is %s", _options.tls ? "ON" : "OFF");
       iob->set_length(msg->msg_len());
       post_send(iob->iov, iob->iov + 1, iob->desc, &*iob, msg, __func__);
 
@@ -2572,8 +2581,8 @@ void Connection_handler::start_tls()
   if (gnutls_certificate_allocate_credentials(&_xcred) != GNUTLS_E_SUCCESS)
     throw General_exception("gnutls_certificate_allocate_credentials() failed");
 
-  std::string cert_file(::getenv("CERT"));
-  std::string key_file(::getenv("KEY"));
+  std::string cert_file(::getenv(ENVIRONMENT_VARIABLE_CERT));
+  std::string key_file(::getenv(ENVIRONMENT_VARIABLE_KEY));
   
   PLOG("start_tls: cert=%s key=%s", cert_file.c_str(), key_file.c_str());
   
