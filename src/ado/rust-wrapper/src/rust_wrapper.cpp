@@ -16,14 +16,21 @@
 #include <api/interfaces.h>
 #include <common/logging.h>
 #include <string>
-
-
+#include <ado_proto.h>
 
 extern "C"
 {
+  /* these map to versions in lib.rs */
   struct Value {
     void * data;
     size_t size;    
+  };
+
+  struct Response {
+    void * buffer;
+    size_t buffer_size;
+    size_t used_size;
+    uint32_t layer_id;
   };
   
   status_t ffi_register_mapped_memory(uint64_t shard_vaddr, uint64_t local_vaddr, size_t len);
@@ -33,7 +40,9 @@ extern "C"
                        const Value * attached_value,
                        const Value * detached_value,
                        const uint8_t * request,
-                       const size_t request_len);
+                       const size_t request_len,
+                       const bool new_root,                       
+                       Response * response);
 
   Value callback_allocate_pool_memory(void * callback_ptr, size_t size) {
     assert(callback_ptr);
@@ -84,24 +93,46 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
   (void)values; // unused
   (void)in_work_request; // unused
   (void)in_work_request_len; // unused
-  (void)new_root; // unused
   (void)response_buffers; // unused
 
+  /* ADO_protocol_builder::MAX_MESSAGE_SIZE governs size of messages */
+
+  /* allocate memory for the response */
+  size_t response_buffer_size = ADO_protocol_builder::MAX_MESSAGE_SIZE;
+  void * response_buffer = ::malloc(response_buffer_size);
+  Response response{response_buffer, response_buffer_size, 0, 0};
+
+  memset(response_buffer, 0, response_buffer_size);
+  memset(response_buffer, 'a', 10);
+  response.used_size = 10;
+  
   assert(values.size() > 0);
   Value attached_value{values[0].ptr, values[0].len};
 
+  status_t rc;
   if(values.size() > 1) {
     Value detached_value{values[1].ptr, values[1].len};
-    return ffi_do_work(reinterpret_cast<void*>(this),
-                       work_key, key, &attached_value, &detached_value,
-                       reinterpret_cast<const uint8_t*>(in_work_request), in_work_request_len);    
+    rc = ffi_do_work(reinterpret_cast<void*>(this),
+                     work_key, key, &attached_value, &detached_value,
+                     reinterpret_cast<const uint8_t*>(in_work_request),
+                     in_work_request_len,
+                     new_root,
+                     &response);    
   }
   else {
     Value detached_value{nullptr, 0};
-    return ffi_do_work(reinterpret_cast<void*>(this),
-                       work_key, key, &attached_value, &detached_value,
-                       reinterpret_cast<const uint8_t*>(in_work_request), in_work_request_len);
+    rc = ffi_do_work(reinterpret_cast<void*>(this),
+                     work_key, key, &attached_value, &detached_value,
+                     reinterpret_cast<const uint8_t*>(in_work_request),
+                     in_work_request_len,
+                     new_root,
+                     &response);
   }
+
+  /* transpose response */
+  PNOTICE("response=(%s)", reinterpret_cast<char*>( response.buffer));
+  
+  return rc;
 }
 
 status_t ADO_rust_wrapper_plugin::shutdown() {
