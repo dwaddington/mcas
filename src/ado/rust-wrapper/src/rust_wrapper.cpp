@@ -15,6 +15,7 @@
 #include <libpmem.h>
 #include <api/interfaces.h>
 #include <common/logging.h>
+#include <common/dump_utils.h>
 #include <string>
 #include <ado_proto.h>
 
@@ -22,8 +23,8 @@ extern "C"
 {
   /* these map to versions in lib.rs */
   struct Value {
-    void * data;
-    size_t size;    
+    void * buffer;
+    size_t buffer_size;    
   };
 
   struct Response {
@@ -56,7 +57,15 @@ extern "C"
   status_t callback_free_pool_memory(void * callback_ptr, Value value) {
     assert(callback_ptr);
     auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
-    return p_this->cb_free_pool_memory(value.size, value.data);
+    return p_this->cb_free_pool_memory(value.buffer_size, value.buffer);
+  }
+
+  void set_response(const char * response_str)
+  {
+  }
+
+  void debug_break() {
+    asm("int3");
   }
   
 }
@@ -99,7 +108,8 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
 
   /* allocate memory for the response */
   size_t response_buffer_size = ADO_protocol_builder::MAX_MESSAGE_SIZE;
-  void * response_buffer = ::malloc(response_buffer_size);
+  void * response_buffer = ::aligned_alloc(0xFFFFF, response_buffer_size);
+  PNOTICE("response_buffer @%p", response_buffer);
   Response response{response_buffer, response_buffer_size, 0, 0};
 
   memset(response_buffer, 0, response_buffer_size);
@@ -130,6 +140,9 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
   }
 
   /* transpose response */
+  //  PNOTICE("value -->");
+  //  hexdump(values[0].ptr, 10);
+  PNOTICE("value=(%s)", reinterpret_cast<char*>(values[0].ptr));
   PNOTICE("response=(%s)", reinterpret_cast<char*>( response.buffer));
   
   return rc;

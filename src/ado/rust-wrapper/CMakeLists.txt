@@ -12,7 +12,7 @@ add_definitions(-DCONFIG_DEBUG)
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/debug/libexample_rust_ado.a
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/example-rust-ado/src/lib.rs
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/example-rust-ado/src/lib.rs ${CMAKE_CURRENT_SOURCE_DIR}/example-rust-ado/src/ado_plugin.rs
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/example-rust-ado && ${CARGO} build --target-dir ${CMAKE_CURRENT_BINARY_DIR}
 )
 
