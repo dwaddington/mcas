@@ -38,8 +38,7 @@ pub fn do_work(_callback_ptr: *const c_void,
 {
     println!("[RUST]: do_work (workid={:#X}, key={}, attached-value={:?}) new-root={:?}",
              _work_id, _key, _attached_value.buffer, _new_root);
-//    println!("[RUST]: request={:?}", _work_request);
-//    println!("[RUST]: request={:?}", std::str::from_utf8(_work_request).unwrap());
+    println!("[RUST]: request={:#?}", _work_request.as_string());
 
 
     /* write something into value memory */
@@ -68,7 +67,7 @@ pub fn do_work(_callback_ptr: *const c_void,
         write!(z, "RESPONSE-{:#?}", since_the_epoch).expect("writeln failed");
 
         _response
-            .copy_to(_work_request.buffer, _work_request.buffer_size)
+            .copy_string_to(z)
             .expect("copy into response failed");
     }
     

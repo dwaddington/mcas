@@ -14,6 +14,7 @@ use std::ptr;
 use std::str;
 use std::slice;
 use core::ptr::null_mut;
+use std::borrow::Cow;
 
 type Status = c_int;
 type ConstString = *const *const std::os::raw::c_char;
@@ -46,6 +47,14 @@ impl Value {
         self.copy_to(ptr, len)?;
         Ok(0)
     }
+
+    pub fn as_string(&self) -> CString {
+        let v : &[u8] = unsafe { slice::from_raw_parts(self.buffer, self.buffer_size) };
+        let cstr : CString = std::ffi::CString::new(v).expect("CString::new failed");
+        return cstr;
+    }
+
+
 }
 
 type Request = Value;
@@ -72,14 +81,6 @@ impl Response {
         let (ptr, len, _) = _str.into_raw_parts();
         self.copy_to(ptr, len)?;
         Ok(0)
-    }
-
-    pub fn as_string(&self) -> String {
-//        let x = unsafe { CString::from_raw(self.buffer) };
-//        let str_slice: &str = x.to_str().unwrap();
-//        let str_buf: String = str_slice.to_owned();  // if necessary
-        //        return str_buf;
-        return String::new();
     }
 
     pub fn set_by_string(&mut self, _strvalue : &str) {
@@ -148,7 +149,6 @@ pub extern fn ffi_do_work(_callback_ptr : *const c_void,
 {
     let rstr = unsafe { CStr::from_ptr(_key).to_str().unwrap() };
 
-    //    let response_slice = unsafe { std::slice::from_raw_parts_mut(_response.buffer, _response.size) };
     let req = Request { buffer : _work_request,
                         buffer_size : _work_request_len};
 
