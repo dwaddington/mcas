@@ -20,34 +20,31 @@ type Status = c_int;
 
 #[repr(C)]
 pub struct Value {
-    pub buffer: *mut u8,
-    pub buffer_size: size_t,
+    pub _buffer: *mut u8,
+    pub _buffer_size: size_t,
 }
 
 impl Value {
     pub fn new() -> Value {
         Value {
-            buffer_size: 0,
-            buffer: null_mut()
+            _buffer_size: 0,
+            _buffer: null_mut()
         }
     }
-
     pub fn copy_to(&self, _src : *const u8, _len : usize) -> Result<i32,i32> {
-        if _len >= self.buffer_size {
+        if _len >= self._buffer_size {
             return Err(-1);
         }        
-        unsafe { std::ptr::copy_nonoverlapping(_src, self.buffer, _len) } ;
+        unsafe { std::ptr::copy_nonoverlapping(_src, self._buffer, _len) } ;
         Ok(0)
     }
-
     pub fn copy_string_to(&self, _str : String) -> Result<i32,i32>  {
         let (ptr, len, _) = _str.into_raw_parts();
         self.copy_to(ptr, len)?;
         Ok(0)
     }
-
     pub fn as_string(&self) -> CString {
-        let v : &[u8] = unsafe { slice::from_raw_parts(self.buffer, self.buffer_size) };
+        let v : &[u8] = unsafe { slice::from_raw_parts(self._buffer, self._buffer_size) };
         let cstr : CString = std::ffi::CString::new(v).expect("CString::new failed");
         return cstr;
     }
@@ -57,18 +54,18 @@ type Request = Value;
 
 #[repr(C)]
 pub struct Response {
-    pub buffer: *mut u8,
-    pub buffer_size : size_t,
-    pub used_size : size_t,
-    pub layer_id : u32,
+    pub _buffer: *mut u8,
+    pub _buffer_size : size_t,
+    pub _used_size : size_t,
+    pub _layer_id : u32,
 }
 
 impl Response {
     pub fn copy_to(&self, _src : *const u8, _len : usize) -> Result<i32,i32> {
-        if _len >= self.buffer_size {
+        if _len >= self._buffer_size {
             return Err(-1);
         }        
-        unsafe { std::ptr::copy_nonoverlapping(_src, self.buffer, _len) } ;
+        unsafe { std::ptr::copy_nonoverlapping(_src, self._buffer, _len) } ;
         Ok(0)
     }
 
@@ -79,77 +76,82 @@ impl Response {
     }
 }
 
-
-
 /* callback functions provided by C++-side */
 extern {
-    fn callback_allocate_pool_memory(_callback_ptr : *const c_void,
-                                     _size: size_t) -> Value;
+    fn callback_allocate_pool_memory(context : *const c_void,
+                                     size: size_t) -> Value;
 
-    fn callback_free_pool_memory(_callback_ptr : *const c_void,
-                                 _value : Value) -> Status;
+    fn callback_free_pool_memory(context : *const c_void,
+                                 value : Value) -> Status;
 
-    fn callback_create_key(_work_id : u64,
-                           _key : *const c_char,
-                           _value_size : size_t,
-                           _out_value: &mut Value) -> Status;
+    fn callback_create_key(context : *const c_void,
+                           work_id : u64,
+                           key : *const c_char,
+                           value_size : size_t,
+                           out_value: &mut Value) -> Status;
     fn debug_break();
     fn set_response(response_str: *const c_char );
 }
 
-
-/* ADO call back functions available to RUST side */
-fn ado_create_key(_work_id : u64,
-                  _key : String,
-                  _value_size : size_t) -> Status
-{
-    let strptr = std::ffi::CString::new(_key).expect("CString::new failed").as_ptr();
-    let mut out_value = Value::new();
-    return unsafe { callback_create_key(_work_id,
-                                        strptr,
-                                        _value_size,
-                                        &mut out_value) };
+pub struct ADOCallback {
+    _context : *const c_void,
+    _work_id : u64,
 }
 
-fn allocate_pool_memory(_callback_ptr : *const c_void,
-                        _size: size_t) -> Value
-{
-    return unsafe { callback_allocate_pool_memory(_callback_ptr, _size) };
+impl ADOCallback {
+    pub fn new(context : *const c_void, work_id: u64) -> ADOCallback {
+        ADOCallback {
+            _context : context,
+            _work_id : work_id,
+        }
+    }
+    pub fn allocate_pool_memory(&self, size: size_t) -> Value
+    {
+        return unsafe { callback_allocate_pool_memory(self._context, size) };
+    }
+    pub fn free_pool_memory(&self, value : Value) -> Status
+    {
+        return unsafe { callback_free_pool_memory(self._context, value) };
+    }
+    pub fn create_key(&self, key : String, value_size : size_t) -> Status
+    {
+        let str = std::ffi::CString::new(key).expect("CString::new failed");
+        let strptr = str.as_ptr();
+        let mut out_value = Value::new();
+        return unsafe { callback_create_key(self._context,
+                                            self._work_id,
+                                            strptr,
+                                            value_size,
+                                            &mut out_value) };
+    }
 }
-
-fn free_pool_memory(_callback_ptr : *const c_void,
-                    _value : Value) -> Status
-{
-    return unsafe { callback_free_pool_memory(_callback_ptr, _value) };
-}
-
 
 #[no_mangle]
-pub extern fn ffi_do_work(_callback_ptr : *const c_void,
-                          _work_id: u64,
-                          _key : *const c_char,
-                          _attached_value : &Value,
-                          _detached_value : &Value,
-                          _work_request : *mut u8,
-                          _work_request_len : size_t,
-                          _new_root : bool,
-                          _response : &mut Response) -> Status
+pub extern fn ffi_do_work(context : *const c_void,
+                          work_id: u64,
+                          key : *const c_char,
+                          attached_value : &Value,
+                          detached_value : &Value,
+                          work_request : *mut u8,
+                          work_request_len : size_t,
+                          new_root : bool,
+                          response : &mut Response) -> Status
 {
-    let rstr = unsafe { CStr::from_ptr(_key).to_str().unwrap() };
+    let rstr = unsafe { CStr::from_ptr(key).to_str().unwrap() };
 
-    let req = Request { buffer : _work_request,
-                        buffer_size : _work_request_len};
+    let req = Request { _buffer : work_request,
+                        _buffer_size : work_request_len};
 
-    return ado_plugin::do_work(_callback_ptr,
-                               _work_id,
+    let services = ADOCallback { _context : context, _work_id : work_id };
+
+    return ado_plugin::do_work(&services,
                                rstr.to_string(),
-                               _attached_value,
-                               _detached_value,
+                               attached_value,
+                               detached_value,
                                &req,
-                               _new_root,
-                               _response);
+                               new_root,
+                               response);
 }
-
 
 #[no_mangle]
 pub extern fn ffi_register_mapped_memory(_shard_base: u64,
@@ -159,11 +161,3 @@ pub extern fn ffi_register_mapped_memory(_shard_base: u64,
     return ado_plugin::register_mapped_memory(_shard_base, _local_base, _size);
 }
 
-
-// #[cfg(test)]
-// mod tests {
-//     #[test]
-//     fn it_works() {
-//         assert_eq!(2 + 2, 4);
-//     }
-// }

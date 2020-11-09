@@ -18,17 +18,15 @@ use crate::size_t;
 use crate::c_void;
 use crate::Response;
 use crate::Request;
+use crate::ADOCallback;
 
 /* available callback services, see lib.rs */
-use crate::allocate_pool_memory; /* allocate memory from the pool */
-use crate::free_pool_memory; /* free memory back to the pool */
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-pub fn do_work(_callback_ptr: *const c_void,
-               _work_id: u64,
+pub fn do_work(_services: &ADOCallback,
                _key: String,
                _attached_value : &Value,
                _detached_value : &Value,
@@ -36,8 +34,8 @@ pub fn do_work(_callback_ptr: *const c_void,
                _new_root : bool,
                _response : &Response) -> Status
 {
-    println!("[RUST]: do_work (workid={:#X}, key={}, attached-value={:?}) new-root={:?}",
-             _work_id, _key, _attached_value.buffer, _new_root);
+    println!("[RUST]: do_work (key={}, attached-value={:?}) new-root={:?}",
+             _key, _attached_value._buffer, _new_root);
     println!("[RUST]: request={:#?}", _work_request.as_string());
 
 
@@ -52,11 +50,13 @@ pub fn do_work(_callback_ptr: *const c_void,
     }
 
     /* allocate some memory from pool */
-    let newmem = allocate_pool_memory(_callback_ptr, 128);
-    println!("[RUST]: newly allocated mem {:?},{:?}", newmem.buffer, newmem.buffer_size);
+    let newmem = _services.allocate_pool_memory(128);
+    println!("[RUST]: newly allocated mem {:?},{:?}",
+             newmem._buffer,
+             newmem._buffer_size);
 
     /* release it */
-    free_pool_memory(_callback_ptr, newmem);
+    _services.free_pool_memory(newmem);
     println!("[RUST]: freed memory");
 
     /* set response */
