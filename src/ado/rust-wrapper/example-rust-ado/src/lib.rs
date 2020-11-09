@@ -17,8 +17,6 @@ use core::ptr::null_mut;
 use std::borrow::Cow;
 
 type Status = c_int;
-type ConstString = *const *const std::os::raw::c_char;
-type ResponseBuffer = Vec<u8>;  // ? need to work out response buffers.
 
 #[repr(C)]
 pub struct Value {
@@ -53,8 +51,6 @@ impl Value {
         let cstr : CString = std::ffi::CString::new(v).expect("CString::new failed");
         return cstr;
     }
-
-
 }
 
 type Request = Value;
@@ -68,7 +64,6 @@ pub struct Response {
 }
 
 impl Response {
-
     pub fn copy_to(&self, _src : *const u8, _len : usize) -> Result<i32,i32> {
         if _len >= self.buffer_size {
             return Err(-1);
@@ -81,13 +76,6 @@ impl Response {
         let (ptr, len, _) = _str.into_raw_parts();
         self.copy_to(ptr, len)?;
         Ok(0)
-    }
-
-    pub fn set_by_string(&mut self, _strvalue : &str) {
-
-//        let _v = unsafe { slice::from_raw_parts_mut(self.buffer, self.buffer_size) };
-  //      _v[0] = 'X' as i8;
-    //    _v[1] = 0;
     }
 }
 
