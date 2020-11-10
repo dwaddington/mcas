@@ -2,10 +2,10 @@
 
 ## Key new features
 
-* Support for Active Data Objects (ADO)
+* Support for Active Data Objects (ADO) - requires kernel module
 * Python/C++ client API
-* Container-based deployment
-* Configurable with volatile reconstituing memory allocator (hstore) or persistent allocator (hstore-cc)
+* Container and VM based deployment
+* Configurable with volatile reconstituting memory allocator (hstore) or persistent allocator (hstore-cc)
 
 ## Limitations
 
