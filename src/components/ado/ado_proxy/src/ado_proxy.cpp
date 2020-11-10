@@ -86,8 +86,17 @@ ADO_proxy::ADO_proxy(const uint64_t              auth_id,
                      int                         memory,
                      float                       cpu_num,
                      numa_node_t                 numa_zone)
-: _auth_id(auth_id), _kvs(kvs), _pool_id(pool_id), _pool_name(pool_name), _pool_size(pool_size),
-  _pool_flags(pool_flags), _expected_obj_count(expected_obj_count), _cores(cores), _filename(filename), _args(args),
+: _debug_level(debug_level),
+  _auth_id(auth_id),
+  _kvs(kvs),
+  _pool_id(pool_id),
+  _pool_name(pool_name),
+  _pool_size(pool_size),
+  _pool_flags(pool_flags),
+  _expected_obj_count(expected_obj_count),
+  _cores(cores),
+  _filename(filename),
+  _args(args),
   _channel_name(make_channel_name(this)),
   _ipc(std::make_unique<ADO_protocol_builder>(debug_level, _channel_name, ADO_protocol_builder::Role::CONNECT)),
   _core_number(cpu_num), _memory(memory), _numa(numa_zone), _deferred_unlocks(), _life_unlocks()
@@ -519,12 +528,17 @@ status_t ADO_proxy::shutdown()
 
 void ADO_proxy::add_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key)
 {
-  //  PNOTICE("Adding deferred unlock (%p, %p)", this, key);
+  CPLOG(2, "ADO_proxy: adding deferred unlock (work_id=%lx, key_handle=%p)",
+        work_request_id, reinterpret_cast<void*>(key));
+
   /* check for _deferred_unlocks being too large
      it may be an attack from ADO code */
-  if (_deferred_unlocks.size() > MAX_ALLOWED_DEFERRED_LOCKS) throw std::range_error("too many deferred locks");
+  if (_deferred_unlocks[work_request_id].size() > MAX_ALLOWED_DEFERRED_LOCKS)
+    throw std::range_error("too many deferred locks");
 
   _deferred_unlocks[work_request_id].insert(key);
+
+  CPLOG(2, "ADO_proxy: deferred unlock count %lu", _deferred_unlocks[work_request_id].size());
 }
 
 status_t ADO_proxy::update_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key)
@@ -544,7 +558,8 @@ void ADO_proxy::get_deferred_unlocks(const uint64_t work_key, std::vector<compon
   v.clear();
 }
 
-bool ADO_proxy::check_for_implicit_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key)
+bool ADO_proxy::check_for_implicit_unlock(const uint64_t work_request_id,
+                                          const component::IKVStore::key_t key)
 {
   if (_deferred_unlocks.find(work_request_id) != _deferred_unlocks.end()) {
     auto &key_v = _deferred_unlocks[work_request_id];

@@ -27,9 +27,6 @@
 
 class ADO_rust_wrapper_plugin : public component::IADO_plugin
 {
-private:
-  static constexpr bool option_DEBUG = true;
-
 public:
   /**
    * Constructor

@@ -689,7 +689,7 @@ void Shard::process_messages_from_ado()
               ado->send_table_op_response(rc);
             }
             else {
-              CPLOG(2, "Shard_ado: locked KV pair (keyhandle=%p, value=%p,len=%lu) invoke_completion_unlock=%d",
+              CPLOG(2, "Shard_ado: locked KV pair (keyhandle=%p, value=%p, len=%lu) invoke_completion_unlock=%d",
                     static_cast<void*>(key_handle), value, value_len, invoke_completion_unlock);
 
               add_index_key(ado->pool_id(), key);
@@ -1035,18 +1035,28 @@ void Shard::process_messages_from_ado()
           ado->send_find_index_response(rc, matched_pos, matched_key);
         }
       }
+      /* UNLOCK request */
       else if (ado->check_unlock_request(buffer, work_id, key_handle)) {
 
-        CPLOG(2, "ADO callback: unlock request (work_id=%lx, handle=%p", work_id, static_cast<const void*>(key_handle));
+        CPLOG(2, "ADO callback: unlock request (work_id=%lx, handle=%p)", work_id, static_cast<const void*>(key_handle));
 
         /* unlock should fail if implicit unlock exists, i.e.  it
            should only be performed on locks taken via
            FLAGS_NO_IMPLICIT_UNLOCK */
-        if (key_handle == nullptr || ado->check_for_implicit_unlock(work_id, key_handle)) {
+        if (key_handle == nullptr) {
+          CPWRN(1, "ADO callback: bad key (nullptr)");
           ado->send_unlock_response(E_INVAL);
         }
         else {
-          ado->send_unlock_response(_i_kvstore->unlock(ado->pool_id(), key_handle));
+          if(!ado->check_for_implicit_unlock(work_id, key_handle)) {
+            CPWRN(1, "ADO callback: unlock, implicit lock not found "
+                  "(work_id=%lx, key_handle=%p)",
+                  work_id, reinterpret_cast<void*>(key_handle));
+            ado->send_unlock_response(E_INVAL);
+          }
+          else {
+            ado->send_unlock_response(_i_kvstore->unlock(ado->pool_id(), key_handle));
+          }
         }
       }
       else if (ado->check_configure_request(buffer, options)) {

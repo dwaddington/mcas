@@ -2,23 +2,20 @@
   Here is a skeleton implementation which would need implemented
   for a specific application
  */
-
-use std::mem;
-use std::vec;
-use std::slice;
-use std::io::prelude::*;
-use std::io::{self, SeekFrom};
-use std::fs::File;
-use std::ffi::CStr;
 use std::fmt::Write;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::ptr;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::Status;
 use crate::Value;
 use crate::size_t;
-use crate::c_void;
+use crate::KeyHandle;
 use crate::Response;
 use crate::Request;
 use crate::ADOCallback;
+
+#[allow(unused_imports)]
+use crate::KeyLifetimeFlags;
 
 /* available callback services, see lib.rs */
 
@@ -39,12 +36,12 @@ pub fn do_work(_services: &ADOCallback,
     println!("[RUST]: request={:#?}", _work_request.as_string());
 
 
-    /* write something into value memory */
+    /* write something into value memory, terminate with null for C-side printing */
     {
         let mut z = String::new();
         let start = SystemTime::now();
         let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        write!(z, "CLOCK-{:#?}", since_the_epoch).expect("writeln failed");
+        write!(z, "CLOCK-{:#?}\0", since_the_epoch).expect("writeln failed");
 
         _attached_value.copy_string_to(z).expect("copying into value failed");
     }
@@ -59,6 +56,31 @@ pub fn do_work(_services: &ADOCallback,
     _services.free_pool_memory(newmem);
     println!("[RUST]: freed memory");
 
+    /* create a key */
+    {
+        let mut value = Value::new();
+        let mut key_handle : KeyHandle = ptr::null_mut();
+        let rc = _services.create_key("egg".to_string(),
+                                      256,
+                                      None,
+                                      &mut value,
+                                      &mut key_handle);
+        println!("[RUST]: created key {:#?} handle: {:?} rc:{}", value, key_handle, rc);
+        /* unlock key */
+        if _services.unlock_key(key_handle) == 0 {
+            println!("[RUST]: unlock OK");
+        }
+    }
+
+    /* open key */
+    {
+        let mut value = Value::new();
+        let mut key_handle : KeyHandle = ptr::null_mut();
+        let rc = _services.open_key("egg".to_string(), None, &mut value, &mut key_handle);
+        println!("[RUST]: opened key {:#?} handle: {:?} rc:{}", value, key_handle, rc);
+        
+    }
+
     /* set response */
     {
         let mut z = String::new();
@@ -66,9 +88,7 @@ pub fn do_work(_services: &ADOCallback,
         let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
         write!(z, "RESPONSE-{:#?}", since_the_epoch).expect("writeln failed");
 
-        _response
-            .copy_string_to(z)
-            .expect("copy into response failed");
+        _response.copy_string_to(z).expect("copy into response failed");
     }
     
     return 0;

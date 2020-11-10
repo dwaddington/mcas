@@ -657,7 +657,11 @@ status_t Pool_handle::lock(const std::string &key,
 
 status_t Pool_handle::unlock(IKVStore::key_t key_handle) {
 
-  if(key_handle == nullptr) return E_INVAL;
+  if(key_handle == nullptr) {
+    PWRN("Map_store: unlock argument key handle invalid (%p)",
+         reinterpret_cast<void*>(key_handle));
+    return E_INVAL;
+  }
 
   /* TODO: how do we know key_handle is valid? */
   if(reinterpret_cast<common::RWLock *>(key_handle)->unlock() != 0) {

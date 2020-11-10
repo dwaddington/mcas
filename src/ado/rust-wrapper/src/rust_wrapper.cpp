@@ -19,6 +19,8 @@
 #include <string>
 #include <ado_proto.h>
 
+static unsigned debug_level() { return 2; }
+
 extern "C"
 {
   /* these map to versions in lib.rs */
@@ -38,6 +40,7 @@ extern "C"
   status_t ffi_do_work(void* callback_ptr,
                        uint64_t work_id,
                        const char * key,
+                       const size_t key_len,
                        const Value * attached_value,
                        const Value * detached_value,
                        const uint8_t * request,
@@ -60,9 +63,64 @@ extern "C"
     return p_this->cb_free_pool_memory(value.buffer_size, value.buffer);
   }
 
-  void set_response(const char * response_str)
-  {
+  status_t callback_create_key(void * callback_ptr,
+                               uint64_t work_id,
+                               const char * key,
+                               size_t value_size,
+                               int flags,
+                               Value* out_value,
+                               component::IKVStore::key_t* out_key_handle) {
+    assert(callback_ptr);
+    assert(out_value);
+    
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    const char * key_ptr;
+    auto rc = p_this->cb_create_key(work_id,
+                                    key,
+                                    value_size,
+                                    flags,
+                                    out_value->buffer,
+                                    &key_ptr,
+                                    out_key_handle);
+    
+    if(rc == S_OK) {
+      out_value->buffer_size = value_size;
+    }
+    return rc;
   }
+
+  status_t callback_open_key(void * callback_ptr,
+                             uint64_t work_id,
+                             const char * key,
+                             int flags,
+                             Value* out_value,
+                             component::IKVStore::key_t* out_key_handle) {
+    assert(callback_ptr);
+    assert(out_value);
+    
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    const char * key_ptr;
+    auto rc = p_this->cb_open_key(work_id,
+                                  key,
+                                  flags,
+                                  out_value->buffer,
+                                  out_value->buffer_size,                                  
+                                  &key_ptr,
+                                  out_key_handle);    
+    return rc;
+  }
+
+  status_t callback_unlock_key(void * callback_ptr,
+                               uint64_t work_id,
+                               component::IKVStore::key_t key_handle) {
+    assert(callback_ptr);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    auto rc = p_this->cb_unlock(work_id, key_handle);
+    if(debug_level() >= 2)
+      PLOG("callback_unlock_key: %p %lx %p rc=%d", callback_ptr, work_id, key_handle, rc);
+    return rc;
+  }
+
 
   void debug_break() {
     asm("int3");
@@ -88,7 +146,7 @@ status_t ADO_rust_wrapper_plugin::register_mapped_memory(void *shard_vaddr,
                                     len);
 }
 
-status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
+status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_id,
                                           const char * key,
                                           size_t key_len,
                                           IADO_plugin::value_space_t& values,
@@ -97,24 +155,22 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
                                           bool new_root,
                                           response_buffer_vector_t& response_buffers) {
 
-  
-  (void)key_len; // unused
-  (void)values; // unused
-  (void)in_work_request; // unused
-  (void)in_work_request_len; // unused
-  (void)response_buffers; // unused
+
+  if(debug_level() >= 2) {
+    PLOG("ADO_rust_wrapper_plugin::do_work (work_id=%lx key=%.*s)",
+         work_id, boost::numeric_cast<int>(key_len), key);
+    PLOG("ADO_rust_wrapper_plugin::do_work (work_request=%p, work_request_len=%lu)",
+         in_work_request, in_work_request_len);
+  }
 
   /* ADO_protocol_builder::MAX_MESSAGE_SIZE governs size of messages */
 
   /* allocate memory for the response */
   size_t response_buffer_size = ADO_protocol_builder::MAX_MESSAGE_SIZE;
-  void * response_buffer = ::aligned_alloc(0xFFFFF, response_buffer_size);
-  PNOTICE("response_buffer @%p", response_buffer);
-  Response response{response_buffer, response_buffer_size, 0, 0};
-
+  void * response_buffer = ::aligned_alloc(CACHE_LINE_SIZE, response_buffer_size);
   memset(response_buffer, 0, response_buffer_size);
-  memset(response_buffer, 'a', 10);
-  response.used_size = 10;
+  
+  Response response{response_buffer, response_buffer_size, 0, 0};
   
   assert(values.size() > 0);
   Value attached_value{values[0].ptr, values[0].len};
@@ -123,7 +179,7 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
   if(values.size() > 1) {
     Value detached_value{values[1].ptr, values[1].len};
     rc = ffi_do_work(reinterpret_cast<void*>(this),
-                     work_key, key, &attached_value, &detached_value,
+                     work_id, key, key_len, &attached_value, &detached_value,
                      reinterpret_cast<const uint8_t*>(in_work_request),
                      in_work_request_len,
                      new_root,
@@ -132,7 +188,7 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_key,
   else {
     Value detached_value{nullptr, 0};
     rc = ffi_do_work(reinterpret_cast<void*>(this),
-                     work_key, key, &attached_value, &detached_value,
+                     work_id, key, key_len, &attached_value, &detached_value,
                      reinterpret_cast<const uint8_t*>(in_work_request),
                      in_work_request_len,
                      new_root,

@@ -38,9 +38,12 @@ struct default_delete<DOCKER>
 };
 }
 
-class ADO_proxy : public component::IADO_proxy {
+class ADO_proxy : public component::IADO_proxy
+{
 public:
   static constexpr size_t MAX_ALLOWED_DEFERRED_LOCKS = 256;
+
+  unsigned debug_level() const { return _debug_level; }
   
   ADO_proxy(const uint64_t auth_id,
 	    const unsigned debug_level,
@@ -207,6 +210,7 @@ private:
   status_t kill();
   void launch(unsigned debug_level);
 
+  unsigned                              _debug_level;
   uint64_t                              _auth_id;
   component::IKVStore*                  _kvs;
   component::IKVStore::pool_t           _pool_id;
