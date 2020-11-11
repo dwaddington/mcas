@@ -14,6 +14,8 @@
 #![allow(dead_code)]
 #![feature(vec_into_raw_parts)]
 #![allow(unused_imports)]
+#![allow(clippy::missing_safety_doc)]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
     
 extern crate alloc;
 extern crate libc;
@@ -21,25 +23,22 @@ extern crate libc;
 mod ado_plugin;
 mod status;
 
+use core::ptr::{null, null_mut};
+use libc::{c_char, c_uchar, c_uint, c_void, size_t};
 use status::Status;
-use libc::{c_char, c_uchar, c_void, size_t, c_uint};
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt;
 use std::slice;
-use core::ptr::{null_mut, null};
-
 
 type KeyHandle = *mut c_void;
 
 /* helpers */
-fn convert_to_string(ptr : *const c_uchar, len : size_t) -> String
-{
+fn convert_to_string(ptr: *const c_uchar, len: size_t) -> String {
     let slice = unsafe { slice::from_raw_parts(ptr, len) };
-    let str : String = std::str::from_utf8(slice).unwrap().to_string();
-    return str;
+    let str: String = std::str::from_utf8(slice).unwrap().to_string();
+    str
 }
-
 
 #[repr(u32)]
 pub enum KeyLifetimeFlags {
@@ -54,12 +53,18 @@ pub struct Value {
     pub _buffer_size: size_t,
 }
 
+impl Default for Value {
+    fn default() -> Value {
+        Value { _buffer : null_mut(),
+                 _buffer_size : 0 }
+    }
+}
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Value")
-         .field("buffer", &self._buffer)
-         .field("buffer_size", &self._buffer_size)
-         .finish()
+            .field("buffer", &self._buffer)
+            .field("buffer_size", &self._buffer_size)
+            .finish()
     }
 }
 
@@ -67,25 +72,25 @@ impl Value {
     pub fn new() -> Value {
         Value {
             _buffer_size: 0,
-            _buffer: null_mut()
+            _buffer: null_mut(),
         }
     }
-    pub fn copy_to(&self, _src : *const u8, _len : usize) -> Result<i32,i32> {
+    pub unsafe fn copy_to(&self, _src: *const u8, _len: usize) -> Result<i32, i32> {
         if _len >= self._buffer_size {
             return Err(-1);
-        }        
-        unsafe { std::ptr::copy_nonoverlapping(_src, self._buffer, _len) } ;
+        }
+        std::ptr::copy_nonoverlapping(_src, self._buffer, _len);
         Ok(0)
     }
-    pub fn copy_string_to(&self, _str : String) -> Result<i32,i32>  {
+    pub fn copy_string_to(&self, _str: String) -> Result<i32, i32> {
         let (ptr, len, _) = _str.into_raw_parts();
-        self.copy_to(ptr, len)?;
+        unsafe { self.copy_to(ptr, len)? };
         Ok(0)
     }
     pub fn as_string(&self) -> CString {
-        let v : &[u8] = unsafe { slice::from_raw_parts(self._buffer, self._buffer_size) };
-        let cstr : CString = std::ffi::CString::new(v).expect("CString::new failed");
-        return cstr;
+        let v: &[u8] = unsafe { slice::from_raw_parts(self._buffer, self._buffer_size) };
+        let cstr: CString = std::ffi::CString::new(v).expect("CString::new failed");
+        cstr
     }
 }
 
@@ -94,9 +99,9 @@ type Request = Value;
 #[repr(C)]
 pub struct Response {
     pub _buffer: *mut u8,
-    pub _buffer_size : size_t,
-    pub _used_size : size_t,
-    pub _layer_id : u32,
+    pub _buffer_size: size_t,
+    pub _used_size: size_t,
+    pub _layer_id: u32,
 }
 
 impl fmt::Debug for Response {
@@ -111,22 +116,22 @@ impl fmt::Debug for Response {
 }
 
 impl Response {
-    pub fn copy_to(&self, _src : *const u8, _len : usize) -> Result<i32,i32> {
-        if _len >= self._buffer_size {
+    pub unsafe fn copy_to(&self, src: *const u8, len: usize) -> Result<i32, i32> {
+        if len >= self._buffer_size {
             return Err(-1);
-        }        
-        unsafe { std::ptr::copy_nonoverlapping(_src, self._buffer, _len) } ;
+        }
+        std::ptr::copy_nonoverlapping(src, self._buffer, len);
         Ok(0)
     }
 
-    pub fn copy_string_to(&self, _str : String) -> Result<i32,i32>  {
+    pub unsafe fn copy_string_to(&self, _str: String) -> Result<i32, i32> {
         let (ptr, len, _) = _str.into_raw_parts();
         self.copy_to(ptr, len)?;
         Ok(0)
     }
 }
 
-/* TODO 
+/* TODO
 std::function<status_t(const uint64_t     work_id,
                            const std::string& key_name,
                            const size_t       new_value_size,
@@ -151,47 +156,47 @@ std::function<status_t(const uint64_t option)>
 */
 
 /// Callback table (implemented on C/C++ side)
-extern {
-    fn callback_allocate_pool_memory(context : *const c_void,
-                                     size: size_t) -> Value;
+extern "C" {
+    fn callback_allocate_pool_memory(context: *const c_void, size: size_t) -> Value;
 
-    fn callback_free_pool_memory(context : *const c_void,
-                                 value : Value) -> Status;
+    fn callback_free_pool_memory(context: *const c_void, value: Value) -> Status;
 
     fn callback_get_pool_info(context: *const c_void) -> *mut c_void;
 
-    fn callback_create_key(context : *const c_void,
-                           work_id : u64,
-                           key : *const c_char,
-                           value_size : size_t,
-                           flags : KeyLifetimeFlags,
-                           out_value: &mut Value,
-                           out_key_handle : &mut KeyHandle) -> Status;
+    fn callback_create_key(
+        context: *const c_void,
+        work_id: u64,
+        key: *const c_char,
+        value_size: size_t,
+        flags: KeyLifetimeFlags,
+        out_value: &mut Value,
+        out_key_handle: &mut KeyHandle,
+    ) -> Status;
 
-    fn callback_open_key(context : *const c_void,
-                         work_id : u64,
-                         key : *const c_char,
-                         flags : KeyLifetimeFlags,
-                         out_value: &mut Value,
-                         out_key_handle : &mut KeyHandle) -> Status;
+    fn callback_open_key(
+        context: *const c_void,
+        work_id: u64,
+        key: *const c_char,
+        flags: KeyLifetimeFlags,
+        out_value: &mut Value,
+        out_key_handle: &mut KeyHandle,
+    ) -> Status;
 
-    fn callback_unlock_key(context : *const c_void,
-                           work_id : u64,
-                           key_handle : KeyHandle) -> Status;
+    fn callback_unlock_key(context: *const c_void, work_id: u64, key_handle: KeyHandle) -> Status;
 
     fn debug_break();
 }
 
 pub struct ADOCallback {
-    _context : *const c_void,
-    _work_id : u64,
+    _context: *const c_void,
+    _work_id: u64,
 }
 
 impl ADOCallback {
-    pub fn new(context : *const c_void, work_id: u64) -> ADOCallback {
+    pub fn new(context: *const c_void, work_id: u64) -> ADOCallback {
         ADOCallback {
-            _context : context,
-            _work_id : work_id,
+            _context: context,
+            _work_id: work_id,
         }
     }
 
@@ -207,9 +212,8 @@ impl ADOCallback {
     /// ```
     /// let my_mem : Value = _services.allocate_pool_memory(128);
     /// ```
-    pub fn allocate_pool_memory(&self, size: size_t) -> Value
-    {
-        return unsafe { callback_allocate_pool_memory(self._context, size) };
+    pub fn allocate_pool_memory(&self, size: size_t) -> Value {
+        unsafe { callback_allocate_pool_memory(self._context, size) }
     }
 
     /// Free memory from the pool
@@ -223,9 +227,8 @@ impl ADOCallback {
     /// ```
     /// _services.free_pool_memory(my_mem);
     /// ```    
-    pub fn free_pool_memory(&self, value : Value) -> Status
-    {
-        return unsafe { callback_free_pool_memory(self._context, value) };
+    pub fn free_pool_memory(&self, value: Value) -> Status {
+        unsafe { callback_free_pool_memory(self._context, value) }
     }
 
     /// Get pool information
@@ -235,14 +238,17 @@ impl ADOCallback {
     /// ```
     /// let info : String  = _services.get_pool_info();
     /// ```    
-    pub fn get_pool_info(&self) -> String
-    {
-        let ptr = unsafe { callback_get_pool_info(self._context) } ;
-        let s = unsafe { CStr::from_ptr(ptr as *const i8).to_string_lossy().into_owned() };
+    pub fn get_pool_info(&self) -> String {
+        let ptr = unsafe { callback_get_pool_info(self._context) };
+        let s = unsafe {
+            CStr::from_ptr(ptr as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        };
 
-        let rv = s.clone();
+        let rv = s;
         unsafe { libc::free(ptr) };
-        return rv;
+        rv
     }
 
     /// Create new key-value pair in index (this pool)
@@ -265,134 +271,171 @@ impl ADOCallback {
     ///                              256, None, &mut value, &mut key_handle);
     /// assert!(rc == Status::Ok);
     /// ```    
-    pub fn create_key(&self,
-                      key : String,
-                      value_size : size_t,
-                      flags : Option<KeyLifetimeFlags>,
-                      out_value : &mut Value,
-                      out_key_handle : &mut KeyHandle) -> Status
-    {
+    pub fn create_key(
+        &self,
+        key: String,
+        value_size: size_t,
+        flags: Option<KeyLifetimeFlags>,
+        out_value: &mut Value,
+        out_key_handle: &mut KeyHandle,
+    ) -> Status {
         let str = std::ffi::CString::new(key).expect("CString::new failed");
         let strptr = str.as_ptr();
         match flags {
-            None => return unsafe { callback_create_key(self._context,
-                                                        self._work_id,
-                                                        strptr,
-                                                        value_size,
-                                                        KeyLifetimeFlags::None,
-                                                        out_value,
-                                                        out_key_handle) },
-            Some(f) => return unsafe { callback_create_key(self._context,
-                                                           self._work_id,
-                                                           strptr,
-                                                           value_size,
-                                                           f,
-                                                           out_value,
-                                                           out_key_handle) }
-        }
-    }
-    
-    pub fn open_key(&self,
-                    key : String,
-                    flags : Option<KeyLifetimeFlags>,
-                    out_value : &mut Value,
-                    out_key_handle : &mut KeyHandle) -> Status
-    {
-        let str = std::ffi::CString::new(key).expect("CString::new failed");
-        let strptr = str.as_ptr();
-        match flags {
-            None => return unsafe { callback_open_key(self._context,
-                                                      self._work_id,
-                                                      strptr,
-                                                      KeyLifetimeFlags::None,
-                                                      out_value,
-                                                      out_key_handle) },
-            Some(f) => return unsafe { callback_open_key(self._context,
-                                                         self._work_id,
-                                                         strptr,
-                                                         f,
-                                                         out_value,
-                                                         out_key_handle) }
+            None => {
+                unsafe {
+                    callback_create_key(
+                        self._context,
+                        self._work_id,
+                        strptr,
+                        value_size,
+                        KeyLifetimeFlags::None,
+                        out_value,
+                        out_key_handle,
+                    )
+                }
+            }
+            Some(f) => {
+                unsafe {
+                    callback_create_key(
+                        self._context,
+                        self._work_id,
+                        strptr,
+                        value_size,
+                        f,
+                        out_value,
+                        out_key_handle,
+                    )
+                }
+            }
         }
     }
 
-    pub fn unlock_key(&self, key_handle : KeyHandle) -> Status
-    {
-        return unsafe { callback_unlock_key(self._context,
-                                            self._work_id,
-                                            key_handle) };
+    pub fn open_key(
+        &self,
+        key: String,
+        flags: Option<KeyLifetimeFlags>,
+        out_value: &mut Value,
+        out_key_handle: &mut KeyHandle,
+    ) -> Status {
+        let str = std::ffi::CString::new(key).expect("CString::new failed");
+        let strptr = str.as_ptr();
+        match flags {
+            None => {
+                unsafe {
+                    callback_open_key(
+                        self._context,
+                        self._work_id,
+                        strptr,
+                        KeyLifetimeFlags::None,
+                        out_value,
+                        out_key_handle,
+                    )
+                }
+            }
+            Some(f) => {
+                unsafe {
+                    callback_open_key(
+                        self._context,
+                        self._work_id,
+                        strptr,
+                        f,
+                        out_value,
+                        out_key_handle,
+                    )
+                }
+            }
+        }
     }
-        
+
+    pub fn unlock_key(&self, key_handle: KeyHandle) -> Status {
+        unsafe { callback_unlock_key(self._context, self._work_id, key_handle) }
+    }
 }
 
 #[no_mangle]
-pub extern fn ffi_do_work(context : *const c_void,
-                          work_id: u64,
-                          key : *const c_uchar,
-                          key_len : size_t,
-                          attached_value : &Value,
-                          detached_value : &Value,
-                          work_request : *mut u8,
-                          work_request_len : size_t,
-                          new_root : bool,
-                          response : &mut Response) -> Status
-{
+pub extern "C" fn ffi_do_work(
+    context: *const c_void,
+    work_id: u64,
+    key: *const c_uchar,
+    key_len: size_t,
+    attached_value: &Value,
+    detached_value: &Value,
+    work_request: *mut u8,
+    work_request_len: size_t,
+    new_root: bool,
+    response: &mut Response,
+) -> Status {
     /* create slice from potentially non terminated C string */
     let slice = unsafe { slice::from_raw_parts(key, key_len) };
 
     /* create String from slice */
-    let rstr : String = std::str::from_utf8(slice).unwrap().to_string();
+    let rstr: String = std::str::from_utf8(slice).unwrap().to_string();
 
-    let req = Request { _buffer : work_request,
-                        _buffer_size : work_request_len};
+    let req = Request {
+        _buffer: work_request,
+        _buffer_size: work_request_len,
+    };
 
-    let services = ADOCallback { _context : context, _work_id : work_id };
+    let services = ADOCallback {
+        _context: context,
+        _work_id: work_id,
+    };
 
-    return ado_plugin::do_work(&services,
-                               rstr,
-                               attached_value,
-                               detached_value,
-                               &req,
-                               new_root,
-                               response);
+    ado_plugin::do_work(
+        &services,
+        rstr,
+        attached_value,
+        detached_value,
+        &req,
+        new_root,
+        response,
+    )
 }
 
 #[no_mangle]
-pub extern fn ffi_register_mapped_memory(shard_base : u64,
-                                         local_base : u64,
-                                         size : size_t) -> Status
-{
-    return ado_plugin::register_mapped_memory(shard_base, local_base, size);
+pub extern "C" fn ffi_register_mapped_memory(
+    shard_base: u64,
+    local_base: u64,
+    size: size_t,
+) -> Status {
+    ado_plugin::register_mapped_memory(shard_base, local_base, size)
 }
 
 #[no_mangle]
-pub extern fn ffi_launch_event(auth_id : u64,
-                               pool_name_ptr : *const c_uchar,
-                               pool_name_len : size_t,
-                               pool_size : size_t,
-                               pool_flags : c_uint,
-                               memory_type : c_uint,
-                               expected_obj_count : size_t,
-                               json_params_ptr : *const c_uchar,
-                               json_params_len : size_t)
-{
+pub extern "C" fn ffi_launch_event(
+    auth_id: u64,
+    pool_name_ptr: *const c_uchar,
+    pool_name_len: size_t,
+    pool_size: size_t,
+    pool_flags: c_uint,
+    memory_type: c_uint,
+    expected_obj_count: size_t,
+    json_params_ptr: *const c_uchar,
+    json_params_len: size_t,
+) {
     let pool_name = convert_to_string(pool_name_ptr, pool_name_len);
-    let json_params = convert_to_string(json_params_ptr, json_params_len); 
-    ado_plugin::launch_event(auth_id, &pool_name, pool_size, pool_flags,
-                             memory_type, expected_obj_count, &json_params);
+    let json_params = convert_to_string(json_params_ptr, json_params_len);
+    ado_plugin::launch_event(
+        auth_id,
+        &pool_name,
+        pool_size,
+        pool_flags,
+        memory_type,
+        expected_obj_count,
+        &json_params,
+    );
 }
 
-
-    
-
 #[no_mangle]
-pub extern fn ffi_cluster_event(sender_ptr : *const c_uchar,
-                                sender_len : size_t,
-                                event_type_ptr : *const c_uchar,
-                                event_type_len : size_t,
-                                message_ptr : *const c_uchar,
-                                message_len : size_t)
-{
+pub extern "C" fn ffi_cluster_event(
+    sender_ptr: *const c_uchar,
+    sender_len: size_t,
+    event_type_ptr: *const c_uchar,
+    event_type_len: size_t,
+    message_ptr: *const c_uchar,
+    message_len: size_t,
+) {
     let sender = convert_to_string(sender_ptr, sender_len);
     let event_type = convert_to_string(event_type_ptr, event_type_len);
     let message = convert_to_string(message_ptr, message_len);

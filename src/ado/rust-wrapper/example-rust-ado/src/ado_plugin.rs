@@ -38,12 +38,12 @@ fn print_type_of<T>(_: &T) {
 }
 
 pub fn launch_event(auth_id : u64,
-                    pool_name : &String,
+                    pool_name : &str,
                     pool_size : size_t,
                     pool_flags : u32,
                     memory_type : u32,
                     expected_obj_count : size_t,
-                    params : &String)
+                    params : &str)
 {
     println!("[RUST]: launch_event (auth={}, pool_name={}, pool_size={}, \
               flags={}, memory_type={}, expected_obj_count={})",
@@ -51,9 +51,9 @@ pub fn launch_event(auth_id : u64,
     println!("[RUST]: params -> {}", params);
 }
 
-pub fn cluster_event(sender : &String,
-                     event_type : &String,
-                     message : &String)
+pub fn cluster_event(sender : &str,
+                     event_type : &str,
+                     message : &str)
 {
     println!("[RUST]: cluster event ({},{},{})", sender, event_type, message);
 }
@@ -138,17 +138,17 @@ pub fn do_work(_services: &ADOCallback,
         let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
         write!(z, "RESPONSE-{:#?}", since_the_epoch).expect("writeln failed");
 
-        _response.copy_string_to(z).expect("copy into response failed");
+        unsafe { _response.copy_string_to(z).expect("copy into response failed") };
     }
     
-    return Status::Ok;
+    Status::Ok
 }
 
 pub fn register_mapped_memory(shard_base: u64, local_base: u64, size: size_t) -> Status
 {
     println!("[RUST]: register_mapped_memory (shard@{:#X} local@{:#X} size={})",
              shard_base, local_base, size);
-    return Status::Ok;
+    Status::Ok
 }
 
 
