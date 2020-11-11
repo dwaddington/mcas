@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 14) # 14 for auto deduction of return type
 
 enable_language(CXX C ASM)
 
+add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wformat=2 -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
+
 file(GLOB SOURCES src/*.cpp)
 
 add_definitions(-DCONFIG_DEBUG)

@@ -466,7 +466,7 @@ int main(int argc, char* argv[])
 
           switch(mcas::ipc::Message::type(buffer))
             {
-            case mcas::ipc::MSG_TYPE_CHIRP: {
+            case mcas::ipc::MSG_TYPE::CHIRP: {
               auto chirp = reinterpret_cast<mcas::ipc::Chirp*>(buffer);
 
               switch(chirp->type)
@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
                 }
               break;
             }
-            case mcas::ipc::MSG_TYPE_MAP_MEMORY: {
+            case mcas::ipc::MSG_TYPE::MAP_MEMORY: {
 
               auto * mm = reinterpret_cast<Map_memory*>(buffer);
 
@@ -534,7 +534,7 @@ int main(int argc, char* argv[])
 
               break;
             }
-            case mcas::ipc::MSG_TYPE_MAP_MEMORY_NAMED: {
+            case mcas::ipc::MSG_TYPE::MAP_MEMORY_NAMED: {
 
               auto * mm = static_cast<Map_memory_named*>(static_cast<void *>(buffer));
 
@@ -573,7 +573,7 @@ int main(int argc, char* argv[])
 
               break;
             }
-            case mcas::ipc::MSG_TYPE_WORK_REQUEST:  {
+            case mcas::ipc::MSG_TYPE::WORK_REQUEST:  {
 
               component::IADO_plugin::response_buffer_vector_t response_buffers;
               auto * wr = reinterpret_cast<Work_request*>(buffer);
@@ -620,7 +620,7 @@ int main(int argc, char* argv[])
 
               break;
             }
-            case mcas::ipc::MSG_TYPE_BOOTSTRAP_REQUEST:  {
+            case mcas::ipc::MSG_TYPE::BOOTSTRAP_REQUEST:  {
 
               auto boot_req = reinterpret_cast<Bootstrap_request*>(buffer);
               std::string pool_name(boot_req->pool_name, boot_req->pool_name_len);
@@ -645,7 +645,7 @@ int main(int argc, char* argv[])
 
               break;
             }
-            case mcas::ipc::MSG_TYPE_OP_EVENT: {
+            case mcas::ipc::MSG_TYPE::OP_EVENT: {
               auto event = reinterpret_cast<Op_event*>(buffer);
               if(debug_level > 1)
                 PLOG("ADO_process: received op event (%s)",
@@ -657,7 +657,7 @@ int main(int argc, char* argv[])
 
               break;
             }
-            case mcas::ipc::MSG_TYPE_CLUSTER_EVENT: {
+            case mcas::ipc::MSG_TYPE::CLUSTER_EVENT: {
               auto event = reinterpret_cast<Cluster_event*>(buffer);
               PLOG("ADO_process: received cluster event (%s,%s,%s)",
                    event->sender(), event->type(), event->message());

@@ -16,6 +16,7 @@ set(TEST_SOURCES ./src/example_fb_test.cpp)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/flatbuffers/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
@@ -32,7 +33,7 @@ add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/example_fb_proto.fbs
   COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/src/example_fb_proto.fbs
-  COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h  
+  COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h
 )
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)

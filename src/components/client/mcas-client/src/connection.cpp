@@ -881,7 +881,7 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
 {
   char *env = ::getenv("SHORT_CIRCUIT_BACKEND");
   if (env && env[0] == '1') {
-    _options.short_circuit_backend = true;    
+    _options.short_circuit_backend = true;
   }
 
   if(!other.empty()) {
@@ -2175,9 +2175,8 @@ status_t Connection_handler::find(const IMCAS::pool_t pool,
 }
 
 status_t Connection_handler::invoke_ado(const IKVStore::pool_t            pool,
-                                        const std::string &               key,
-                                        const void *                      request,
-                                        const size_t                      request_len,
+                                        const basic_string_view<byte>     key,
+                                        const basic_string_view<byte>     request,
                                         const unsigned int                flags,
                                         std::vector<IMCAS::ADO_response> &out_response,
                                         const size_t                      value_size)
@@ -2189,7 +2188,7 @@ status_t Connection_handler::invoke_ado(const IKVStore::pool_t            pool,
 
   try {
     const auto msg = new (iobs->base()) mcas::protocol::Message_ado_request(
-        iobs->length(), auth_id(), request_id(), pool, key, request, request_len, flags, value_size);
+        iobs->length(), auth_id(), request_id(), pool, key, request, flags, value_size);
     iobs->set_length(msg->message_size());
 
     if (flags & IMCAS::ADO_FLAG_ASYNC) {
@@ -2251,9 +2250,8 @@ status_t Connection_handler::invoke_ado(const IKVStore::pool_t            pool,
 }
 
 status_t Connection_handler::invoke_ado_async(const component::IMCAS::pool_t               pool,
-                                              const std::string &                          key,
-                                              const void *                                 request,
-                                              const size_t                                 request_len,
+                                              const basic_string_view<byte>                key,
+                                              const basic_string_view<byte>                request,
                                               const component::IMCAS::ado_flags_t          flags,
                                               std::vector<component::IMCAS::ADO_response> &out_response,
                                               component::IMCAS::async_handle_t &           out_async_handle,
@@ -2269,7 +2267,7 @@ status_t Connection_handler::invoke_ado_async(const component::IMCAS::pool_t    
 
   try {
     const auto msg = new (iobs->base()) mcas::protocol::Message_ado_request(
-        iobs->length(), auth_id(), request_id(), pool, key, request, request_len, flags, value_size);
+        iobs->length(), auth_id(), request_id(), pool, key, request, flags, value_size);
     iobs->set_length(msg->message_size());
 
     post_recv(&*iobr);
@@ -2293,18 +2291,16 @@ status_t Connection_handler::invoke_ado_async(const component::IMCAS::pool_t    
 }
 
 status_t Connection_handler::invoke_put_ado(const IKVStore::pool_t            pool,
-                                            const std::string &               key,
-                                            const void *                      request,
-                                            const size_t                      request_len,
-                                            const void *                      value,
-                                            const size_t                      value_len,
+                                            const basic_string_view<byte>     key,
+                                            const basic_string_view<byte>     request,
+                                            const basic_string_view<byte>     value,
                                             const size_t                      root_len,
                                             const unsigned int                flags,
                                             std::vector<IMCAS::ADO_response> &out_response)
 {
   API_LOCK();
 
-  if (request_len == 0) return E_INVAL;
+  if (request.size() == 0) return E_INVAL;
 
   const auto iobs = make_iob_ptr_send();
   assert(iobs);
@@ -2315,7 +2311,7 @@ status_t Connection_handler::invoke_put_ado(const IKVStore::pool_t            po
 
   try {
     const auto msg = new (iobs->base()) mcas::protocol::Message_put_ado_request(
-        iobs->length(), auth_id(), request_id(), pool, key, request, request_len, value, value_len, root_len, flags);
+        iobs->length(), auth_id(), request_id(), pool, key, request, value, root_len, flags);
 
     iobs->set_length(msg->message_size());
 
@@ -2415,7 +2411,7 @@ int Connection_handler::tick()
       /* set security options */
       msg->security_tls = _options.tls;
       msg->security_hmac = _options.hmac;
-      
+
       iob->set_length(msg->msg_len());
       post_send(iob->iov, iob->iov + 1, iob->desc, &*iob, msg, __func__);
 
@@ -2442,7 +2438,7 @@ int Connection_handler::tick()
         wait_for_completion(&*iobr);
         const auto response_msg = msg_recv<const mcas::protocol::Message_handshake_reply>(&*iobr, "handshake");
 
-        /* server is indicating that it wants to start TLS session */     
+        /* server is indicating that it wants to start TLS session */
         if(response_msg->start_tls)
           start_tls();
       }
@@ -2511,7 +2507,7 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection, void*
 
     if(debug_level() > 2)
       PLOG("TLS pull: taking %lu bytes from remaining (%lu)", buffer_size, p_connection->_tls_buffer.remaining());
-    
+
     p_connection->_tls_buffer.pull(buffer, buffer_size);
     return buffer_size;
   }
@@ -2520,7 +2516,7 @@ ssize_t TLS_transport::gnutls_pull_func(gnutls_transport_ptr_t connection, void*
 
   p_connection->post_recv(&*iobr);
   p_connection->wait_for_completion(&*iobr); /* await response */
-  
+
   void * base_v = iobr->base();
   uint64_t * base = reinterpret_cast<uint64_t*>(base_v);
   uint64_t payload_size = base[0];
@@ -2544,7 +2540,7 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection, c
 
   char * ptr = reinterpret_cast<char*>(&base[1]);
   size_t size = 0;
-  
+
   for(int i=0; i<iovec_cnt; i++) {
     memcpy(ptr, iovec[i].iov_base, iovec[i].iov_len);
     size += iovec[i].iov_len;
@@ -2553,12 +2549,12 @@ ssize_t TLS_transport::gnutls_vec_push_func(gnutls_transport_ptr_t connection, c
 
   base[0] = size; /* prefix with length */
   iobs->set_length(size + sizeof(uint64_t));
-  
+
   p_connection->sync_send(&*iobs, "TLS packet (client send)", __func__);
 
   if(debug_level() > 2)
     PLOG("TLS sent: %lu bytes (%p)", size, reinterpret_cast<void*>(&*iobs));
-  
+
   return size;
 }
 
@@ -2574,9 +2570,9 @@ void Connection_handler::start_tls()
 
   std::string cert_file(::getenv("CERT"));
   std::string key_file(::getenv("KEY"));
-  
+
   PLOG("start_tls: cert=%s key=%s", cert_file.c_str(), key_file.c_str());
-  
+
   if (gnutls_certificate_set_x509_key_file(_xcred, cert_file.c_str(), key_file.c_str(), GNUTLS_X509_FMT_PEM) !=
       GNUTLS_E_SUCCESS)
     throw General_exception("gnutls_certificate_set_x509_key_file() failed");
@@ -2599,7 +2595,7 @@ void Connection_handler::start_tls()
   gnutls_transport_set_ptr(_session, this);
   gnutls_transport_set_vec_push_function(_session, TLS_transport::gnutls_vec_push_func);
   gnutls_transport_set_pull_function(_session, TLS_transport::gnutls_pull_func);
-  gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func); 
+  gnutls_transport_set_pull_timeout_function(_session, TLS_transport::gnutls_pull_timeout_func);
 
   /* initiate handshake */
   int rc;
@@ -2613,7 +2609,7 @@ void Connection_handler::start_tls()
       auto           status = gnutls_session_get_verify_cert_status(_session);
       if (gnutls_certificate_verification_status_print(status, type, &out, 0) != GNUTLS_E_SUCCESS)
         throw General_exception("gnutls_certificate_verification_status_print() failed");
-      
+
       gnutls_deinit(_session);
       gnutls_free(out.data);
     }

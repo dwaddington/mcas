@@ -90,21 +90,21 @@ int Connection_handler::tick()
         //        PNOTICE("Recv message: crc32 (id=%lx, len=%u)", msg->auth_id(), msg->msg_len());
 
         switch (msg->type_id()) {
-        case MSG_TYPE_IO_REQUEST:
+        case MSG_TYPE::IO_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: IO_REQUEST");
           _pending_msgs.push(iob);
           post_recv_buffer(allocate_recv());
           break;
 
-        case MSG_TYPE_PUT_ADO_REQUEST:
-        case MSG_TYPE_ADO_REQUEST:
+        case MSG_TYPE::PUT_ADO_REQUEST:
+        case MSG_TYPE::ADO_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: ADO_REQUEST");
           _pending_msgs.push(iob);
           assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           break;
 
-        case MSG_TYPE_CLOSE_SESSION:
+        case MSG_TYPE::CLOSE_SESSION:
           assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           if (option_DEBUG > 2) PMAJOR("Shard: CLOSE_SESSION");
@@ -112,14 +112,14 @@ int Connection_handler::tick()
           response = TICK_RESPONSE_CLOSE;
           break;
 
-        case MSG_TYPE_POOL_REQUEST:
+        case MSG_TYPE::POOL_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: POOL_REQUEST");
           _pending_msgs.push(iob);
           assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           break;
 
-        case MSG_TYPE_INFO_REQUEST:
+        case MSG_TYPE::INFO_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: INFO_REQUEST");
           _pending_msgs.push(iob);
           assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */

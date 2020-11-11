@@ -116,9 +116,9 @@ class IADO_plugin : public component::IBase {
 
   public:
     response_buffer_t(const response_buffer_t &) = delete;
-    
+
     response_buffer_t &operator=(const response_buffer_t &) = delete;
-    
+
     response_buffer_t(void* ptr_p,
                       size_t len_p,
                       uint32_t layer_id_,
@@ -192,10 +192,10 @@ class IADO_plugin : public component::IBase {
 
     uint64_t len = 0;
     uint32_t layer_id;
-    
+
   private:
     alloc_type_t _alloc_type;
-    
+
   public:
     ~response_buffer_t()
     {
@@ -241,16 +241,50 @@ class IADO_plugin : public component::IBase {
   virtual status_t register_mapped_memory(void* shard_vaddr, void* local_vaddr, size_t len) = 0;
 
   /**
-   * Upcall to perform ADO operation on a specific key-value pair
+   * Upcall to perform ADO operation on a specific key-value pair.
+   *
+   * (Informational:
+   *   ADO plugin:
+   *   ^  (implements IADO_plugin) function do_work in, e.g., ADO_{demo,testing,passthru}_plugin
+   *   ^  interface IADO_plugin <+++ YOU ARE HERE
+   *   ADO:
+   *   ^  interface IADO_plugin <+++ YOU ARE HERE
+   *   ^  ado_server main: calls do_work in response to discriminant mcas::ipc::MSG_TYPE::WORK_REQUEST
+   *   ^  object mcas::ipc::Work_request
+   *
+   *  (shared memory buffers)
+   *
+   *  ADO Proxy:
+   *   ^  object mcas::ipc::Work_request
+   *   ^  function ADO_protocol_builder::send_work_request,
+   *   ^  ADO_proxy (implements IADO_proxy) function send_work_request
+   *   ^  interface IADO_proxy::send_work_request,
+   *  Shard
+   *   ^  interface IADO_proxy::send_work_request,
+   *   ^  functions Shard::{process_ado_request,Shard::process_put_ado_request},
+   *   ^    (from discriminants mcas::protocol::MSG_TYPE::{ADO_REQUEST,PUT_ADO_REQUEST}),
+   *   ^  objects Message_ado_request,Message_put_ado_request
+   *
+   *  (Infiniband or IP)
+   *
+   *  MCAS Client:
+   *   ^  objects Message_ado_request,Message_put_ado_request
+   *   ^  function Connection_handler::{invoke_ado,invoke_ado_async,invoke_put_ado}
+   *   ^  MCAS_client (implements IMCAS) functions {invoke_ado,async_invoke_ado,invoke_put_ado}
+   *   ^  interface IMCAS::{invoke_ado,invoke_ado_async,invoke_put_ado}
+   *  User:
+   *   ^  interface IMCAS::{invoke_ado,invoke_ado_async,invoke_put_ado}
+   *   ^  from user, e.g. testing/ado-test/src/main.cpp src/apps/ado-perf/src/main.cpp
+   * )
    *
    * @param work_id Work identifier
-   * @param key Key pointer for target
+   *
    * @param key_len Length of key in bytes
    * @param values Set of pointer,length pairs for associated value memory.
    * First in vector is attached to the key.
    * @param in_work_request Open protocol request message
    * @param in_work_request_len Open protocol request message length
-   * @param new_root Set to true if a new root value was created
+   * @param new_root true iff a new root value was created (the values[0] element contains no data)
    * @param response_buffers Buffers to transmit, in order, for response
    *
    * @return ADO plugin response. S_ERASE_TARGET to erase the target pair on return

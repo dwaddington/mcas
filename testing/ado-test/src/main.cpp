@@ -72,7 +72,6 @@ TEST_F(ADO_test, BasicInvokeAdo)
   const std::string testname = "BasicInvokeAdo";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(256), /* size */
                                 0,                 /* flags */
@@ -99,7 +98,6 @@ TEST_F(ADO_test, BasicAdoResponse)
   const std::string testname = "BasicAdoResponse";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,                 /* flags */
@@ -130,7 +128,6 @@ TEST_F(ADO_test, BasicInvokePutAdo)
   const std::string testname = "BasicInvokePutAdo";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,            /* flags */
@@ -165,7 +162,6 @@ TEST_F(ADO_test, InvokeAdoCreateOnDemand)
   const std::string testname = "InvokeAdoCreateOnDemand";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,                 /* flags */
@@ -188,7 +184,6 @@ TEST_F(ADO_test, AdoKeyReference)
   const std::string testname = "AdoKeyReference";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,                 /* flags */
@@ -214,7 +209,6 @@ TEST_F(ADO_test, FindKeyCallback)
   const std::string testname = "FindKeyCallback";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,            /* flags */
@@ -240,7 +234,6 @@ TEST_F(ADO_test, BasicAllocatePoolMemory)
   const std::string testname = "BasicAllocatePoolMemory";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,                /* flags */
@@ -270,7 +263,6 @@ TEST_F(ADO_test, BasicDetachedMemory)
   const std::string testname = "BasicDetachedMemory";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
@@ -305,7 +297,6 @@ TEST_F(ADO_test, GetReferenceVector)
   const std::string testname = "GetReferenceVector";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, GiB(1), /* size */
                                 0,               /* flags */
@@ -332,7 +323,6 @@ TEST_F(ADO_test, GetReferenceVectorByTime)
   const std::string testname = "GetReferenceVectorByTime";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(32), /* size */
                                 0,               /* flags */
@@ -344,15 +334,15 @@ TEST_F(ADO_test, GetReferenceVectorByTime)
   for (unsigned i = 0; i < 10; i++) {
     ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
-  
+
   sleep(2);
-  
+
   for (unsigned i = 0; i < 10; i++) {
     ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
   sleep(2);
-  
+
   ASSERT_OK(mcas->invoke_ado(pool, testname, "RUN!TEST-GetReferenceVectorByTime", 0, response, KiB(4)));
 
   ASSERT_OK(mcas->close_pool(pool));
@@ -365,7 +355,6 @@ TEST_F(ADO_test, Iterator)
   const std::string testname = "Iterator";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(32),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
@@ -395,21 +384,20 @@ TEST_F(ADO_test, IteratorTS)
   const std::string testname = "IteratorTS";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, MiB(32),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
                                 100);                        /* obj count */
-  
+
   ASSERT_FALSE(pool == IMCAS::POOL_ERROR);
 
   std::vector<IMCAS::ADO_response> response;
 
   common::epoch_time_t ts1 = common::epoch_now();
-   
+
   ASSERT_TRUE(ts1.seconds() > 0);
   PLOG("now epoch.seconds = %lu", ts1.seconds());
-  
+
   wmb();
   sleep(3);
 
@@ -423,14 +411,13 @@ TEST_F(ADO_test, IteratorTS)
   PLOG("now epoch.seconds = %lu ", common::epoch_now().seconds());
 
   ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
-                             std::to_string(ts1.seconds()), 0, response, KiB(1)));
+                             "RUN!TEST-IteratorTS " + std::to_string(ts1.seconds()), 0, response, KiB(1)));
 
   ASSERT_LT(0, response.size());
-  uint64_t cnt;
-  cnt = *(response[0].cast_data<uint64_t>());
+  uint64_t cnt = *(response[0].cast_data<uint64_t>());
   PLOG("Iterator TS: count (1st round) = %lu", cnt);
   ASSERT_TRUE(cnt == 11);
-  
+
   sleep(3);
   wmb();
   common::epoch_time_t ts2 = common::epoch_now();
@@ -441,17 +428,13 @@ TEST_F(ADO_test, IteratorTS)
 
 
   ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
-                             std::to_string(ts2.seconds()), 0, response, KiB(1)));
+                             "RUN!TEST-IteratorTS " + std::to_string(ts2.seconds()), 0, response, KiB(1)));
 
   cnt = *(response[0].cast_data<uint64_t>());
   PLOG("Iterator TS: count (2nd round) = %lu", cnt);
 
-  /* There is a semantic different between mapstore and hstore
-     that needs fixing. I think hstore may not update the timestamp
-     on put on existing key.
-  */
-  //  ASSERT_TRUE(cnt == 10 || cnt == 11); /* IteratorTS key updated */
-  
+  ASSERT_TRUE(cnt == 10 || cnt == 11); /* IteratorTS key updated */
+
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }
@@ -462,7 +445,6 @@ TEST_F(ADO_test, Erase)
   const std::string testname = "Erase";
   const std::string poolname = testname;
   mcas->delete_pool(poolname);
-::system("ls -l /mnt/pmem1");
 
   auto pool = mcas->create_pool(poolname, GiB(1),             /* size */
                                 IMCAS::ADO_FLAG_CREATE_ONLY, /* flags */
@@ -474,7 +456,7 @@ TEST_F(ADO_test, Erase)
   ASSERT_OK(mcas->put(pool, testname, common::random_string(16)));
 
   mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
-                   testname, 0, response, KiB(1));
+                   "RUN!TEST-Erase", 0, response, KiB(1));
   std::string outvalue;
   auto        r = mcas->get(pool, testname, outvalue);
 
@@ -489,7 +471,6 @@ TEST_F(ADO_test, BasicAsyncInvokeAdo)
 {
   const std::string poolname = "pool0";
 
-::system("ls -l /mnt/pmem1");
   auto pool = mcas->create_pool(poolname, MiB(1), /* size */
                                 0,                 /* flags */
                                 50);              /* obj count */
@@ -499,11 +480,10 @@ TEST_F(ADO_test, BasicAsyncInvokeAdo)
   IMCAS::async_handle_t handles[4];
   const char * keys[] = {"BasicAdoResponse-A","BasicAdoResponse-B","BasicAdoResponse-C","BasicAdoResponse-D"};
 
-  status_t rc;
   std::vector<IMCAS::ADO_response> responses[4];
 
   for(unsigned h=0; h<4 ; h++) {
-    rc = mcas->async_invoke_ado(pool, keys[h], "RUN!TEST-BasicAdoResponse",
+    status_t rc = mcas->async_invoke_ado(pool, keys[h], "RUN!TEST-BasicAdoResponse",
                                 IMCAS::ADO_FLAG_CREATE_ON_DEMAND, responses[h], handles[h], KiB(4));
     ASSERT_OK(rc);
   }
