@@ -532,7 +532,7 @@ TEST_F(ADO_test, BasicAsyncInvokeAdo)
 TEST_F(ADO_test, RepeatInvokeAdo)
 {
   const std::string testname = "RepeatInvokeAdo";
-  const std::string poolname = testname;
+  const std::string poolname = "THIS_IS_A_TEST_POOL";
   mcas->delete_pool(poolname);
   ::system("ls -l /mnt/pmem1");
 

@@ -815,7 +815,7 @@ std::vector<std::string> mcas::Config_file::get_shard_ado_plugins(rapidjson::Siz
 
 std::map<std::string, std::string> mcas::Config_file::get_shard_ado_params(rapidjson::SizeType i) const
 {
-  auto result = std::map<std::string, std::string>();
+  std::map<std::string, std::string> result;
   if (i > shard_count()) throw Config_exception("%s shard out of bounds", __func__);
 
   auto shard = get_shard(i);
@@ -824,14 +824,8 @@ std::map<std::string, std::string> mcas::Config_file::get_shard_ado_params(rapid
     for (auto itr = obj.MemberBegin(); itr != obj.MemberEnd(); ++itr) {
       result[itr->name.GetString()] = itr->value.GetString();
     }
-#if 0
-    if (!shard[config::ado_params].IsArray()) throw Config_exception("%s should be an array", config::ado_params);
-    auto array = shard[config::ado_params].GetArray();
-    for (auto itr = array.Begin(); itr != array.End(); ++itr) {
-      result.push_back(itr->GetString());
-    }
-#endif
   }
+
   return result;
 }
 

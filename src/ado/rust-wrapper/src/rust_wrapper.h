@@ -63,10 +63,23 @@ public:
 public:
 
   /* IADO_plugin */
+  void launch_event(const uint64_t auth_id,
+                    const std::string& pool_name,
+                    const size_t pool_size,
+                    const unsigned int pool_flags,
+                    const unsigned int memory_type,
+                    const size_t expected_obj_count,
+                    const std::vector<std::string>& params);
+
   status_t register_mapped_memory(void * shard_vaddr,
                                   void * local_vaddr,
                                   size_t len) override;
 
+  void notify_op_event(component::ADO_op op) override;
+
+  void cluster_event(const std::string& sender,
+                     const std::string& type,
+                     const std::string& message) override;
 
   status_t do_work(const uint64_t work_key,
                    const char * key,

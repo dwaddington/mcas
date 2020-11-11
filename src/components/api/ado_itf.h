@@ -300,8 +300,8 @@ class IADO_plugin : public component::IBase {
    * @param message Message content
    */
   virtual void cluster_event(const std::string& sender,
-			     const std::string& type,
-			     const std::string& message) {}
+                             const std::string& type,
+                             const std::string& message) {}
 
 
   /* note:     FLAGS_CREATE_ONLY = 0x4, */

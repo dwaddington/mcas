@@ -1,12 +1,26 @@
 /*
+   Copyright [2020] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+/*
   Here is a skeleton implementation which would need implemented
   for a specific application
  */
+
 use std::fmt::Write;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::Status;
+use crate::status::Status;
 use crate::Value;
 use crate::size_t;
 use crate::KeyHandle;
@@ -23,6 +37,27 @@ fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
+pub fn launch_event(auth_id : u64,
+                    pool_name : &String,
+                    pool_size : size_t,
+                    pool_flags : u32,
+                    memory_type : u32,
+                    expected_obj_count : size_t,
+                    params : &String)
+{
+    println!("[RUST]: launch_event (auth={}, pool_name={}, pool_size={}, \
+              flags={}, memory_type={}, expected_obj_count={})",
+             auth_id, pool_name, pool_size, pool_flags, memory_type, expected_obj_count);
+    println!("[RUST]: params -> {}", params);
+}
+
+pub fn cluster_event(sender : &String,
+                     event_type : &String,
+                     message : &String)
+{
+    println!("[RUST]: cluster event ({},{},{})", sender, event_type, message);
+}
+    
 pub fn do_work(_services: &ADOCallback,
                _key: String,
                _attached_value : &Value,
@@ -35,6 +70,11 @@ pub fn do_work(_services: &ADOCallback,
              _key, _attached_value._buffer, _new_root);
     println!("[RUST]: request={:#?}", _work_request.as_string());
 
+    /* get pool info */
+    {
+        let info = _services.get_pool_info();
+        println!("[RUST]: pool info {}", info);
+    }
 
     /* write something into value memory, terminate with null for C-side printing */
     {
@@ -56,19 +96,23 @@ pub fn do_work(_services: &ADOCallback,
     _services.free_pool_memory(newmem);
     println!("[RUST]: freed memory");
 
+    let keyname = &_work_request.as_string().into_string().unwrap();
+    
     /* create a key */
     {
         let mut value = Value::new();
         let mut key_handle : KeyHandle = ptr::null_mut();
-        let rc = _services.create_key("egg".to_string(),
+        let rc = _services.create_key(keyname.to_string(),
                                       256,
                                       None,
                                       &mut value,
                                       &mut key_handle);
-        println!("[RUST]: created key {:#?} handle: {:?} rc:{}", value, key_handle, rc);
-        /* unlock key */
-        if _services.unlock_key(key_handle) == 0 {
-            println!("[RUST]: unlock OK");
+        println!("[RUST]: created key {:#?} handle: {:?} rc:{:?}", value, key_handle, rc);
+
+        if rc == Status::Ok {
+            /* unlock key */
+            let rc = _services.unlock_key(key_handle);
+            assert!(rc == Status::Ok, "service.unlock failed");
         }
     }
 
@@ -76,9 +120,15 @@ pub fn do_work(_services: &ADOCallback,
     {
         let mut value = Value::new();
         let mut key_handle : KeyHandle = ptr::null_mut();
-        let rc = _services.open_key("egg".to_string(), None, &mut value, &mut key_handle);
-        println!("[RUST]: opened key {:#?} handle: {:?} rc:{}", value, key_handle, rc);
-        
+        let rc = _services.open_key(keyname.to_string(), None, &mut value, &mut key_handle);
+        println!("[RUST]: opened key {:#?} handle: {:?} rc:{:?}", value, key_handle, rc);
+        assert!(rc == Status::Ok, "open key failed");
+
+        if rc == Status::Ok {
+            /* unlock key */
+            let rc = _services.unlock_key(key_handle);
+            assert!(rc == Status::Ok, "service.unlock failed");
+        }
     }
 
     /* set response */
@@ -91,17 +141,14 @@ pub fn do_work(_services: &ADOCallback,
         _response.copy_string_to(z).expect("copy into response failed");
     }
     
-    return 0;
+    return Status::Ok;
 }
 
-pub fn register_mapped_memory(_shard_base: u64, _local_base: u64, _size: size_t) -> Status
+pub fn register_mapped_memory(shard_base: u64, local_base: u64, size: size_t) -> Status
 {
-    println!("[RUST]: register_mapped_memory (shard@{:#X} local@{:#X} size={})", _shard_base, _local_base, _size);
-    return 0;
+    println!("[RUST]: register_mapped_memory (shard@{:#X} local@{:#X} size={})",
+             shard_base, local_base, size);
+    return Status::Ok;
 }
 
 
-pub fn debug_break()
-{
-    unsafe { crate::debug_break() };
-}

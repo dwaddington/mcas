@@ -993,8 +993,7 @@ void Shard::process_messages_from_ado()
                                  });
           }
           else {
-            rc = _i_kvstore->map(
-                                 ado->pool_id(),
+            rc = _i_kvstore->map(ado->pool_id(),
                                  [count, &check, &ptr](const void* key, const size_t key_len, const void* value, const size_t value_len,
                                                        const common::tsc_time_t  // timestamp
                                                        ) -> int {

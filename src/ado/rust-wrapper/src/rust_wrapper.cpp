@@ -48,11 +48,28 @@ extern "C"
                        const bool new_root,                       
                        Response * response);
 
+  status_t ffi_launch_event(const uint64_t auth_id,
+                            const char * pool_name,
+                            const size_t pool_name_len,
+                            const size_t pool_size,
+                            const unsigned int pool_flags,
+                            const unsigned int memory_type,
+                            const size_t expected_obj_count,
+                            const char * json_params,
+                            const size_t json_params_len);
+
+  void ffi_cluster_event(const char * sender,
+                         const size_t sender_len,
+                         const char * type,
+                         const size_t type_len,
+                         const char * message,
+                         const size_t message_len);
+
   Value callback_allocate_pool_memory(void * callback_ptr, size_t size) {
     assert(callback_ptr);
     auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
     void *ptr = nullptr;
-    auto result = p_this->cb_allocate_pool_memory(size, 4096, ptr);
+    auto result = p_this->cb_allocate_pool_memory(size, 64 /* alignment */, ptr);
     if(result != S_OK) throw General_exception("allocate_pool_memory_failed");
     return {ptr, size};
   }
@@ -121,20 +138,25 @@ extern "C"
     return rc;
   }
 
+  void * callback_get_pool_info(void * callback_ptr) {
+    assert(callback_ptr);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    if(debug_level() >= 2)
+      PLOG("callback_get_pool_info: %p", callback_ptr);
+    std::string info;
+    auto rc = p_this->cb_get_pool_info(info);
+    char * result = reinterpret_cast<char*>(::malloc(info.size() + 1));
+    memcpy(result, info.c_str(), info.size());
+    result[info.size()]='\0';
+    return result;
+  }
+
 
   void debug_break() {
     asm("int3");
   }
   
 }
-
-
-// extern "C"
-// {
-//   status_t allocate_pool_memory(const size_t size, const size_t alignment_hint, void*& out_new_addr)
-//   {
-//     return _cb.allocate_pool_memory(size, alignment_hint, out_new_addr);
-//   }
 
 
 status_t ADO_rust_wrapper_plugin::register_mapped_memory(void *shard_vaddr,
@@ -145,6 +167,51 @@ status_t ADO_rust_wrapper_plugin::register_mapped_memory(void *shard_vaddr,
                                     reinterpret_cast<uint64_t>(local_vaddr),
                                     len);
 }
+
+void ADO_rust_wrapper_plugin::launch_event(const uint64_t auth_id,
+                                           const std::string& pool_name,
+                                           const size_t pool_size,
+                                           const unsigned int pool_flags,
+                                           const unsigned int memory_type,
+                                           const size_t expected_obj_count,
+                                           const std::vector<std::string>& params) {
+  const char * pool_name_ptr = pool_name.c_str();
+  size_t pool_name_len = pool_name.size();
+
+  /* translate param vector */
+  if(params.size() > 0) {
+    std::stringstream ss;
+    
+    for(auto p : params) {
+      ss << p.substr(1, p.size() - 2) << ",";
+    }
+    ss.seekp(-1,ss.cur);
+    
+    std::string pstr = ss.str();
+    ffi_launch_event(auth_id,
+                     pool_name_ptr,
+                     pool_name_len,
+                     pool_size,
+                     pool_flags,
+                     memory_type,
+                     expected_obj_count,
+                     pstr.c_str(),
+                     pstr.size());
+    
+  }
+  else {
+    ffi_launch_event(auth_id,
+                     pool_name_ptr,
+                     pool_name_len,
+                     pool_size,
+                     pool_flags,
+                     memory_type,
+                     expected_obj_count,
+                     nullptr,
+                     0);
+  }
+}
+
 
 status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_id,
                                           const char * key,
@@ -203,6 +270,17 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_id,
   
   return rc;
 }
+
+void ADO_rust_wrapper_plugin::notify_op_event(component::ADO_op op) {
+  //  auto opstr = to_str(op);
+}
+
+void ADO_rust_wrapper_plugin::cluster_event(const std::string& sender,
+                                            const std::string& type,
+                                            const std::string& message) {
+  
+}
+
 
 status_t ADO_rust_wrapper_plugin::shutdown() {
   /* here you would put graceful shutdown code if any */
