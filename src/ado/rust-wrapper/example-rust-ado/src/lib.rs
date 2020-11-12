@@ -269,8 +269,7 @@ impl ADOCallback {
 
         if new_value._buffer.is_null() {
             None
-        }
-        else {
+        } else {
             Some(new_value)
         }
     }
@@ -351,6 +350,25 @@ impl ADOCallback {
         }
     }
 
+    /// Open existing key-value pair in index (this pool)
+    ///
+    /// Arguments:
+    ///
+    /// * `key`: String based keyhandle
+    /// * `flags` : Flags that govern implicit locking
+    /// * `out_value` : Returned value (ptr,len) in pool memory
+    /// * `out_key_handle` : Handle that can be used to release lock explicitly
+    /// * return status
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut value = Value::new();
+    /// let mut key_handle : KeyHandle = ptr::null_mut();
+    /// let rc = _services.create_key(keyname.to_string(),
+    ///                               None, &mut value, &mut key_handle);
+    /// assert!(rc == Status::Ok);
+    /// ```    
     pub fn open_key(
         &self,
         key: String,
@@ -384,6 +402,13 @@ impl ADOCallback {
         }
     }
 
+    /// Unlock explicitly locked key.  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// _services.unlock(key_handle)
+    /// ```    
     pub fn unlock_key(&self, key_handle: KeyHandle) -> Status {
         unsafe { callback_unlock_key(self._context, self._work_id, key_handle) }
     }
