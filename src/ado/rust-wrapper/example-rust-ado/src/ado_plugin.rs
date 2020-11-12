@@ -133,8 +133,22 @@ pub fn do_work(
 
         /* resize key - must be unlocked */
         {
-            let new_value = _services.resize_value(keyname.to_string(), 128);
-            println!("[RUST]: resized value to {:?}", new_value);
+            _services.resize_value(keyname.to_string(), 128);
+
+            /* because this is not the current target key we 
+               need to reopen it */
+            let rc = _services.open_key(keyname.to_string(), None, &mut value, &mut key_handle);
+            println!(
+                "[RUST]: re-opened key {:#?} handle: {:?} rc:{:?}",
+                value, key_handle, rc
+            );
+            assert!(rc == Status::Ok, "re-open key failed");
+
+            if rc == Status::Ok {
+                /* unlock key */
+                let rc = _services.unlock_key(key_handle);
+                assert!(rc == Status::Ok, "service.unlock failed");
+            }
         }
     }
 
@@ -158,7 +172,7 @@ pub fn do_work(
 
     /* resize current (target) value, need to unlock it first */
     {
-        let new_value = _services.resize_value(_key.to_string(), _attached_value._buffer_size - 4);
+        let new_value = _services.resize_value(_key, _attached_value._buffer_size - 4);
         println!("[RUST]: resized target value to {:?}", new_value);
     }
 

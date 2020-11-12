@@ -23,7 +23,6 @@ extern crate json;
 extern crate alloc;
 extern crate libc;
 
-
 mod ado_plugin;
 mod status;
 
@@ -138,11 +137,6 @@ impl Response {
 }
 
 /* TODO
-std::function<status_t(const uint64_t     work_id,
-                           const std::string& key_name,
-                           const size_t       new_value_size,
-                           void*&             out_new_value_addr)>
-        resize_value;
 
  std::function<status_t(const std::string&     key_expression,
                            const offset_t         begin_position,
@@ -195,9 +189,9 @@ extern "C" {
         work_id: u64,
         key: *const c_char,
         new_value_size: size_t,
-        out_new_value: &mut Value
+        out_new_value: &mut Value,
     ) -> Status;
-    
+
     fn debug_break();
 }
 
@@ -245,8 +239,9 @@ impl ADOCallback {
         unsafe { callback_free_pool_memory(self._context, value) }
     }
 
-
-    /// Resize existing value associated with key
+    /// Resize existing value associated with key.  If this
+    /// is the invoke-target key then the new value is returned,
+    /// otherwise, the key-value pair will need relocking
     ///
     /// Arguments:
     ///
@@ -258,19 +253,26 @@ impl ADOCallback {
     /// ```
     /// _services.resize_value("myKey", 256);
     /// ```    
-    pub fn resize_value(
-        &self,
-        key: String,
-        new_size: size_t) -> Value {
+    pub fn resize_value(&self, key: String, new_size: size_t) -> Option<Value> {
         let str = std::ffi::CString::new(key).expect("CString::new failed");
         let strptr = str.as_ptr();
         let mut new_value = Value::new();
-        unsafe { callback_resize_value(self._context,
-                                       self._work_id,
-                                       strptr,
-                                       new_size,
-                                       &mut new_value) };
-        new_value
+        unsafe {
+            callback_resize_value(
+                self._context,
+                self._work_id,
+                strptr,
+                new_size,
+                &mut new_value,
+            )
+        };
+
+        if new_value._buffer.is_null() {
+            None
+        }
+        else {
+            Some(new_value)
+        }
     }
 
     /// Get pool information

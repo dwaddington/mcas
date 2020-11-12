@@ -25,6 +25,7 @@ MCAS supports read and write locks on kv-pairs.
 |create-key   |  unlocked                | wr-lock                   |
 |open-key     |                          | wr-lock                   |
 |resize-value |  unlocked                | unlocked                  |
+|resize-value |  wr-lock                 | wr-lock                   |
 |unlock-key   |  wr-lock                 | unlocked                  |
 |unlock-key   |  rd-lock                 | rd-lock/unlocked          |
 
