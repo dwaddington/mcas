@@ -114,6 +114,14 @@ pub fn do_work(_services: &ADOCallback,
             let rc = _services.unlock_key(key_handle);
             assert!(rc == Status::Ok, "service.unlock failed");
         }
+        
+        /* resize key - must be unlocked */
+        {
+            let new_value = _services.resize_value(keyname.to_string(), 128);
+            println!("[RUST]: resized value to {:?}", new_value);
+        }
+
+
     }
 
     /* open key */

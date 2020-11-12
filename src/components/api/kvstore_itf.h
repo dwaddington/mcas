@@ -340,7 +340,7 @@ class IKVStore : public component::IBase {
    * Resize memory for a value
    *
    * @param pool Pool handle
-   * @param key Object key
+   * @param key Object key (should be unlocked)
    * @param new_size New size of value in bytes (can be more or less)
    *
    * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND,
@@ -500,7 +500,7 @@ class IKVStore : public component::IBase {
    * nullptr if not required)
    *
    * @return S_OK, S_CREATED_OK (if created on demand), E_KEY_NOT_FOUND,
-   * E_LOCKED (already locket), E_INVAL (e.g., no key & no length),
+   * E_LOCKED (already locked), E_INVAL (e.g., no key & no length),
    * E_TOO_LARGE (cannot allocate space for lock), E_NOT_SUPPORTED
    * if unable to take lock or other error
    */

@@ -37,6 +37,7 @@ extern "C"
   };
   
   status_t ffi_register_mapped_memory(uint64_t shard_vaddr, uint64_t local_vaddr, size_t len);
+  
   status_t ffi_do_work(void* callback_ptr,
                        uint64_t work_id,
                        const char * key,
@@ -123,7 +124,9 @@ extern "C"
                                   out_value->buffer,
                                   out_value->buffer_size,                                  
                                   &key_ptr,
-                                  out_key_handle);    
+                                  out_key_handle);
+
+    PNOTICE("rust-wrapper: callback_open_key (%s) out_value=%p", key, out_value->buffer);
     return rc;
   }
 
@@ -144,14 +147,33 @@ extern "C"
     if(debug_level() >= 2)
       PLOG("callback_get_pool_info: %p", callback_ptr);
     std::string info;
-    auto rc = p_this->cb_get_pool_info(info);
+    if(p_this->cb_get_pool_info(info) != S_OK)
+      throw General_exception("cb_get_pool_info failed unexpectedly");
+    
     char * result = reinterpret_cast<char*>(::malloc(info.size() + 1));
     memcpy(result, info.c_str(), info.size());
     result[info.size()]='\0';
     return result;
   }
-
-
+  
+  status_t callback_resize_value(void * callback_ptr,
+                                 uint64_t work_id,
+                                 const char * key,
+                                 size_t new_value_size,
+                                 Value* out_new_value) {
+    assert(callback_ptr);
+    assert(out_new_value);
+    std::string key_name(key);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    void * new_val_addr = nullptr;
+    auto rc = p_this->cb_resize_value(work_id, key_name, new_value_size, new_val_addr);
+    if(rc == S_OK) {
+      out_new_value->buffer = new_val_addr;
+      out_new_value->buffer_size = new_value_size;
+    }
+    return rc;
+  }
+  
   void debug_break() {
     asm("int3");
   }

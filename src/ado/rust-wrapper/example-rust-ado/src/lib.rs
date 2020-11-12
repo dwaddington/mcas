@@ -16,7 +16,7 @@
 #![allow(unused_imports)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-    
+
 extern crate alloc;
 extern crate libc;
 
@@ -55,8 +55,10 @@ pub struct Value {
 
 impl Default for Value {
     fn default() -> Value {
-        Value { _buffer : null_mut(),
-                 _buffer_size : 0 }
+        Value {
+            _buffer: null_mut(),
+            _buffer_size: 0,
+        }
     }
 }
 impl fmt::Debug for Value {
@@ -184,6 +186,14 @@ extern "C" {
 
     fn callback_unlock_key(context: *const c_void, work_id: u64, key_handle: KeyHandle) -> Status;
 
+    fn callback_resize_value(
+        context: *const c_void,
+        work_id: u64,
+        key: *const c_char,
+        new_value_size: size_t,
+        out_new_value: &mut Value
+    ) -> Status;
+    
     fn debug_break();
 }
 
@@ -229,6 +239,34 @@ impl ADOCallback {
     /// ```    
     pub fn free_pool_memory(&self, value: Value) -> Status {
         unsafe { callback_free_pool_memory(self._context, value) }
+    }
+
+
+    /// Resize existing value associated with key
+    ///
+    /// Arguments:
+    ///
+    /// * `key`: Key
+    /// * `new_size`: Size to resize to in bytes
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// _services.resize_value("myKey", 256);
+    /// ```    
+    pub fn resize_value(
+        &self,
+        key: String,
+        new_size: size_t) -> Value {
+        let str = std::ffi::CString::new(key).expect("CString::new failed");
+        let strptr = str.as_ptr();
+        let mut new_value = Value::new();
+        unsafe { callback_resize_value(self._context,
+                                       self._work_id,
+                                       strptr,
+                                       new_size,
+                                       &mut new_value) };
+        new_value
     }
 
     /// Get pool information
@@ -282,32 +320,28 @@ impl ADOCallback {
         let str = std::ffi::CString::new(key).expect("CString::new failed");
         let strptr = str.as_ptr();
         match flags {
-            None => {
-                unsafe {
-                    callback_create_key(
-                        self._context,
-                        self._work_id,
-                        strptr,
-                        value_size,
-                        KeyLifetimeFlags::None,
-                        out_value,
-                        out_key_handle,
-                    )
-                }
-            }
-            Some(f) => {
-                unsafe {
-                    callback_create_key(
-                        self._context,
-                        self._work_id,
-                        strptr,
-                        value_size,
-                        f,
-                        out_value,
-                        out_key_handle,
-                    )
-                }
-            }
+            None => unsafe {
+                callback_create_key(
+                    self._context,
+                    self._work_id,
+                    strptr,
+                    value_size,
+                    KeyLifetimeFlags::None,
+                    out_value,
+                    out_key_handle,
+                )
+            },
+            Some(f) => unsafe {
+                callback_create_key(
+                    self._context,
+                    self._work_id,
+                    strptr,
+                    value_size,
+                    f,
+                    out_value,
+                    out_key_handle,
+                )
+            },
         }
     }
 
@@ -321,30 +355,26 @@ impl ADOCallback {
         let str = std::ffi::CString::new(key).expect("CString::new failed");
         let strptr = str.as_ptr();
         match flags {
-            None => {
-                unsafe {
-                    callback_open_key(
-                        self._context,
-                        self._work_id,
-                        strptr,
-                        KeyLifetimeFlags::None,
-                        out_value,
-                        out_key_handle,
-                    )
-                }
-            }
-            Some(f) => {
-                unsafe {
-                    callback_open_key(
-                        self._context,
-                        self._work_id,
-                        strptr,
-                        f,
-                        out_value,
-                        out_key_handle,
-                    )
-                }
-            }
+            None => unsafe {
+                callback_open_key(
+                    self._context,
+                    self._work_id,
+                    strptr,
+                    KeyLifetimeFlags::None,
+                    out_value,
+                    out_key_handle,
+                )
+            },
+            Some(f) => unsafe {
+                callback_open_key(
+                    self._context,
+                    self._work_id,
+                    strptr,
+                    f,
+                    out_value,
+                    out_key_handle,
+                )
+            },
         }
     }
 

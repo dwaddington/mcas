@@ -728,12 +728,13 @@ void Shard::process_messages_from_ado()
           ado->send_table_op_response(_i_kvstore->erase(ado->pool_id(), key));
           break;
         }
-        case ADO_op::VALUE_RESIZE: /* resize only allowed on current work
-                                      invocation target */
+        case ADO_op::VALUE_RESIZE: 
           {
-            CPLOG(2, "Shard_ado: received table op resize value (work_id=%p)", reinterpret_cast<const void*>(work_id));
+            /* resize_value can only be performed on keys not already locked */
+            
+            CPLOG(2, "Shard_ado: received table op resize value (work_id=%p)",
+                  reinterpret_cast<const void*>(work_id));
 
-            /* for resize, we need unlock, resize, and then relock */
             auto work_item = _outstanding_work.find(work_id);
 
             if (work_item == _outstanding_work.end()) {
@@ -743,34 +744,24 @@ void Shard::process_messages_from_ado()
 
             /* use the work id to get the key handle */
             work_request_t* wr      = request_key_to_record(work_id);
-            const char*     key_ptr = nullptr;
             status_t        rc;
 
-            if (!wr) throw Logic_exception("unable to get request from work_id");
-
-            if ((rc = _i_kvstore->unlock(ado->pool_id(), wr->key_handle)) != S_OK) {
-              ado->send_table_op_response(rc);
+            if (!wr) {
+              PWRN("unable to get request from work_id");
+              ado->send_table_op_response(E_INVAL);
               break;
             }
-
-            CPLOG(2, "Shard_ado: table op resize, unlocked");
-
-            /* perform resize */
+            
+            /* perform resize, which will need to take the lock */
             void*  new_value      = nullptr;
             size_t new_value_len  = 0;
-            auto   old_key_handle = wr->key_handle;
-            rc                    = _i_kvstore->resize_value(ado->pool_id(), key, value_len, align_or_flags);
 
-            if (_i_kvstore->lock(ado->pool_id(), key, IKVStore::STORE_LOCK_WRITE, new_value, new_value_len,
-                                 wr->key_handle /* update key handle in record */, &key_ptr) != S_OK)
-              throw Logic_exception("ADO OP_RESIZE request failed to relock");
+            rc = _i_kvstore->resize_value(ado->pool_id(),
+                                          key,
+                                          value_len,
+                                          align_or_flags);
 
-            /* update deferred locks */
-            if (ado->update_deferred_unlock(work_id, wr->key_handle) != S_OK) {
-              if (ado->remove_life_unlock(old_key_handle) == S_OK) ado->add_life_unlock(wr->key_handle);
-            }
-
-            ado->send_table_op_response(rc, new_value, new_value_len, key_ptr);
+            ado->send_table_op_response(rc, new_value, new_value_len, nullptr); /* HACK last param not needed */
             break;
           }
         case ADO_op::ALLOCATE_POOL_MEMORY: {

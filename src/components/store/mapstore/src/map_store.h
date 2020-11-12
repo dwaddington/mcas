@@ -23,6 +23,8 @@
 
 #include <api/kvstore_itf.h>
 
+static constexpr unsigned DEBUG_LEVEL = 3;
+
 namespace nupm
 {
   struct region_descriptor;
@@ -31,7 +33,7 @@ namespace nupm
 class Map_store : public component::IKVStore /* generic Key-Value store interface */
 {
 public:
-  static constexpr unsigned debug_level() { return 0; }
+  static constexpr unsigned debug_level() { return DEBUG_LEVEL; }
 
   /**
    * Constructor
