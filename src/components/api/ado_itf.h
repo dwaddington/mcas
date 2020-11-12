@@ -1015,14 +1015,14 @@ class IADO_proxy : public component::IBase {
   virtual void add_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key) = 0;
 
   /**
-   * Updates a key-value pair deferred unlock
+   * Removes a key-value pair deferred unlock
    *
    * @param work_request_id Work request identifier
    * @param key Key/lock handle
    *
    * @return S_OK or E_NOT_FOUND
    */
-  virtual status_t update_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key) = 0;
+  virtual status_t remove_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key) = 0;
 
   /**
    * Retrive (and clear) keys that need to be unlock on associated pool

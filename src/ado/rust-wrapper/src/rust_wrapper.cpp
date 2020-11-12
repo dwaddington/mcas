@@ -167,10 +167,10 @@ extern "C"
     auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
     void * new_val_addr = nullptr;
     auto rc = p_this->cb_resize_value(work_id, key_name, new_value_size, new_val_addr);
-    if(rc == S_OK) {
-      out_new_value->buffer = new_val_addr;
-      out_new_value->buffer_size = new_value_size;
-    }
+
+    out_new_value->buffer = new_val_addr;
+    out_new_value->buffer_size = rc == S_OK ? new_value_size : 0;
+    
     return rc;
   }
   

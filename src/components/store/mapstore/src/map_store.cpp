@@ -1170,7 +1170,7 @@ status_t Map_store::unlock(const pool_t pid,
   auto session = get_session(pid);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
 
-  CPLOG(1, "Map_store: unlock(%p)", reinterpret_cast<void*>(key_handle));
+  CPLOG(1, "Map_store::unlock (key-handle=%p)", reinterpret_cast<void*>(key_handle));
 
   session->pool->unlock(key_handle);
   return S_OK;

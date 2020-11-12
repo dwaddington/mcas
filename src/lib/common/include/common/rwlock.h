@@ -7,7 +7,8 @@
 #include <pthread.h>
 #include <stdexcept>
 
-#define DEBUG_LOCKING
+/* enables lock checking and debugging output */
+//#define DEBUG_LOCKING
 
 namespace common
 {
@@ -61,7 +62,11 @@ class RWLock {
       _read_lock_count--;
     else if(_write_lock_count == 1)
       _write_lock_count = 0;
-    else throw Logic_exception("bad lock state");
+    else {
+      PWRN("bad lock state, nothing to unlock");
+      asm("int3");
+    }
+    //    else throw Logic_exception("bad lock state");
     show();
 #endif
     return pthread_rwlock_unlock(&_lock);

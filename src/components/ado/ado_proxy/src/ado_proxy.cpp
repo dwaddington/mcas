@@ -541,11 +541,11 @@ void ADO_proxy::add_deferred_unlock(const uint64_t work_request_id, const compon
   CPLOG(2, "ADO_proxy: deferred unlock count %lu", _deferred_unlocks[work_request_id].size());
 }
 
-status_t ADO_proxy::update_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key)
+status_t ADO_proxy::remove_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key)
 {
   if (_deferred_unlocks.find(work_request_id) == _deferred_unlocks.end()) return E_NOT_FOUND;
   auto &key_v    = _deferred_unlocks[work_request_id];
-  auto  iter_pos = key_v.find(key);
+  auto iter_pos = key_v.find(key);
   if (iter_pos == key_v.end()) return E_NOT_FOUND;
   key_v.erase(iter_pos);
   return S_OK;

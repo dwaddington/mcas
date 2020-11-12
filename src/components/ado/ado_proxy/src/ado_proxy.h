@@ -11,8 +11,8 @@
   limitations under the License.
 */
 
-#ifndef __ADOPROX_COMPONENT_H__
-#define __ADOPROX_COMPONENT_H__
+#ifndef __ADOPROXY_COMPONENT_H__
+#define __ADOPROXY_COMPONENT_H__
 
 #include "ado_proto.h"
 #include "docker.h"
@@ -72,8 +72,8 @@ public:
   void *query_interface(component::uuid_t &itf_uuid) override {
     if (itf_uuid == component::IADO_proxy::iid()) {
       return static_cast<component::IADO_proxy *>(this);
-    } else
-      return NULL; // we don't support this interface
+    }
+    else return NULL; // we don't support this interface
   }
 
   void unload() override {
@@ -86,18 +86,17 @@ public:
   status_t send_op_event(component::ADO_op op) override;
 
   status_t send_cluster_event(const std::string& sender,
-			      const std::string& type,
-			      const std::string& content) override;
+                              const std::string& type,
+                              const std::string& content) override;
 
   status_t send_memory_map(uint64_t token, size_t size,
                            void *value_vaddr) override;
 
-  status_t send_memory_map_named(
-    unsigned region_id,
-    string_view pool_name,
-    std::size_t offset,
-    ::iovec iov) override;
-
+  status_t send_memory_map_named(unsigned region_id,
+                                 string_view pool_name,
+                                 std::size_t offset,
+                                 ::iovec iov) override;
+  
   status_t send_work_request(const uint64_t work_request_key,
                              const char * key,
                              const size_t key_len,
@@ -184,7 +183,7 @@ public:
   void add_deferred_unlock(const uint64_t work_key,
                            const component::IKVStore::key_t key) override;
 
-  status_t update_deferred_unlock(const uint64_t work_request_id,
+  status_t remove_deferred_unlock(const uint64_t work_request_id,
                                   const component::IKVStore::key_t key) override;
 
   void get_deferred_unlocks(const uint64_t work_key,
@@ -258,21 +257,20 @@ public:
 
   void unload() override { delete this; }
 
-  virtual component::IADO_proxy *
-  create(const uint64_t auth_id,
-	 const unsigned debug_level,
-         component::IKVStore * kvs,
-         component::IKVStore::pool_t pool_id,
-         const std::string &pool_name,
-         const size_t pool_size,
-         const unsigned int pool_flags,
-         const uint64_t expected_obj_count,
-         const std::string &filename,
-         std::vector<std::string> &args,
-         std::string cores,
-         int memory,
-         float cpu_num,
-         numa_node_t numa_zone) override
+  virtual component::IADO_proxy * create(const uint64_t auth_id,
+                                         const unsigned debug_level,
+                                         component::IKVStore * kvs,
+                                         component::IKVStore::pool_t pool_id,
+                                         const std::string &pool_name,
+                                         const size_t pool_size,
+                                         const unsigned int pool_flags,
+                                         const uint64_t expected_obj_count,
+                                         const std::string &filename,
+                                         std::vector<std::string> &args,
+                                         std::string cores,
+                                         int memory,
+                                         float cpu_num,
+                                         numa_node_t numa_zone) override
   {
     component::IADO_proxy *obj =
       static_cast<component::IADO_proxy *>(new ADO_proxy(auth_id,

@@ -17,8 +17,12 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+#[macro_use]
+extern crate json;
+
 extern crate alloc;
 extern crate libc;
+
 
 mod ado_plugin;
 mod status;
