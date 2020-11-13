@@ -126,7 +126,8 @@ extern "C"
                                   &key_ptr,
                                   out_key_handle);
 
-    PNOTICE("rust-wrapper: callback_open_key (%s) out_value=%p", key, out_value->buffer);
+    if(debug_level() >= 2)
+      PLOG("rust-wrapper: callback_open_key (%s) out_value=%p", key, out_value->buffer);
     return rc;
   }
 
@@ -284,11 +285,8 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_id,
                      &response);
   }
 
-  /* transpose response */
-  //  PNOTICE("value -->");
-  //  hexdump(values[0].ptr, 10);
-  PNOTICE("value=(%s)", reinterpret_cast<char*>(values[0].ptr));
-  PNOTICE("response=(%s)", reinterpret_cast<char*>( response.buffer));
+  if(debug_level() >= 2)
+    PLOG("ADO: do_work response=(%s)", reinterpret_cast<char*>( response.buffer));
   
   return rc;
 }
@@ -300,7 +298,12 @@ void ADO_rust_wrapper_plugin::notify_op_event(component::ADO_op op) {
 void ADO_rust_wrapper_plugin::cluster_event(const std::string& sender,
                                             const std::string& type,
                                             const std::string& message) {
-  
+  ffi_cluster_event(sender.c_str(),
+                    sender.size(),
+                    type.c_str(),
+                    type.size(),
+                    message.c_str(),
+                    message.size());
 }
 
 

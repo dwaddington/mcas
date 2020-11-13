@@ -250,6 +250,7 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
     std::vector<uint64_t> answer;
     std::string           key(msg->key());
 
+    /* check if key exists */
     if (_i_kvstore->get_attribute(msg->pool_id(), IKVStore::Attribute::VALUE_LEN, answer, &key) !=
         IKVStore::E_KEY_NOT_FOUND) {
       /* already exists */

@@ -17,16 +17,15 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-#[macro_use]
-extern crate json;
 
+extern crate json;
 extern crate alloc;
 extern crate libc;
 
 mod ado_plugin;
 mod status;
 
-use core::ptr::{null, null_mut};
+use core::ptr::{null_mut};
 use libc::{c_char, c_uchar, c_uint, c_void, size_t};
 use status::Status;
 use std::ffi::CStr;
@@ -201,12 +200,6 @@ pub struct ADOCallback {
 }
 
 impl ADOCallback {
-    pub fn new(context: *const c_void, work_id: u64) -> ADOCallback {
-        ADOCallback {
-            _context: context,
-            _work_id: work_id,
-        }
-    }
 
     /// Allocate memory from the pool
     ///
@@ -445,7 +438,7 @@ pub extern "C" fn ffi_do_work(
 
     ado_plugin::do_work(
         &services,
-        rstr,
+        &rstr,
         attached_value,
         detached_value,
         &req,
@@ -501,4 +494,10 @@ pub extern "C" fn ffi_cluster_event(
     let event_type = convert_to_string(event_type_ptr, event_type_len);
     let message = convert_to_string(message_ptr, message_len);
     ado_plugin::cluster_event(&sender, &event_type, &message);
+}
+
+#[no_mangle]
+pub extern "C" fn ffi_shutdown()
+{
+    ado_plugin::shutdown();
 }

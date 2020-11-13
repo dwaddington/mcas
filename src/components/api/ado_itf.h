@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019,2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -176,7 +176,10 @@ class IADO_plugin : public component::IBase {
       return *this;
     }
 
-    inline bool is_pool() const { return _alloc_type == alloc_type_t::POOL || _alloc_type == alloc_type_t::POOL_TO_FREE; }
+    inline bool is_pool() const {
+      return (_alloc_type == alloc_type_t::POOL) ||
+        (_alloc_type == alloc_type_t::POOL_TO_FREE);
+    }
     inline bool is_malloc() const { return _alloc_type == alloc_type_t::MALLOC; }
     inline bool is_inline() const { return _alloc_type == alloc_type_t::INLINE; }
     inline bool is_pool_to_free() const { return _alloc_type == alloc_type_t::POOL_TO_FREE; }
