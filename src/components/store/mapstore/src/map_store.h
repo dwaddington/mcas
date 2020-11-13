@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2019] [IBM Corporation]
+  Copyright [2017-2020] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -187,15 +187,14 @@ public:
    * Component/interface management
    *
    */
-  DECLARE_VERSION(0.1f);
-  DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75,
-                         0x21, 0xa1, 0x21);
+  DECLARE_VERSION(1.0f);
+  DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x21);
 
   void *query_interface(component::uuid_t &itf_uuid) override {
     if (itf_uuid == component::IKVStore_factory::iid()) {
       return static_cast<component::IKVStore_factory *>(this);
-    } else
-      return NULL;  // we don't support this interface
+    }
+    else return NULL;  // we don't support this interface
   }
 
   void unload() override { delete this; }
