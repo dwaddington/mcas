@@ -23,7 +23,12 @@
 
 #include <api/kvstore_itf.h>
 
-static constexpr unsigned DEBUG_LEVEL = 3;
+#define PREFIX "Map_store: "
+/** 
+ * Debug level for this component
+ * 
+ */
+static constexpr unsigned DEBUG_LEVEL = 0;
 
 namespace nupm
 {
