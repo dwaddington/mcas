@@ -1,3 +1,12 @@
+# Release v0.5.0 (major release)
+
+## Key new features
+
+* Support for fsdax PMEM configuration (info/MCAS_notes_on_dax.md).
+* Use of Mellanox/NVIDIA Connect-X ODP (On-demand Paging) via USE_ODP=1
+* Experimental wrapper for Rust-basd ADO implementation (src/ado/rust-wrapper)
+
+
 # Release v0.4.0 (major release)
 
 ## Key new features
