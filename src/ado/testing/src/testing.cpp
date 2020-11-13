@@ -152,9 +152,8 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     void *                     new_value_addr = nullptr;
     const char *               new_key_addr   = nullptr;
     component::IKVStore::key_t key_handle, key_handle2;
-    ASSERT_OK(
-        cb_create_key(work_key, "akrKey", 256, FLAGS_NO_IMPLICIT_UNLOCK, new_value_addr, &new_key_addr, &key_handle),
-        "ADO_testing_plugin: create key failed");
+    ASSERT_OK(cb_create_key(work_key, "akrKey", 256, FLAGS_NO_IMPLICIT_UNLOCK, new_value_addr, &new_key_addr, &key_handle),
+              "ADO_testing_plugin: create key failed");
 
     ASSERT_TRUE(new_value_addr, "ADO_testing_plugin: bad result from create key");
     ASSERT_TRUE(new_key_addr, "ADO_testing_plugin: bad result from create key");

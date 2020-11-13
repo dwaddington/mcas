@@ -701,8 +701,7 @@ void Shard::process_messages_from_ado()
               if (align_or_flags & IADO_plugin::FLAGS_NO_IMPLICIT_UNLOCK) {
                 CPLOG(2, "Shard_ado: locked (%s) without implicit unlock", key.c_str());
               }
-              else if (invoke_completion_unlock) { /* unlock on ADO invoke
-                                                      completion */
+              else if (invoke_completion_unlock) { /* unlock on ADO invoke completion */
                 if (work_id == 0) {
                   ado->send_table_op_response(E_INVAL);
                 }
@@ -1059,27 +1058,19 @@ void Shard::process_messages_from_ado()
 
         CPLOG(2, "ADO callback: unlock request (work_id=%lx, handle=%p)", work_id, static_cast<const void*>(key_handle));
 
-        /* unlock should fail if implicit unlock exists, i.e.  it
-           should only be performed on locks taken via
-           FLAGS_NO_IMPLICIT_UNLOCK */
         if (key_handle == nullptr) {
           CPWRN(1, "ADO callback: bad key (nullptr)");
           ado->send_unlock_response(E_INVAL);
         }
         else {
-          if(!ado->check_for_implicit_unlock(work_id, key_handle)) {
-            CPWRN(1, "ADO callback: unlock, implicit lock not found "
-                  "(work_id=%lx, key_handle=%p)",
-                  work_id, reinterpret_cast<void*>(key_handle));
-            ado->send_unlock_response(E_INVAL);
-          }
-          else {
+          auto rc = _i_kvstore->unlock(ado->pool_id(), key_handle);
+          
+          if(ado->check_for_implicit_unlock(work_id, key_handle)) {
             CPLOG(2, "ADO callback: unlock request target lock is implicit");
-            auto rc = _i_kvstore->unlock(ado->pool_id(), key_handle);
             if(rc == S_OK)
               ado->remove_deferred_unlock(work_id, key_handle);
-            ado->send_unlock_response(rc);
           }
+          ado->send_unlock_response(rc);
         }
       }
       else if (ado->check_configure_request(buffer, options)) {
