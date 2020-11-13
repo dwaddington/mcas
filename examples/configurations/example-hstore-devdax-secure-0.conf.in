@@ -12,7 +12,7 @@
             "net"  : "mlx5_0",
             "default_backend" : "hstore",
             "dax_config" : [{ "path": "/dev/dax0.0", "addr": "0x9000000000" }],
-            "security_mode" : "tls-hmac",
+            "security_mode" : "tls:auth",
             "security_port" : 11912
         }
     ],
