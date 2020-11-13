@@ -17,15 +17,14 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-
-extern crate json;
 extern crate alloc;
+extern crate json;
 extern crate libc;
 
 mod ado_plugin;
 mod status;
 
-use core::ptr::{null_mut};
+use core::ptr::null_mut;
 use libc::{c_char, c_uchar, c_uint, c_void, size_t};
 use status::Status;
 use std::ffi::CStr;
@@ -41,6 +40,83 @@ fn convert_to_string(ptr: *const c_uchar, len: size_t) -> String {
     let str: String = std::str::from_utf8(slice).unwrap().to_string();
     str
 }
+
+/// Trait which must be implemented by the ADO plugin (see ado_plugin.rs example)
+///
+trait AdoPlugin {
+    /// Up-called when the ADO is launched
+    ///
+    /// Arguments:
+    ///
+    /// * `auth_id`: Authentication identifier
+    /// * `pool_name` : Name of pool
+    /// * `pool_size` : Size of pool in bytes
+    /// * `pool_flags` : Flags passed to pool open/create (see mcas_itf.h)
+    /// * `memory_type` : Type of memory (1=>DRAM, 2=>PMEM)
+    /// * `expected_obj_count` : Expected object count passed to pool creation
+    /// * `params` : Concatenated additional parameters defined in configuration file (e.g. shard network endpoint)
+    ///    
+    fn launch_event(
+        auth_id: u64,
+        pool_name: &str,
+        pool_size: size_t,
+        pool_flags: u32,
+        memory_type: u32,
+        expected_obj_count: size_t,
+        params: &str,
+    );
+
+    /// Up-called when a cluster event happens (clustering must be enabled)
+    ///
+    /// Arguments:
+    ///
+    /// * `sender`: Authentication identifier
+    /// * `event_type` : Event type
+    /// * `message` : Message
+    ///
+    fn cluster_event(sender: &str, event_type: &str, message: &str);
+
+    /// Main entry point up-called in response to invoke_ado/invoke_put_ado operations
+    ///
+    /// Arguments:
+    ///
+    /// * `services` : Provider of callback API
+    /// * `key` : Target key name
+    /// * `attached_value` : Value space associated with the key
+    /// * `detached_value` : Value space allocated through invoke_put_ado with
+    ///                      IMCAS::ADO_FLAG_DETACHED (i.e. not attached to the key root pointer)
+    /// * `work_request` : Identifier for the invocation/work request
+    /// * `new_root` : If the key-value pair has been newly created, this is set to true. Can be
+    ///                used to trigger data structure init.
+    /// * `response` : Return response from this layer
+    ///
+    fn do_work(
+        services: &ADOCallback,
+        key: &str,
+        attached_value: &Value,
+        detached_value: &Value,
+        work_request: &Request,
+        new_root: bool,
+        response: &Response,
+    ) -> Status;
+
+    /// Called when the shard process performs a memory mapping
+    ///
+    /// Arguments:
+    ///
+    /// * `shard_base` : Address of base in the shard process
+    /// * `local_base` : Address of base in ADO process
+    /// * `size` : Size of mapping in bytes
+    ///
+    fn register_mapped_memory(shard_base: u64, local_base: u64, size: size_t) -> Status;
+
+    /// Called prior to ADO shutdown
+    ///
+    fn shutdown();
+}
+
+/// Type which will be implemented in by the plugin .rs file
+pub struct Plugin {}
 
 #[repr(u32)]
 pub enum KeyLifetimeFlags {
@@ -200,7 +276,6 @@ pub struct ADOCallback {
 }
 
 impl ADOCallback {
-
     /// Allocate memory from the pool
     ///
     /// Arguments:
@@ -436,7 +511,7 @@ pub extern "C" fn ffi_do_work(
         _work_id: work_id,
     };
 
-    ado_plugin::do_work(
+    Plugin::do_work(
         &services,
         &rstr,
         attached_value,
@@ -453,7 +528,7 @@ pub extern "C" fn ffi_register_mapped_memory(
     local_base: u64,
     size: size_t,
 ) -> Status {
-    ado_plugin::register_mapped_memory(shard_base, local_base, size)
+    Plugin::register_mapped_memory(shard_base, local_base, size)
 }
 
 #[no_mangle]
@@ -470,7 +545,7 @@ pub extern "C" fn ffi_launch_event(
 ) {
     let pool_name = convert_to_string(pool_name_ptr, pool_name_len);
     let json_params = convert_to_string(json_params_ptr, json_params_len);
-    ado_plugin::launch_event(
+    Plugin::launch_event(
         auth_id,
         &pool_name,
         pool_size,
@@ -493,11 +568,10 @@ pub extern "C" fn ffi_cluster_event(
     let sender = convert_to_string(sender_ptr, sender_len);
     let event_type = convert_to_string(event_type_ptr, event_type_len);
     let message = convert_to_string(message_ptr, message_len);
-    ado_plugin::cluster_event(&sender, &event_type, &message);
+    Plugin::cluster_event(&sender, &event_type, &message);
 }
 
 #[no_mangle]
-pub extern "C" fn ffi_shutdown()
-{
-    ado_plugin::shutdown();
+pub extern "C" fn ffi_shutdown() {
+    Plugin::shutdown();
 }
