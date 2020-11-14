@@ -18,7 +18,9 @@
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
 #include <boost/optional.hpp>
+#include <gsl/gsl_byte> /* std::byte in c++20 */
 
+#include <experimental/string_view> /* std::string_view in c++20 */
 #include <cstdint> /* uint16_t */
 #include <memory>
 
@@ -76,6 +78,10 @@ public:
   using key_t           = IKVStore::key_t;
   using Attribute       = IKVStore::Attribute;
 
+  template <typename T>
+    using basic_string_view = std::experimental::basic_string_view<T>;
+  using byte = gsl::byte;
+
   static constexpr key_t           KEY_NONE           = IKVStore::KEY_NONE;
   static constexpr memory_handle_t MEMORY_HANDLE_NONE = IKVStore::HANDLE_NONE;
   static constexpr pool_t          POOL_ERROR         = IKVStore::POOL_ERROR;
@@ -131,7 +137,7 @@ public:
   static constexpr ado_flags_t ADO_FLAG_DETACHED = 0x10;
   /*< only take read lock */
   static constexpr ado_flags_t ADO_FLAG_READ_ONLY = 0x20;
-  
+
 public:
   /**
    * Determine thread safety of the component
@@ -423,7 +429,7 @@ public:
    * @return S_OK or E_BUSY if not yet complete
    */
   virtual status_t check_async_completion(async_handle_t& handle) = 0;
-  
+
   /**
    * Perform key search based on regex or prefix
    *
@@ -503,7 +509,7 @@ public:
    */
   virtual status_t free_memory(void* p) = 0;
 
-  
+
   /**
    * ADO_response data structure manages response data sent back from the ADO
    * invocations.  The free function is so we can eventually support zero-copy.
@@ -515,7 +521,7 @@ public:
 
 #pragma GCC diagnostic push /* pointer members are considered inefficient */
 #pragma GCC diagnostic ignored "-Weffc++"
-    
+
     class Data_reference {
     public:
       Data_reference(void * data) : _data(data) { assert(data); }
@@ -525,10 +531,10 @@ public:
     };
 
 #pragma GCC diagnostic pop
-    
+
   public:
     ADO_response() = delete;
-    
+
     ADO_response(void* data, size_t data_len, uint32_t layer_id)
       : _ref(std::make_shared<Data_reference>(data)),
         _data_len(data_len),
@@ -558,6 +564,18 @@ public:
   /**
    * Used to invoke an operation on an active data object
    *
+   * Roughly, the shard locates a data value by key and calls ADO (with accessors to both the key and data).
+   *   Several variations:
+   *       1) Skip the "locate data" operation (could have been directed by a null
+   *          key address in the basic_string_view form, or by a flag, but is
+   *          instead indicated by a zero-length key)
+   *       2) Skip the ADO call (directed by ADO_FLAG_CREATE_ONLY)
+   *       3) Create uninitialized data of size value_size if the key was not found
+   *          (directed by ADO_FLAG_CREATE_ON_DEMAND)
+   *       4) Create uninitialized data of size value_size if the key was not found(?)
+   *          not associated with the key and maybe also create a "root value" which
+   *          which is attached to the key (directed by ADO_FLAG_DETACHED)
+   *
    * @param pool Pool handle
    * @param key Key. Note, if key is empty, the work request is key-less.
    * @param request Request data
@@ -570,12 +588,26 @@ public:
    * @return S_OK on success
    */
   virtual status_t invoke_ado(const IMCAS::pool_t        pool,
+                              const basic_string_view<byte> key,
+                              const basic_string_view<byte> request,
+                              const ado_flags_t          flags,
+                              std::vector<ADO_response>& out_response,
+                              const size_t               value_size = 0) = 0;
+
+  virtual status_t invoke_ado(const IMCAS::pool_t        pool,
                               const std::string&         key,
                               const void*                request,
                               const size_t               request_len,
                               const ado_flags_t          flags,
                               std::vector<ADO_response>& out_response,
-                              const size_t               value_size = 0) = 0;
+                              const size_t               value_size = 0)
+  {
+    return
+      invoke_ado(pool,
+        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(static_cast<const byte *>(request), request_len),
+        flags, out_response, value_size);
+  }
 
   inline status_t invoke_ado(const IMCAS::pool_t        pool,
                              const std::string&         key,
@@ -584,12 +616,15 @@ public:
                              std::vector<ADO_response>& out_response,
                              const size_t               value_size = 0)
   {
-    return invoke_ado(pool, key, request.data(), request.length(), flags, out_response, value_size);
+    return
+      invoke_ado(pool, key, request.data(), request.length(), flags, out_response, value_size);
   }
 
 
   /**
    * Used to invoke an operation on an active data object
+   *
+   * Roughly, the shard locates a data value by key and calls ADO (with accessors to both the key and data).
    *
    * @param pool Pool handle
    * @param key Key. Note, if key is empty, the work request is key-less.
@@ -602,9 +637,8 @@ public:
    * @return S_OK on success
    */
   virtual status_t async_invoke_ado(const IMCAS::pool_t        pool,
-                                    const std::string&         key,
-                                    const void*                request,
-                                    const size_t               request_len,
+                                    const basic_string_view<byte> key,
+                                    const basic_string_view<byte> request,
                                     const ado_flags_t          flags,
                                     std::vector<ADO_response>& out_response,
                                     async_handle_t&            out_async_handle,
@@ -618,11 +652,17 @@ public:
                                    async_handle_t&            out_async_handle,
                                    const size_t               value_size = 0)
   {
-    return async_invoke_ado(pool, key, request.data(), request.length(), flags, out_response, out_async_handle, value_size);
+    return
+      async_invoke_ado(pool,
+        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(request.data())), request.length()),
+        flags, out_response, out_async_handle, value_size);
   }
 
   /**
    * Used to invoke a combined put + ADO operation on an active data object.
+   *
+   * Roughly, the shard writes a data value by key and calls ADO (with accessors to both the key and data).
    *
    * @param pool Pool handle
    * @param key Key
@@ -630,12 +670,20 @@ public:
    * @param request_len Length of request data in bytes
    * @param value Value data
    * @param value_len Length of value data in bytes
-   * @param root_len Length to allocate for root value (with ADO_FLAGS_DETACHED)
+   * @param root_len Length to allocate for root value (with ADO_FLAG_DETACHED)
    * @param flags Flags for invocation (see ADO_FLAG_XXX)
    * @param out_response Responses from invocation
    *
    * @return S_OK on success
    */
+  virtual status_t invoke_put_ado(const IMCAS::pool_t        pool,
+                                  const basic_string_view<byte> key,
+                                  const basic_string_view<byte> request,
+                                  const basic_string_view<byte> value,
+                                  const size_t               root_len,
+                                  const ado_flags_t          flags,
+                                  std::vector<ADO_response>& out_response) = 0;
+
   virtual status_t invoke_put_ado(const IMCAS::pool_t        pool,
                                   const std::string&         key,
                                   const void*                request,
@@ -644,7 +692,15 @@ public:
                                   const size_t               value_len,
                                   const size_t               root_len,
                                   const ado_flags_t          flags,
-                                  std::vector<ADO_response>& out_response) = 0;
+                                  std::vector<ADO_response>& out_response)
+  {
+    return
+      invoke_put_ado(pool,
+        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(static_cast<const byte *>(request), request_len),
+        basic_string_view<byte>(static_cast<const byte *>(value), value_len),
+        root_len, flags, out_response);
+  }
 
   inline status_t invoke_put_ado(const IMCAS::pool_t        pool,
                                  const std::string&         key,
@@ -654,8 +710,8 @@ public:
                                  const ado_flags_t          flags,
                                  std::vector<ADO_response>& out_response)
   {
-    return invoke_put_ado(pool, key, request.data(), request.length(), value.data(), value.length(), root_len, flags,
-                          out_response);
+    return
+      invoke_put_ado(pool, key, request.data(), request.length(), value.data(), value.length(), root_len, flags, out_response);
   }
 
   /**
@@ -692,12 +748,12 @@ public:
                              const boost::optional<std::string>&, // src_nic_device
                              const boost::optional<std::string>&, // src_ip_addr
                              const std::string&, // dest_addr_with_port
-                             const std::string = "") // other 
+                             const std::string = "") // other
   {
     throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,owner,addr_with_port,"
                         "nic_device) not implemented");
   }
-  
+
   IMCAS* mcas_create(const unsigned debug_level,
                      const unsigned patience,
                      const std::string& owner,

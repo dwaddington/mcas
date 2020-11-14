@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
     if(g_options.threads == 0 || g_options.threads == 1) {
       PLOG("Using single-threaded process ..");
       auto mcasptr = init(g_options.server, g_options.port);
-      
+
       if(g_options.blastkey.empty())
         do_throughput_work(&*mcasptr);
       else
@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
       PLOG("Using tasklet ..");
       cpu_mask_t mask;
       for (unsigned c = 0; c < g_options.threads; c++) mask.add_core(c + g_options.base_core);
-      
+
       common::Per_core_tasking<Tasklet, int> t(mask,0); //,false,10000);
       t.wait_for_all();
     }
@@ -122,7 +122,7 @@ public:
   {
     PMAJOR("Tasklet: init complete");
   }
-  
+
   virtual void initialize(unsigned  ) override
   {
   }
@@ -174,18 +174,18 @@ void do_blast_work(component::IMCAS* mcas, const std::string& blastkey, unsigned
   using clock     = std::chrono::high_resolution_clock;
 
   std::stringstream ss;
-  
+
   // single pool shard across threads
   //  ss << g_options.poolname; // << "-" << core;
   //  const std::string poolname = ss.str();
   auto poolname = g_options.poolname;
-  
+
   PMAJOR("Doing ADO blast...");
   PMAJOR("Creating pool (%s)...", poolname.c_str());
-  
+
   auto pool = mcas->create_pool(poolname, GB(1), 0, /* flags */
                                 1000000);           /* obj count */
-  
+
   const unsigned iterations = 100000;
 
   if(pool == IMCAS::POOL_ERROR) throw General_exception("unable to create pool (%s)", poolname.c_str());
@@ -200,7 +200,7 @@ void do_blast_work(component::IMCAS* mcas, const std::string& blastkey, unsigned
   while(1) {
 
     auto start_time = clock::now();
-    
+
     /* perform invoke_ado repeatedly */
     std::vector<component::IMCAS::ADO_response> response;
     for(unsigned i=0;i<iterations;i++) {
@@ -210,7 +210,7 @@ void do_blast_work(component::IMCAS* mcas, const std::string& blastkey, unsigned
     __sync_synchronize();
 
     auto secs = std::chrono::duration<double>(clock::now() - start_time).count();
-    double per_sec = double(iterations) / secs; 
+    double per_sec = double(iterations) / secs;
     PINF("Time: %.2f secs", secs);
     PINF("Rate (%u): %.0f /sec", core, per_sec);
 
@@ -229,8 +229,8 @@ void do_throughput_work(component::IMCAS* mcas)
   PMAJOR("Creating pool (%s)...", poolname.c_str());
   auto pool = mcas->create_pool(poolname, GB(1), 0, /* flags */
                                 1000000);           /* obj count */
-  
-  if (pool == IKVStore::POOL_ERROR) 
+
+  if (pool == IKVStore::POOL_ERROR)
     throw General_exception("create_pool (%s) failed", poolname.c_str());
 
   std::vector<std::string> key_samples;
@@ -291,7 +291,7 @@ void do_throughput_work(component::IMCAS* mcas)
   start_time = clock::now();
 
   for (unsigned i = 0; i < iterations; i++) {
-    if(S_OK != mcas->invoke_ado(pool, key_samples[i], "put-" + std::to_string(i), flags, response))
+    if(S_OK != mcas->invoke_ado(pool, key_samples[i], "put " + std::to_string(i), flags, response))
       throw General_exception("invoke_ado failed");
   }
 

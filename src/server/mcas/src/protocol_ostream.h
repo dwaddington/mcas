@@ -27,19 +27,19 @@ struct msg_attrs {
   enum category { req, rsp, other } c;
 };
 static const std::map<mcas::protocol::MSG_TYPE, msg_attrs> type_map{
-    {mcas::protocol::MSG_TYPE_HANDSHAKE, {"HANDSHAKE", msg_attrs::category::other}},
-    {mcas::protocol::MSG_TYPE_HANDSHAKE_REPLY, {"HANDSHAKE_REPLY", msg_attrs::category::other}},
-    {mcas::protocol::MSG_TYPE_CLOSE_SESSION, {"CLOSE_SESSION", msg_attrs::category::other}},
-    {mcas::protocol::MSG_TYPE_STATS, {"STATS", msg_attrs::category::other}},
-    {mcas::protocol::MSG_TYPE_POOL_REQUEST, {"POOL", msg_attrs::category::req}},
-    {mcas::protocol::MSG_TYPE_POOL_RESPONSE, {"POOL", msg_attrs::category::rsp}},
-    {mcas::protocol::MSG_TYPE_IO_REQUEST, {"IO", msg_attrs::category::req}},
-    {mcas::protocol::MSG_TYPE_IO_RESPONSE, {"IO", msg_attrs::category::rsp}},
-    {mcas::protocol::MSG_TYPE_INFO_REQUEST, {"INFO", msg_attrs::category::req}},
-    {mcas::protocol::MSG_TYPE_INFO_RESPONSE, {"INFO", msg_attrs::category::rsp}},
-    {mcas::protocol::MSG_TYPE_ADO_REQUEST, {"ADO", msg_attrs::category::req}},
-    {mcas::protocol::MSG_TYPE_ADO_RESPONSE, {"ADO", msg_attrs::category::rsp}},
-    {mcas::protocol::MSG_TYPE_PUT_ADO_REQUEST, {"PUT_ADO", msg_attrs::category::req}},
+    {mcas::protocol::MSG_TYPE::HANDSHAKE, {"HANDSHAKE", msg_attrs::category::other}},
+    {mcas::protocol::MSG_TYPE::HANDSHAKE_REPLY, {"HANDSHAKE_REPLY", msg_attrs::category::other}},
+    {mcas::protocol::MSG_TYPE::CLOSE_SESSION, {"CLOSE_SESSION", msg_attrs::category::other}},
+    {mcas::protocol::MSG_TYPE::STATS, {"STATS", msg_attrs::category::other}},
+    {mcas::protocol::MSG_TYPE::POOL_REQUEST, {"POOL", msg_attrs::category::req}},
+    {mcas::protocol::MSG_TYPE::POOL_RESPONSE, {"POOL", msg_attrs::category::rsp}},
+    {mcas::protocol::MSG_TYPE::IO_REQUEST, {"IO", msg_attrs::category::req}},
+    {mcas::protocol::MSG_TYPE::IO_RESPONSE, {"IO", msg_attrs::category::rsp}},
+    {mcas::protocol::MSG_TYPE::INFO_REQUEST, {"INFO", msg_attrs::category::req}},
+    {mcas::protocol::MSG_TYPE::INFO_RESPONSE, {"INFO", msg_attrs::category::rsp}},
+    {mcas::protocol::MSG_TYPE::ADO_REQUEST, {"ADO", msg_attrs::category::req}},
+    {mcas::protocol::MSG_TYPE::ADO_RESPONSE, {"ADO", msg_attrs::category::rsp}},
+    {mcas::protocol::MSG_TYPE::PUT_ADO_REQUEST, {"PUT_ADO", msg_attrs::category::req}},
 };
 
 static const std::map<mcas::protocol::OP_TYPE, const char *> op_map{

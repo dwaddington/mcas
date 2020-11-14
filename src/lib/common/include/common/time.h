@@ -68,6 +68,7 @@ public:
     tv_nsec = 0;
   };
 
+  /* Why is seconds not time_t, as in the two-argument constructor? */
   Timespec(const int seconds) {
      tv_sec = seconds;
      tv_nsec = 0;
