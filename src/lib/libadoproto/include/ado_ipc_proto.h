@@ -34,30 +34,30 @@ namespace mcas
 
 namespace ipc
 {
-enum {
-  MSG_TYPE_BOOTSTRAP_REQUEST = 1,
-  MSG_TYPE_WORK_REQUEST  = 2,
-  MSG_TYPE_WORK_RESPONSE = 3,
-  MSG_TYPE_TABLE_OP_REQUEST = 4,
-  MSG_TYPE_TABLE_OP_RESPONSE = 5,
-  MSG_TYPE_INDEX_REQUEST = 6,
-  MSG_TYPE_INDEX_RESPONSE = 7,
-  MSG_TYPE_CHIRP = 8,
-  MSG_TYPE_MAP_MEMORY = 9,
-  MSG_TYPE_VECTOR_REQUEST = 10,
-  MSG_TYPE_VECTOR_RESPONSE = 11,
-  MSG_TYPE_POOL_INFO_RESPONSE = 12,
-  MSG_TYPE_OP_EVENT = 13,
-  MSG_TYPE_OP_EVENT_RESPONSE = 14,
-  MSG_TYPE_ITERATE_REQUEST = 15,
-  MSG_TYPE_ITERATE_RESPONSE = 16,
-  MSG_TYPE_UNLOCK_REQUEST = 17,
-  MSG_TYPE_CONFIGURE_REQUEST = 18,
-  MSG_TYPE_CLUSTER_EVENT = 19,
-  MSG_TYPE_MAP_MEMORY_NAMED = 20,
+enum class MSG_TYPE {
+  BOOTSTRAP_REQUEST = 1,
+  WORK_REQUEST  = 2,
+  WORK_RESPONSE = 3,
+  TABLE_OP_REQUEST = 4,
+  TABLE_OP_RESPONSE = 5,
+  INDEX_REQUEST = 6,
+  INDEX_RESPONSE = 7,
+  CHIRP = 8,
+  MAP_MEMORY = 9,
+  VECTOR_REQUEST = 10,
+  VECTOR_RESPONSE = 11,
+  POOL_INFO_RESPONSE = 12,
+  OP_EVENT = 13,
+  OP_EVENT_RESPONSE = 14,
+  ITERATE_REQUEST = 15,
+  ITERATE_RESPONSE = 16,
+  UNLOCK_REQUEST = 17,
+  CONFIGURE_REQUEST = 18,
+  CLUSTER_EVENT = 19,
+  MAP_MEMORY_NAMED = 20,
 };
 
-typedef enum {
+enum class chirp_t {
   HELLO = 1,
   HEARTBEAT,
   OK,
@@ -66,13 +66,13 @@ typedef enum {
   POOL_INFO_REQUEST,
   UNLOCK_RESPONSE,
   CONFIGURE_RESPONSE,
-} chirp_t;
+};
 
 static constexpr uint16_t MAGIC = 0xDEAF;
 
 struct Message {
 
-  Message(uint16_t type_id_p) : magic(MAGIC), type_id(type_id_p)
+  Message(MSG_TYPE type_id_p) : magic(MAGIC), type_id(static_cast<uint16_t>(type_id_p))
   {
   }
 
@@ -91,9 +91,9 @@ struct Message {
     return *(reinterpret_cast<const uint16_t*>(buffer)) == MAGIC;
   }
 
-  inline static uint16_t type(const void * buffer) {
+  inline static MSG_TYPE type(const void * buffer) {
     if(buffer == nullptr) throw std::invalid_argument(__FILE__ " Message::type - pointer is null");
-    return (reinterpret_cast<const Message*>(buffer))->type_id;
+    return MSG_TYPE(static_cast<const Message*>(buffer)->type_id);
   }
 
   uint16_t  magic;
@@ -103,7 +103,7 @@ struct Message {
 //-------------
 
 struct Chirp : public Message {
-  static constexpr uint8_t id = MSG_TYPE_CHIRP;
+  static constexpr auto id = MSG_TYPE::CHIRP;
   static constexpr const char *description = "mcas::ipc::Chirp";
 
   Chirp(chirp_t _type, status_t _status = S_OK)
@@ -120,7 +120,7 @@ struct Chirp : public Message {
 //-------------
 
 struct Op_event : public Message {
-  static constexpr uint8_t id = MSG_TYPE_OP_EVENT;
+  static constexpr auto id = MSG_TYPE::OP_EVENT;
   static constexpr const char *description = "mcas::ipc::Op_event";
 
   Op_event(component::ADO_op _op) : Message(id), op(_op)
@@ -133,7 +133,7 @@ struct Op_event : public Message {
 //-------------
 
 struct Op_event_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_OP_EVENT_RESPONSE;
+  static constexpr auto id = MSG_TYPE::OP_EVENT_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Op_event_response";
 
   Op_event_response(component::ADO_op _op) : Message(id), op(_op)
@@ -146,7 +146,7 @@ struct Op_event_response : public Message {
 //-------------
 
 struct Cluster_event : public Message {
-  static constexpr uint8_t id = MSG_TYPE_CLUSTER_EVENT;
+  static constexpr auto id = MSG_TYPE::CLUSTER_EVENT;
   static constexpr const char *description = "mcas::ipc::Cluster_event";
 
   Cluster_event(size_t buffer_size,
@@ -183,7 +183,7 @@ struct Cluster_event : public Message {
 //-------------
 
 struct Bootstrap_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_BOOTSTRAP_REQUEST;
+  static constexpr auto id = MSG_TYPE::BOOTSTRAP_REQUEST;
   static constexpr const char *description = "mcas::ipc::Bootstrap_request";
 
   Bootstrap_request(size_t buffer_size,
@@ -227,7 +227,7 @@ struct Bootstrap_request : public Message {
 //-------------
 
 struct Map_memory : public Message {
-  static constexpr uint8_t id = MSG_TYPE_MAP_MEMORY;
+  static constexpr auto id = MSG_TYPE::MAP_MEMORY;
   static constexpr const char *description = "mcas::ipc::Map_memory";
 
   Map_memory(size_t buffer_size,
@@ -247,7 +247,7 @@ struct Map_memory : public Message {
 };
 
 struct Map_memory_named : public Message {
-  static constexpr uint8_t id = MSG_TYPE_MAP_MEMORY_NAMED;
+  static constexpr auto id = MSG_TYPE::MAP_MEMORY_NAMED;
   static constexpr const char *description = "mcas::ipc::Map_memory_named";
 
   using string_view = std::experimental::string_view;
@@ -276,7 +276,7 @@ struct Map_memory_named : public Message {
 //-------------
 
 struct Work_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_WORK_REQUEST;
+  static constexpr auto id = MSG_TYPE::WORK_REQUEST;
   static constexpr const char *description = "mcas::ipc::Work_request";
 
 #pragma GCC diagnostic push
@@ -340,7 +340,7 @@ struct Work_request : public Message {
 //-------------
 
 struct Work_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_WORK_RESPONSE;
+  static constexpr auto id = MSG_TYPE::WORK_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Work_response";
 
   Work_response(size_t buffer_size,
@@ -437,7 +437,7 @@ struct Work_response : public Message {
 //-------------
 
 struct Table_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_TABLE_OP_REQUEST;
+  static constexpr auto id = MSG_TYPE::TABLE_OP_REQUEST;
   static constexpr const char *description = "mcas::ipc::Table_request";
 
   Table_request(size_t buffer_size,
@@ -487,7 +487,7 @@ struct Table_request : public Message {
 //-------------
 
 struct Table_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_TABLE_OP_RESPONSE;
+  static constexpr auto id = MSG_TYPE::TABLE_OP_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Table_response";
 
   Table_response(size_t buffer_size,
@@ -519,7 +519,7 @@ struct Table_response : public Message {
 //-------------
 
 struct Index_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_INDEX_REQUEST;
+  static constexpr auto id = MSG_TYPE::INDEX_REQUEST;
   static constexpr const char *description = "mcas::ipc::Index_request";
 
 private:
@@ -556,7 +556,7 @@ public:
 //-------------
 
 struct Index_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_INDEX_RESPONSE;
+  static constexpr auto id = MSG_TYPE::INDEX_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Index_response";
 
   Index_response(size_t buffer_size,
@@ -586,7 +586,7 @@ struct Index_response : public Message {
 //-------------
 
 struct Vector_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_VECTOR_REQUEST;
+  static constexpr auto id = MSG_TYPE::VECTOR_REQUEST;
   static constexpr const char *description = "mcas::ipc::Vector_request";
 
   Vector_request(const common::epoch_time_t _t_begin,
@@ -603,7 +603,7 @@ struct Vector_request : public Message {
 //-------------
 
 struct Vector_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_VECTOR_RESPONSE;
+  static constexpr auto id = MSG_TYPE::VECTOR_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Vector_request";
 
   Vector_response(status_t _status,
@@ -621,7 +621,7 @@ struct Vector_response : public Message {
 //-------------
 
 struct Pool_info_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_POOL_INFO_RESPONSE;
+  static constexpr auto id = MSG_TYPE::POOL_INFO_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Pool_info_request";
 
 #pragma GCC diagnostic push
@@ -652,7 +652,7 @@ struct Pool_info_response : public Message {
 //-------------
 
 struct Iterate_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_ITERATE_REQUEST;
+  static constexpr auto id = MSG_TYPE::ITERATE_REQUEST;
   static constexpr const char *description = "mcas::ipc::Iterate_request";
 
   Iterate_request(const common::epoch_time_t _t_begin,
@@ -670,7 +670,7 @@ struct Iterate_request : public Message {
 
 
 struct Iterate_response : public Message {
-  static constexpr uint8_t id = MSG_TYPE_ITERATE_RESPONSE;
+  static constexpr auto id = MSG_TYPE::ITERATE_RESPONSE;
   static constexpr const char *description = "mcas::ipc::Iterate_response";
 
   Iterate_response(status_t _status,
@@ -690,7 +690,7 @@ struct Iterate_response : public Message {
 //-------------
 
 struct Unlock_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_UNLOCK_REQUEST;
+  static constexpr auto id = MSG_TYPE::UNLOCK_REQUEST;
   static constexpr const char *description = "mcas::ipc::Unlock_request";
 
   Unlock_request(const uint64_t _work_id,
@@ -708,7 +708,7 @@ struct Unlock_request : public Message {
 
 //---------------
 struct Configure_request : public Message {
-  static constexpr uint8_t id = MSG_TYPE_CONFIGURE_REQUEST;
+  static constexpr auto id = MSG_TYPE::CONFIGURE_REQUEST;
   static constexpr const char *description = "mcas::ipc::Configure_request";
 
   Configure_request(const uint64_t _options)

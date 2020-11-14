@@ -75,11 +75,14 @@ public:
 				for ( unsigned i = log_min_alignment; i != limit; ++i )
 				{
 					const std::size_t upper_bound = 1ULL << i;
-					hop_hash_log<B>::write(LOG_LOCATION
-						, "[", lower_bound, "..", upper_bound, "): "
-						, _hist_alloc.data()[i], " ", _hist_inject.data()[i], " ", _hist_free.data()[i]
-						, " "
-					);
+					if ( _hist_alloc.data()[i] != 0 || _hist_inject.data()[i] != 0 || _hist_free.data()[i] != 0 )
+					{
+						hop_hash_log<B>::write(LOG_LOCATION
+							, "[", lower_bound, "..", upper_bound, "): "
+							, _hist_alloc.data()[i], " ", _hist_inject.data()[i], " ", _hist_free.data()[i]
+							, " "
+						);
+					}
 					lower_bound = upper_bound;
 				}
 				suppress = true;

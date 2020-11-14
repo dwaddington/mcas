@@ -27,6 +27,7 @@
 #include <common/exceptions.h>
 #include <common/utils.h>
 #include <common/byte_buffer.h>
+#include <gsl/gsl_byte>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -35,6 +36,7 @@
 #include <gnutls/crypto.h>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <experimental/string_view>
 #include <map>
 #include <set>
 #include <tuple>
@@ -87,8 +89,11 @@ class Connection_handler : public Connection_base {
 
 public:
   friend struct TLS_transport;
-  
+
   using memory_region_t = typename Transport::memory_region_t;
+  template <typename T>
+    using basic_string_view = std::experimental::basic_string_view<T>;
+  using byte = gsl::byte;
 
   /**
    * Constructor
@@ -284,28 +289,24 @@ public:
                 std::string &                     out_matched_key);
 
   status_t invoke_ado(const component::IKVStore::pool_t            pool,
-                      const std::string &                          key,
-                      const void *                                 request,
-                      size_t                                       request_len,
+                      basic_string_view<byte>                      key,
+                      basic_string_view<byte>                      request,
                       const unsigned int                           flags,
                       std::vector<component::IMCAS::ADO_response> &out_response,
                       const size_t                                 value_size);
 
   status_t invoke_ado_async(const component::IMCAS::pool_t               pool,
-                            const std::string &                          key,
-                            const void *                                 request,
-                            const size_t                                 request_len,
+                            basic_string_view<byte>                      key,
+                            basic_string_view<byte>                      request,
                             const component::IMCAS::ado_flags_t          flags,
                             std::vector<component::IMCAS::ADO_response> &out_response,
                             component::IMCAS::async_handle_t &           out_async_handle,
                             const size_t                                 value_size);
 
   status_t invoke_put_ado(const component::IKVStore::pool_t            pool,
-                          const std::string &                          key,
-                          const void *                                 request,
-                          size_t                                       request_len,
-                          const void *                                 value,
-                          size_t                                       value_len,
+                          basic_string_view<byte>                      key,
+                          basic_string_view<byte>                      request,
+                          basic_string_view<byte>                      value,
                           size_t                                       root_len,
                           const unsigned int                           flags,
                           std::vector<component::IMCAS::ADO_response> &out_response);
@@ -409,8 +410,8 @@ public:
   void sync_inject_send(buffer_t *iob, std::size_t size)
   {
     Connection_base::sync_inject_send(iob, size);
-  } 
-  
+  }
+
 
 private:
   /* unused */
@@ -524,7 +525,7 @@ private:
     bool short_circuit_backend;
     unsigned tls   : 1;
     unsigned hmac : 1;
-    
+
     options_s()
       : short_circuit_backend(env_scbe && env_scbe[0] == '1'), tls(0), hmac(0)
     {}
@@ -536,7 +537,7 @@ private:
   gnutls_priority_t                _priority;
   gnutls_session_t                 _session;
   common::Byte_buffer              _tls_buffer;
-  
+
 };
 
 }  // namespace client

@@ -522,19 +522,19 @@ void Shard::main_loop(common::profiler &pr_)
             idle = 0;
             assert(p_msg);
             switch (p_msg->type_id()) {
-            case MSG_TYPE_IO_REQUEST:
+            case MSG_TYPE::IO_REQUEST:
               process_message_IO_request(handler, static_cast<const protocol::Message_IO_request *>(p_msg));
               break;
-            case MSG_TYPE_ADO_REQUEST:
+            case MSG_TYPE::ADO_REQUEST:
               process_ado_request(handler, static_cast<const protocol::Message_ado_request *>(p_msg));
               break;
-            case MSG_TYPE_PUT_ADO_REQUEST:
+            case MSG_TYPE::PUT_ADO_REQUEST:
               process_put_ado_request(handler, static_cast<const protocol::Message_put_ado_request *>(p_msg));
               break;
-            case MSG_TYPE_POOL_REQUEST:
+            case MSG_TYPE::POOL_REQUEST:
               process_message_pool_request(handler, static_cast<const protocol::Message_pool_request *>(p_msg));
               break;
-            case MSG_TYPE_INFO_REQUEST:
+            case MSG_TYPE::INFO_REQUEST:
               process_info_request(handler, static_cast<const protocol::Message_INFO_request *>(p_msg), pr_);
               break;
             default:
@@ -1647,11 +1647,6 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
     {
       memory_registered<Connection_base> mr(debug_level(), handler, reinterpret_cast<void *>(sgr.mr_low), sgr.mr_high - sgr.mr_low, 0,
                                           0);
-#if 0
-    auto cmd = "/bin/cat /proc/" + std::to_string(::getpid()) + "/smaps";
-    CPLOG(2, "%s::%s: bounds %p %p %s", _cname, __func__, reinterpret_cast<const void *>(mr_low),  reinterpret_cast<const void *>(mr_high),  cmd.c_str());
-    ::system(cmd.c_str());
-#endif
       key = mr.key();
       /* register deregister task for space */
       add_space_shared(range<std::uint64_t>(t.first, t.second - sgr.excess_length), std::move(mr));

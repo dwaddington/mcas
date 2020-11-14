@@ -234,28 +234,24 @@ class MCAS_client
                         std::string &          out_matched_key) override;
 
   virtual status_t invoke_ado(const IKVStore::pool_t            pool,
-                              const std::string &               key,
-                              const void *                      request,
-                              const size_t                      request_len,
+                              const basic_string_view<byte>     key,
+                              const basic_string_view<byte>     request,
                               const uint32_t                    flags,
                               std::vector<IMCAS::ADO_response> &out_response,
                               const size_t                      value_size = 0) override;
 
   virtual status_t async_invoke_ado(const IMCAS::pool_t               pool,
-                                    const std::string &               key,
-                                    const void *                      request,
-                                    const size_t                      request_len,
+                                    const basic_string_view<byte>     key,
+                                    const basic_string_view<byte>     request,
                                     const ado_flags_t                 flags,
                                     std::vector<IMCAS::ADO_response> &out_response,
                                     async_handle_t &                  out_async_handle,
                                     const size_t                      value_size = 0) override;
 
   virtual status_t invoke_put_ado(const IKVStore::pool_t            pool,
-                                  const std::string &               key,
-                                  const void *                      request,
-                                  const size_t                      request_len,
-                                  const void *                      value,
-                                  const size_t                      value_len,
+                                  const basic_string_view<byte>     key,
+                                  const basic_string_view<byte>     request,
+                                  const basic_string_view<byte>     value,
                                   const size_t                      root_len,
                                   const ado_flags_t                 flags,
                                   std::vector<IMCAS::ADO_response> &out_response) override;

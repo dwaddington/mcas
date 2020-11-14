@@ -42,20 +42,20 @@ namespace protocol
 {
 static constexpr unsigned PROTOCOL_VERSION = 0xFB;
 
-enum MSG_TYPE : uint8_t {
-  MSG_TYPE_HANDSHAKE       = 0x1,
-  MSG_TYPE_HANDSHAKE_REPLY = 0x2,
-  MSG_TYPE_CLOSE_SESSION   = 0x3,
-  MSG_TYPE_STATS           = 0x4,
-  MSG_TYPE_POOL_REQUEST    = 0x10,
-  MSG_TYPE_POOL_RESPONSE   = 0x11,
-  MSG_TYPE_IO_REQUEST      = 0x20,
-  MSG_TYPE_IO_RESPONSE     = 0x21,
-  MSG_TYPE_INFO_REQUEST    = 0x30,
-  MSG_TYPE_INFO_RESPONSE   = 0x31,
-  MSG_TYPE_ADO_REQUEST     = 0x40,
-  MSG_TYPE_ADO_RESPONSE    = 0x41,
-  MSG_TYPE_PUT_ADO_REQUEST = 0x42,
+enum class MSG_TYPE : uint8_t {
+  HANDSHAKE       = 0x1,
+  HANDSHAKE_REPLY = 0x2,
+  CLOSE_SESSION   = 0x3,
+  STATS           = 0x4,
+  POOL_REQUEST    = 0x10,
+  POOL_RESPONSE   = 0x11,
+  IO_REQUEST      = 0x20,
+  IO_RESPONSE     = 0x21,
+  INFO_REQUEST    = 0x30,
+  INFO_RESPONSE   = 0x31,
+  ADO_REQUEST     = 0x40,
+  ADO_RESPONSE    = 0x41,
+  PUT_ADO_REQUEST = 0x42,
 };
 
 template <typename T>
@@ -246,7 +246,7 @@ static_assert(sizeof(Message) == 16, "Unexpected Message data structure size");
 // POOL OPERATIONS - create, delete
 
 struct Message_pool_request : public Message {
-  static constexpr auto        id          = MSG_TYPE_POOL_REQUEST;
+  static constexpr auto        id          = MSG_TYPE::POOL_REQUEST;
   static constexpr const char* description = "Message_pool_request";
 
  private:
@@ -319,7 +319,7 @@ public:
 } __attribute__((packed));
 
 struct Message_pool_response : public Message {
-  static constexpr auto        id          = MSG_TYPE_POOL_RESPONSE;
+  static constexpr auto        id          = MSG_TYPE::POOL_RESPONSE;
   static constexpr const char* description = "Message_pool_response";
 
  private:
@@ -338,6 +338,10 @@ struct Message_pool_response : public Message {
 class Message_numbered_request : public Message {
   uint64_t _request_id; /*< id or sender timestamp counter */
   uint64_t _pool_id;
+ protected:
+  template <typename T>
+    using basic_string_view = std::experimental::basic_string_view<T>;
+  using byte = gsl::byte;
 
  public:
   Message_numbered_request(uint64_t    auth_id_,
@@ -370,7 +374,7 @@ class Message_numbered_response : public Message {
 // IO OPERATIONS
 
 struct Message_IO_request : public Message_numbered_request {
-  static constexpr auto        id          = MSG_TYPE_IO_REQUEST;
+  static constexpr auto        id          = MSG_TYPE::IO_REQUEST;
   static constexpr const char* description = "Message_IO_request";
   using data_t                             = uint8_t; /* some trailing data is typed uint8_t, some is typed
                                                          charu. This used to be char */
@@ -390,7 +394,7 @@ struct Message_IO_request : public Message_numbered_request {
                      const void* value,
                      size_t      value_len_,
                      uint32_t    flags_)
-      : Message_numbered_request(auth_id, (sizeof *this), MSG_TYPE_IO_REQUEST, op_, request_id_, pool_id_),
+      : Message_numbered_request(auth_id, (sizeof *this), MSG_TYPE::IO_REQUEST, op_, request_id_, pool_id_),
         _key_len(),
         _val_len(),
         addr(),
@@ -579,7 +583,7 @@ class Message_IO_response : public Message_numbered_response {
   static constexpr uint64_t BIT_TWOSTAGE = 1ULL << 63;
 
  public:
-  static constexpr auto        id          = MSG_TYPE_IO_RESPONSE;
+  static constexpr auto        id          = MSG_TYPE::IO_RESPONSE;
   static constexpr const char* description = "Message_IO_response";
   /* data elements in response to OP_LOCATE */
   struct locate_element {
@@ -648,7 +652,7 @@ class Message_IO_response : public Message_numbered_response {
 // INFO REQUEST/RESPONSE
 
 struct Message_INFO_request : public Message {
-  static constexpr auto        id          = MSG_TYPE_INFO_REQUEST;
+  static constexpr auto        id          = MSG_TYPE::INFO_REQUEST;
   static constexpr const char* description = "Message_INFO_request";
 
  private:
@@ -717,7 +721,7 @@ struct Message_INFO_request : public Message {
 } __attribute__((packed));
 
 struct Message_INFO_response : public Message {
-  static constexpr auto        id          = MSG_TYPE_INFO_RESPONSE;
+  static constexpr auto        id          = MSG_TYPE::INFO_RESPONSE;
   static constexpr const char* description = "Message_INFO_response";
 
  private:
@@ -779,7 +783,7 @@ struct Message_handshake : public Message {
   {
   }
 
-  static constexpr auto        id          = MSG_TYPE_HANDSHAKE;
+  static constexpr auto        id          = MSG_TYPE::HANDSHAKE;
   static constexpr const char* description = "Message_handshake";
   // fields
   uint64_t seq;
@@ -801,7 +805,7 @@ enum {
 };
 
 struct Message_handshake_reply : public Message {
-  static constexpr auto        id          = MSG_TYPE_HANDSHAKE_REPLY;
+  static constexpr auto        id          = MSG_TYPE::HANDSHAKE_REPLY;
   static constexpr const char* description = "Message_handshake_reply";
 
  private:
@@ -838,7 +842,7 @@ struct Message_handshake_reply : public Message {
 // CLOSE SESSION
 
 struct Message_close_session : public Message {
-  static constexpr auto        id          = MSG_TYPE_CLOSE_SESSION;
+  static constexpr auto        id          = MSG_TYPE::CLOSE_SESSION;
   static constexpr const char* description = "Message_close_session";
 
   Message_close_session(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID), seq() {}
@@ -849,7 +853,7 @@ struct Message_close_session : public Message {
 } __attribute__((packed));
 
 struct Message_stats : public Message {
-  static constexpr auto        id          = MSG_TYPE_STATS;
+  static constexpr auto        id          = MSG_TYPE::STATS;
   static constexpr const char* description = "Message_stats";
 
   Message_stats(uint64_t auth, const component::IMCAS::Shard_stats& shard_stats)
@@ -868,7 +872,7 @@ struct Message_stats : public Message {
 // ADO MESSAGES
 
 struct Message_ado_request : public Message_numbered_request {
-  static constexpr auto        id          = MSG_TYPE_ADO_REQUEST;
+  static constexpr auto        id          = MSG_TYPE::ADO_REQUEST;
   static constexpr const char* description = "Message_ado_request";
 
  private:
@@ -882,9 +886,8 @@ struct Message_ado_request : public Message_numbered_request {
                       uint64_t           auth_id,
                       uint64_t           request_id,
                       uint64_t           pool_id_,
-                      const std::string& key,
-                      const void*        invocation_data,
-                      size_t             invocation_data_len_,
+                      const basic_string_view<byte> key,
+                      const basic_string_view<byte> invocation_data,
                       uint32_t           flags_,
                       size_t             odvl = 4096)
       : Message_numbered_request(auth_id, (sizeof *this), id, OP_INVALID, request_id, pool_id_),
@@ -894,17 +897,17 @@ struct Message_ado_request : public Message_numbered_request {
         flags(flags_)
 
   {
-    this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data_len_);
+    this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data.size());
     key_len                   = key.size();
-    increase_msg_len(key_len + invocation_data_len + 1);
+    increase_msg_len(key_len + invocation_data.size() + 1);
 
     if (buffer_size < msg_len())
       throw API_exception("%s::%s - insufficient buffer for Message_ado_request", +description, __func__);
 
-    std::memcpy(data(), key.c_str(), key.size());
+    std::memcpy(data(), key.begin(), key.size());
     data()[key_len] = '\0';
 
-    if (invocation_data_len > 0) std::memcpy(&data()[key_len + 1], invocation_data, invocation_data_len_);
+    if (invocation_data_len > 0) std::memcpy(&data()[key_len + 1], invocation_data.begin(), invocation_data.size());
   }
 
   /* ca;er could use Message::msg_len */
@@ -923,11 +926,11 @@ struct Message_ado_request : public Message_numbered_request {
 } __attribute__((packed));
 
 struct Message_put_ado_request : public Message_numbered_request {
-  static constexpr auto        id          = MSG_TYPE_PUT_ADO_REQUEST;
+  static constexpr auto        id          = MSG_TYPE::PUT_ADO_REQUEST;
   static constexpr const char* description = "Message_put_ado_request";
 
  private:
-  using data_t = uint8_t;
+  using data_t = byte;
   auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
   auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
@@ -937,44 +940,41 @@ struct Message_put_ado_request : public Message_numbered_request {
                           uint64_t           auth_id,
                           uint64_t           request_id,
                           uint64_t           pool_id_,
-                          const std::string& key,
-                          const void*        invocation_data,
-                          size_t             invocation_data_len_,
-                          const void*        value,
-                          size_t             value_len,
+                          const basic_string_view<byte> key,
+                          const basic_string_view<byte> invocation_data,
+                          const basic_string_view<byte> value,
                           size_t             root_len,
                           uint32_t           flags_)
       : Message_numbered_request(auth_id, (sizeof *this), id, OP_INVALID, request_id, pool_id_),
-        key_len(),
+        key_len(key.size()),
         invocation_data_len(),
         flags(flags_),
-        _val_len(value_len),
+        _val_len(value.size()),
         val_addr(),
         root_val_len(root_len)
   {
-    assert(invocation_data);
-    assert(invocation_data_len_ > 0);
-    assert(value);
-    assert(value_len > 0);
+    assert(invocation_data.begin());
+    assert(invocation_data.size() > 0);
+    assert(value.begin());
+    assert(value.size() > 0);
 
-    this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data_len_);
-    key_len                   = key.size();
-    increase_msg_len(key_len + 1 + invocation_data_len + _val_len);
+    this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data.size());
+    increase_msg_len(key_len + 1 + invocation_data.size() + _val_len);
 
     if (buffer_size < message_size())
       throw API_exception("%s::%s - insufficient buffer for Message_ado_request", +description, __func__);
 
-    std::memcpy(data(), key.c_str(), key.size());
-    data()[key_len] = '\0'; /* ADO keys, unlike IO keys, are sent with a null terminator */
+    std::memcpy(data(), key.begin(), key.size());
+    data()[key_len] = byte('\0'); /* ADO keys, unlike IO keys, are sent with a null terminator */
     byte* ptr       = static_cast<byte*>(&data()[key_len + 1]);
 
     /* copy in invocation data */
-    std::memcpy(ptr, invocation_data, invocation_data_len_);
+    std::memcpy(ptr, invocation_data.begin(), invocation_data.size());
 
     /* copy in value_len */
-    std::memcpy(ptr + invocation_data_len_, value, value_len);
+    std::memcpy(ptr + invocation_data.size(), value.begin(), value.size());
 
-    val_addr = reinterpret_cast<uint64_t>(value);
+    val_addr = reinterpret_cast<uint64_t>(value.begin());
   }
   /* caller could use Message::msg_len */
   std::size_t message_size() const { return msg_len(); }
@@ -1007,7 +1007,7 @@ struct Message_ado_response : public Message_numbered_response {
   auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
 
  public:
-  static constexpr auto        id          = MSG_TYPE_ADO_RESPONSE;
+  static constexpr auto        id          = MSG_TYPE::ADO_RESPONSE;
   static constexpr const char* description = "Message_ado_response";
 
   Message_ado_response(size_t buffer_size, status_t status, uint64_t auth_id, uint64_t request_id)

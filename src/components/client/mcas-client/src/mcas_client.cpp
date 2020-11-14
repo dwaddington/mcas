@@ -388,40 +388,36 @@ status_t MCAS_client::find(const IKVStore::pool_t pool,
 }
 
 status_t MCAS_client::invoke_ado(const IKVStore::pool_t            pool,
-                                 const std::string &               key,
-                                 const void *                      request,
-                                 size_t                            request_len,
+                                 basic_string_view<byte>           key,
+                                 basic_string_view<byte>           request,
                                  const uint32_t                    flags,
                                  std::vector<IMCAS::ADO_response> &out_response,
                                  const size_t                      value_size)
 {
-  return _connection->invoke_ado(pool, key, request, request_len, flags, out_response, value_size);
+  return _connection->invoke_ado(pool, key, request, flags, out_response, value_size);
 }
 
 status_t MCAS_client::async_invoke_ado(const IMCAS::pool_t        pool,
-                                       const std::string &        key,
-                                       const void *               request,
-                                       const size_t               request_len,
+                                       basic_string_view<byte>    key,
+                                       basic_string_view<byte>    request,
                                        const ado_flags_t          flags,
                                        std::vector<ADO_response> &out_response,
                                        async_handle_t &           out_async_handle,
                                        const size_t               value_size)
 {
-  return _connection->invoke_ado_async(pool, key, request, request_len, flags, out_response, out_async_handle,
+  return _connection->invoke_ado_async(pool, key, request, flags, out_response, out_async_handle,
                                        value_size);
 }
 
 status_t MCAS_client::invoke_put_ado(const IKVStore::pool_t            pool,
-                                     const std::string &               key,
-                                     const void *                      request,
-                                     size_t                            request_len,
-                                     const void *                      value,
-                                     size_t                            value_len,
+                                     basic_string_view<byte>           key,
+                                     basic_string_view<byte>           request,
+                                     basic_string_view<byte>           value,
                                      size_t                            root_len,
                                      ado_flags_t                       flags,
                                      std::vector<IMCAS::ADO_response> &out_response)
 {
-  return _connection->invoke_put_ado(pool, key, request, request_len, value, value_len, root_len, flags, out_response);
+  return _connection->invoke_put_ado(pool, key, request, value, root_len, flags, out_response);
 }
 
 /**
