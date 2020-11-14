@@ -12,9 +12,11 @@
 */
 
 /*
- Here is a skeleton implementation which would need implemented
+ Here is an example ADO plugin implementation which would need implemented
  for a specific application
 */
+
+#[allow(unused_imports)]
 
 use std::fmt::Write;
 use std::ptr;
@@ -23,20 +25,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::size_t;
 use crate::status::Status;
 use crate::ADOCallback;
+use crate::AdoPlugin;
 use crate::KeyHandle;
 use crate::Request;
 use crate::Response;
 use crate::Value;
-use crate::AdoPlugin;
 
-#[allow(unused_imports)]
 use crate::KeyLifetimeFlags;
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-
+/// Implement the plugin trait
+///
 impl AdoPlugin for crate::Plugin {
     fn launch_event(
         auth_id: u64,
@@ -120,6 +122,7 @@ impl AdoPlugin for crate::Plugin {
             let mut key_handle: KeyHandle = ptr::null_mut();
             let rc =
                 services.create_key(keyname.to_string(), 256, None, &mut value, &mut key_handle);
+            
             println!(
                 "[RUST]: created key {:#?} handle: {:?} rc:{:?}",
                 value, key_handle, rc
@@ -170,6 +173,39 @@ impl AdoPlugin for crate::Plugin {
             }
         }
 
+        /* create some keys then iterate over them */
+        {
+            let count = 5;
+            let mut value_vec = Vec::<Value>::new();
+            value_vec.resize_with(count, Default::default);
+            let mut handle_vec = Vec::<KeyHandle>::new();
+            handle_vec.resize_with(count, || { ptr::null_mut() } );
+            
+            for i in 0..4 {
+
+                let mut key_name = String::new();
+                write!(key_name, "Object-{}", i).expect("write! failed");
+                let s = key_name;
+                       
+                handle_vec[i] = ptr::null_mut();
+                let rc =
+                    services.create_key(s.clone(),
+                                        256,
+                                        None,
+                                        &mut value_vec[i],
+                                        &mut handle_vec[i]);
+                
+                assert!(rc == Status::Ok, "failed to create key");
+
+                println!("[RUST]: created key {}", s);
+            }
+
+            /* now lets iterate over them */
+            
+
+        }
+            
+
         /* resize current (target) value, need to unlock it first */
         {
             let new_value = services.resize_value(key.to_string(), attached_value._buffer_size - 4);
@@ -203,6 +239,7 @@ impl AdoPlugin for crate::Plugin {
         Status::Ok
     }
 
-    fn shutdown() {}
+    fn shutdown() {
+        println!("[RUST]: received shutdown notfication");
+    }
 }
-

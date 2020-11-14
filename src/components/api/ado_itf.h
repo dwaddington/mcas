@@ -560,8 +560,7 @@ class IADO_plugin : public component::IBase {
   };
 
   /**------------------------------------------------------------------------------
-       Call back API wrappers - used to support optional parameters on
-     call-backs
+       Call back API wrappers
      ------------------------------------------------------------------------------
   */
   inline status_t cb_create_key(const uint64_t              work_id,
@@ -607,16 +606,21 @@ class IADO_plugin : public component::IBase {
     return _cb.resize_value(work_id, key_name, new_value_size, out_new_value_addr);
   }
 
-  inline status_t cb_allocate_pool_memory(const size_t size, const size_t alignment_hint, void*& out_new_addr)
+  inline status_t cb_allocate_pool_memory(const size_t size,
+                                          const size_t alignment_hint,
+                                          void*& out_new_addr)
   {
     return _cb.allocate_pool_memory(size, alignment_hint, out_new_addr);
   }
 
-  inline status_t cb_free_pool_memory(const size_t size, const void* addr) { return _cb.free_pool_memory(size, addr); }
+  inline status_t cb_free_pool_memory(const size_t size, const void* addr)
+  {
+    return _cb.free_pool_memory(size, addr);
+  }
 
   inline status_t cb_get_reference_vector(const common::epoch_time_t t_begin,
                                           const common::epoch_time_t t_end,
-                                          Reference_vector&  out_vector)
+                                          Reference_vector&          out_vector)
   {
     return _cb.get_reference_vector(t_begin, t_end, out_vector);
   }
@@ -630,12 +634,15 @@ class IADO_plugin : public component::IBase {
     return _cb.find_key(key_expression, begin_position, find_type, out_matched_position, out_matched_key);
   }
 
-  inline status_t cb_get_pool_info(std::string& out_result) { return _cb.get_pool_info(out_result); }
+  inline status_t cb_get_pool_info(std::string& out_result)
+  {
+    return _cb.get_pool_info(out_result);
+  }
 
-  inline status_t cb_iterate(const common::epoch_time_t             t_begin,
-                             const common::epoch_time_t             t_end,
-                             component::IKVStore::pool_iterator_t&  iterator,
-                             component::IKVStore::pool_reference_t& reference)
+  inline status_t cb_iterate(const common::epoch_time_t  t_begin,
+                             const common::epoch_time_t  t_end,
+                             IKVStore::pool_iterator_t&  iterator,
+                             IKVStore::pool_reference_t& reference)
   {
     return _cb.iterate(t_begin, t_end, iterator, reference);
   }
@@ -845,7 +852,9 @@ class IADO_proxy : public component::IBase {
    *
    * @return True if message interpreted as vector op
    */
-  virtual bool check_vector_ops(const void* buffer, common::epoch_time_t& t_begin, common::epoch_time_t& t_end) = 0;
+  virtual bool check_vector_ops(const void* buffer,
+                                common::epoch_time_t& t_begin,
+                                common::epoch_time_t& t_end) = 0;
 
   /**
    * Check for vector operations

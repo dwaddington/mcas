@@ -14,8 +14,10 @@
 #include "rust_wrapper.h"
 #include <libpmem.h>
 #include <api/interfaces.h>
+#include <api/kvstore_itf.h>
 #include <common/logging.h>
 #include <common/dump_utils.h>
+#include <common/time.h>
 #include <string>
 #include <ado_proto.h>
 
@@ -35,7 +37,7 @@ extern "C"
     size_t used_size;
     uint32_t layer_id;
   };
-  
+
   status_t ffi_register_mapped_memory(uint64_t shard_vaddr, uint64_t local_vaddr, size_t len);
   
   status_t ffi_do_work(void* callback_ptr,
@@ -174,6 +176,22 @@ extern "C"
     
     return rc;
   }
+
+  status_t callback_iterate(void * callback_ptr,
+                            const common::epoch_time_t& t_begin,
+                            const common::epoch_time_t& t_end,
+                            void *& iterator,
+                            component::IKVStore::pool_reference_t& out_reference) {
+    assert(callback_ptr);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+
+    auto result = p_this->cb_iterate(t_begin,
+                                     t_end,
+                                     reinterpret_cast<component::IKVStore::pool_iterator_t&>(iterator),
+                                     out_reference);      
+    return result;
+  }
+  
   
   void debug_break() {
     asm("int3");
@@ -286,7 +304,7 @@ status_t ADO_rust_wrapper_plugin::do_work(uint64_t work_id,
   }
 
   if(debug_level() >= 2)
-    PLOG("ADO: do_work response=(%s)", reinterpret_cast<char*>( response.buffer));
+    PLOG("ADO: do_work response=(%s)", reinterpret_cast<const char*>( response.buffer));
   
   return rc;
 }

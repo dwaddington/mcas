@@ -25,7 +25,7 @@ mod ado_plugin;
 mod status;
 
 use core::ptr::null_mut;
-use libc::{c_char, c_uchar, c_uint, c_void, size_t};
+use libc::{c_char, c_uchar, c_uint, c_void, size_t, timespec};
 use status::Status;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -33,6 +33,7 @@ use std::fmt;
 use std::slice;
 
 type KeyHandle = *mut c_void;
+type IteratorHandle = *const c_void;
 
 /* helpers */
 fn convert_to_string(ptr: *const c_uchar, len: size_t) -> String {
@@ -211,6 +212,15 @@ impl Response {
     }
 }
 
+#[repr(C)]
+pub struct Reference {
+    pub _key: *mut u8,
+    pub _key_size: size_t,
+    pub _value: *mut u8,
+    pub _value_len: size_t,
+    pub _timestamp: timespec,
+}
+
 /* TODO
 
  std::function<status_t(const std::string&     key_expression,
@@ -267,6 +277,13 @@ extern "C" {
         out_new_value: &mut Value,
     ) -> Status;
 
+    fn callback_iterate(
+        context: *const c_void,
+        t_begin: timespec,
+        t_end: timespec,
+        iterator: &mut IteratorHandle,
+        out_reference: &mut Reference,
+    ) -> Status;
     fn debug_break();
 }
 
@@ -276,6 +293,25 @@ pub struct ADOCallback {
 }
 
 impl ADOCallback {
+    
+    /// Iterate over the key-value space
+    ///
+    /// Arguments:
+    ///
+    /// * `t_begin`: TODO
+    ///
+    /// # Examples
+    ///
+    pub fn iterate(
+        &self,
+        t_begin: timespec,
+        t_end: timespec,
+        iterator_handle: &mut IteratorHandle,
+        out_reference: &mut Reference,
+    ) -> Status {
+        unsafe { callback_iterate(self._context, t_begin, t_end, iterator_handle, out_reference) }
+    }
+
     /// Allocate memory from the pool
     ///
     /// Arguments:

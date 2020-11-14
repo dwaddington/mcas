@@ -579,9 +579,11 @@ class IKVStore : public component::IBase {
    *
    * @return S_OK, E_POOL_NOT_FOUND
    */
-  virtual status_t map(
-      const pool_t                                                                                         pool,
-      std::function<int(const void* key, const size_t key_len, const void* value, const size_t value_len)> function)
+  virtual status_t map(const pool_t pool,
+                       std::function<int(const void* key,
+                                         const size_t key_len,
+                                         const void* value,
+                                         const size_t value_len)> function)
   {
     return E_NOT_SUPPORTED;
   }
@@ -611,7 +613,7 @@ class IKVStore : public component::IBase {
   }
 
   /**
-   * Apply functor to all keys only. Useful for file_store
+   * Apply functor to all keys only. Useful for file_store (now deprecated)
    *
    * @param pool Pool handle
    * @param function Functor
@@ -642,7 +644,7 @@ class IKVStore : public component::IBase {
     const void*          value;
     size_t               value_len;
     common::epoch_time_t timestamp; /* zero if not supported */
-
+    
     inline std::string get_key() const {
       std::string k(static_cast<const char*>(key), key_len);
       return k;
