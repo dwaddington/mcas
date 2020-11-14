@@ -140,6 +140,7 @@ impl Default for Value {
         }
     }
 }
+
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Value")
@@ -215,11 +216,47 @@ impl Response {
 #[repr(C)]
 pub struct Reference {
     pub _key: *mut u8,
-    pub _key_size: size_t,
+    pub _key_len: size_t,
     pub _value: *mut u8,
     pub _value_len: size_t,
     pub _timestamp: timespec,
 }
+
+impl Default for Reference {
+    fn default() -> Reference {
+        Reference {
+            _key: null_mut(),
+            _key_len: 0,
+            _value: null_mut(),
+            _value_len: 0,
+            _timestamp: timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+        }
+    }
+}
+
+impl Reference {
+    pub fn new() -> Reference {
+        Reference::default()
+    }
+}
+
+impl fmt::Debug for Reference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let k: &[u8] = unsafe { slice::from_raw_parts(self._key,
+                                                      self._key_len) };
+        let key_str: CString = std::ffi::CString::new(k).expect("CString::new failed");
+        f.debug_struct("Reference")
+            .field("key", &key_str)
+            .field("value-len", &self._value_len)
+            .field("time.tv_sec", &self._timestamp.tv_sec)
+            .field("time.tv_nsec", &self._timestamp.tv_nsec)            
+            .finish()
+    }
+}
+
 
 /* TODO
 
@@ -229,12 +266,6 @@ pub struct Reference {
                            offset_t&              out_matched_position,
                            std::string&           out_matched_key)>
         find_key;
-
- std::function<status_t(const common::epoch_time_t             t_begin,
-                           const common::epoch_time_t             t_end,
-                           component::IKVStore::pool_iterator_t&  iterator,
-                           component::IKVStore::pool_reference_t& reference)>
-        iterate;
 
 std::function<status_t(const uint64_t option)>
         configure;
@@ -293,7 +324,6 @@ pub struct ADOCallback {
 }
 
 impl ADOCallback {
-    
     /// Iterate over the key-value space
     ///
     /// Arguments:
@@ -309,7 +339,15 @@ impl ADOCallback {
         iterator_handle: &mut IteratorHandle,
         out_reference: &mut Reference,
     ) -> Status {
-        unsafe { callback_iterate(self._context, t_begin, t_end, iterator_handle, out_reference) }
+        unsafe {
+            callback_iterate(
+                self._context,
+                t_begin,
+                t_end,
+                iterator_handle,
+                out_reference,
+            )
+        }
     }
 
     /// Allocate memory from the pool

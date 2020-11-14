@@ -16,8 +16,8 @@
  for a specific application
 */
 
+use libc::timespec;
 #[allow(unused_imports)]
-
 use std::fmt::Write;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -31,7 +31,9 @@ use crate::Request;
 use crate::Response;
 use crate::Value;
 
+use crate::IteratorHandle;
 use crate::KeyLifetimeFlags;
+use crate::Reference;
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -122,7 +124,7 @@ impl AdoPlugin for crate::Plugin {
             let mut key_handle: KeyHandle = ptr::null_mut();
             let rc =
                 services.create_key(keyname.to_string(), 256, None, &mut value, &mut key_handle);
-            
+
             println!(
                 "[RUST]: created key {:#?} handle: {:?} rc:{:?}",
                 value, key_handle, rc
@@ -179,32 +181,50 @@ impl AdoPlugin for crate::Plugin {
             let mut value_vec = Vec::<Value>::new();
             value_vec.resize_with(count, Default::default);
             let mut handle_vec = Vec::<KeyHandle>::new();
-            handle_vec.resize_with(count, || { ptr::null_mut() } );
-            
-            for i in 0..4 {
+            handle_vec.resize_with(count, || { ptr::null_mut() });
 
+            for i in 0..count {
                 let mut key_name = String::new();
                 write!(key_name, "Object-{}", i).expect("write! failed");
                 let s = key_name;
-                       
+
                 handle_vec[i] = ptr::null_mut();
-                let rc =
-                    services.create_key(s.clone(),
-                                        256,
-                                        None,
-                                        &mut value_vec[i],
-                                        &mut handle_vec[i]);
-                
+                let rc = services.create_key(
+                    s.clone(),
+                    256,
+                    None,
+                    &mut value_vec[i],
+                    &mut handle_vec[i],
+                );
+
                 assert!(rc == Status::Ok, "failed to create key");
 
                 println!("[RUST]: created key {}", s);
             }
 
-            /* now lets iterate over them */
-            
+            let mut rc = Status::Ok;
+            let mut handle: IteratorHandle = ptr::null_mut();
+            while rc == Status::Ok
+            {
+                /* now lets iterate over them */
+                /* TODO: can we wrap in iterator */
+                let mut reference: Reference = Reference::new();
+                rc = services.iterate(
+                    timespec {
+                        tv_sec: 0,
+                        tv_nsec: 0,
+                    },
+                    timespec {
+                        tv_sec: 0,
+                        tv_nsec: 0,
+                    },
+                    &mut handle,
+                    &mut reference,
+                );
 
+                println!("[RUST]: iteration result {:?}", reference);
+            }
         }
-            
 
         /* resize current (target) value, need to unlock it first */
         {

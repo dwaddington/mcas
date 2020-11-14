@@ -178,11 +178,12 @@ extern "C"
   }
 
   status_t callback_iterate(void * callback_ptr,
-                            const common::epoch_time_t& t_begin,
-                            const common::epoch_time_t& t_end,
+                            const common::epoch_time_t t_begin,
+                            const common::epoch_time_t t_end,
                             void *& iterator,
                             component::IKVStore::pool_reference_t& out_reference) {
     assert(callback_ptr);
+
     auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
 
     auto result = p_this->cb_iterate(t_begin,
