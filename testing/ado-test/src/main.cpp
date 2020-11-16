@@ -519,6 +519,9 @@ TEST_F(ADO_test, RepeatInvokeAdo)
                                 0,                 /* flags */
                                 50);              /* obj count */
 
+  /* add index to pool */
+  ASSERT_TRUE(mcas->configure_pool(pool, "AddIndex::VolatileTree") == S_OK);
+
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   mcas->erase(pool, testname);

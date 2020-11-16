@@ -31,6 +31,7 @@ use crate::Request;
 use crate::Response;
 use crate::Value;
 
+use crate::FindType;
 use crate::IteratorHandle;
 use crate::KeyLifetimeFlags;
 use crate::Reference;
@@ -181,7 +182,7 @@ impl AdoPlugin for crate::Plugin {
             let mut value_vec = Vec::<Value>::new();
             value_vec.resize_with(count, Default::default);
             let mut handle_vec = Vec::<KeyHandle>::new();
-            handle_vec.resize_with(count, || { ptr::null_mut() });
+            handle_vec.resize_with(count, || { ptr::null_mut() } );
 
             for i in 0..count {
                 let mut key_name = String::new();
@@ -204,8 +205,7 @@ impl AdoPlugin for crate::Plugin {
 
             let mut rc = Status::Ok;
             let mut handle: IteratorHandle = ptr::null_mut();
-            while rc == Status::Ok
-            {
+            while rc == Status::Ok {
                 /* now lets iterate over them */
                 /* TODO: can we wrap in iterator */
                 let mut reference: Reference = Reference::new();
@@ -223,6 +223,21 @@ impl AdoPlugin for crate::Plugin {
                 );
 
                 println!("[RUST]: iteration result {:?}", reference);
+            }
+
+            /* iterate via key find - index must be enabled */
+            rc = Status::Ok;
+            let mut position: i64 = 0;
+
+            while rc == Status::Ok {
+                let mut matched: String = String::new();
+
+                rc = services.find_key(".*", FindType::Regex, &mut position, &mut matched);
+
+                if rc == Status::Ok {
+                    println!("[RUST]: find key returned '{}' at position {}", matched, position);
+                }
+                position += 1;
             }
         }
 

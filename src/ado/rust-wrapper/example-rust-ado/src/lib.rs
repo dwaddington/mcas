@@ -120,6 +120,15 @@ trait AdoPlugin {
 pub struct Plugin {}
 
 #[repr(u32)]
+pub enum FindType {
+    None = 0x0,
+    Next = 0x1,
+    Exact = 0x2,
+    Regex = 0x3,
+    Prefix = 0x4,
+}
+
+#[repr(u32)]
 pub enum KeyLifetimeFlags {
     None = 0x0,
     AdoLifetimeUnlock = 0x21,
@@ -245,18 +254,16 @@ impl Reference {
 
 impl fmt::Debug for Reference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let k: &[u8] = unsafe { slice::from_raw_parts(self._key,
-                                                      self._key_len) };
+        let k: &[u8] = unsafe { slice::from_raw_parts(self._key, self._key_len) };
         let key_str: CString = std::ffi::CString::new(k).expect("CString::new failed");
         f.debug_struct("Reference")
             .field("key", &key_str)
             .field("value-len", &self._value_len)
             .field("time.tv_sec", &self._timestamp.tv_sec)
-            .field("time.tv_nsec", &self._timestamp.tv_nsec)            
+            .field("time.tv_nsec", &self._timestamp.tv_nsec)
             .finish()
     }
 }
-
 
 /* TODO
 
@@ -315,6 +322,17 @@ extern "C" {
         iterator: &mut IteratorHandle,
         out_reference: &mut Reference,
     ) -> Status;
+
+    fn callback_find_key(
+        context: *const c_void,
+        key: *const c_uchar,
+        key_len : size_t,
+        find_type: FindType,
+        position: &mut libc::off_t,
+        key: &mut *mut libc::c_void,
+        key_size: &mut size_t,
+    ) -> Status;
+
     fn debug_break();
 }
 
@@ -347,6 +365,57 @@ impl ADOCallback {
                 iterator_handle,
                 out_reference,
             )
+        }
+    }
+
+    /// Iterate over key space using secondary index (must be configured)
+    ///
+    /// Arguments:
+    ///
+    /// * `str`: Expression string (e.g., ".*")
+    /// * `find_type` : Find type (e.g. FindType::Regex)
+    /// * `position` : Position to start search from, updated with matched position.
+    /// * `out_match` : Matching key
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let mut position: i64 = 0;
+    ///
+    /// while rc == Status::Ok {
+    ///   let key_expression = ".*";
+    ///   let mut matched: String = String::new();
+    ///
+    ///   rc = services.find_key(".*", FindType::Regex, &mut position, &mut matched);
+    ///   if rc == Status::Ok { .. }
+    ///   position += 1
+    /// }
+    ///
+    pub fn find_key(
+        &self,
+        key_expression: &str,
+        find_type: FindType,
+        position: &mut i64,
+        out_match: &mut String,
+    ) -> Status {
+        unsafe {
+            let mut out_key_ptr: *mut libc::c_void = std::ptr::null_mut();
+            let mut out_key_len: size_t = 0;
+            let status = callback_find_key(
+                self._context,
+                key_expression.as_ptr(),
+                key_expression.len(),
+                find_type,
+                position,
+                &mut out_key_ptr,
+                &mut out_key_len,
+            );
+
+            let cstr = convert_to_string(out_key_ptr as *const u8, out_key_len);
+            *out_match = cstr;
+            /* clean up C-side allocated memory */
+            libc::free(out_key_ptr);
+            status
         }
     }
 

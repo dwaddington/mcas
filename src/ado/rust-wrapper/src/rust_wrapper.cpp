@@ -18,6 +18,7 @@
 #include <common/logging.h>
 #include <common/dump_utils.h>
 #include <common/time.h>
+#include <common/types.h>
 #include <string>
 #include <ado_proto.h>
 
@@ -192,7 +193,40 @@ extern "C"
                                      out_reference);      
     return result;
   }
-  
+
+
+  status_t callback_find_key(void * callback_ptr,
+                             const char * key_expression,
+                             const size_t key_len,
+                             const component::IKVIndex::find_t find_type,
+                             offset_t& position,
+                             char*& out_matched_key,
+                             size_t& out_matched_key_len) {
+    assert(callback_ptr);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    std::string expr(key_expression, key_len);
+    std::string out_match;
+    offset_t loc = 0;
+    auto result = p_this->cb_find_key(expr, position, find_type, loc, out_match);
+
+    if(result == S_OK) {
+      out_matched_key_len = out_match.size();
+      out_matched_key = reinterpret_cast<char*>(::malloc(out_matched_key_len + 1));
+      memcpy(out_matched_key, out_match.c_str(), out_matched_key_len);
+      out_matched_key[out_matched_key_len] = '\0';
+      if(debug_level() >= 2)
+        PLOG("rust-wrapper::callback_find_key: match=%s begin=%lu foundat=%lu", out_match.c_str(), position, loc);
+    }
+    else {
+      out_matched_key_len = 0;
+      out_matched_key = nullptr;
+    }
+    
+    return result;
+  }
+                           
+                           
+                           
   
   void debug_break() {
     asm("int3");
