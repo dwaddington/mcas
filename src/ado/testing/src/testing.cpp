@@ -417,6 +417,20 @@ namespace
     return IADO_plugin::S_ERASE_TARGET;
   }
 
+  status_t repeatInvokeAdo(
+    IADO_plugin * // ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & // args_
+    , const string_view // key_
+    , value_space_t & // values_
+    , response_buffer_vector_t & //response_buffers_
+  )
+  {
+    /* used by another test */
+    return S_OK;
+  }
+
+  
   status_t basicAdoResponse(
     IADO_plugin * // ap_
     , uint64_t // work_key_
@@ -604,6 +618,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-IteratorTS", iteratorTS },
     { "RUN!TEST-Erase", erase },
     { "RUN!TEST-BasicAdoResponse", basicAdoResponse },
+    { "RUN!TEST-RepeatInvokeAdo", repeatInvokeAdo },
     { "BLAST ME!", other }, // used by ado-perf
     { "put", other }, // used by ado-perf
     { "erase", erase }, // used by ado-perf

@@ -531,7 +531,7 @@ TEST_F(ADO_test, RepeatInvokeAdo)
     ss << "RUN!" << i;
     rc = mcas->invoke_ado(pool,
                           testname,
-                          ss.str().c_str(),
+                          "RUN!TEST-RepeatInvokeAdo",
                           IMCAS::ADO_FLAG_CREATE_ON_DEMAND,
                           response,
                           KiB(4));
