@@ -437,7 +437,7 @@ void heap_rc::free_tracked(void *p_, std::size_t sz_, std::size_t alignment_)
 	persister_nupm::persist(&h->_prev->_next, sizeof h->_prev->_next);
 
 	auto p = static_cast<char *>(p_) - h->_align;
-	assert(sz = h->_size);
+	assert(sz == h->_size);
 	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p, " size ", sz);
 	return _eph->free(p, sz, _numa_node);
