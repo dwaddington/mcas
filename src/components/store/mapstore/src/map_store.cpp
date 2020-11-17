@@ -815,7 +815,6 @@ status_t Pool_handle::resize_value(const std::string &key,
 
   i->second._ptr = buffer;
   i->second._length = new_size;
-  PNOTICE("resized value (%s) to size=%lu ptr=%p", key.c_str(), new_size, buffer);
 
   /* release lock */
   if(unlock(out_key_handle) != S_OK)

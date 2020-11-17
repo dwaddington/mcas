@@ -17,30 +17,16 @@
 */
 
 use libc::timespec;
-#[allow(unused_imports)]
 use std::fmt::Write;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::size_t;
-use crate::status::Status;
-use crate::ADOCallback;
-use crate::AdoPlugin;
-use crate::KeyHandle;
-use crate::Request;
-use crate::Response;
-use crate::Value;
+use crate::{
+    size_t, status::Status, ADOCallback, AdoPlugin, FindType, IteratorHandle, KeyHandle,
+    KeyLifetimeFlags, Reference, Request, Response, Value,
+};
 
-use crate::FindType;
-use crate::IteratorHandle;
-use crate::KeyLifetimeFlags;
-use crate::Reference;
-
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
-
-/// Implement the plugin trait
+/// Implement the plugin trait (this is an example)
 ///
 impl AdoPlugin for crate::Plugin {
     fn launch_event(
@@ -182,7 +168,7 @@ impl AdoPlugin for crate::Plugin {
             let mut value_vec = Vec::<Value>::new();
             value_vec.resize_with(count, Default::default);
             let mut handle_vec = Vec::<KeyHandle>::new();
-            handle_vec.resize_with(count, || { ptr::null_mut() } );
+            handle_vec.resize_with(count, || ptr::null_mut());
 
             for i in 0..count {
                 let mut key_name = String::new();
@@ -237,7 +223,10 @@ impl AdoPlugin for crate::Plugin {
                 rc = services.find_key("Object.*", FindType::Regex, &mut position, &mut matched);
 
                 if rc == Status::Ok {
-                    println!("[RUST]: find key returned '{}' at position {}", matched, position);
+                    println!(
+                        "[RUST]: find key returned '{}' at position {}",
+                        matched, position
+                    );
                     count += 1;
                 }
                 position += 1;
