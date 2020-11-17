@@ -53,6 +53,24 @@ enum search_t {
 
 enum traversal_order_t { LTREE, KEY, RTREE };
 
+/*
+ * A pointer, wrapped in a packed struct so that it can be referenced
+ * in packed form.
+ */
+template <typename T>
+  struct packed_ptr
+  {
+  private:
+    T *p;
+  public:
+    explicit packed_ptr(T *p_) : p(p_) {}
+    packed_ptr() : packed_ptr(nullptr) {}
+    // operators
+    T * operator->() const { return p; }
+    T & operator*() const { return *p; }
+    operator bool() const { return bool(p); }
+  } __attribute__((packed));
+
 /**
  * A node in an AVL tree.
  */
@@ -72,7 +90,7 @@ class AVL_node {
   inline static constexpr int RIGHT_IMBALANCE(short bal) { return (bal > RIGHT_HEAVY); }
 
  public:
-  AVL_node<T> *subtree[2];
+  packed_ptr<AVL_node<T>> subtree[2];
 
   /**
    * The balance factor.
@@ -115,9 +133,9 @@ class AVL_node {
       case EQ_CMP:
         return (static_cast<T *>(this)->compare(static_cast<T *>(n)));
       case MIN_CMP:  // Find the minimal element in this tree
-        return (subtree[LEFT] == nullptr) ? EQ_CMP : MIN_CMP;
+        return subtree[LEFT] ? MIN_CMP : EQ_CMP;
       case MAX_CMP:  // Find the maximal element in this tree
-        return (subtree[RIGHT] == nullptr) ? EQ_CMP : MAX_CMP;
+        return subtree[RIGHT] ? MAX_CMP : EQ_CMP;
     }
     throw Logic_exception("unexpected condition");
     return EQ_CMP;
@@ -127,9 +145,9 @@ class AVL_node {
   static dir_t opposite(dir_t dir) { return dir_t(1 - int(dir)); }
 
   /** Performs a single rotation (LL case or RR case). */
-  static short rotate_once(AVL_node *&root, dir_t dir) {
+  static short rotate_once(packed_ptr<AVL_node> &root, dir_t dir) {
     dir_t otherDir = opposite(dir);
-    AVL_node *oldRoot = root;
+    auto oldRoot = root;
 
     short heightChange =
         (root->subtree[otherDir]->bf == 0) ? HEIGHT_NOCHANGE : HEIGHT_CHANGE;
@@ -145,10 +163,10 @@ class AVL_node {
   }
 
   /** Performs double rotation (RL case or LR case). */
-  static short rotate_twice(AVL_node *&root, dir_t dir) {
+  static short rotate_twice(packed_ptr<AVL_node> &root, dir_t dir) {
     dir_t otherDir = opposite(dir);
-    AVL_node *oldRoot = root;
-    AVL_node *oldOtherDirSubtree = root->subtree[otherDir];
+    auto oldRoot = root;
+    auto oldOtherDirSubtree = root->subtree[otherDir];
 
     // assign new root
     root = oldRoot->subtree[otherDir]->subtree[dir];
@@ -170,13 +188,13 @@ class AVL_node {
    * Rebalances a tree.
    * @param root the root of the tree.
    */
-  static short rebalance(AVL_node *&root) {
+  static short rebalance(packed_ptr<AVL_node> &root) {
     short heightChange = HEIGHT_NOCHANGE;
 
-    if (root == nullptr) throw API_exception("root is nullptr");
+    if (! root) throw API_exception("root is nullptr");
 
     if (LEFT_IMBALANCE(root->bf)) {
-      if (root->subtree[LEFT] == nullptr) throw Logic_exception("avl tree");
+      if (! root->subtree[LEFT]) throw Logic_exception("avl tree");
 
       if (root->subtree[LEFT]->bf == RIGHT_HEAVY) {
         heightChange = rotate_twice(root, RIGHT);
@@ -186,7 +204,7 @@ class AVL_node {
       }
     }
     else if (RIGHT_IMBALANCE(root->bf)) {
-      if (root->subtree[RIGHT] == nullptr) throw Logic_exception("avl tree");
+      if (! root->subtree[RIGHT]) throw Logic_exception("avl tree");
 
       if (root->subtree[RIGHT]->bf == LEFT_HEAVY) {
         heightChange = rotate_twice(root, LEFT);
@@ -205,15 +223,15 @@ class AVL_node {
    * @param change
    * @returns
    */
-  static AVL_node *insert(AVL_node *n, AVL_node *&root, int &change) {
-    if (root == nullptr) {
-      root = n;
+  static packed_ptr<AVL_node> insert(AVL_node *n, packed_ptr<AVL_node> &root, int &change) {
+    if (! root) {
+      root = packed_ptr<AVL_node>(n);
       change = HEIGHT_CHANGE;
-      return nullptr;
+      return packed_ptr<AVL_node>{};
     }
 
     short increase = 0;
-    AVL_node *ret;
+    packed_ptr<AVL_node> ret;
 
     cmp_t result = root->compare(n, EQ_CMP);
     dir_t dir = (result == MIN_CMP) ? LEFT : RIGHT;
@@ -237,7 +255,7 @@ class AVL_node {
     root->bf += increase;
 #pragma GCC diagnostic pop
     change = (increase && root->bf) ? (1 - rebalance(root)) : HEIGHT_NOCHANGE;
-    return nullptr;
+    return packed_ptr<AVL_node>{};
   }
 
   /**
@@ -248,15 +266,15 @@ class AVL_node {
    * @param cmp
    * @returns
    */
-  static AVL_node *remove(AVL_node *n, AVL_node *&root, short &change,
+  static packed_ptr<AVL_node> remove(AVL_node *n, packed_ptr<AVL_node> &root, short &change,
                           cmp_t cmp) {
-    if (root == nullptr) {
+    if (! root) {
       change = HEIGHT_NOCHANGE;
-      return nullptr;
+      return root;
     }
 
     short decrease = 0;
-    AVL_node *ret;
+    packed_ptr<AVL_node> ret;
 
     cmp_t result = root->compare(n, cmp);
     dir_t dir = (result == MIN_CMP) ? LEFT : RIGHT;
@@ -270,14 +288,14 @@ class AVL_node {
     }
     else {
       ret = root;
-      if ((root->subtree[LEFT] == nullptr) &&
-          (root->subtree[RIGHT] == nullptr)) {
-        root = nullptr;
+      if ((! root->subtree[LEFT]) &&
+          (! root->subtree[RIGHT])) {
+        root = packed_ptr<AVL_node>{};
         change = HEIGHT_CHANGE;
         return ret;
       }
-      else if ((root->subtree[LEFT] == nullptr) ||
-               (root->subtree[RIGHT] == nullptr)) {
+      else if ((! root->subtree[LEFT]) ||
+               (! root->subtree[RIGHT])) {
         root = root->subtree[(root->subtree[RIGHT]) ? RIGHT : LEFT];
         change = HEIGHT_CHANGE;
         return ret;
@@ -344,7 +362,7 @@ class AVL_node {
 
  public:
   /** Constructor. */
-  AVL_node() : bf(0) { subtree[LEFT] = subtree[RIGHT] = nullptr; }
+  AVL_node() : subtree{}, bf(0) { /* subtree[LEFT] = subtree[RIGHT] = nullptr; */ }
 
   AVL_node(const AVL_node &) = delete;
   AVL_node &operator=(const AVL_node &) = delete;
@@ -356,7 +374,7 @@ class AVL_node {
    * @param n the node.
    * @param root the root of the tree.
    */
-  static void insert(AVL_node *n, AVL_node *&root) {
+  static void insert(AVL_node *n, packed_ptr<AVL_node> &root) {
     int change;
     insert(n, root, change);
   }
@@ -366,7 +384,7 @@ class AVL_node {
    * @param n the node.
    * @param root the root of the tree.
    */
-  static void remove(AVL_node *n, AVL_node *&root) {
+  static void remove(AVL_node *n, packed_ptr<AVL_node> &root) {
     short change;
     remove(n, root, change, EQ_CMP);
   }
@@ -396,7 +414,7 @@ class AVL_tree {
    *
    * @param root Pointer to space for the root pointer (this may be persistent)
    */
-  AVL_tree(AVL_node<T> **root)  : _root(root) {
+  AVL_tree(packed_ptr<AVL_node<T>> *root)  : _root(root) {
     if (_root == nullptr)
       throw Constructor_exception("AVL_tree: requires root pointer space");
   }
@@ -416,16 +434,16 @@ class AVL_tree {
     __apply_topdown(*_root, 0, func);
 #else
     std::vector<AVL_node<T> *> stack;
-    stack.push_back(*_root);
+    stack.push_back(&**_root);
 
     while (!stack.empty()) {
       AVL_node<T> *node = stack.back();
       stack.pop_back();
 
-      AVL_node<T> *l = node->subtree[LEFT];
+      AVL_node<T> *l = &*node->subtree[LEFT];
       if (l) stack.push_back(l);
 
-      AVL_node<T> *r = node->subtree[RIGHT];
+      AVL_node<T> *r = &*node->subtree[RIGHT];
       if (r) stack.push_back(r);
 
       func(node, sizeof(AVL_node<T>));
@@ -471,7 +489,7 @@ class AVL_tree {
    * @return Pointer to the root of the tree (note this can change) through
    * rebalancing.
    */
-  AVL_node<T> **root() const { return _root; }
+  packed_ptr<AVL_node<T>> *root() const { return _root; }
 
   /**
    * Dump debugging information
@@ -485,19 +503,19 @@ class AVL_tree {
     }
     else {
       dump(RTREE, node, level);
-      if (node->subtree[RIGHT] != nullptr) {
-        dump(node->subtree[RIGHT], level + 1);
+      if (node->subtree[RIGHT]) {
+        dump(&*node->subtree[RIGHT], level + 1);
       }
       dump(KEY, node, level);
-      if (node->subtree[LEFT] != nullptr) {
-        dump(node->subtree[LEFT], level + 1);
+      if (node->subtree[LEFT]) {
+        dump(&*node->subtree[LEFT], level + 1);
       }
       dump(LTREE, node, level);
     }
   }
 
  protected:
-  AVL_node<T> **_root; /**< Root of the tree.*/
+  packed_ptr<AVL_node<T>> *_root; /**< Root of the tree.*/
 
  private:
   static void indent(unsigned len) {
@@ -510,7 +528,7 @@ class AVL_tree {
     int verbose = 1;
     unsigned len = (level * 5) + 1U;
 
-    if ((order == LTREE) && (node->subtree[LEFT] == nullptr)) {
+    if ((order == LTREE) && (! node->subtree[LEFT])) {
       indent(len);
       printf("         **NULL**\n");
     }
@@ -519,15 +537,15 @@ class AVL_tree {
       if (verbose) {
         static_cast<T *>(node)->dump();
         printf("@[%p] bf=%x left=%p right=%p level=%d\n", static_cast<void *>(node),
-               unsigned(node->bf), static_cast<void *>(node->subtree[LEFT]),
-               static_cast<void *>(node->subtree[RIGHT]), level);
+               unsigned(node->bf), static_cast<void *>(&*node->subtree[LEFT]),
+               static_cast<void *>(&*node->subtree[RIGHT]), level);
       }
       else {
         static_cast<T *>(node)->dump();
         printf("\n");
       }
     }
-    if ((order == RTREE) && (node->subtree[RIGHT] == nullptr)) {
+    if ((order == RTREE) && (! node->subtree[RIGHT])) {
       indent(len);
       printf("         **NULL**\n");
     }

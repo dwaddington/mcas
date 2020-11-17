@@ -18,8 +18,6 @@
 #include <linux/cdev.h>
 #include <linux/percpu.h>
 
-#include <asm/tlb.h>
-#include <asm/tlbflush.h>
 #include <asm/uaccess.h>
 
 #include "xpmem_internal.h"
@@ -66,19 +64,20 @@ xpmem_invalidate_PTEs_range(struct xpmem_thread_group *seg_tg,
  * XPMEM only uses the invalidate_range_end() portion. That is, when all pages
  * in the range have been unmapped and the pages have been freed by the VM.
  */
-static void
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+static void
 xpmem_invalidate_range(struct mmu_notifier *mn,
                        const struct mmu_notifier_range *rp)
 #else
+static void
 xpmem_invalidate_range(struct mmu_notifier *mn, struct mm_struct *mm,
                        unsigned long start, unsigned long end)
 #endif
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-  unsigned long start = rp->start;
-  unsigned long end = rp->end;
-  struct mm_struct *mm = rp->mm;
+	struct mm_struct *mm = rp->mm;
+	unsigned long start = rp->start;
+	unsigned long end = rp->end;
 #endif
   
 	struct xpmem_thread_group *seg_tg;
