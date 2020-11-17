@@ -29,7 +29,7 @@ apt-get install -y --no-install-recommends \
         libgoogle-perftools-dev libcurl4-openssl-dev \
         linux-headers-generic \
         uuid-dev golang gnutls-dev libgnutls30 \
-        lcov libzmq5-dev libczmq-dev
+        lcov libzmq5-dev libczmq-dev bash-completion
 
 # special handling of googletest
 #
