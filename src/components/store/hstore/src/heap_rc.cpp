@@ -413,13 +413,16 @@ void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
 	return _eph->free(p_, sz, _numa_node);
 }
 
-void heap_rc::free_tracked(void *p_, std::size_t sz_, std::size_t alignment_)
+void heap_rc::free_tracked(
+	void *p_
+	, std::size_t sz_
+	, std::size_t // align_
+)
 {
-	auto align = std::max(alignment_, sizeof(void *));
-	sz_ = std::max(sz_, align);
-	auto sz = sz_ + sizeof(tracked_header);
-	sz = (sz_ + align - 1U)/align * align;
 	tracked_header *h = static_cast<tracked_header *>(p_)-1;
+	auto align = h->_align;
+	/* size: a multiple of alignment */
+	auto sz = round_up(sz_ + align, align);
 	if ( 3 < _eph->debug_level() )
 	{
 		PLOG(
