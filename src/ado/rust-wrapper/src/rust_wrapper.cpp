@@ -225,8 +225,13 @@ extern "C"
     return result;
   }
                            
-                           
-                           
+  status_t callback_configure(void * callback_ptr,
+                              uint64_t option)
+  {
+    assert(callback_ptr);
+    auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
+    return p_this->cb_configure(option);
+  }
   
   void debug_break() {
     asm("int3");

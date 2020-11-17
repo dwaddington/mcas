@@ -222,23 +222,27 @@ impl AdoPlugin for crate::Plugin {
                     &mut reference,
                 );
 
-                println!("[RUST]: iteration result {:?}", reference);
+                if rc == Status::Ok {
+                    println!("[RUST]: iteration result {:?}", reference);
+                }
             }
 
             /* iterate via key find - index must be enabled */
             rc = Status::Ok;
             let mut position: i64 = 0;
-
+            let mut count = 0;
             while rc == Status::Ok {
                 let mut matched: String = String::new();
 
-                rc = services.find_key(".*", FindType::Regex, &mut position, &mut matched);
+                rc = services.find_key("Object.*", FindType::Regex, &mut position, &mut matched);
 
                 if rc == Status::Ok {
                     println!("[RUST]: find key returned '{}' at position {}", matched, position);
+                    count += 1;
                 }
                 position += 1;
             }
+            assert!(count == 5);
         }
 
         /* resize current (target) value, need to unlock it first */

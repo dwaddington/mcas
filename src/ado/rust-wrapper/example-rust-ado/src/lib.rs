@@ -135,6 +135,12 @@ pub enum KeyLifetimeFlags {
     NoImplicitUnlock = 0x22,
 }
 
+#[repr(u64)]
+pub enum ShardOption {
+    IncRef = 0x1,
+    DecRef = 0x2,
+}
+
 #[repr(C)]
 pub struct Value {
     pub _buffer: *mut u8,
@@ -265,20 +271,8 @@ impl fmt::Debug for Reference {
     }
 }
 
-/* TODO
-
- std::function<status_t(const std::string&     key_expression,
-                           const offset_t         begin_position,
-                           const IKVIndex::find_t find_type,
-                           offset_t&              out_matched_position,
-                           std::string&           out_matched_key)>
-        find_key;
-
-std::function<status_t(const uint64_t option)>
-        configure;
-*/
-
 /// Callback table (implemented on C/C++ side)
+///
 extern "C" {
     fn callback_allocate_pool_memory(context: *const c_void, size: size_t) -> Value;
 
@@ -326,12 +320,14 @@ extern "C" {
     fn callback_find_key(
         context: *const c_void,
         key: *const c_uchar,
-        key_len : size_t,
+        key_len: size_t,
         find_type: FindType,
         position: &mut libc::off_t,
         key: &mut *mut libc::c_void,
         key_size: &mut size_t,
     ) -> Status;
+
+    fn callback_configure(context: *const c_void, option: ShardOption) -> Status;
 
     fn debug_break();
 }
@@ -622,6 +618,17 @@ impl ADOCallback {
     /// ```    
     pub fn unlock_key(&self, key_handle: KeyHandle) -> Status {
         unsafe { callback_unlock_key(self._context, self._work_id, key_handle) }
+    }
+
+    /// Configure shard (e.g. increment or decrement ADO reference count
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// _services.configure(ShardOption::IncRef)
+    /// ```    
+    pub fn configure(&self, option: ShardOption) -> Status {
+        unsafe { callback_configure(self._context, option) }
     }
 }
 

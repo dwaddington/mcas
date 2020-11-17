@@ -588,6 +588,8 @@ class IADO_plugin : public component::IBase {
 
     /**
      * Send configuration option to shard
+     * (e.g. IADO_plugin::CONFIG_SHARD_INC_REF,
+     * IADO_plugin::CONFIG_SHARD_DEC_REF)
      */
     std::function<status_t(const uint64_t option)>
         configure;
