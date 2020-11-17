@@ -162,7 +162,7 @@ class Memory_region : public core::AVL_node<Memory_region> {
    * @return
    */
   Memory_region* left() {
-    return static_cast<Memory_region*>(subtree[core::LEFT]);
+    return static_cast<Memory_region*>(&*subtree[core::LEFT]);
   }
 
   /**
@@ -172,7 +172,7 @@ class Memory_region : public core::AVL_node<Memory_region> {
    * @return
    */
   Memory_region* right() {
-    return static_cast<Memory_region*>(subtree[core::RIGHT]);
+    return static_cast<Memory_region*>(&*subtree[core::RIGHT]);
   }
 
  protected:
@@ -389,13 +389,13 @@ class AVL_range_allocator {
 #endif
 
     /* establish root */
-    core::AVL_node<core::Memory_region>** root = nullptr;
+    packed_ptr<core::AVL_node<core::Memory_region>>* root = nullptr;
     bool newroot = true;
 
     if (slab.is_reconstructed()) {
       newroot = false;
       /* the first entry will be the root (at least it should be!) */
-      root = reinterpret_cast<core::AVL_node<core::Memory_region>**>(
+      root = reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(
           (reinterpret_cast<addr_t>(slab.get_first_element())));
 
       if (option_DEBUG) PLOG("reconstructed root pointer: %p", static_cast<const void *>(root));
@@ -403,11 +403,11 @@ class AVL_range_allocator {
     else {
       /* create root pointer on slab */
       root =
-          reinterpret_cast<core::AVL_node<core::Memory_region>**>(slab.alloc());
+          reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(slab.alloc());
 
       if (option_DEBUG) PLOG("new root pointer: %p", static_cast<void*>(root));
 
-      *root = nullptr;
+      *root = packed_ptr<core::AVL_node<core::Memory_region>>{};
     }
 
     /* now we can create the tree and pass the root pointer */
@@ -476,7 +476,7 @@ class AVL_range_allocator {
 #endif
 
     /* look for fitting region that is aligned */
-    Memory_region* root = static_cast<Memory_region*>(*(_tree->root()));
+    Memory_region* root = static_cast<Memory_region*>(&**(_tree->root()));
     Memory_region* aligned_region = root->find_free_region(root, size, alignment);
 
     if (aligned_region == nullptr) {
@@ -623,7 +623,7 @@ class AVL_range_allocator {
    */
   Memory_region* leftmost_region() {
     assert(_tree);
-    Memory_region* r = static_cast<Memory_region*>(*(_tree->root()));
+    Memory_region* r = static_cast<Memory_region*>(&**(_tree->root()));
     if (r == nullptr)
       throw Logic_exception("AVL memory range tree root is nullptr");
 
@@ -638,7 +638,7 @@ class AVL_range_allocator {
    * @return Rightmost memory region (give top end of region)
    */
   Memory_region* rightmost_region() {
-    Memory_region* r = static_cast<Memory_region*>(*(_tree->root()));
+    Memory_region* r = static_cast<Memory_region*>(&**(_tree->root()));
     while (r->right()) r = r->right();
     return r;
   }
@@ -654,7 +654,7 @@ class AVL_range_allocator {
    */
   Memory_region* alloc_at(addr_t addr, size_t size) {
     // find fitting region
-    Memory_region* root = static_cast<Memory_region*>(*(_tree->root()));
+    Memory_region* root = static_cast<Memory_region*>(&**(_tree->root()));
     Memory_region* region = root->find_containing_region(root, addr);
 
     if (region == nullptr)
@@ -727,7 +727,7 @@ class AVL_range_allocator {
    * @return Pointer to memory region if found, otherwise nullptr
    */
   Memory_region* find(addr_t addr) {
-    Memory_region* root = static_cast<Memory_region*>(*(_tree->root()));
+    Memory_region* root = static_cast<Memory_region*>(&**(_tree->root()));
     return root->find_region(root, addr);
   }
 
@@ -822,7 +822,7 @@ class AVL_range_allocator {
     }
     else {
       PINF("%s", "+ AVL_tree: ");
-      AVL_tree<Memory_region>::dump(*(_tree->root()));
+      AVL_tree<Memory_region>::dump(&**(_tree->root()));
     }
 
   }

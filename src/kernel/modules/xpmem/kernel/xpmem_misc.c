@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2004-2007 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright 2009, 2010, 2014 Cray Inc. All Rights Reserved
- * Copyright 2017 ARM, Inc. All Rights Reserved
+ * Copyright 2017-2020 Arm, Inc. All Rights Reserved
  */
 
 /*
@@ -325,7 +325,7 @@ struct file_operations xpmem_debug_printk_procfs_ops = {
 	.release	= single_release,
 };
 #else
-struct proc_ops xpmem_debug_printk_procfs_ops = {
+const struct proc_ops xpmem_debug_printk_procfs_ops = {
 	.proc_lseek   = seq_lseek,
 	.proc_read    = seq_read,
 	.proc_write   = xpmem_debug_printk_procfs_write,

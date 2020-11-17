@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2004-2007 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright 2009, 2014 Cray Inc. All Rights Reserved
- * Copyright 2016-2017 ARM Inc. All Rights Reserved
+ * Copyright 2016-2020 Arm Inc. All Rights Reserved
  * Copyright (c) 2016-2018 Nathan Hjelm <hjelmn@cs.unm.edu>
  */
 
@@ -274,7 +274,7 @@ xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
 		set_cpus_allowed_ptr(current, &saved_mask);
 
 	if (ret == 1) {
-    *pfn = page_to_pfn(page);
+		*pfn = page_to_pfn(page);
 		atomic_inc(&tg->n_pinned);
 		atomic_inc(&xpmem_my_part->n_pinned);
 		ret = 0;
@@ -340,7 +340,7 @@ xpmem_unpin_pages(struct xpmem_segment *seg, struct mm_struct *mm,
  * Given a virtual address and XPMEM segment, pin the page.
  */
 int
-xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr, unsigned long * pfn)
+xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr, unsigned long *pfn)
 {
   int ret;
 	struct xpmem_thread_group *seg_tg = seg->tg;
@@ -350,7 +350,7 @@ xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr, unsigned long * pfn
 		return -ENOENT;
 
 	/* pin PFN */
-  ret = xpmem_pin_page(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr, pfn);
+	ret = xpmem_pin_page(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr, pfn);
 
 	return ret;
 }
@@ -632,7 +632,7 @@ struct file_operations xpmem_unpin_procfs_ops = {
 	.release	= single_release,
 };
 #else
-struct proc_ops xpmem_unpin_procfs_ops = {
+const struct proc_ops xpmem_unpin_procfs_ops = {
 	.proc_lseek   = seq_lseek,
 	.proc_read    = seq_read,
 	.proc_write   = xpmem_unpin_procfs_write,
