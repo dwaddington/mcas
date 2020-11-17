@@ -14,6 +14,7 @@ apt-get install -y --no-install-recommends \
 # removed: libcunit1 libcunit1-dev liblz4-dev libomp-dev libsnappy-dev uuid (unused)
 # removed: g++-multilib (cross-compiles)
 # removed: google-perftools (profiling)
+# added for ndctl: bash-completion systemd
 
 apt-get install -y --no-install-recommends \
         autoconf automake ca-certificates cmake gcc g++ git make python python-numpy libtool-bin pkg-config \
@@ -28,7 +29,7 @@ apt-get install -y --no-install-recommends \
         libgoogle-perftools-dev libcurl4-openssl-dev \
         linux-headers-generic \
         uuid-dev golang libgnutls-dev libgnutls30 lcov \
-        libzmq5 libzmq3-dev libczmq-dev bash-completion
+        libzmq5 libzmq3-dev libczmq-dev bash-completion systemd
 
 # special handling of googletest
 #

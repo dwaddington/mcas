@@ -12,7 +12,7 @@ apt-get install -y build-essential git libnuma-dev libelf-dev libpcap-dev uuid-d
         libboost-python-dev libkmod-dev libjson-c-dev libbz2-dev \
         linux-headers-`uname -r` libelf-dev libsnappy-dev liblz4-dev \
         asciidoc xmlto libtool libgtest-dev google-perftools libgoogle-perftools-dev golang gnutls-dev \
-        libgnutls30 lcov libzmq5-dev libczmq-dev bash-completion
+        libgnutls30 lcov libzmq5-dev libczmq-dev bash-completion systemd
 
 # not sure this works
 # install Rust compiler and runtime
