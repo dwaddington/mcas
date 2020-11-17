@@ -659,6 +659,23 @@ public:
         flags, out_response, out_async_handle, value_size);
   }
 
+  inline status_t async_invoke_ado(const IMCAS::pool_t        pool,
+                                   const std::string&         key,
+                                   const void*                request,
+                                   const size_t               request_len,
+                                   const ado_flags_t          flags,
+                                   std::vector<ADO_response>& out_response,
+                                   async_handle_t&            out_async_handle,
+                                   const size_t               value_size = 0)
+  {
+    return
+      async_invoke_ado(pool,
+        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(static_cast<const byte *>(request), request_len),
+        flags, out_response, out_async_handle, value_size);
+  }
+
+
   /**
    * Used to invoke a combined put + ADO operation on an active data object.
    *
