@@ -16,7 +16,6 @@ apt-get install -y --no-install-recommends build-essential cmake
 # removed: g++-multilib (cross-compiles)
 # removed: google-perftools (profiling)
 # removed: libpcap-dev (debugging)
-# added for ndctl: bash-completion systemd
 apt-get install -y --no-install-recommends \
         autoconf automake ca-certificates cmake gcc g++ git make python3 python3-numpy libtool-bin pkg-config \
         libnuma-dev \
@@ -30,7 +29,7 @@ apt-get install -y --no-install-recommends \
         libgoogle-perftools-dev libcurl4-openssl-dev \
         linux-headers-generic \
         uuid-dev golang gnutls-dev libgnutls30 \
-        lcov libzmq5-dev libczmq-dev bash-completion systemd
+        lcov libzmq5-dev libczmq-dev
 
 # special handling of googletest
 #
