@@ -146,8 +146,9 @@ try
   {
     _pool_manager->pool_create_check(size_);
   }
-  catch ( const std::exception & )
+  catch ( const std::exception &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return pool_t(E_FAIL);
   }
 
@@ -171,16 +172,17 @@ try
 
   return to_pool_t(rac.address_map.front().iov_base);
 }
-catch ( const pool_error & )
+catch ( const pool_error &e )
 {
   return flags_ & FLAGS_CREATE_ONLY
     ? static_cast<IKVStore::pool_t>(POOL_ERROR)
     : open_pool(name_, flags_ & ~FLAGS_SET_SIZE)
     ;
 }
-catch ( std::bad_alloc & )
+catch ( const std::bad_alloc &e )
 {
-	return POOL_ERROR; // E_TOO_LARGE incorrect type
+  CPLOG(0, "%s: %s", __func__, e.what());
+  return POOL_ERROR; // E_TOO_LARGE incorrect type
 }
 
 auto hstore::open_pool(const std::string &name_,
@@ -214,15 +216,18 @@ auto hstore::open_pool(const std::string &name_,
       return to_pool_t(v.address_map.front().iov_base);
     }
   }
-  catch( const pool_error & ) {
+  catch( const pool_error &e ) {
+    CPLOG(0, "%s: %s", __func__, e.message().c_str());
     return component::IKVStore::POOL_ERROR;
   }
-  catch( const std::invalid_argument & ) {
+  catch( const std::invalid_argument &e ) {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return component::IKVStore::POOL_ERROR;
   }
-  catch ( const std::bad_alloc & )
+  catch ( const std::bad_alloc &e )
   {
-   	return POOL_ERROR; // E_TOO_LARGE incorrect type
+    CPLOG(0, "%s: %s", __func__, e.what());
+    return POOL_ERROR; // E_TOO_LARGE incorrect type
   }
 }
 
@@ -235,10 +240,12 @@ status_t hstore::close_pool(const pool_t p)
     CPLOG(1, PREFIX "closed pool (%" PRIxIKVSTORE_POOL_T ")", LOCATION, p);
     _pool_manager->pool_close_check(path);
   }
-  catch ( const std::runtime_error & )  {
+  catch ( const std::runtime_error &e )  {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_POOL_NOT_FOUND;
   }
-  catch ( const std::invalid_argument & )  {
+  catch ( const std::invalid_argument &e )  {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_INVAL;
   }
 
@@ -252,10 +259,12 @@ status_t hstore::delete_pool(const std::string& name_)
   try {
     _pool_manager->pool_delete(path);
   }
-  catch ( const std::runtime_error & )  {
+  catch ( const std::runtime_error &e )  {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_POOL_NOT_FOUND;
   }
-  catch ( const std::invalid_argument & )  {
+  catch ( const std::invalid_argument &e )  {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_INVAL;
   }
 
@@ -277,8 +286,9 @@ auto hstore::grow_pool( //
   {
     reconfigured_size = session->pool_grow(_pool_manager->get_dax_manager(), increment_size);
   }
-  catch ( const std::bad_alloc & )
+  catch ( const std::bad_alloc &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
   }
   return S_OK;
@@ -337,16 +347,19 @@ auto hstore::put(const pool_t pool,
           )
         ;
     }
-    catch ( const std::bad_alloc & )
+    catch ( const std::bad_alloc &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return component::IKVStore::E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
     }
-    catch ( const std::invalid_argument & )
+    catch ( const std::invalid_argument &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return E_NOT_SUPPORTED;
     }
-    catch ( const impl::is_locked & )
+    catch ( const impl::is_locked &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return E_LOCKED; /* ... and is locked, so cannot be updated */
     }
   }
@@ -417,15 +430,17 @@ auto hstore::get(const pool_t pool,
         out_value = std::get<0>(r);
         out_value_len = std::get<1>(r);
       }
-      catch ( const std::bad_alloc & )
+      catch ( const std::bad_alloc &e )
       {
+        CPLOG(0, "%s: %s", __func__, e.what());
         return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
       }
     }
     return S_OK;
   }
-  catch ( const impl::key_not_found & )
+  catch ( const impl::key_not_found &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return component::IKVStore::E_KEY_NOT_FOUND;
   }
 }
@@ -452,8 +467,9 @@ auto hstore::get_direct(const pool_t pool,
     }
     return S_OK;
   }
-  catch ( const impl::key_not_found & )
+  catch ( const impl::key_not_found &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return component::IKVStore::E_KEY_NOT_FOUND;
   }
 }
@@ -492,12 +508,14 @@ auto hstore::get_attribute(
       out_attr.push_back(session->get_value_len(*key));
       return S_OK;
     }
-    catch ( const impl::key_not_found & )
+    catch ( const impl::key_not_found &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return component::IKVStore::E_KEY_NOT_FOUND;
     }
-    catch ( const std::bad_alloc & )
+    catch ( const std::bad_alloc &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
     }
     break;
@@ -507,8 +525,9 @@ auto hstore::get_attribute(
       out_attr.push_back(session->get_auto_resize());
       return S_OK;
     }
-    catch ( const std::bad_alloc & )
+    catch ( const std::bad_alloc &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
     }
     break;
@@ -527,8 +546,9 @@ auto hstore::get_attribute(
       out_attr.push_back(session->get_write_epoch_time(*key));
       return S_OK;
     }
-    catch ( const impl::key_not_found & )
+    catch ( const impl::key_not_found &e )
     {
+      CPLOG(0, "%s: %s", __func__, e.what());
       return component::IKVStore::E_KEY_NOT_FOUND;
     }
     break;
@@ -582,20 +602,24 @@ auto hstore::resize_value(
       ;
   }
   /* how might this fail? Out of memory, key not found, not locked, read locked */
-  catch ( const std::invalid_argument & )
+  catch ( const std::invalid_argument &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_BAD_ALIGNMENT; /* bad alignment, probably */
   }
-  catch ( const std::bad_alloc & )
+  catch ( const std::bad_alloc &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
   }
-  catch ( const impl::key_not_found & )
+  catch ( const impl::key_not_found &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_KEY_NOT_FOUND; /* key not found */
   }
-  catch ( const impl::is_locked & )
+  catch ( const impl::is_locked &e )
   {
+    CPLOG(0, "%s: %s", __func__, e.what());
     return E_LOCKED; /* could not get unique lock (?) */
   }
 }
@@ -643,9 +667,10 @@ try
   }
   return E_KEY_NOT_FOUND;
 }
-catch ( const std::bad_alloc & )
+catch ( const std::bad_alloc &e )
 {
-	return E_TOO_LARGE;
+  CPLOG(0, "%s: %s", __func__, e.what());
+  return E_TOO_LARGE;
 }
 
 auto hstore::unlock(const pool_t pool,
@@ -786,24 +811,29 @@ try
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
-catch ( const std::bad_alloc & )
+catch ( const std::bad_alloc &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
 }
-catch ( const std::invalid_argument & )
+catch ( const std::invalid_argument &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_NOT_SUPPORTED;
 }
-catch ( const impl::key_not_found & )
+catch ( const impl::key_not_found &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_KEY_NOT_FOUND;
 }
-catch ( const impl::is_locked & )
+catch ( const impl::is_locked &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_LOCKED; /* ... is locked, so cannot be updated */
 }
-catch ( const std::system_error & )
+catch ( const std::system_error &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_FAIL;
 }
 
@@ -821,8 +851,9 @@ try
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
-catch ( const std::bad_alloc & )
+catch ( const std::bad_alloc &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
 }
 
@@ -837,16 +868,18 @@ try
   const auto session = static_cast<session_t *>(locate_session(pool));
   return
     session
-    ? ( out_addr = session->allocate_memory(AK_INSTANCE size, clean_align(alignment)), S_OK )
+    ? ( out_addr = session->allocate_memory(AK_INSTANCE size, clean_align(alignment, sizeof(void *))), S_OK )
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
-catch ( const std::invalid_argument & )
+catch ( const std::invalid_argument &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_BAD_ALIGNMENT; /* ... probably */
 }
-catch ( const std::bad_alloc & )
+catch ( const std::bad_alloc &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
 }
 
@@ -864,12 +897,14 @@ try
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
-catch ( const API_exception & ) /* bad pointer */
+catch ( const API_exception &e ) /* bad pointer */
 {
+  CPLOG(0, "%s: %s", __func__, e.cause());
   return E_INVAL;
 }
-catch ( const std::exception & )
+catch ( const std::exception &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_FAIL;
 }
 
@@ -887,12 +922,14 @@ try
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
-catch ( const API_exception & ) /* bad pointer */
+catch ( const API_exception &e ) /* bad pointer */
 {
+  CPLOG(0, "%s: %s", __func__, e.cause());
   return E_INVAL;
 }
-catch ( const std::exception & )
+catch ( const std::exception &e )
 {
+  CPLOG(0, "%s: %s", __func__, e.what());
   return E_FAIL;
 }
 

@@ -17,6 +17,7 @@
 #include "hstore_config.h"
 #include "atomic_controller.h"
 #include "as_emplace.h"
+#include "clean_align.h"
 #include "construction_mode.h"
 #include "key_not_found.h"
 #include "logging.h"
@@ -874,18 +875,9 @@ PLOG("%s", s.str().c_str());
 			, std::size_t alignment
 		)
 		{
-			if ( alignment != 0 && alignment < sizeof(void*) )
-			{
-				throw std::invalid_argument("alignment < sizeof(void*)");
-			}
-			if ( (alignment & (alignment - 1)) != 0 )
-			{
-				throw std::invalid_argument("alignment is not a power of 2");
-			}
-
 			persistent_t<char *> p = nullptr;
 			/* ERROR: leaks memory on a crash */
-			allocator().allocate_tracked(AK_REF p, size, alignment);
+			allocator().allocate_tracked(AK_REF p, size, clean_align(alignment, sizeof(void *)));
 			return p;
 		}
 
