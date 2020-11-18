@@ -14,6 +14,7 @@
 #include "hstore.h"
 
 #include "atomic_controller.h"
+#include "clean_align.h"
 #include "hop_hash.h"
 #include "is_locked.h"
 #include "key_not_found.h"
@@ -576,14 +577,14 @@ auto hstore::resize_value(
   {
     return
       session
-      ? ( session->resize_mapped(AK_INSTANCE key, new_value_len, alignment), S_OK )
+      ? ( session->resize_mapped(AK_INSTANCE key, new_value_len, clean_align(alignment)), S_OK )
       : E_FAIL
       ;
   }
   /* how might this fail? Out of memory, key not found, not locked, read locked */
   catch ( const std::invalid_argument & )
   {
-    return E_BAD_ALIGNMENT; /* not properly locked */
+    return E_BAD_ALIGNMENT; /* bad alignment, probably */
   }
   catch ( const std::bad_alloc & )
   {
@@ -836,7 +837,7 @@ try
   const auto session = static_cast<session_t *>(locate_session(pool));
   return
     session
-    ? ( out_addr = session->allocate_memory(AK_INSTANCE size, alignment), S_OK )
+    ? ( out_addr = session->allocate_memory(AK_INSTANCE size, clean_align(alignment)), S_OK )
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
