@@ -23,6 +23,18 @@ class shard_proto(dm):
         })
         self.merge(default_backend)
 
+class shard_proto_net(dm):
+    """ shard prototype with network device """
+    def __init__(self, addr, default_backend, net):
+        dm.__init__(self, {
+            "core" : 0,
+            "addr" : addr,
+            "port" : 11911,
+            "net"  : net
+        })
+        self.merge(default_backend)
+
+
 class shard_proto_dax(shard_proto):
     """ shard prototype (for dax) """
     def __init__(self, addr, default_backend, path):
