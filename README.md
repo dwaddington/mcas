@@ -1,10 +1,12 @@
 # MCAS
 
-Memory Centric Active Storage (MCAS) is a high-performance key-value store
-explicitly designed for persistent memory.  Beyond a conventional
-key-value store, MCAS provides the ability to provide custom in-store
-compute, ultimately reducing data movement across the network and
-improving performance.
+Memory Centric Active Storage (MCAS) is a high-performance key-value
+store explicitly designed for persistent memory.  Beyond a
+conventional key-value store, MCAS provides the ability to provide
+custom in-store compute (termed Active Data Objects), ultimately
+reducing data movement across the network and improving performance.
+MCAS gives the ADO plugin direct access to persistent memory to
+in-place operations without data copying can be performed.
 
 The key attributes of the solution are:
 
@@ -12,7 +14,7 @@ The key attributes of the solution are:
 2. Support for Intel Optane DC Persistent Memory or conventional DRAM (without persistence).
 3. Support for both RDMA and traditional TCP/IP network transports.
 4. Zero-copy transfer capable with RDMA and GPU-Direct capable.
-5. Support for C++ based in-store compute plugins.
+5. Support for C++ and Rust (experimental) based in-store compute plugins.
 6. Support for C++ and Python clients. 
 
 ## Documentation
@@ -21,7 +23,6 @@ The key attributes of the solution are:
 * [Quick Start](./info/quick_start.md)
 * [Overview](./info/MCAS_overview.md)
 * [More documentation](./info/index.md)
-* [Trello - IBM only](https://trello.com/b/vXomq2Xg/mcas-core)
 
 
 ## Run dependencies for your OS 
