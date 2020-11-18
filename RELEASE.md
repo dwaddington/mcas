@@ -6,6 +6,9 @@
 * Use of Mellanox/NVIDIA Connect-X ODP (On-demand Paging) via USE_ODP=1
 * Experimental wrapper for Rust-basd ADO implementation (src/ado/rust-wrapper)
 
+## Limitations
+
+* Rust-based ADO expects UTF8 interpretable keys.
 
 # Release v0.4.0 (major release)
 
