@@ -13,6 +13,7 @@
 
 #include "heap_rc.h"
 
+#include "clean_align.h"
 #include "dax_manager.h"
 #include "heap_rc_ephemeral.h"
 #include "hstore_config.h"
@@ -276,18 +277,13 @@ namespace
 	}
 }
 
-void *heap_rc::alloc(const std::size_t sz_, const std::size_t alignment_)
+void *heap_rc::alloc(const std::size_t sz_, const std::size_t align_)
 {
-	auto alignment = std::max(alignment_, sizeof(void *));
-
-	if ( (alignment & (alignment - 1U)) != 0 )
-	{
-		throw std::invalid_argument("alignment is not a power of 2");
-	}
+	auto align = clean_align(align_, sizeof(void *));
 
 	auto sz = sz_;
 
-	if ( sz < alignment )
+	if ( sz < align )
 	{
 		/* round up only to a power of 2, so Rca_LB will find the element
 		 * on free.
@@ -296,20 +292,20 @@ void *heap_rc::alloc(const std::size_t sz_, const std::size_t alignment_)
 		assert( (sz & (sz - 1)) == 0 );
 		/* Allocation must be a multiple of alignment. In the case,
 		 * adjust alignment. */
-		alignment = std::max(sizeof(void *), sz);
+		align = std::max(sizeof(void *), sz);
 	}
 
 	/* In any case, sz must be a multiple of alignment. */
-	sz = (sz + alignment - 1U)/alignment * alignment;
+	sz = (sz + align - 1U)/align * align;
 
 	try {
-		auto p = _eph->allocate(sz, _numa_node, alignment);
+		auto p = _eph->allocate(sz, _numa_node, align);
 		/* Note: allocation exception from Rca_LB is General_exception, which does not derive
 		 * from std::bad_alloc.
 		 */
 
 		VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p, sz);
-		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_full.iov_base, " addr ", p, " align ", alignment_, " -> ", alignment, " size ", sz_, " -> ", sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_full.iov_base, " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
 		return p;
 	}
 	catch ( const std::bad_alloc & )
@@ -333,13 +329,8 @@ void *heap_rc::alloc(const std::size_t sz_, const std::size_t alignment_)
 
 void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 {
-	if ( align_ != 0 && (align_ & (align_ - 1U)) != 0 )
-	{
-		throw std::invalid_argument("alignment is not a power of 2");
-	}
-
 	/* alignment: enough for tracked_header prefix, and a power of 2 */
-	auto align = clp2(std::max(align_, sizeof(tracked_header)));
+	auto align = clp2(std::max(clean_align(align_), sizeof(tracked_header)));
 
 	/* size: a multiple of alignment */
 	auto sz = round_up(sz_ + align, align);
@@ -405,9 +396,9 @@ void heap_rc::inject_allocation(const void * p, std::size_t sz_)
 
 void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
 {
-	alignment_ = std::max(alignment_, sizeof(void *));
-	sz_ = std::max(sz_, alignment_);
-	auto sz = (sz_ + alignment_ - 1U)/alignment_ * alignment_;
+	auto align = clean_align(alignment_, sizeof(void *));
+	sz_ = std::max(sz_, align);
+	auto sz = (sz_ + align - 1U)/align * align;
 	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p_);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz);
 	return _eph->free(p_, sz, _numa_node);

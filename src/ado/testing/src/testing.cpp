@@ -321,8 +321,8 @@ namespace
     PMAJOR("rc (count=%lu, val=%p, val_len=%lu", v.count(), static_cast<const void *>(v.ref_array()),
            v.value_memory_size());
 
-    ASSERT_TRUE(rc == S_OK, "get_reference_vector failed");
-    ASSERT_TRUE(v.count() == 4, "GetReferenceVector:: unexpected vector size");
+    ASSERT_TRUE(rc == S_OK, "get_reference_vector failed rc %d", rc);
+    ASSERT_TRUE(v.count() == 4, "GetReferenceVector:: unexpected vector size %zu", v.count());
 
     auto ref = v.ref_array();
     for (size_t i = 0; i < v.count(); i++) {

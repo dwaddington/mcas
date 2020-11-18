@@ -15,7 +15,7 @@
  * This test program works in collaboration with the 'testing' ADO plugin
  *
  */
-#define ASSERT_OK(X) ASSERT_TRUE(X == S_OK)
+#define ASSERT_OK(X) ASSERT_EQ(S_OK, (X))
 
 struct Options {
   unsigned    debug_level;
@@ -312,7 +312,7 @@ TEST_F(ADO_test, GetReferenceVector)
 
   rc = mcas->invoke_ado(pool, testname, "RUN!TEST-GetReferenceVector", 0, response, KiB(4));
 
-  ASSERT_TRUE(rc == S_OK);
+  ASSERT_EQ(S_OK, rc);
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }
