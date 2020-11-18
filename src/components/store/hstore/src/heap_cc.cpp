@@ -16,6 +16,7 @@
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
+#include "clean_align.h"
 #include "dax_manager.h"
 #include "heap_cc_ephemeral.h"
 #include <ccpm/cca.h>
@@ -334,17 +335,12 @@ void heap_cc::quiesce()
 	_eph.reset(nullptr);
 }
 
-void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t alignment_)
+void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align_)
 {
-	alignment_ = std::max(alignment_, sizeof(void *));
-
-	if ( (alignment_ & (alignment_ - 1U)) != 0 )
-	{
-		throw std::invalid_argument("alignment is not a power of 2");
-	}
+	auto align = clean_align(align_, sizeof(void *));
 
 	/* allocation must be multiple of alignment */
-	auto sz = (sz_ + alignment_ - 1U)/alignment_ * alignment_;
+	auto sz = (sz_ + align - 1U)/align * align;
 
 	try {
 #if USE_CC_HEAP == 4
@@ -374,7 +370,7 @@ void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align
 		}
 #endif
 		/* IHeap interface does not support abstract pointers. Cast to regular pointer */
-		_eph->_heap->allocate(*reinterpret_cast<void **>(p_), sz, alignment_);
+		_eph->_heap->allocate(*reinterpret_cast<void **>(p_), sz, align);
 		/* We would like to carry the persistent_t through to the crash-conssitent allocator,
 		 * but for now just assume that the allocator has modifed p_, and call tick ti indicate that.
 		 */
