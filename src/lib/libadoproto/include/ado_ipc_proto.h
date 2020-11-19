@@ -357,8 +357,8 @@ struct Work_response : public Message {
     assert(data);
     char * data_ptr = data;
     char *const data_ptr_begin = data_ptr;
+    
     /* first copy over response buffers */
-
     for(auto i=response_buffers.begin(); i!=response_buffers.end(); i++) {
       const IADO_plugin::response_buffer_t& b = *i;
 

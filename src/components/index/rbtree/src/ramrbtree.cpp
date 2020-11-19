@@ -21,9 +21,6 @@ RamRBTree::~RamRBTree() {}
 
 void RamRBTree::insert(const string& key)
 {
-  // if (!_index.insert(key).second) {
-  //   throw(API_exception("insert index failed"));
-  // }
   _index.insert(key);
 }
 
@@ -58,9 +55,11 @@ status_t RamRBTree::find(const std::string& key_expression,
   offset_t end_position = _index.size();
   unsigned attempts =0;
 
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch" // enumeration value ‘FIND_TYPE_NONE’ not handled in switch
-  switch (find_type) {
+  try {
+    switch (find_type) {
     case FIND_TYPE_REGEX:
       {
         std::regex r(key_expression);
@@ -107,7 +106,12 @@ status_t RamRBTree::find(const std::string& key_expression,
       out_matched_pos = begin_position;
       return S_OK;
       break;
+    }
   }
+  catch(std::out_of_range& ex) {
+    return E_OUT_OF_BOUNDS;
+  }
+
 #pragma GCC diagnostic pop
 
   return E_FAIL;
