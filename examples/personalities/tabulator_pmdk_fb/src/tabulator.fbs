@@ -1,0 +1,26 @@
+// Example tabulator
+namespace Proto;
+
+struct Value {
+  min: float;
+  max: float;
+  mean: float;
+}
+
+table UpdateRequest {
+  key: string;
+  sample: float;
+}
+
+table UpdateReply {
+  status: int;
+}
+
+table QueryRequest {
+  key: string;
+}
+
+table QueryReply {
+  status: int;
+  value: Value;
+}
