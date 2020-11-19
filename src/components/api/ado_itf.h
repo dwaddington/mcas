@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019,2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -176,7 +176,10 @@ class IADO_plugin : public component::IBase {
       return *this;
     }
 
-    inline bool is_pool() const { return _alloc_type == alloc_type_t::POOL || _alloc_type == alloc_type_t::POOL_TO_FREE; }
+    inline bool is_pool() const {
+      return (_alloc_type == alloc_type_t::POOL) ||
+        (_alloc_type == alloc_type_t::POOL_TO_FREE);
+    }
     inline bool is_malloc() const { return _alloc_type == alloc_type_t::MALLOC; }
     inline bool is_inline() const { return _alloc_type == alloc_type_t::INLINE; }
     inline bool is_pool_to_free() const { return _alloc_type == alloc_type_t::POOL_TO_FREE; }
@@ -334,8 +337,8 @@ class IADO_plugin : public component::IBase {
    * @param message Message content
    */
   virtual void cluster_event(const std::string& sender,
-			     const std::string& type,
-			     const std::string& message) {}
+                             const std::string& type,
+                             const std::string& message) {}
 
 
   /* note:     FLAGS_CREATE_ONLY = 0x4, */
@@ -585,14 +588,15 @@ class IADO_plugin : public component::IBase {
 
     /**
      * Send configuration option to shard
+     * (e.g. IADO_plugin::CONFIG_SHARD_INC_REF,
+     * IADO_plugin::CONFIG_SHARD_DEC_REF)
      */
     std::function<status_t(const uint64_t option)>
         configure;
   };
 
   /**------------------------------------------------------------------------------
-       Call back API wrappers - used to support optional parameters on
-     call-backs
+       Call back API wrappers
      ------------------------------------------------------------------------------
   */
   inline status_t cb_create_key(const uint64_t              work_id,
@@ -638,16 +642,21 @@ class IADO_plugin : public component::IBase {
     return _cb.resize_value(work_id, key_name, new_value_size, out_new_value_addr);
   }
 
-  inline status_t cb_allocate_pool_memory(const size_t size, const size_t alignment_hint, void*& out_new_addr)
+  inline status_t cb_allocate_pool_memory(const size_t size,
+                                          const size_t alignment_hint,
+                                          void*& out_new_addr)
   {
     return _cb.allocate_pool_memory(size, alignment_hint, out_new_addr);
   }
 
-  inline status_t cb_free_pool_memory(const size_t size, const void* addr) { return _cb.free_pool_memory(size, addr); }
+  inline status_t cb_free_pool_memory(const size_t size, const void* addr)
+  {
+    return _cb.free_pool_memory(size, addr);
+  }
 
   inline status_t cb_get_reference_vector(const common::epoch_time_t t_begin,
                                           const common::epoch_time_t t_end,
-                                          Reference_vector&  out_vector)
+                                          Reference_vector&          out_vector)
   {
     return _cb.get_reference_vector(t_begin, t_end, out_vector);
   }
@@ -661,12 +670,15 @@ class IADO_plugin : public component::IBase {
     return _cb.find_key(key_expression, begin_position, find_type, out_matched_position, out_matched_key);
   }
 
-  inline status_t cb_get_pool_info(std::string& out_result) { return _cb.get_pool_info(out_result); }
+  inline status_t cb_get_pool_info(std::string& out_result)
+  {
+    return _cb.get_pool_info(out_result);
+  }
 
-  inline status_t cb_iterate(const common::epoch_time_t             t_begin,
-                             const common::epoch_time_t             t_end,
-                             component::IKVStore::pool_iterator_t&  iterator,
-                             component::IKVStore::pool_reference_t& reference)
+  inline status_t cb_iterate(const common::epoch_time_t  t_begin,
+                             const common::epoch_time_t  t_end,
+                             IKVStore::pool_iterator_t&  iterator,
+                             IKVStore::pool_reference_t& reference)
   {
     return _cb.iterate(t_begin, t_end, iterator, reference);
   }
@@ -876,7 +888,9 @@ class IADO_proxy : public component::IBase {
    *
    * @return True if message interpreted as vector op
    */
-  virtual bool check_vector_ops(const void* buffer, common::epoch_time_t& t_begin, common::epoch_time_t& t_end) = 0;
+  virtual bool check_vector_ops(const void* buffer,
+                                common::epoch_time_t& t_begin,
+                                common::epoch_time_t& t_end) = 0;
 
   /**
    * Check for vector operations
@@ -1049,14 +1063,14 @@ class IADO_proxy : public component::IBase {
   virtual void add_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key) = 0;
 
   /**
-   * Updates a key-value pair deferred unlock
+   * Removes a key-value pair deferred unlock
    *
    * @param work_request_id Work request identifier
    * @param key Key/lock handle
    *
    * @return S_OK or E_NOT_FOUND
    */
-  virtual status_t update_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key) = 0;
+  virtual status_t remove_deferred_unlock(const uint64_t work_request_id, const component::IKVStore::key_t key) = 0;
 
   /**
    * Retrive (and clear) keys that need to be unlock on associated pool

@@ -28,7 +28,7 @@ struct Options {
 } g_options;
 
 class ADO_test : public ::testing::Test {
- protected:
+protected:
   virtual void SetUp() {}
   virtual void TearDown() {}
 };
@@ -581,6 +581,45 @@ TEST_F(ADO_test, BasicAsyncInvokeAdo)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(ADO_test, RepeatInvokeAdo)
+{
+  const std::string testname = "RepeatInvokeAdo";
+  const std::string poolname = "THIS_IS_A_TEST_POOL";
+  mcas->delete_pool(poolname);
+
+  auto pool = mcas->create_pool(poolname, MiB(1), /* size */
+                                0,                 /* flags */
+                                50);              /* obj count */
+
+  /* add index to pool */
+  ASSERT_TRUE(mcas->configure_pool(pool, "AddIndex::VolatileTree") == S_OK);
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  mcas->erase(pool, testname);
+
+  std::vector<IMCAS::ADO_response> response;
+  status_t                                    rc;
+
+  for(unsigned i=0;i<10;i++) {
+    std::stringstream ss;
+    ss << "RUN!" << i;
+    rc = mcas->invoke_ado(pool,
+                          testname,
+                          "RUN!TEST-RepeatInvokeAdo",
+                          IMCAS::ADO_FLAG_CREATE_ON_DEMAND,
+                          response,
+                          KiB(4));
+    
+    ASSERT_TRUE(rc == S_OK);
+  }
+ 
+  ASSERT_OK(mcas->close_pool(pool));
+
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
+
+
 
 
 int main(int argc, char *argv[])
@@ -617,17 +656,17 @@ int main(int argc, char *argv[])
 
     g_options.server      = vm["server"].as<std::string>();
     if ( vm.count("src_addr") )
-    {
-      g_options.src_addr = vm["src_addr"].as<std::string>();
-    }
+      {
+        g_options.src_addr = vm["src_addr"].as<std::string>();
+      }
     if ( vm.count("device") )
-    {
-      g_options.device = vm["device"].as<std::string>();
-    }
+      {
+        g_options.device = vm["device"].as<std::string>();
+      }
     if ( ! g_options.src_addr && ! g_options.device )
-    {
-      g_options.device = "mlx5_0";
-    }
+      {
+        g_options.device = "mlx5_0";
+      }
     g_options.port        = vm["port"].as<std::uint16_t>();
     g_options.debug_level = vm["debug"].as<unsigned>();
     g_options.patience = vm["patience"].as<unsigned>();

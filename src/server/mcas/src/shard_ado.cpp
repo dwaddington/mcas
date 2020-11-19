@@ -250,6 +250,7 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
     std::vector<uint64_t> answer;
     std::string           key(msg->key());
 
+    /* check if key exists */
     if (_i_kvstore->get_attribute(msg->pool_id(), IKVStore::Attribute::VALUE_LEN, answer, &key) !=
         IKVStore::E_KEY_NOT_FOUND) {
       /* already exists */
@@ -541,13 +542,12 @@ void Shard::process_messages_from_ado()
       /* unlock the KV pair */
       if (request_record->key_handle != IKVStore::KEY_NONE) {
 
-        CPLOG(2, "Shard_ado: start to unlock KV pair key=(%.*s)",
-              int(request_record->key_len), request_record->key_ptr);
-
         if (_i_kvstore->unlock(request_record->pool, request_record->key_handle) != S_OK)
           throw Logic_exception("Shard_ado: unlock for KV after ADO work completion failed");
 
-        CPLOG(2, "Shard_ado: unlocked KV pair (pool=%lx, key_handle=%p)", request_record->pool,
+        CPLOG(2, "Shard_ado: work completion -> unlocked KV pair (pool=%lx, key=%.*s key_handle=%p)",
+              request_record->pool,
+              int(request_record->key_len), request_record->key_ptr,
               static_cast<const void*>(request_record->key_handle));
       }
 
@@ -556,9 +556,10 @@ void Shard::process_messages_from_ado()
         std::vector<IKVStore::key_t> keys_to_unlock;
         ado->get_deferred_unlocks(request_key, keys_to_unlock);
         for (auto k : keys_to_unlock) {
+          CPLOG(2, "Shard_ado: unlocking deferred lock (key-handle=%p)", static_cast<void*>(k));
           if (_i_kvstore->unlock(request_record->pool, k) != S_OK) throw Logic_exception("deferred unlock failed");
 
-          CPLOG(2, "Shard_ado: deferred unlock (%p)", static_cast<void*>(k));
+          CPLOG(2, "Shard_ado: deferred unlock (key-handle=%p)", static_cast<void*>(k));
         }
       }
 
@@ -684,12 +685,13 @@ void Shard::process_messages_from_ado()
                                            key_handle, &key_ptr);
 
             if (rc < S_OK || key_handle == nullptr) { /* to fix, store should return error code */
-              CPLOG(2, "Shard_ado: lock on key (%s, value_len=%lu) failed rc=%d", key.c_str(), value_len, rc);
+              CPLOG(2, "Shard_ado: lock on key (%s, value_len=%lu) failed rc=%d",
+                    key.c_str(), value_len, rc);
 
               ado->send_table_op_response(rc);
             }
             else {
-              CPLOG(2, "Shard_ado: locked KV pair (keyhandle=%p, value=%p,len=%lu) invoke_completion_unlock=%d",
+              CPLOG(2, "Shard_ado: locked KV pair (keyhandle=%p, value=%p, len=%lu) invoke_completion_unlock=%d",
                     static_cast<void*>(key_handle), value, value_len, invoke_completion_unlock);
 
               add_index_key(ado->pool_id(), key);
@@ -699,8 +701,7 @@ void Shard::process_messages_from_ado()
               if (align_or_flags & IADO_plugin::FLAGS_NO_IMPLICIT_UNLOCK) {
                 CPLOG(2, "Shard_ado: locked (%s) without implicit unlock", key.c_str());
               }
-              else if (invoke_completion_unlock) { /* unlock on ADO invoke
-                                                      completion */
+              else if (invoke_completion_unlock) { /* unlock on ADO invoke completion */
                 if (work_id == 0) {
                   ado->send_table_op_response(E_INVAL);
                 }
@@ -728,12 +729,12 @@ void Shard::process_messages_from_ado()
           ado->send_table_op_response(_i_kvstore->erase(ado->pool_id(), key));
           break;
         }
-        case ADO_op::VALUE_RESIZE: /* resize only allowed on current work
-                                      invocation target */
+        case ADO_op::VALUE_RESIZE: 
           {
-            CPLOG(2, "Shard_ado: received table op resize value (work_id=%p)", reinterpret_cast<const void*>(work_id));
+            /* resize_value can only be performed on keys not already */            
+            CPLOG(2, "Shard_ado: received table op resize value (work_id=%p)",
+                  reinterpret_cast<const void*>(work_id));
 
-            /* for resize, we need unlock, resize, and then relock */
             auto work_item = _outstanding_work.find(work_id);
 
             if (work_item == _outstanding_work.end()) {
@@ -742,35 +743,53 @@ void Shard::process_messages_from_ado()
             }
 
             /* use the work id to get the key handle */
-            work_request_t* wr      = request_key_to_record(work_id);
-            const char*     key_ptr = nullptr;
+            work_request_t* wr = request_key_to_record(work_id);
             status_t        rc;
 
-            if (!wr) throw Logic_exception("unable to get request from work_id");
-
-            if ((rc = _i_kvstore->unlock(ado->pool_id(), wr->key_handle)) != S_OK) {
-              ado->send_table_op_response(rc);
+            if (!wr) {
+              PWRN("unable to get request from work_id");
+              ado->send_table_op_response(E_INVAL);
               break;
             }
 
-            CPLOG(2, "Shard_ado: table op resize, unlocked");
-
-            /* perform resize */
-            void*  new_value      = nullptr;
-            size_t new_value_len  = 0;
-            auto   old_key_handle = wr->key_handle;
-            rc                    = _i_kvstore->resize_value(ado->pool_id(), key, value_len, align_or_flags);
-
-            if (_i_kvstore->lock(ado->pool_id(), key, IKVStore::STORE_LOCK_WRITE, new_value, new_value_len,
-                                 wr->key_handle /* update key handle in record */, &key_ptr) != S_OK)
-              throw Logic_exception("ADO OP_RESIZE request failed to relock");
-
-            /* update deferred locks */
-            if (ado->update_deferred_unlock(work_id, wr->key_handle) != S_OK) {
-              if (ado->remove_life_unlock(old_key_handle) == S_OK) ado->add_life_unlock(wr->key_handle);
+            /* see if this resize is targetting current ADO invoke key */
+            std::string target_key(wr->key_ptr, wr->key_len);
+            bool self_target = (target_key == key);
+            if (self_target) {
+              /* if it is, it will be write locked */
+              if(_i_kvstore->unlock(ado->pool_id(), wr->key_handle) != S_OK)
+                throw Logic_exception("unlocking target key-value for resize_value failed");
             }
 
-            ado->send_table_op_response(rc, new_value, new_value_len, key_ptr);
+            
+            /* perform resize, which will need to take the lock */
+            void*  new_value      = nullptr;
+            size_t new_value_len  = 0;
+
+            rc = _i_kvstore->resize_value(ado->pool_id(),
+                                          key,
+                                          value_len,
+                                          align_or_flags);
+
+            /* if self target, then reapply the lock */
+            if (self_target) {
+              IKVStore::key_t new_key_handle;
+              if(_i_kvstore->lock(ado->pool_id(),
+                                  target_key,
+                                  wr->lock_type,
+                                  new_value,
+                                  new_value_len,
+                                  new_key_handle) != S_OK)
+                throw General_exception("relock of target key after value resize failed");
+              /* update key handle */
+              wr->key_handle = new_key_handle;
+            }
+
+            ado->send_table_op_response(rc, new_value, new_value_len, nullptr);
+            CPLOG(1, "Shard_ado: resize_value response (%d)", rc);
+
+
+            
             break;
           }
         case ADO_op::ALLOCATE_POOL_MEMORY: {
@@ -993,8 +1012,7 @@ void Shard::process_messages_from_ado()
                                  });
           }
           else {
-            rc = _i_kvstore->map(
-                                 ado->pool_id(),
+            rc = _i_kvstore->map(ado->pool_id(),
                                  [count, &check, &ptr](const void* key, const size_t key_len, const void* value, const size_t value_len,
                                                        const common::tsc_time_t  // timestamp
                                                        ) -> int {
@@ -1035,18 +1053,24 @@ void Shard::process_messages_from_ado()
           ado->send_find_index_response(rc, matched_pos, matched_key);
         }
       }
+      /* UNLOCK request */
       else if (ado->check_unlock_request(buffer, work_id, key_handle)) {
 
-        CPLOG(2, "ADO callback: unlock request (work_id=%lx, handle=%p", work_id, static_cast<const void*>(key_handle));
+        CPLOG(2, "ADO callback: unlock request (work_id=%lx, handle=%p)", work_id, static_cast<const void*>(key_handle));
 
-        /* unlock should fail if implicit unlock exists, i.e.  it
-           should only be performed on locks taken via
-           FLAGS_NO_IMPLICIT_UNLOCK */
-        if (key_handle == nullptr || ado->check_for_implicit_unlock(work_id, key_handle)) {
+        if (key_handle == nullptr) {
+          CPWRN(1, "ADO callback: bad key (nullptr)");
           ado->send_unlock_response(E_INVAL);
         }
         else {
-          ado->send_unlock_response(_i_kvstore->unlock(ado->pool_id(), key_handle));
+          auto rc = _i_kvstore->unlock(ado->pool_id(), key_handle);
+          
+          if(ado->check_for_implicit_unlock(work_id, key_handle)) {
+            CPLOG(2, "ADO callback: unlock request target lock is implicit");
+            if(rc == S_OK)
+              ado->remove_deferred_unlock(work_id, key_handle);
+          }
+          ado->send_unlock_response(rc);
         }
       }
       else if (ado->check_configure_request(buffer, options)) {

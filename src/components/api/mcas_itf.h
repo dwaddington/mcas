@@ -727,8 +727,15 @@ public:
                                  const ado_flags_t          flags,
                                  std::vector<ADO_response>& out_response)
   {
-    return
-      invoke_put_ado(pool, key, request.data(), request.length(), value.data(), value.length(), root_len, flags, out_response);
+    return invoke_put_ado(pool,
+                          key,
+                          request.data(),
+                          request.length(),
+                          value.data(),
+                          value.length(),
+                          root_len,
+                          flags,
+                          out_response);
   }
 
   /**

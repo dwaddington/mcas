@@ -1,0 +1,21 @@
+{
+    "shards" :
+    [
+        {
+            "core" : 0,
+            "port" : 11911,
+            "net"  : "mlx5_0",
+            "default_backend" : "hstore",
+            "dax_config" : [{ "path": "/dev/dax0.0", "addr": "0x9000000000" }],
+            "ado_plugins" : ["libcomponent-adoplugin-rustexample.so"],
+            "ado_cores" : "2",
+            "ado_params" :
+	          {
+		            "param1" : "some param",
+		            "param2" : "and another"
+	          }
+        }
+    ],
+    "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
+    "net_providers" : "verbs"
+}
