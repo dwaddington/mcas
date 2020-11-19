@@ -218,9 +218,9 @@ void* Shared_memory::negotiate_addr_create(const std::string &name,
       }
 
       if ( e == ENXIO ) { /* the other end is not yet open */
-        usleep(500000);
+        usleep(1000);
         retry_attempts++;
-        if(retry_attempts > 100) {
+        if(retry_attempts > 10000) {
           PWRN("UIPC: long-wait for connection to ADO process");
         }
 
