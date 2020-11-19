@@ -7,7 +7,7 @@ ExternalProject_Add(ndctl
   BUILD_IN_SOURCE 1
   UPDATE_DISCONNECTED 1
   GIT_REPOSITORY https://github.com/pmem/ndctl.git
-  GIT_TAG v68
+  GIT_TAG v70.1
   CONFIGURE_COMMAND ./autogen.sh COMMAND ./configure --prefix=${CMAKE_INSTALL_PREFIX} --sysconfdir=${CMAKE_INSTALL_PREFIX}/etc --libdir=${CMAKE_INSTALL_PREFIX}/lib --enable-docs=no --with-bash=no --with-systemd=no --with-keyutils=no
   BUILD_COMMAND make COMMAND make check
   # ndctl project tries to install to system, so we have to install things manually
