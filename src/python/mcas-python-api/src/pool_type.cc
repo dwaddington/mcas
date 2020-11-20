@@ -5,6 +5,7 @@
 #define NO_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
 
+#include <string_view>
 #include <common/logging.h>
 #include <Python.h>
 #include <structmember.h>
@@ -385,32 +386,47 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
                                  NULL};
 
   const char * key = nullptr;
-  const char * command = nullptr;
+  PyObject * command = nullptr;
   unsigned long ondemand_size = DEFAULT_ADO_ONDEMAND_VALUE_SIZE;
   
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "ss|k",
+                                    "sO|k",
                                     const_cast<char**>(kwlist),
                                     &key,
                                     &command,
                                     &ondemand_size)) {
-    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments to invoke_ado");
+    return NULL;
+  }
+
+  /* command can be a byte array or a unicode string */
+  void * cmd = nullptr;
+  size_t cmd_len = 0;
+  if(PyByteArray_Check(command)) {
+    cmd = PyByteArray_AsString(command);
+    cmd_len = PyByteArray_Size(command);
+  }
+  else if(PyUnicode_Check(command)) {
+    cmd = PyUnicode_DATA(command);
+    cmd_len = PyUnicode_GET_SIZE(command);
+  }
+  else {
+    PyErr_SetString(PyExc_RuntimeError,"bad value parameter");
     return NULL;
   }
 
   assert(self->_mcas);
   assert(self->_pool);
-
-  std::string request(command);
-  assert(request.size() > 0);
-
+  assert(cmd_len > 0);
+  
   std::vector<component::IMCAS::ADO_response> response;
 
   status_t hr = self->_mcas->invoke_ado(self->_pool,
                                         key,
-                                        request,
+                                        cmd,
+                                        cmd_len,
                                         0, // flags
                                         response,
                                         ondemand_size);
@@ -435,11 +451,11 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
 
   const char * key = nullptr;
   PyObject * value = nullptr;
-  const char * command = nullptr;
+  PyObject * command = nullptr;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "ssO",
+                                    "sOO",
                                     const_cast<char**>(kwlist),
                                     &key,
                                     &value,
@@ -448,6 +464,23 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
     return NULL;
   }
 
+  /* command can be a byte array or a unicode string */
+  void * cmd = nullptr;
+  size_t cmd_len = 0;
+  if(PyByteArray_Check(command)) {
+    cmd = PyByteArray_AsString(command);
+    cmd_len = PyByteArray_Size(command);
+  }
+  else if(PyUnicode_Check(command)) {
+    cmd = PyUnicode_DATA(command);
+    cmd_len = PyUnicode_GET_SIZE(command);
+  }
+  else {
+    PyErr_SetString(PyExc_RuntimeError,"bad value parameter");
+    return NULL;
+  }
+
+  /* value can be a byte array or a unicode string */
   void * p = nullptr;
   size_t p_len = 0;
   if(PyByteArray_Check(value)) {
@@ -463,19 +496,15 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
     return NULL;
   }
 
-
   assert(self->_mcas);
   assert(self->_pool);
-
-  std::string request(command);
-  assert(request.size() > 0);
 
   std::vector<component::IMCAS::ADO_response> response;
 
   status_t hr = self->_mcas->invoke_put_ado(self->_pool,
                                             key,
-                                            request.c_str(),
-                                            request.size(),
+                                            cmd,
+                                            cmd_len,
                                             p,
                                             p_len,
                                             0, // root len
