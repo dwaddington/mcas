@@ -6,7 +6,7 @@
             "port" : 11911,
             "net"  : "mlx5_0",
             "default_backend" : "hstore",
-            "ado_plugins" : ["libpersonality-tabulator-fb-pmdk.so"],
+            "ado_plugins" : ["libpersonality-tabulator.so"],
             "dax_config" : [{ "path": "/mnt/pmem0", "addr": "0x9000000000" }],
             "ado_cores" : "2"
         }

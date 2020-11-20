@@ -27,24 +27,21 @@
 using namespace flatbuffers;
 
 constexpr const char * LAYOUT = "tabulator";
-constexpr const size_t PMDK_POOL_SIZE = GB(1);
-
+constexpr const uint64_t CANARY = 0xCAFEF001;
 int debug_level = 3;
 
+
 struct Record {
+  uint64_t canary;
   float min;
   float max;
   float mean;
+  size_t count;
 };
 
-// struct Key_value_root {
-//   TOID(struct Record) record;
-// };
-
-POBJ_LAYOUT_BEGIN(foo);
-//	POBJ_LAYOUT_ROOT(foo, struct Key_value_root);
-	POBJ_LAYOUT_TOID(foo, struct Record);
-POBJ_LAYOUT_END(foo);
+POBJ_LAYOUT_BEGIN(record);
+	POBJ_LAYOUT_TOID(record, struct Record);
+POBJ_LAYOUT_END(record);
 
 status_t Tabulator_plugin::register_mapped_memory(void * shard_vaddr,
                                                   void * local_vaddr,
@@ -80,30 +77,77 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   auto value = values[0].ptr;  
   auto value_len = values[0].len;
 
-  if(value_len != sizeof(void*)) throw General_exception("unexpected value size");
+  if(value_len != sizeof(TOID(struct Record)))
+     throw General_exception("unexpected value size");
 
+  auto root = reinterpret_cast<TOID(struct Record)*>(value);
+  
   /* new_root == true indicate this is a "fresh" key and therefore needs initializing */
   if(new_root) {
     TX_BEGIN(_pmemobj_pool) {
-      pmemobj_tx_add_range_direct(reinterpret_cast<const void *>(value),sizeof(void*));
+
       TOID(struct Record) v = TX_NEW(struct Record);
-      *reinterpret_cast<TOID(struct Record)*>(value) = v;
+      D_RW(v)->canary = CANARY;      
+      D_RW(v)->min = -1.0f;
+      D_RW(v)->max = -1.0f;
+      D_RW(v)->count = 0;
+        
+      // TODO make this crash consistent       
+      *root = v;
+      pmem_persist(root, sizeof(TOID(struct Record)));
     }
     TX_ONABORT {
       throw General_exception("pmem transaction aborted");
     }
     TX_END
   }
-
-  
-  TX_BEGIN(_pmemobj_pool) {
-    auto tx_value = *reinterpret_cast<TOID(struct Record)*>(value);
-    TX_ADD(tx_value);
-    D_RW(tx_value)->min ++;
-    D_RW(tx_value)->max ++;
-    D_RW(tx_value)->mean ++;
+  else {
+    PNOTICE("canary check:%lx", D_RO(*root)->canary);
+    if(D_RO(*root)->canary != CANARY) throw General_exception("value data corrupt");
+    /* check integrity */
   }
-  TX_END
+
+  /* check ADO message */
+  auto msg = Proto::GetMessage(in_work_request);
+  if(msg->element_as_UpdateRequest()) {
+
+    auto request = msg->element_as_UpdateRequest();
+    PNOTICE("UpdateRequest! (sample=%f)", request->sample());
+    auto sample = request->sample();
+    auto tx_value = *reinterpret_cast<TOID(struct Record)*>(value);
+    
+    /* update data */    
+    TX_BEGIN(_pmemobj_pool) {
+      
+      TX_ADD(tx_value);
+
+      /* update max and min */
+      if(D_RO(tx_value)->min == -1.0f) {
+        D_RW(tx_value)->min = D_RW(tx_value)->max = sample;
+      }
+      else {
+        if(sample < D_RO(tx_value)->min)
+          D_RW(tx_value)->min = sample;
+        if(sample > D_RO(tx_value)->max)
+          D_RW(tx_value)->max = sample;
+      }
+      /* update running average */
+      auto tmp = static_cast<float>(D_RO(tx_value)->count) * D_RO(tx_value)->mean;
+      tmp += sample;
+      D_RW(tx_value)->count ++;
+      D_RW(tx_value)->mean = tmp / D_RO(tx_value)->count;
+      
+    } TX_END
+
+    /* print status */
+    PLOG("min:%f max:%f mean:%f", D_RO(tx_value)->min, D_RO(tx_value)->max, D_RO(tx_value)->mean);
+
+  }
+  else if(msg->element_as_QueryRequest()) {
+    PNOTICE("QueryRequest!");    
+  }
+  else throw Logic_exception("unknown protocol message type");  
+  
 
 
 #if 0
@@ -181,12 +225,13 @@ void Tabulator_plugin::launch_event(const uint64_t                  auth_id,
 {
   _pmem_filename = "/mnt/pmem0/"; // TODO carry this and pool size from params?
   _pmem_filename += pool_name;
-  _pmem_filename += "-value-space";
+  _pmem_filename += ".pmdk";
   
   /* open or create/open file for pmdk-pool (associated with this pool) */
   if((_pmemobj_pool = pmemobj_open(_pmem_filename.c_str(), LAYOUT)) == nullptr) {
-    _pmemobj_pool = pmemobj_create(_pmem_filename.c_str(), LAYOUT, PMDK_POOL_SIZE, 0666);
-    if(_pmemobj_pool == nullptr) throw General_exception("unable to open or create PMDK file");
+    _pmemobj_pool = pmemobj_create(_pmem_filename.c_str(), LAYOUT, pool_size, 0666);
+    if(_pmemobj_pool == nullptr)
+      throw General_exception("unable to open or create PMDK file (%s)", ::strerror(errno));
   }  
 }
 
