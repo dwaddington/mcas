@@ -438,7 +438,12 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
     return NULL;
   }
 
-  return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+  if((response.size() > 0) &&
+     (response[0].data_len()) > 0 &&
+     (response[0].data()))
+    return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+  else
+    Py_RETURN_NONE;
 }
 
 
@@ -518,7 +523,12 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
     return NULL;
   }
 
-  return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+  if((response.size() > 0) &&
+     (response[0].data_len()) > 0 &&
+     (response[0].data()))
+    return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+  else
+    Py_RETURN_NONE;
 }
 
 
