@@ -362,6 +362,7 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
     return;
 #endif
 
+    /* check ADO is configured */
     if (!ado_enabled()) {
       std::ostringstream o;
       o << "ADO!NOT_ENABLED mgr '" << (_i_ado_mgr ? "present" : "missing") << "' load count " << _ado_plugins.size();
@@ -383,6 +384,8 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
     if (msg->flags & IMCAS::ADO_FLAG_CREATE_ONLY) {
       std::vector<uint64_t> answer;
       std::string           key(msg->key());
+
+      /* if pair exists, return with error */
       if (_i_kvstore->get_attribute(msg->pool_id(), IKVStore::Attribute::VALUE_LEN, answer, &key) !=
           IKVStore::E_KEY_NOT_FOUND) {
         error_func(E_ALREADY_EXISTS, "ADO!ALREADY_EXISTS");
@@ -392,9 +395,15 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
       }
 
       IKVStore::key_t key_handle;
-      auto locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY) ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
+      auto locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY)
+        ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
 
-      status_t s = _i_kvstore->lock(msg->pool_id(), msg->key(), locktype, value, value_len, key_handle);
+      status_t s = _i_kvstore->lock(msg->pool_id(),
+                                    msg->key(),
+                                    locktype,
+                                    value,
+                                    value_len,
+                                    key_handle);
       if (s < S_OK) {
         std::stringstream ss;
         ss << "ADO!ALREADY_LOCKED(" << msg->key() << ")";
@@ -404,8 +413,10 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
         return;
       }
 
-      /* zero memory */
-      pmem_memset(value, 0, value_len, 0);
+      /* optionally zero memory */
+      if (msg->flags & IMCAS::ADO_FLAG_ZERO_NEW_VALUE) {
+        pmem_memset(value, 0, value_len, 0);
+      }
 
       /* unlock key-value pair because we are not invoking ADO */
       if (_i_kvstore->unlock(msg->pool_id(), key_handle) != S_OK)
@@ -437,8 +448,16 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
 
     /* if this is associated with a key-value pair, we have to lock */
     if (msg->key_len > 0) {
-      locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY) ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
-      s        = _i_kvstore->lock(msg->pool_id(), msg->key(), locktype, value, value_len, key_handle, &key_ptr);
+      locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY)
+        ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
+      
+      s = _i_kvstore->lock(msg->pool_id(),
+                           msg->key(),
+                           locktype,
+                           value,
+                           value_len,
+                           key_handle,
+                           &key_ptr);
 
       if (s < S_OK) {
         std::stringstream ss;
@@ -448,7 +467,14 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
         return;
       }
 
-      if (key_handle == IKVStore::KEY_NONE) throw Logic_exception("lock gave KEY_NONE");
+      if (key_handle == IKVStore::KEY_NONE)
+        throw Logic_exception("lock gave KEY_NONE");
+
+      if ((s == S_OK_CREATED) &&
+          (msg->flags & IMCAS::ADO_FLAG_ZERO_NEW_VALUE)) {
+        CPLOG(2, "Shard_ado: new value memory is being zeroed.");
+        pmem_memset(value, 0, value_len, 0);
+      }
 
       CPLOG(2, "Shard_ado: locked KV pair (value=%p, value_len=%lu)", value, value_len);
     }
@@ -461,7 +487,8 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
     _outstanding_work.insert(wr_key);                       /* save request by index on key-handle */
 
     /* now send the work request */
-    ado->send_work_request(wr_key, key_ptr, msg->get_key_len(), value, value_len, nullptr, /* no payload */
+    ado->send_work_request(wr_key, key_ptr, msg->get_key_len(), value, value_len,
+                           nullptr, /* no payload */
                            0, msg->request(), msg->request_len(), (s == S_OK_CREATED));
 
     CPLOG(2, "Shard_ado: sent work request (len=%lu, key=%lx, key_ptr=%p)",
