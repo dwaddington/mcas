@@ -7,6 +7,7 @@
 
 #include <string_view>
 #include <common/logging.h>
+#include <common/dump_utils.h>
 #include <Python.h>
 #include <structmember.h>
 #include <numpy/arrayobject.h>
@@ -383,20 +384,22 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   static const char *kwlist[] = {"key",
                                  "command",
                                  "ondemand_size",
+                                 "flags",
                                  NULL};
 
   const char * key = nullptr;
   PyObject * command = nullptr;
   unsigned long ondemand_size = DEFAULT_ADO_ONDEMAND_VALUE_SIZE;
-  
+  unsigned long flags = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "sO|k",
+                                    "sO|kk",
                                     const_cast<char**>(kwlist),
                                     &key,
                                     &command,
-                                    &ondemand_size)) {
+                                    &ondemand_size,
+                                    &flags)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments to invoke_ado");
     return NULL;
   }
@@ -427,7 +430,7 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
                                         key,
                                         cmd,
                                         cmd_len,
-                                        0, // flags
+                                        flags,
                                         response,
                                         ondemand_size);
 
@@ -439,11 +442,14 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   }
 
   if((response.size() > 0) &&
-     (response[0].data_len()) > 0 &&
-     (response[0].data()))
-    return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
-  else
+     (response[0].data_len() > 0) &&
+     (response[0].data())) {
+    //    hexdump(response[0].data(),response[0].data_len());    
+    return PyByteArray_FromStringAndSize((const char *) response[0].data(), response[0].data_len());
+  }
+  else {
     Py_RETURN_NONE;
+  }
 }
 
 
@@ -457,6 +463,7 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
   const char * key = nullptr;
   PyObject * value = nullptr;
   PyObject * command = nullptr;
+  unsigned long flags = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
@@ -464,7 +471,8 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
                                     const_cast<char**>(kwlist),
                                     &key,
                                     &value,
-                                    &command)) {
+                                    &command,
+                                    &flags)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
   }
@@ -513,7 +521,7 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
                                             p,
                                             p_len,
                                             0, // root len
-                                            component::IMCAS::ADO_FLAG_CREATE_ON_DEMAND, // flags
+                                            flags & component::IMCAS::ADO_FLAG_CREATE_ON_DEMAND, // flags
                                             response);
 
   if(hr != S_OK) {
@@ -525,10 +533,12 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
 
   if((response.size() > 0) &&
      (response[0].data_len()) > 0 &&
-     (response[0].data()))
-    return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
-  else
+     (response[0].data())) {
+    return PyByteArray_FromStringAndSize((const char *) response[0].data(), response[0].data_len());
+  }
+  else {
     Py_RETURN_NONE;
+  }
 }
 
 

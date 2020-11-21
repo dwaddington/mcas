@@ -2,13 +2,13 @@
 namespace Proto;
 
 struct Value {
-  min: float;
-  max: float;
-  mean: float;
+  min: double;
+  max: double;
+  mean: double;
 }
 
 table UpdateRequest {
-  sample: float;
+  sample: double;
 }
 
 table UpdateReply {
@@ -16,7 +16,6 @@ table UpdateReply {
 }
 
 table QueryRequest {
-  key: string;
 }
 
 table QueryReply {

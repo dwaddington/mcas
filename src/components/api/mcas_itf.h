@@ -137,6 +137,9 @@ public:
   static constexpr ado_flags_t ADO_FLAG_DETACHED = 0x10;
   /*< only take read lock */
   static constexpr ado_flags_t ADO_FLAG_READ_ONLY = 0x20;
+  /*< zero any newly allocated value memory */
+  static constexpr ado_flags_t ADO_FLAG_ZERO_NEW_VALUE = 0x40;
+  
 
 public:
   /**
