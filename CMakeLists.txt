@@ -5,7 +5,7 @@ option(BOOTSTRAP_DEPS "bootstrap to build deps" ON)
 option(TEST_HSTORE_PERISHABLE "hstore perishable testing enabled" OFF)
 option(BUILD_RUST "enabled Rust-based dependencies" ON)
 option(BUILD_KERNEL_SUPPORT "build kernel module dependencies" OFF)
-option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples" OFF)
+option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples (requires PMDK to be installed)" OFF)
 option(CODE_COVERAGE "enable gcc code coverage" OFF)
 
 set(DM_REGION_LOG_GRAIN_SIZE 25 CACHE STRING "log base 2 of the device_manager allocation granularity")

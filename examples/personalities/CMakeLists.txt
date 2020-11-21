@@ -5,6 +5,6 @@ add_subdirectory(cpp_list)
 add_subdirectory(cpp_symtab)
 add_subdirectory(python_numpy)
 
-if(DEFINED BUILD_EXAMPLES_PMDK)
+if(BUILD_EXAMPLES_PMDK)
   add_subdirectory(tabulator_pmdk_fb)
-endif(DEFINED BUILD_EXAMPLES_PMDK)
+endif(BUILD_EXAMPLES_PMDK)
