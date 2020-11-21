@@ -307,7 +307,7 @@ namespace
     return rc;
   }
 
-  /* RUN!TEST-AddDetachedMemory shall allocate 17 areas of deatched memory, and replace the 17*8 bytes written by value1 with 17 pointers to those areas */
+  /* RUN!TEST-AddDetachedMemory shall allocate 17 areas of detached memory, and replace the 17*8 bytes written by value1 with 17 pointers to those areas */
   status_t addDetachedMemory(
     IADO_plugin *ap_
     , uint64_t // work_key_
@@ -335,7 +335,7 @@ namespace
     return S_OK;
   }
 
-  /* RUN!TEST-CompareDetachedMemory shall iverify that the 17 areas of deatched memory written by RUN!TEST-AddDetachedMemory are intact */
+  /* RUN!TEST-CompareDetachedMemory shall verify that the 17 areas of detached memory written by RUN!TEST-AddDetachedMemory are intact */
   status_t compareDetachedMemory(
     IADO_plugin *ap_
     , uint64_t // work_key_

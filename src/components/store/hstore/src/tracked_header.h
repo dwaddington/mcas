@@ -24,7 +24,7 @@ struct heap_rc_ephemeral;
  * |<--------- tracked_header._align ------->|<-(multiple of tracked_header._align) ->
  * |<-------------- tracked_header._size ------------------------------------------->|
  *
- * Note that tracked_header could perhaps be ipacked into a smaller space: _prev and
+ * Note that tracked_header could perhaps be packed into a smaller space: _prev and
  * _next are at least 16-byte aligned, _align is a power if 2, and _size is a
  * multiple of _align.
  */

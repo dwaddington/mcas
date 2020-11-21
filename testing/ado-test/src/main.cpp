@@ -311,16 +311,7 @@ TEST_F(ADO_test, PersistedDetachedMemory)
   std::string value1 = std::string(sizeof(void *)*17, char('0'));
   mcas->erase(pool, key);
   std::vector<IMCAS::ADO_response> response;
-/*
-  virtual status_t invoke_put_ado(const IMCAS::pool_t        pool,
-                                  const basic_string_view<byte> key,
-                                  const basic_string_view<byte> request,
-                                  const basic_string_view<byte> value,
-                                  const size_t               root_len,
-                                  const ado_flags_t          flags,
-                                  std::vector<ADO_response>& out_response) = 0;
-*/
-  /* RUN!TEST-AddDetachedMemory shall allocate 17 areas of deatched memory, and replace the 17*8 bytes written by value1 with 17 pointers to those areas */
+  /* RUN!TEST-AddDetachedMemory shall allocate 17 areas of detached memory, and replace the 17*8 bytes written by value1 with 17 pointers to those areas */
   status_t rc =
     mcas->invoke_put_ado(
       pool
@@ -348,15 +339,7 @@ TEST_F(ADO_test, PersistedDetachedMemory)
   /* expect to use up all pool space */
   ASSERT_EQ(IKVStore::E_TOO_LARGE, rc);
 
-  /* RUN!TEST-CompareDetachedMemory shall iverify that the 17 areas of deatched memory written by RUN!TEST-AddDetachedMemory are intact */
-/*
-  virtual status_t invoke_ado(const IMCAS::pool_t        pool,
-                              const basic_string_view<byte> key,
-                              const basic_string_view<byte> request,
-                              const ado_flags_t          flags,
-                              std::vector<ADO_response>& out_response,
-                              const size_t               value_size = 0) = 0;
-*/
+  /* RUN!TEST-CompareDetachedMemory shall verify that the 17 areas of detached memory written by RUN!TEST-AddDetachedMemory are intact */
   rc = mcas->invoke_ado(pool, key, "RUN!TEST-CompareDetachedMemory", IMCAS::ADO_FLAG_NONE, response);
   ASSERT_EQ(S_OK, rc);
 
