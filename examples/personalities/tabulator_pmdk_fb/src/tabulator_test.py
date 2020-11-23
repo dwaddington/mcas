@@ -82,7 +82,8 @@ class Tabulator:
 
 # -- main line
 
-tab = Tabulator(ip="10.0.0.101",port=11911)
+
+tab = Tabulator(ip=sys.argv[1],port=11911)
 
 tab.add_sample("manchester", 1.0)
 tab.add_sample("manchester", 1.0)
