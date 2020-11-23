@@ -61,7 +61,7 @@ public:
 
     /* reserve space for data structure on MCAS server */
     std::vector<component::IMCAS::ADO_response> response;
-    
+
     status_t rc = mcas->invoke_ado(pool,
                                    name,
                                    nullptr,
@@ -85,8 +85,9 @@ public:
     _regions.push_back({ptr,size});
 
     /* register for RDMA */
-    _memory_handle = mcas->register_direct_memory(_regions[0].iov_base,
-                                                  _regions[0].iov_len);
+    _memory_handle = mcas->register_direct_memory(ptr, size);
+    PLOG("registered direct memory (%p, %lu)", ptr, size);
+    assert(_memory_handle != IMCAS::MEMORY_HANDLE_NONE);
   }
   
   virtual ~Durable_object_memory()
