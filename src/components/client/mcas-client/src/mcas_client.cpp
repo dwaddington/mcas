@@ -329,8 +329,9 @@ component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(void *v
    * madvise.
    */
   if (madvise(vaddr, len, MADV_DONTFORK) != 0) {
+    
     PWRN("MCAS_client::%s: madvise MADV_DONTFORK failed (%p %lu) %s", __func__, vaddr, len, strerror(errno));
-    assert(false);
+    //    assert(false);
   }
 
   return _connection->register_direct_memory(vaddr, len);

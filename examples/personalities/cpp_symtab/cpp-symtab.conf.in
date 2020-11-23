@@ -7,15 +7,9 @@
             "net"  : "mlx5_0",
             "default_backend" : "mapstore",
             "ado_plugins" : ["libpersonality-cpp-symtab.so"],
-            "ado_core" : "2",
-            "ado_core_number" : 1
+            "ado_cores" : "2"
         }
     ],
     "net_providers" : "verbs",
-    "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
-    "resources":
-    {
-            "ado_cores":"6-8",
-            "ado_manager_core": 1
-    }    
+    "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado"
 }

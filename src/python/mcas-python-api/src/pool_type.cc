@@ -8,6 +8,7 @@
 #include <string_view>
 #include <common/logging.h>
 #include <common/dump_utils.h>
+#include <common/utils.h>
 #include <Python.h>
 #include <structmember.h>
 #include <numpy/arrayobject.h>
@@ -232,6 +233,11 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
     p = PyByteArray_AsString(value);
     p_len = PyByteArray_Size(value);
   }
+  else if(PyMemoryView_Check(value)) {
+    auto buffer = PyMemoryView_GET_BUFFER(value);
+    p = buffer->buf;
+    p_len = buffer->len;
+  }
   else {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
@@ -245,7 +251,7 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
     PyErr_SetString(PyExc_RuntimeError,"RDMA memory registration failed");
     return NULL;
   }
-  
+
   hr = self->_mcas->put_direct(self->_pool,
                                key,
                                p,
@@ -310,7 +316,7 @@ static PyObject * pool_get(Pool* self, PyObject *args, PyObject *kwds)
   }
 
   /* copy value string */
-  auto result = PyUnicode_FromString(static_cast<const char*>(out_p));
+  auto result = PyUnicode_FromStringAndSize(static_cast<const char*>(out_p), out_p_len);
   self->_mcas->free_memory(out_p);
 
   return result;
@@ -352,20 +358,23 @@ static PyObject * pool_get_direct(Pool* self, PyObject *args, PyObject *kwds)
   
   /* now we have the buffer size, we can allocate accordingly */
   size_t p_len = v[0];
-  PyObject * result = PyBytes_FromStringAndSize(NULL, p_len);
+  char * ptr = static_cast<char*>(::aligned_alloc(PAGE_SIZE, p_len));
+  //  memset(ptr, 0xcc, p_len);
 
-  void * p = (void *) PyBytes_AsString(result);
+  PyObject * result = PyMemoryView_FromMemory(ptr, p_len, PyBUF_WRITE); //PyBytes_FromStringAndSize(NULL, p_len);
+
+  //  void * p = (void *) PyBytes_AsString(result);
 
   /* register memory */
-  component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(p, p_len);
+  component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(ptr, round_up_page(p_len));
 
   if(handle == nullptr) {
     PyErr_SetString(PyExc_RuntimeError,"RDMA memory registration failed");
     return NULL;
   }
-  
+
   /* now perform get_direct */
-  hr = self->_mcas->get_direct(self->_pool, k, p, p_len, handle);
+  hr = self->_mcas->get_direct(self->_pool, k, ptr, p_len, handle);
   if(hr != S_OK) {
     std::stringstream ss;
     ss << "pool.get_direct failed [status:" << hr << "]";
