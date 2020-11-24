@@ -10,7 +10,8 @@ This directory contains general examples of using MCAS with and without ADO.
 
 ## Personalities
 
-These examples provide "personalities" consisting of the ADO, client-side adapter and a test program.
+These examples provide "personalities" consisting of the ADO,
+client-side adapter and a test program.
 
 **tabulator_pmdk_fb** : Example ADO using PMDK (side-file). ADO is
 written in C++ and the client is Python. Protocol based on
@@ -26,8 +27,6 @@ crash-consistent.
 
 **cpp_versioning** : C++ ADO demonstrating versioning as an overlay
 service.
-
-**python_numpy** :
 
 
 

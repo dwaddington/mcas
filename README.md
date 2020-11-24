@@ -93,3 +93,17 @@ make install
 ```
 
 
+### Additional build options
+
+| Option               | Description             |
+|----------------------|-------------------------|
+| BUILD_KERNEL_SUPPORT | Build kernel support    |
+| BUILD_EXAMPLES_PMDK  | PMDK in ADO example     |
+| BUILD_RUST           | Rust-based dependencies |
+
+### Build all for development
+
+``` bash
+cmake -DBUILD_KERNEL_SUPPORT=ON -DBUILD_EXAMPLES_PMDK=ON -DBUILD_RUST=ON  -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist ..
+```
+

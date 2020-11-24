@@ -27,7 +27,6 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include) # rapidjson
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb (via nupm)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb (via nupm)
-link_directories(${CMAKE_SOURCE_DIR}/src/kernel/modules/xpmem/lib/.libs)
 
 add_definitions(-DCONFIG_DEBUG)
 add_compile_options("$<$<CONFIG:Release>:-DNDEBUG>")
