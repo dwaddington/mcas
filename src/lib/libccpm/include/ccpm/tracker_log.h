@@ -32,7 +32,7 @@ namespace ccpm
 				, char = '0'
 			) const noexcept
 		{
-			/* tracker does not excpect *v to be modified, but rollback
+			/* tracker does not expect *v to be modified, but rollback
 			 * will do just that. Perhaps track_pre and track_post parameters
 			 * should be void *, not const void *.
 			 */
