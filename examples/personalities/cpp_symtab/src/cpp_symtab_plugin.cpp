@@ -118,9 +118,9 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
     return S_OK;
   }
 
-  /*-----------------------------*/
-  /* build inex request handling */
-  /*-----------------------------*/
+  /*------------------------------*/
+  /* build index request handling */
+  /*------------------------------*/
   if(msg->command_as_BuildIndex()) {
     PMAJOR("Building index...");
     std::sort(pointer_table.begin(),
