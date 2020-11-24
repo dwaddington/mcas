@@ -1573,20 +1573,12 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
     auto iobr = make_iob_ptr_recv();
     auto iobs = make_iob_ptr_send();
 
-    if (!mcas::protocol::Message_IO_request::would_fit(key_len_ + value_len_, iobs->original_length())) {
-      /* check value is not too large for underlying transport */
-      if (value_len_ > _max_message_size) {
-        PWRN("%s: message size too large", __func__);
-        return IKVStore::E_TOO_LARGE;
-      }
-
-      /* for large puts, where the receiver will not have
-       * sufficient buffer space, we use a two-stage protocol */
-      out_async_handle_ = put_locate_async(
-          pool_, key_, key_len_, value_, value_len_, rmd_,
-          mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc(), flags_);
-    }
-    else {
+    if (
+      mcas::protocol::Message_IO_request::would_fit(key_len_ + value_len_, iobs->original_length())
+      &&
+      mem_handle_ != IKVStore::HANDLE_NONE
+    ) {
+      /* Fast path: small size and memory already registered */
       CPLOG(1, "%s: using small send for direct put key=(%.*s) key_len=%lu value=(%.20s...) value_len=%lu", __func__, int(key_len_),
         static_cast<const char *>(key_), key_len_, static_cast<const char *>(value_), value_len_);
 
@@ -1602,9 +1594,24 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
       post_recv(&*iobr);
       iobs->iov[1].iov_base = const_cast<void*>(value_);
       iobs->iov[1].iov_len =  value_len_;
+      iobs->desc[1] = static_cast<buffer_base *>(mem_handle_)->get_desc();
       post_send(iobs->iov, iobs->iov + 2, iobs->desc, &*iobs, msg, __func__); /* send two concatentated buffers in single DMA */
 
       out_async_handle_ = new async_buffer_set_simple(debug_level(), std::move(iobs), std::move(iobr));
+    }
+    else
+    {
+      /* check value is not too large for underlying transport */
+      if (value_len_ > _max_message_size) {
+        PWRN("%s: message size too large", __func__);
+        return IKVStore::E_TOO_LARGE;
+      }
+
+      /* for large puts, where the receiver will not have
+       * sufficient buffer space, we use a two-stage protocol */
+      out_async_handle_ = put_locate_async(
+          pool_, key_, key_len_, value_, value_len_, rmd_,
+          mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc(), flags_);
     }
     return S_OK;
   }
