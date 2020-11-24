@@ -43,16 +43,19 @@ def test_index(pool):
 
 
 def test_direct_operations(pool):
-    arr = bytearray(int(1e2))
-    arr[0] = 3;
-    arr[1] = 2;
-    arr[2] = 1;
+    print('Testing direct operation...')
+    arr = mcas.allocate_direct_memory(size=64,zero=True);
+    arr[0] = 0xff;
+    arr[1] = 0xee;
+    arr[2] = 0xdd;
     pool.put_direct('array0', arr)
+    print('put_direct OK')
 
     y = pool.get_direct('array0')
-    print('First part...')
-    print(y[0:20])
-
+    print('get_direct OK')
+    b = y.tobytes()
+    print('First part of direct array...')
+    print(b[0:10])
     print('Len: %d' % pool.get_attribute('array0','length'))
     print('Crc: %x' % pool.get_attribute('array0','crc32'))
     print('Size enquiry:%d' % pool.get_size('array0'))

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -50,7 +50,7 @@ public:
    * Component/interface management
    * 
    */
-  DECLARE_VERSION(0.1f);
+  DECLARE_VERSION(1.0f);
   DECLARE_COMPONENT_UUID(0x59564581,0x9e1b,0x4811,0xbdb2,0x19,0x57,0xa0,0xa6,0x84,0x57);
   
   void * query_interface(component::uuid_t& itf_uuid) override {

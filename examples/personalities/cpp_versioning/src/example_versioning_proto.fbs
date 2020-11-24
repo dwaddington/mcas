@@ -1,6 +1,6 @@
 // FlatBuffers IDL file
 
-namespace example_fb_protocol;
+namespace example_versioning_protocol;
 
 table Ack
 {

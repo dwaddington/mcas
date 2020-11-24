@@ -1,4 +1,4 @@
-
+#define PAGE_SIZE 4096
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
 #include <numpy/arrayobject.h>
@@ -28,9 +28,29 @@ extern PyTypeObject ZcStringType;
 extern PyTypeObject SessionType;
 extern PyTypeObject PoolType;
 
-static PyMethodDef mcas_methods[] = {
-  {NULL, NULL, 0, NULL}        /* Sentinel */
-};
+PyDoc_STRVAR(mcas_allocate_direct_memory_doc,
+             "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
+PyDoc_STRVAR(mcas_free_direct_memory_doc,
+             "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
+
+
+static PyObject * mcas_allocate_direct_memory(PyObject * self,
+                                              PyObject * args,
+                                              PyObject * kwargs);
+static PyObject * mcas_free_direct_memory(PyObject * self,
+                                          PyObject * args,
+                                          PyObject * kwargs);
+
+
+static PyMethodDef mcas_methods[] =
+  {
+   {"allocate_direct_memory",
+    (PyCFunction) mcas_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, mcas_allocate_direct_memory_doc },
+   {"free_direct_memory",
+    (PyCFunction) mcas_free_direct_memory, METH_VARARGS | METH_KEYWORDS, mcas_free_direct_memory_doc },
+   {NULL, NULL, 0, NULL}        /* Sentinel */
+  };
+
 
 static PyModuleDef mcas_module = {
     PyModuleDef_HEAD_INIT,
@@ -41,6 +61,7 @@ static PyModuleDef mcas_module = {
     NULL, NULL, NULL, NULL
 };
 
+                                     
 PyMODINIT_FUNC
 PyInit_mcas(void)
 {  
@@ -98,3 +119,87 @@ PyInit_mcas(void)
   return m;
 }
 
+/** 
+ * Allocated memory view of aligned memory.  This memory
+ * will not be garbage collected and should be explicitly 
+ * freed
+ * 
+ * @param self 
+ * @param args: size(size in bytes to allocate), zero(zero memory)
+ * @param kwds 
+ * 
+ * @return memoryview object
+ */
+static PyObject * mcas_allocate_direct_memory(PyObject * self,
+                                              PyObject * args,
+                                              PyObject * kwds)
+{
+  static const char *kwlist[] = {"size",
+                                 "zero",
+                                 NULL};
+
+  unsigned long nsize = 0;
+  int zero_flag = 0;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "k|p",
+                                    const_cast<char**>(kwlist),
+                                    &nsize,
+                                    &zero_flag)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+  
+  char * ptr = static_cast<char*>(aligned_alloc(PAGE_SIZE, nsize));
+
+  if(zero_flag)
+    memset(ptr, 0x0, nsize);
+  
+  if(ptr == NULL) {
+    PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
+    return NULL;
+  }
+  //  PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
+  return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
+}
+
+
+
+/** 
+ * Free direct memory allocated with allocate_direct_memory
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return 
+ */
+static PyObject * mcas_free_direct_memory(PyObject * self,
+                                          PyObject * args,
+                                          PyObject * kwds)
+{
+  static const char *kwlist[] = {"memory",
+                                 NULL};
+
+  PyObject * memview = NULL;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &memview)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  if (PyMemoryView_Check(memview) == 0) {
+    PyErr_SetString(PyExc_RuntimeError,"argument should be memoryview type");
+    return NULL;
+  }
+  
+  Py_buffer * buffer = PyMemoryView_GET_BUFFER(memview);
+  buffer->len = 0;
+  PyBuffer_Release(buffer);
+  Py_RETURN_NONE;
+}

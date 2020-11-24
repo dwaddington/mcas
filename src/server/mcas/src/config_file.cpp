@@ -636,7 +636,8 @@ rapidjson::Document filename_to_doc(unsigned debug_level_, const std::string &fi
   /* use file stream instead of istreamwrapper because of older Ubuntu 16.04
    */
   FILE *fp = ::fopen(filename.c_str(), "rb");
-  if (fp == nullptr) throw Config_exception("configuration file open/parse failed");
+  if (fp == nullptr)
+    throw Config_exception("fopen failed to open configuration file (%s)", ::strerror(errno));
 
   struct stat st;
   stat(filename.c_str(), &st);

@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-20] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -38,8 +38,8 @@ int main(int argc, char* argv[])
     po::options_description desc("Options");
     desc.add_options()("help", "Show help")
       ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")
-      ("patiencd", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
-      ("server-addr", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
+      ("patience", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
+      ("server", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")
       ;
 
@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
       return -1;
     }
 
-    Options.addr        = vm["server-addr"].as<std::string>();
+    Options.addr        = vm["server"].as<std::string>();
     Options.debug_level = vm["debug"].as<unsigned>();
     Options.patience    = vm["patience"].as<unsigned>();
     Options.device      = vm["device"].as<std::string>();

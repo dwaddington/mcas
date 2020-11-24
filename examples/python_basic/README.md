@@ -1,11 +1,21 @@
 # Basic Python API example
 
-This example demonstrates the basic key-value API for Python.
+This example demonstrates the MCAS client API for Python.
+
+## Create Configuration File
+
+For example, using helper script:
+
+``` bash
+./dist/testing/mapstore-0.py 10.0.0.101 > myConfig.conf
+```
 
 ## Running Test
 
+Server: 
+
 ``` bash
-./dist/bin/mcas --conf dist/testing/mapstore-0.conf --debug 3
+./dist/bin/mcas --conf myConfig.conf --debug 0
 ```
 
 Client:

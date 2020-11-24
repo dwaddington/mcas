@@ -16,6 +16,11 @@
 
 using namespace component;
 
+namespace global
+{
+unsigned debug_level;
+}
+
 typedef struct {
   PyObject_HEAD
   component::IMCAS * _mcas;
@@ -52,13 +57,13 @@ Session_dealloc(Session *self)
   
   assert(self);
   Py_TYPE(self)->tp_free((PyObject*)self);
-  PLOG("Session: dealloc");
+  if(global::debug_level > 0)
+    PLOG("Session: dealloc");
 }
 
 
 static int Session_init(Session *self, PyObject *args, PyObject *kwds)
 {
-  PLOG("Session: init");
   static const char *kwlist[] = {"ip",
                                  "port",
                                  "device",
@@ -82,14 +87,22 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
                                     &p_ext,
                                     &debug_level)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+    PWRN("bad arguments or argument types to Session constructor");
     return -1;
   }
+
+  global::debug_level = debug_level;
+  if(global::debug_level > 0)
+    PLOG("Session: init");
+
 
   std::string device = p_device ? p_device : DEFAULT_DEVICE;
 
   std::stringstream addr;
   addr << p_ip << ":" << port;
 
+  if(global::debug_level > 0)
+    PLOG("Session: init (addr=%s)", addr.str().c_str());
 
   using namespace component;
   
@@ -115,6 +128,7 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   if(p_env_user_name) user_name = p_env_user_name;
   else user_name = "unknown";
 
+  
   if(p_ext) {
     self->_mcas = fact->mcas_create(debug_level, 30,
                                     user_name,
@@ -128,10 +142,16 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
                                     addr.str(),
                                     device);
   }
-    
+
+  if(self->_mcas == nullptr) {
+    PyErr_SetString(PyExc_RuntimeError, "mcas.Session failed called to mcas_create");
+    return -1;
+  }
+
   self->_port = port;
 
-  PLOG("session: (%s)(%s) %p", addr.str().c_str(), device.c_str(), self->_mcas);
+  if(global::debug_level > 0)
+    PLOG("session: (%s)(%s) %p", addr.str().c_str(), device.c_str(), self->_mcas);
   return 0;
 }
 
@@ -324,7 +344,9 @@ static PyObject * get_stats(Session* self, PyObject *args, PyObject *kwds)
 {
   component::IMCAS::Shard_stats stats;
 
-  PLOG("mcas.Session.get_statistics ");
+  if(global::debug_level > 0)
+    PLOG("mcas.Session.get_statistics ");
+  
   status_t hr = self->_mcas->get_statistics(stats);
 
   if(hr != S_OK) {

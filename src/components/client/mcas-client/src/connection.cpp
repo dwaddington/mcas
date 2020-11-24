@@ -1587,7 +1587,7 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
           mem_handle_ == IKVStore::HANDLE_NONE ? nullptr : static_cast<buffer_base *>(mem_handle_)->get_desc(), flags_);
     }
     else {
-      CPLOG(1, "%s: key=(%.*s) key_len=%lu value=(%.20s...) value_len=%lu", __func__, int(key_len_),
+      CPLOG(1, "%s: using small send for direct put key=(%.*s) key_len=%lu value=(%.20s...) value_len=%lu", __func__, int(key_len_),
         static_cast<const char *>(key_), key_len_, static_cast<const char *>(value_), value_len_);
 
       const auto msg =
@@ -1597,11 +1597,22 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
 
       if (_options.short_circuit_backend) msg->add_scbe();
 
-      iobs->set_length(msg->msg_len());
-
       post_recv(&*iobr);
-      post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg,
-                __func__); /* send two concatentated buffers in single DMA */
+      
+      
+#if 0 // ISSUE #36
+      // this should work - not sure which is faster BTW
+      iobs->set_length(msg->msg_len());
+      iobs->iov[1].iov_base = const_cast<void*>(value_);
+      iobs->iov[1].iov_len =  value_len_;
+
+      post_send(iobs->iov, iobs->iov + 2, iobs->desc, &*iobs, msg, __func__); /* send two concatentated buffers */
+#else
+      // hack, do a copy
+      iobs->set_length(msg->msg_len() + value_len_);
+      memcpy(reinterpret_cast<char*>(iobs->iov[0].iov_base)+msg->msg_len(), value_, value_len_);
+      post_send(iobs->iov, iobs->iov + 1, iobs->desc, &*iobs, msg, __func__); /* send two concatentated buffers */
+#endif
 
       out_async_handle_ = new async_buffer_set_simple(debug_level(), std::move(iobs), std::move(iobr));
     }

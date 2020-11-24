@@ -5,7 +5,10 @@
 #define NO_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
 
+#include <string_view>
 #include <common/logging.h>
+#include <common/dump_utils.h>
+#include <common/utils.h>
 #include <Python.h>
 #include <structmember.h>
 #include <numpy/arrayobject.h>
@@ -230,6 +233,17 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
     p = PyByteArray_AsString(value);
     p_len = PyByteArray_Size(value);
   }
+  else if(PyMemoryView_Check(value)) {
+    auto buffer = PyMemoryView_GET_BUFFER(value);
+    p = buffer->buf;
+    p_len = buffer->len;
+  }
+  // else if(PyArray_Check(value)) {
+  //   /* see https://docs.scipy.org/doc/numpy-1.13.0/reference/c-api.array.html */
+  //   auto array_obj = reinterpret_cast<PyArrayObject *>(value);
+  //   p = PyArray_DATA(array_obj);
+  //   p_len = PyArray_NBYTES(array_obj);
+  // }
   else {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
@@ -243,7 +257,7 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
     PyErr_SetString(PyExc_RuntimeError,"RDMA memory registration failed");
     return NULL;
   }
-  
+
   hr = self->_mcas->put_direct(self->_pool,
                                key,
                                p,
@@ -308,7 +322,7 @@ static PyObject * pool_get(Pool* self, PyObject *args, PyObject *kwds)
   }
 
   /* copy value string */
-  auto result = PyUnicode_FromString(static_cast<const char*>(out_p));
+  auto result = PyUnicode_FromStringAndSize(static_cast<const char*>(out_p), out_p_len);
   self->_mcas->free_memory(out_p);
 
   return result;
@@ -350,20 +364,23 @@ static PyObject * pool_get_direct(Pool* self, PyObject *args, PyObject *kwds)
   
   /* now we have the buffer size, we can allocate accordingly */
   size_t p_len = v[0];
-  PyObject * result = PyBytes_FromStringAndSize(NULL, p_len);
+  char * ptr = static_cast<char*>(::aligned_alloc(PAGE_SIZE, p_len));
+  //  memset(ptr, 0xcc, p_len);
 
-  void * p = (void *) PyBytes_AsString(result);
+  PyObject * result = PyMemoryView_FromMemory(ptr, p_len, PyBUF_WRITE); //PyBytes_FromStringAndSize(NULL, p_len);
+
+  //  void * p = (void *) PyBytes_AsString(result);
 
   /* register memory */
-  component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(p, p_len);
+  component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(ptr, round_up_page(p_len));
 
   if(handle == nullptr) {
     PyErr_SetString(PyExc_RuntimeError,"RDMA memory registration failed");
     return NULL;
   }
-  
+
   /* now perform get_direct */
-  hr = self->_mcas->get_direct(self->_pool, k, p, p_len, handle);
+  hr = self->_mcas->get_direct(self->_pool, k, ptr, p_len, handle);
   if(hr != S_OK) {
     std::stringstream ss;
     ss << "pool.get_direct failed [status:" << hr << "]";
@@ -382,36 +399,53 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   static const char *kwlist[] = {"key",
                                  "command",
                                  "ondemand_size",
+                                 "flags",
                                  NULL};
 
   const char * key = nullptr;
-  const char * command = nullptr;
+  PyObject * command = nullptr;
   unsigned long ondemand_size = DEFAULT_ADO_ONDEMAND_VALUE_SIZE;
-  
+  unsigned long flags = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "ss|k",
+                                    "sO|kk",
                                     const_cast<char**>(kwlist),
                                     &key,
                                     &command,
-                                    &ondemand_size)) {
-    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+                                    &ondemand_size,
+                                    &flags)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments to invoke_ado");
+    return NULL;
+  }
+
+  /* command can be a byte array or a unicode string */
+  void * cmd = nullptr;
+  size_t cmd_len = 0;
+  if(PyByteArray_Check(command)) {
+    cmd = PyByteArray_AsString(command);
+    cmd_len = PyByteArray_Size(command);
+  }
+  else if(PyUnicode_Check(command)) {
+    cmd = PyUnicode_DATA(command);
+    cmd_len = PyUnicode_GET_SIZE(command);
+  }
+  else {
+    PyErr_SetString(PyExc_RuntimeError,"bad value parameter");
     return NULL;
   }
 
   assert(self->_mcas);
   assert(self->_pool);
-
-  std::string request(command);
-  assert(request.size() > 0);
-
+  assert(cmd_len > 0);
+  
   std::vector<component::IMCAS::ADO_response> response;
 
   status_t hr = self->_mcas->invoke_ado(self->_pool,
                                         key,
-                                        request,
-                                        0, // flags
+                                        cmd,
+                                        cmd_len,
+                                        flags,
                                         response,
                                         ondemand_size);
 
@@ -422,7 +456,15 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
     return NULL;
   }
 
-  return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+  if((response.size() > 0) &&
+     (response[0].data_len() > 0) &&
+     (response[0].data())) {
+    //    hexdump(response[0].data(),response[0].data_len());    
+    return PyByteArray_FromStringAndSize((const char *) response[0].data(), response[0].data_len());
+  }
+  else {
+    Py_RETURN_NONE;
+  }
 }
 
 
@@ -435,19 +477,38 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
 
   const char * key = nullptr;
   PyObject * value = nullptr;
-  const char * command = nullptr;
+  PyObject * command = nullptr;
+  unsigned long flags = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "ssO",
+                                    "sOO",
                                     const_cast<char**>(kwlist),
                                     &key,
                                     &value,
-                                    &command)) {
+                                    &command,
+                                    &flags)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
   }
 
+  /* command can be a byte array or a unicode string */
+  void * cmd = nullptr;
+  size_t cmd_len = 0;
+  if(PyByteArray_Check(command)) {
+    cmd = PyByteArray_AsString(command);
+    cmd_len = PyByteArray_Size(command);
+  }
+  else if(PyUnicode_Check(command)) {
+    cmd = PyUnicode_DATA(command);
+    cmd_len = PyUnicode_GET_SIZE(command);
+  }
+  else {
+    PyErr_SetString(PyExc_RuntimeError,"bad value parameter");
+    return NULL;
+  }
+
+  /* value can be a byte array or a unicode string */
   void * p = nullptr;
   size_t p_len = 0;
   if(PyByteArray_Check(value)) {
@@ -463,23 +524,19 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
     return NULL;
   }
 
-
   assert(self->_mcas);
   assert(self->_pool);
-
-  std::string request(command);
-  assert(request.size() > 0);
 
   std::vector<component::IMCAS::ADO_response> response;
 
   status_t hr = self->_mcas->invoke_put_ado(self->_pool,
                                             key,
-                                            request.c_str(),
-                                            request.size(),
+                                            cmd,
+                                            cmd_len,
                                             p,
                                             p_len,
                                             0, // root len
-                                            component::IMCAS::ADO_FLAG_CREATE_ON_DEMAND, // flags
+                                            flags & component::IMCAS::ADO_FLAG_CREATE_ON_DEMAND, // flags
                                             response);
 
   if(hr != S_OK) {
@@ -489,7 +546,14 @@ static PyObject * pool_invoke_put_ado(Pool* self, PyObject *args, PyObject *kwds
     return NULL;
   }
 
-  return PyUnicode_DecodeUTF8((const char *) response[0].data(), response[0].data_len(), "strict");
+  if((response.size() > 0) &&
+     (response[0].data_len()) > 0 &&
+     (response[0].data())) {
+    return PyByteArray_FromStringAndSize((const char *) response[0].data(), response[0].data_len());
+  }
+  else {
+    Py_RETURN_NONE;
+  }
 }
 
 

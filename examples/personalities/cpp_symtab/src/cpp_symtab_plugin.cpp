@@ -94,7 +94,9 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
 
   auto msg = GetMessage(in_work_request);
 
+  /*----------------------*/
   /* put request handling */
+  /*----------------------*/
   auto put_request = msg->command_as_PutRequest();
   if(put_request) {
     auto str = put_request->word()->c_str();
@@ -116,6 +118,9 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
     return S_OK;
   }
 
+  /*------------------------------*/
+  /* build index request handling */
+  /*------------------------------*/
   if(msg->command_as_BuildIndex()) {
     PMAJOR("Building index...");
     std::sort(pointer_table.begin(),
@@ -167,6 +172,9 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
     return S_OK;
   }
 
+  /*---------------------------------------*/
+  /* requesting symbol for given string    */
+  /*---------------------------------------*/  
   auto get_symbol_request = msg->command_as_GetSymbol();
   if(get_symbol_request) {
     auto& req_word = *(get_symbol_request->word());
@@ -196,11 +204,18 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
     return S_OK;
   }
 
+  /*---------------------------------------*/
+  /* requesting string for provided sym id */
+  /*---------------------------------------*/
   auto get_string_request = msg->command_as_GetString();
-  if(get_string_request) {
-    char* sym_id = reinterpret_cast<char *>(get_string_request->symbol());
-    PLOG("Request symbol:%p", sym_id);
-    response_buffers.emplace_back(sym_id, strlen(sym_id), response_buffer_t::alloc_type_pool{});
+  if(get_string_request) { 
+    
+    auto sym_id = get_string_request->symbol();
+    auto sym_str = reinterpret_cast<char*>(sym_id);
+    PLOG("Request symbol:(0x%lx, %s)", sym_id, sym_str);
+    response_buffers.emplace_back(sym_str,
+                                  strlen(sym_str),
+                                  response_buffer_t::alloc_type_pool{}); /* pool type means don't try to free */
     return S_OK;
   }
 
