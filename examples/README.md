@@ -15,7 +15,7 @@ These examples provide "personalities" consisting of the ADO, client-side adapte
 written in C++ and the client is Python. Protocol based on flatbuffers.
 
 **cpp_list** : C++ ADO manipulating immutable list. Basic demonstration of non-serializing 
-relocation of data structures and ADO operations.
+relocation of data structures and ADO operations without crash-consistency and persistent memory.
 
 **cpp_symtab** : 
 

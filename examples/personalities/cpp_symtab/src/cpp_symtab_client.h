@@ -120,7 +120,11 @@ public:
                                     response);
     if(rc != S_OK)
       throw General_exception("get_symbol failed");
-    return *(reinterpret_cast<const uint64_t*>(response.data()));
+
+    assert(response.size() == 1);
+    assert(response[0].data_len() == 8);
+    
+    return *(reinterpret_cast<const uint64_t*>(response[0].data()));
   }
 
 private:

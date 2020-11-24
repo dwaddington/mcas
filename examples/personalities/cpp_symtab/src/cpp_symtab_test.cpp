@@ -137,10 +137,13 @@ int main(int argc, char * argv[])
   table.build_index();
 
   auto sym = table.get_symbol("business");
-  PLOG("Symbol for business:%lx", sym);
+  PLOG("Symbol for business:0x%lx", sym);
 
   auto reverse_lookup = table.get_string(sym);
   PLOG("Reverse lookup: %s", reverse_lookup.c_str());
+
+  if(reverse_lookup != "business")
+    throw General_exception("unexpected data mismatch");
   
   /* implicitly close and delete pool */
   PLOG("Cleaning up.");
