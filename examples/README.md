@@ -5,6 +5,7 @@ This directory contains general examples of using MCAS with and without ADO.
 ## Basic
 
 **cpp_basic** : Basic C++ client using MCAS as a plain key-value store.
+
 **python_basic** : Basic Python client using MCAS as a plain key-value store.
 
 ## Personalities

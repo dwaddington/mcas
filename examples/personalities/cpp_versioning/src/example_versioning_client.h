@@ -4,7 +4,7 @@
 #include <string>
 #include <api/mcas_itf.h>
 
-namespace example_fb
+namespace example_versioning
 {
 using pool_t = component::IKVStore::pool_t;
 
@@ -41,4 +41,4 @@ private:
 
 }
 
-#endif // __EXAMPLE_FB_CLIENT_H__
+#endif // __EXAMPLE_VERSIONING_CLIENT_H__

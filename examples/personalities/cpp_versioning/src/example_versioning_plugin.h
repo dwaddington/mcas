@@ -19,29 +19,29 @@
  *
  */
 
-#ifndef __EXAMPLE_FB_PLUGIN_H__
-#define __EXAMPLE_FB_PLUGIN_H__
+#ifndef __EXAMPLE_VERSIONING_PLUGIN_H__
+#define __EXAMPLE_VERSIONING_PLUGIN_H__
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 
 #include <common/cycles.h>
 #include <api/ado_itf.h>
-#include <example_fb_proto_generated.h>
+#include <example_versioning_proto_generated.h>
 #include <libpmem.h>
 
 /** 
     Simple versioning root structure (fixed length).
  */
-class ADO_example_fb_plugin_root
+class ADO_example_versioning_plugin_root
 {
 public:
   static constexpr int MAX_VERSIONS = 3;
   
-  ADO_example_fb_plugin_root() {}
+  ADO_example_versioning_plugin_root() {}
 
   void init() {
-    pmem_memset_persist(this, 0, sizeof(ADO_example_fb_plugin_root));
+    pmem_memset_persist(this, 0, sizeof(ADO_example_versioning_plugin_root));
   }
 
   void check_recovery() {
@@ -124,7 +124,7 @@ private:
 };
   
 
-class ADO_example_fb_plugin : public component::IADO_plugin
+class ADO_example_versioning_plugin : public component::IADO_plugin
 {  
 private:
   static constexpr bool option_DEBUG = true;
@@ -136,13 +136,13 @@ public:
    * @param block_device Block device interface
    * 
    */
-  ADO_example_fb_plugin() {}
+  ADO_example_versioning_plugin() {}
 
   /** 
    * Destructor
    * 
    */
-  virtual ~ADO_example_fb_plugin() {}
+  virtual ~ADO_example_versioning_plugin() {}
 
   /** 
    * Component/interface management
