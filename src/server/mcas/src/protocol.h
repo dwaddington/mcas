@@ -895,7 +895,6 @@ struct Message_ado_request : public Message_numbered_request {
         ondemand_val_len(odvl),
         invocation_data_len(),
         flags(flags_)
-
   {
     this->invocation_data_len = boost::numeric_cast<decltype(this->invocation_data_len)>(invocation_data.size());
     key_len                   = key.size();
