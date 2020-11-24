@@ -2,7 +2,7 @@
 
 This example personality shows how a symbol table with bidirectional
 lookup can be realized and exposed to the ADO.  This example is
-crash consistent.
+not fully crash consistent.
 
 ## Running Test
 

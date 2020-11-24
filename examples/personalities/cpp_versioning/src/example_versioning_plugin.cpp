@@ -17,21 +17,21 @@
 #include <common/cycles.h>
 #include <api/interfaces.h>
 #include <string.h>
-#include "example_fb_plugin.h"
+#include "example_versioning_plugin.h"
 
 #include <flatbuffers/flatbuffers.h>
-#include <example_fb_proto_generated.h>
+#include <example_versioning_proto_generated.h>
 
 using namespace flatbuffers;
-using namespace example_fb_protocol;
+using namespace example_versioning_protocol;
 
 int debug_level = 3;
 
-status_t ADO_example_fb_plugin::register_mapped_memory(void * shard_vaddr,
+status_t ADO_example_versioning_plugin::register_mapped_memory(void * shard_vaddr,
                                                        void * local_vaddr,
                                                        size_t len)
 {
-  PLOG("ADO_example_fb_plugin: register_mapped_memory (%p, %p, %lu)",
+  PLOG("ADO_example_versioning_plugin: register_mapped_memory (%p, %p, %lu)",
        shard_vaddr, local_vaddr, len);
   /* we would need a mapping if we are not using the same virtual
      addresses as the Shard process */
@@ -47,7 +47,7 @@ inline void * copy_flat_buffer(FlatBufferBuilder& fbb)
   return ptr;
 }
 
-status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
+status_t ADO_example_versioning_plugin::do_work(const uint64_t work_key,
                                         const char * key,
                                         size_t key_len,
                                         IADO_plugin::value_space_t& values,
@@ -63,7 +63,7 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
   auto detached_value = values[1].ptr;
   auto detached_value_len = values[1].len;
 
-  auto root = static_cast<ADO_example_fb_plugin_root *>(value);
+  auto root = static_cast<ADO_example_versioning_plugin_root *>(value);
   if(new_root) {
     root->init();
   }
@@ -133,7 +133,7 @@ status_t ADO_example_fb_plugin::do_work(const uint64_t work_key,
   return S_OK;
 }
 
-status_t ADO_example_fb_plugin::shutdown()
+status_t ADO_example_versioning_plugin::shutdown()
 {
   /* here you would put graceful shutdown code if any */
   return S_OK;
@@ -146,7 +146,7 @@ status_t ADO_example_fb_plugin::shutdown()
 extern "C" void * factory_createInstance(component::uuid_t interface_iid)
 {
   if(interface_iid == interface::ado_plugin)
-    return static_cast<void*>(new ADO_example_fb_plugin());
+    return static_cast<void*>(new ADO_example_versioning_plugin());
   else return NULL;
 }
 

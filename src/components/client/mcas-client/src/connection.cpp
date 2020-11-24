@@ -1589,9 +1589,9 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
 
       if (_options.short_circuit_backend) msg->add_scbe();
 
-      iobs->set_length(msg->msg_len());
-
       post_recv(&*iobr);
+
+      iobs->set_length(msg->msg_len());
       iobs->iov[1].iov_base = const_cast<void*>(value_);
       iobs->iov[1].iov_len =  value_len_;
       iobs->desc[1] = static_cast<buffer_base *>(mem_handle_)->get_desc();

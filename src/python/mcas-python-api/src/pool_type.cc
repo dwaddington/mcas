@@ -238,6 +238,12 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
     p = buffer->buf;
     p_len = buffer->len;
   }
+  // else if(PyArray_Check(value)) {
+  //   /* see https://docs.scipy.org/doc/numpy-1.13.0/reference/c-api.array.html */
+  //   auto array_obj = reinterpret_cast<PyArrayObject *>(value);
+  //   p = PyArray_DATA(array_obj);
+  //   p_len = PyArray_NBYTES(array_obj);
+  // }
   else {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;

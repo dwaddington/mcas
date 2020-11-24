@@ -307,6 +307,62 @@ namespace
     return rc;
   }
 
+  /* RUN!TEST-AddDetachedMemory shall allocate 17 areas of detached memory, and replace the 17*8 bytes written by value1 with 17 pointers to those areas */
+  status_t addDetachedMemory(
+    IADO_plugin *ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & // args_
+    , const string_view // key_
+    , value_space_t & values_
+    , response_buffer_vector_t & // response_buffers_
+  )
+  {
+    ASSERT_TRUE(values_[0].ptr != nullptr, "addDetachedMemory::invalid space");
+    std::array<void *, 17> p;
+    ASSERT_TRUE(values_[0].len == p.size() * sizeof(void *), "addDetachedMemory::invalid space");
+    constexpr size_t align = 8;
+    for ( auto i = 0U; i != p.size(); ++i )
+    {
+      std::size_t sz = 1 << i;
+      status_t rc = ap_->cb_allocate_pool_memory(sz, align, p[i]);
+      ASSERT_OK(rc, "%s: rc %d", __func__, rc);
+      /* fill the allocated space with a checkable value */
+      std::fill_n(static_cast<char *>(p[i]), sz, char('0' + i));
+    }
+    ASSERT_TRUE(values_[0].len == p.size() * sizeof(&p[0]), "%s: mismatch values_[0].len %zu vs p.size %zu, sizeof(&p[0]) %zu", __func__, values_[0].len, p.size(), sizeof(&p[0]));
+    /* preserve the pointers in the value location */
+    memcpy(values_[0].ptr, &p[0], p.size() * sizeof(&p[0]));
+    return S_OK;
+  }
+
+  /* RUN!TEST-CompareDetachedMemory shall verify that the 17 areas of detached memory written by RUN!TEST-AddDetachedMemory are intact */
+  status_t compareDetachedMemory(
+    IADO_plugin *ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & // args_
+    , const string_view // key_
+    , value_space_t & values_
+    , response_buffer_vector_t & // response_buffers_
+  )
+  {
+    ASSERT_TRUE(values_[1].ptr != nullptr, "compareDetachedMemory::invalid detached ptr");
+    std::array<void *, 17> p;
+    ASSERT_TRUE(values_[0].len == p.size() * sizeof(&p[0]), "%s: mismatch values_[0].len %zu vs p.size %zu, sizeof(&p[0]) %zu", __func__, values_[0].len, p.size(), sizeof(&p[0]));
+    /* Recover the pointers from the value location */
+    memcpy(&p[0], values_[0].ptr, p.size() * sizeof(&p[0]));
+    for ( auto i = 0U; i != p.size(); ++i )
+    {
+      std::size_t sz = 1 << i;
+      auto ev = char('0' + i);
+      auto c = static_cast<char *>(p[i]);
+      auto e = std::find_if(c, c+sz, [ev] (const char c_) { return c_ != ev; });
+      ASSERT_TRUE(e == c+sz, "%s: detached element %d byte at %zu bad", __func__, i, std::size_t(e-c));
+      status_t rc = ap_->cb_free_pool_memory(sz, p[i]);
+      ASSERT_OK(rc, "%s: rc %d", __func__, rc);
+    }
+    return S_OK;
+  }
+
   status_t getReferenceVector(
     IADO_plugin *ap_
     , uint64_t // work_key_
@@ -612,6 +668,8 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-FindKeyCallback", findKeyCallback },
     { "RUN!TEST-BasicAllocatePoolMemory", basicAllocatePoolMemory },
     { "RUN!TEST-BasicDetachedMemory", basicDetachedMemory },
+    { "RUN!TEST-AddDetachedMemory", addDetachedMemory },
+    { "RUN!TEST-CompareDetachedMemory", compareDetachedMemory },
     { "RUN!TEST-GetReferenceVector", getReferenceVector },
     { "RUN!TEST-GetReferenceVectorByTime", getReferenceVectorByTime },
     { "RUN!TEST-Iterate", iterator },

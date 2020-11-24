@@ -6,15 +6,11 @@
             "port" : 11911,
             "net"  : "mlx5_0",
             "default_backend" : "hstore",
-            "ado_plugins" : ["libpersonality-example-fb.so"],
-            "dax_config" : [{ "region_id": 0, "path": "/dev/dax0.0", "addr": "0x9000000000" }],
+            "ado_plugins" : ["libpersonality-example-versioning.so"],
+            "dax_config" : [{ "path": "/mnt/pmem0", "addr": "0x9000000000" }],
             "ado_cores" : "2"
         }
     ],
     "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",     
-    "net_providers" : "verbs",
-    "resources":
-    {
-        "ado_manager_core" : 1
-    }
+    "net_providers" : "verbs"
 }

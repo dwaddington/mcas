@@ -292,6 +292,61 @@ TEST_F(ADO_test, BasicDetachedMemory)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(ADO_test, PersistedDetachedMemory)
+{
+  const std::string testname = "PersistedDetachedMemory";
+  const std::string poolname = testname;
+  mcas->delete_pool(poolname);
+
+  /* phase 1: create the pool, write some values to "detached memory" */
+  auto pool = mcas->create_pool(poolname, MiB(64), /* size */
+                                0,               /* flags */
+                                100);            /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  const char *key = "PersistedDetachedMemory";
+  const char *key_saturate = "PersistedDetachedMemorySaturate";
+
+  std::string value1 = std::string(sizeof(void *)*17, char('0'));
+  mcas->erase(pool, key);
+  std::vector<IMCAS::ADO_response> response;
+  /* RUN!TEST-AddDetachedMemory shall allocate 17 areas of detached memory, and replace the 17*8 bytes written by value1 with 17 pointers to those areas */
+  status_t rc =
+    mcas->invoke_put_ado(
+      pool
+      , key
+      , "RUN!TEST-AddDetachedMemory"
+      , value1
+      , 0 // root_len - only used with ADO_FLAG_DETACHED
+      , IMCAS::ADO_FLAG_NONE
+      , response
+    );
+  ASSERT_EQ(S_OK, rc);
+  ASSERT_OK(mcas->close_pool(pool));
+
+  /* phase 2: reopen pool, allocate all available space.
+   * Verify that the values written by phase 1 have not been overwritten
+   */
+
+  pool = mcas->open_pool(poolname);
+
+  unsigned j = 0;
+  while ( rc == S_OK )
+  {
+    rc = mcas->put(pool, key_saturate + std::to_string(j), std::string(4096, 'x'));
+  }
+  /* expect to use up all pool space */
+  ASSERT_EQ(IKVStore::E_TOO_LARGE, rc);
+
+  /* RUN!TEST-CompareDetachedMemory shall verify that the 17 areas of detached memory written by RUN!TEST-AddDetachedMemory are intact */
+  rc = mcas->invoke_ado(pool, key, "RUN!TEST-CompareDetachedMemory", IMCAS::ADO_FLAG_NONE, response);
+  ASSERT_EQ(S_OK, rc);
+
+  ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
+
 TEST_F(ADO_test, GetReferenceVector)
 {
   const std::string testname = "GetReferenceVector";

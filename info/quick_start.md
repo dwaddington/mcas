@@ -63,7 +63,7 @@ For TCP/IP sockets networking:
 
 ```bash
 cd ~/mcas/build/dist/testing
-python mapstore-0.py <Your-IP-Address> <Your-Ethernet-Device(e.g. eth0)> > myConfig.conf
+python mapstore-0-sockets.py <Your-IP-Address> <Your-Ethernet-Device(e.g. eth0)> > myConfig.conf
 cd ../../../
 ```
 

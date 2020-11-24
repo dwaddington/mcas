@@ -1,18 +1,18 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 
-#include "example_fb_proto_generated.h"
-#include "example_fb_client.h"
+#include "example_versioning_proto_generated.h"
+#include "example_versioning_client.h"
 #include <api/mcas_itf.h>
 #include <api/components.h>
 #include <common/dump_utils.h>
 
 using namespace flatbuffers;
-using namespace example_fb_protocol;
+using namespace example_versioning_protocol;
 
 static unsigned long g_transaction_id = 0;
 
-namespace example_fb
+namespace example_versioning
 {
 
 Client::Client(const unsigned debug_level,
@@ -87,7 +87,7 @@ status_t Client::get(const pool_t pool,
                      std::string& out_value)
 {
   assert(_mcas);
-  using namespace example_fb_protocol;
+  using namespace example_versioning_protocol;
   
   status_t s;
   FlatBufferBuilder fbb;

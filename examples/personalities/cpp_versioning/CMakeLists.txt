@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
-project(personality-example-fb CXX)
+project(personality-example-versioning CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -10,9 +10,9 @@ if (NOT FLATC)
   message(FATAL_ERROR ": Flatc compiler not found")
 endif()
 
-set(CLIENT_SOURCES ./src/example_fb_client.cpp ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h)
-set(PLUGIN_SOURCES ./src/example_fb_plugin.cpp ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h)
-set(TEST_SOURCES ./src/example_fb_test.cpp)
+set(CLIENT_SOURCES ./src/example_versioning_client.cpp ${CMAKE_CURRENT_BINARY_DIR}/generated/example_versioning_proto.h)
+set(PLUGIN_SOURCES ./src/example_versioning_plugin.cpp ${CMAKE_CURRENT_BINARY_DIR}/generated/example_versioning_proto.h)
+set(TEST_SOURCES ./src/example_versioning_test.cpp)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
@@ -30,10 +30,10 @@ link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # flatbuffers
 #add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/example_fb_proto.fbs
-  COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/src/example_fb_proto.fbs
-  COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/generated/example_fb_proto.h
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated/example_versioning_proto.h
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/example_versioning_proto.fbs
+  COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/src/example_versioning_proto.fbs
+  COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/generated/example_versioning_proto.h
 )
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
@@ -45,7 +45,7 @@ add_executable(${PROJECT_NAME}-test ${TEST_SOURCES})
 
 target_link_libraries(${PROJECT_NAME} common pthread numa dl rt flatbuffers pmem)
 target_link_libraries(${PROJECT_NAME}-client common pthread numa dl rt flatbuffers)
-target_link_libraries(${PROJECT_NAME}-test common pthread numa dl rt flatbuffers ${PROJECT_NAME}-client)
+target_link_libraries(${PROJECT_NAME}-test common pthread numa dl rt flatbuffers boost_program_options ${PROJECT_NAME}-client)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 set_target_properties(${PROJECT_NAME}-test PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
@@ -54,7 +54,7 @@ install (TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install (TARGETS ${PROJECT_NAME}-client LIBRARY DESTINATION lib)
 install (TARGETS ${PROJECT_NAME}-test RUNTIME DESTINATION bin)
 
-configure_file(example-fb.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-fb.conf)
+configure_file(example-versioning.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-versioning.conf)
 
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/
   DESTINATION conf

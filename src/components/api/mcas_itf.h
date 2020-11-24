@@ -583,7 +583,7 @@ public:
    * @param key Key. Note, if key is empty, the work request is key-less.
    * @param request Request data
    * @param request_len Length of request in bytes
-   * @param flags Flags for invocation (see ADO_FLAG_XXX)
+   * @param flags Flags for invocation (see ADO_FLAG_CREATE_ONLY, ADO_FLAG_READ_ONLY)
    * @param out_response Responses from invocation
    * @param value_size Optional parameter to define value size to create for
    * on-demand
@@ -691,7 +691,7 @@ public:
    * @param value Value data
    * @param value_len Length of value data in bytes
    * @param root_len Length to allocate for root value (with ADO_FLAG_DETACHED)
-   * @param flags Flags for invocation (see ADO_FLAG_XXX)
+   * @param flags Flags for invocation (ADO_FLAG_NO_OVERWRITE, ADO_FLAG_DETACHED)
    * @param out_response Responses from invocation
    *
    * @return S_OK on success
