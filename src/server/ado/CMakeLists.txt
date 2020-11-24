@@ -25,6 +25,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/kernel/modules/xpmem/include)
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) 
+link_directories(${CMAKE_SOURCE_DIR}/src/kernel/modules/xpmem/lib/.libs)
 
 add_executable(ado src/ado.cpp)
 
