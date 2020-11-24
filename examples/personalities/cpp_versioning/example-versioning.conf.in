@@ -6,7 +6,7 @@
             "port" : 11911,
             "net"  : "mlx5_0",
             "default_backend" : "hstore",
-            "ado_plugins" : ["libpersonality-example-fb.so"],
+            "ado_plugins" : ["libpersonality-example-versioning.so"],
             "dax_config" : [{ "path": "/mnt/pmem0", "addr": "0x9000000000" }],
             "ado_cores" : "2"
         }
