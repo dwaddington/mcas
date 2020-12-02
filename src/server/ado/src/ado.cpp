@@ -186,11 +186,12 @@ int main(int argc, char* argv[])
 
   try
     {
-      std::string plugins, channel_id;
+      std::string plugins, channel_id, base;
       unsigned debug_level;
       std::string cpu_mask;
       std::vector<std::string> ado_params;
       bool use_log = false;
+      void * base_addr = nullptr;
 
       try {
         namespace po = boost::program_options;
@@ -202,7 +203,8 @@ int main(int argc, char* argv[])
           ("debug", po::value<unsigned>(&debug_level)->default_value(0), "Debug level")
           ("cpumask", po::value<std::string>(&cpu_mask), "Cores to restrict threads to (string form)")
           ("param", po::value<std::vector<std::string>>(&ado_params), "Plugin parameters")
-          ("log", "Redirect output to ado.log")
+          ("base", po::value<std::string>(&base), "Virtual base address for memory mapping into ADO space")
+          ("log", "Redirect output to ado.log")          
           ;
 
         po::variables_map vm;
@@ -211,6 +213,10 @@ int main(int argc, char* argv[])
           if (vm.count("help")) {
             std::cout << desc << std::endl;
             return 0;
+          }
+
+          if (vm.count("base")) {
+            base_addr = reinterpret_cast<void*>(strtoull(vm["base"].as<std::string>().c_str(),nullptr, 16));
           }
           use_log = vm.count("log") > 0;
           po::notify(vm);
@@ -488,8 +494,10 @@ int main(int argc, char* argv[])
 
               assert(memory_type != 0xFF);
 
-              /* use same as shard virtual address for the moment */
+              /* set base address for mapping */
+              auto mapping_base = base_addr ? base_addr : mm->shard_addr;
               void * mm_addr;
+              
               if(memory_type == 1) { /* DRAM case, e.g. mapstore */
 
                 if(!check_xpmem_kernel_module()) {
@@ -507,10 +515,9 @@ int main(int argc, char* argv[])
 
                 mm_addr = xpmem_attach(seg,
                                        mm->size,
-                                       reinterpret_cast<void*>(mm->shard_addr));
+                                       mapping_base);
               }
               else {
-
                 if(!nupm::check_mcas_kernel_module()) {
                   PERR("inaccessible MCAS kernel module");
                   throw General_exception("inaccessible MCAS kernel module");
@@ -518,10 +525,12 @@ int main(int argc, char* argv[])
 
                 mm_addr = nupm::mmap_exposed_memory(mm->token,
                                                     mm->size,
-                                                    reinterpret_cast<void*>(mm->shard_addr));
+                                                    mapping_base);
               }
+
+              /* TODO: improve error handling */
               if(mm_addr == MAP_FAILED)
-                throw General_exception("mcasmod: mmap_exposed_memory failed unexpectly.");
+                throw General_exception("mcasmod: mmap_exposed_memory failed unexpectly (base=%p).", mapping_base);
 
               PMAJOR("ADO: mapped memory %lx size:%lu addr=%p", mm->token, mm->size, mm_addr);
 
@@ -554,7 +563,8 @@ int main(int argc, char* argv[])
                 throw General_exception(
                   "%s: %.*s mmap(%p, 0x%zx, %s, 0x%x=%s, %i, 0x%zu) failed unexpectly: %zu/%s"
                   , __func__, int(mm->pool_name_len), mm->pool_name()
-                  , mm->iov.iov_base, mm->iov.iov_len, "PROT_READ|PROT_WRITE", flags, "MAP_SHARED_VALIDATE|MAP_FIXED", fd.fd(), mm->offset
+                  , mm->iov.iov_base, mm->iov.iov_len, "PROT_READ|PROT_WRITE", flags
+                  , "MAP_SHARED_VALIDATE|MAP_FIXED", fd.fd(), mm->offset
                   , mme.iov_len, ::strerror(int(mme.iov_len))
                 );
               }

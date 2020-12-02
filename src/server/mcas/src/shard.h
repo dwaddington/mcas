@@ -123,6 +123,7 @@ class Shard : public Shard_transport, private common::log_source {
     unsigned int flags;
     size_t       expected_obj_count;
     bool         opened_existing;
+    void *       base_addr;
   };
 
   using pool_t              = component::IKVStore::pool_t;

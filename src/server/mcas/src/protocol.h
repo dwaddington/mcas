@@ -183,7 +183,8 @@ class Message {
 
   void print() const
   {
-    PLOG("Message:%p auth_id:%lu msg_len=%u type=%x", static_cast<const void*>(this), _auth_id, _msg_len,
+    PLOG("Message:%p auth_id:%lu msg_len=%u type=%x",
+         static_cast<const void*>(this), _auth_id, _msg_len,
          int(_type_id));
   }
 
@@ -261,10 +262,12 @@ struct Message_pool_request : public Message {
                        OP_TYPE            op_,
                        const std::string& pool_name,
                        uint64_t           pool_id_,
-                       uint32_t           flags_)
+                       uint32_t           flags_,
+                       void *             base_addr_)
       : Message(auth_id, (sizeof *this), id, op_),
         _pool_size(pool_size),
         _expected_object_count(expected_object_count),
+        _base_addr(base_addr_),
         _pool_id(pool_id_),
         _flags(flags_)
   {
@@ -281,42 +284,62 @@ struct Message_pool_request : public Message {
 
     increase_msg_len(len + 1);
   }
+  
  public:
   Message_pool_request(size_t             buffer_size,
                        uint64_t           auth_id,
-                       uint64_t           // request_id
-                       ,
+                       uint64_t           /* request_id */,
                        size_t             pool_size,
                        size_t             expected_object_count,
                        OP_TYPE            op_,
                        const std::string& pool_name,
-                       uint32_t           flags_)
-      : Message_pool_request(buffer_size, auth_id, pool_size, expected_object_count, op_, pool_name, 0, flags_)
+                       uint32_t           flags_,
+                       void *             base_addr_ = nullptr)
+      : Message_pool_request(buffer_size,
+                             auth_id,
+                             pool_size,
+                             expected_object_count,
+                             op_,
+                             pool_name,
+                             0,
+                             flags_,
+                             base_addr_)
   {
   }
 
-  Message_pool_request(size_t buffer_size, uint64_t auth_id,
-     uint64_t // request_id
-     , OP_TYPE op_, uint64_t pool_id_)
-      : Message_pool_request(buffer_size, auth_id, 0, 0, op_, "", pool_id_, 0)
+  Message_pool_request(size_t buffer_size,
+                       uint64_t auth_id,
+                       uint64_t /* request_id */,
+                       OP_TYPE op_,
+                       uint64_t pool_id_)
+      : Message_pool_request(buffer_size,
+                             auth_id,
+                             0,
+                             0,
+                             op_,
+                             "",
+                             pool_id_,
+                             0,
+                             nullptr)
   {
   }
 
   const char* pool_name() const { return data(); }
 
-private:
-  size_t _pool_size;                              /*< size of pool in bytes */
-  size_t _expected_object_count;
-  /* _pool_id and _flags were formerly a union, but without a discriminant */
-  uint64_t _pool_id;
-  uint64_t _flags;
-public:
-  auto   pool_size() const { return _pool_size; } /*< size of pool in bytes */
-  auto   expected_object_count() const { return _expected_object_count; }
+  auto pool_size() const { return _pool_size; } /*< size of pool in bytes */
+  auto expected_object_count() const { return _expected_object_count; }
   auto pool_id() const { return _pool_id; }
   auto flags() const { return boost::numeric_cast<uint32_t>(_flags); }
-  /* data immediately follows */
+  auto base_addr() const { return _base_addr; }
+  
+private:
+  size_t   _pool_size; /*< size of pool in bytes */
+  size_t   _expected_object_count;
+  void *   _base_addr; /*< virtual base address to use in ADO space */
+  uint64_t _pool_id;
+  uint64_t _flags;
 } __attribute__((packed));
+
 
 struct Message_pool_response : public Message {
   static constexpr auto        id          = MSG_TYPE::POOL_RESPONSE;

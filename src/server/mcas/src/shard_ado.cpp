@@ -73,18 +73,31 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
     if (!_ado_map.has_ado_for_pool(desc.name)) {
       /* need to launch new ADO process */
       std::vector<std::string> args;
-      args.push_back("--plugins");
-
-      std::string plugin_str;
-      for (auto& plugin : _ado_plugins) {
-        args.push_back(plugin);
-        plugin_str += plugin + ",";
+      
+      /* add --plugins options */
+      {
+        args.push_back("--plugins");
+        
+        std::string plugin_str;
+        for (auto& plugin : _ado_plugins) {
+          args.push_back(plugin);
+          plugin_str += plugin + ",";
+        }
+        plugin_str = plugin_str.substr(0, plugin_str.size() - 1);
+        PMAJOR("Shard: ADO plugins: (%s)", plugin_str.c_str());
+        
+        for (auto& ado_param : _ado_params) {
+          args.push_back("--param");
+          args.push_back("'{" + ado_param.first + ":" + ado_param.second + "}'");
+        }
       }
-      plugin_str = plugin_str.substr(0, plugin_str.size() - 1);
 
-      for (auto& ado_param : _ado_params) {
-        args.push_back("--param");
-        args.push_back("'{" + ado_param.first + ":" + ado_param.second + "}'");
+      /* add --base option for base address */
+      if(desc.base_addr != nullptr) {
+        args.push_back("--base");
+        std::stringstream ss;
+        ss << std::hex << desc.base_addr;
+        args.push_back(ss.str());
       }
 
       /* add parameter passing ipaddr */
@@ -93,7 +106,6 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       args.push_back("'{net:" + net_addr + "," + std::to_string(_port) + "}'");
 
       PMAJOR("Shard: Launching with ADO path: (%s)", _ado_path.c_str());
-      PMAJOR("Shard: ADO plugins: (%s)", plugin_str.c_str());
 
       ado = _i_ado_mgr->create(handler->auth_id(), debug_level(), kvs, pool_id,
                                desc.name,                // pool name
