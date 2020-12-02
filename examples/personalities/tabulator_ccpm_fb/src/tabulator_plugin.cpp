@@ -170,7 +170,9 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
 
   }
   else throw Logic_exception("unknown protocol message type");  
-  
+
+  /* clean up */
+  delete ccaptr;
   
   return S_OK;
 }
