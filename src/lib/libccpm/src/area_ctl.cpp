@@ -92,6 +92,7 @@ ccpm::area_ctl::area_ctl(level_ix_t full_height_)
 #if USE_MAGIC
 	, _magic(magic)
 #endif
+  , _root{nullptr,0}
 #if USE_PADDING
 	, _padding()
 #endif
@@ -118,6 +119,7 @@ ccpm::area_ctl::area_ctl(
 #if USE_MAGIC
 	, _magic(magic)
 #endif
+  , _root{nullptr, 0}
 #if USE_PADDING
 	, _padding()
 #endif
@@ -1019,4 +1021,14 @@ auto ccpm::area_ctl::root(void *const ptr_) -> area_ctl *
 		}
 	}
 	return &ctl0[ctl0->full_height()-1];
+}
+
+void ccpm::area_ctl::set_root(const iovec& iov) {
+  _root = iov;
+  persist(&_root);
+}
+
+iovec ccpm::area_ctl::get_root() const
+{
+  return _root;
 }

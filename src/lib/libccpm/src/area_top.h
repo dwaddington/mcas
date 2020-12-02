@@ -167,12 +167,17 @@ namespace ccpm
 			std::ostream &o
 			, std::ios_base::fmtflags size_format
 		) const;
+
 		void print_ctls(
 			std::ostream *o_
 			, std::ios_base::fmtflags format_
 		) const;
-		level_ix_t height() const { return level_ix_t(_level.size()); }
 
+    level_ix_t height() const { return level_ix_t(_level.size()); }
+
+    void set_root(const iovec& iov);
+    iovec get_root() const;
+    
 		/*
 		 * called by area_ctl to add area_ctl a, at level level_ix, with a longest
 		 * free run (consecutive free elements) of free_run, to _level, which is the

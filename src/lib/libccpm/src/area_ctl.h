@@ -26,7 +26,7 @@
 #include <ios> // ios_base::fmtflags
 #include <limits>
 #include <stdexcept>
-
+#include <common/cpu.h>
 #include <iosfwd>
 
 #define USE_MAGIC 1
@@ -139,15 +139,18 @@ namespace ccpm
 		using level_ix_t = std::uint8_t;
 #if 1
 		static constexpr index_t ct_atomic_words = 1;
-#define USE_PADDING 8
+#define USE_PADDING 56
 #elif 0
 		static constexpr index_t ct_atomic_words = 2;
-#define USE_PADDING 0
+#define USE_PADDING 48
 #else
 		static constexpr index_t ct_atomic_words = 4;
-#define USE_PADDING 48
+#define USE_PADDING 32
 #endif
 		static constexpr std::size_t min_alloc_size = 8;
+
+    void set_root(const iovec& iov);
+    iovec get_root() const;
 
 	private:
 		static constexpr index_t alloc_states_per_word = ccpm::alloc_states_per_word;
@@ -158,7 +161,7 @@ namespace ccpm
 		 */
 		level_ix_t _full_height;
 		level_ix_t _level;
-		index_t _element_count;
+		index_t    _element_count;
 
 		/* _dt is used (non-zero) only in the top level area. It appears in all
 		 * other areas only for consistency. Some day it might be used in more
@@ -173,6 +176,9 @@ namespace ccpm
 		 */
 		std::array<sub_state, max_elements> _element_state;
 		std::uint64_t _magic;
+
+    /* space for the root pointer */
+    iovec _root; 
 
 #if USE_PADDING
 		char _padding[USE_PADDING];
@@ -411,6 +417,7 @@ namespace ccpm
 		void set_deallocated(void *p, std::size_t bytes);
 		auto restore(const ownership_callback_t &resolver_) -> area_ctl &;
 		level_ix_t level() const;
+    
 		index_t el_max_free_run() const
 		{
 			index_t m = 0;
@@ -420,6 +427,7 @@ namespace ccpm
 			}
 			return m;
 		}
+    
 		doubt &get_doubt()
 		{
 			return _dt;
@@ -464,4 +472,7 @@ namespace ccpm
 	};
 }
 
+
+static_assert(sizeof(ccpm::area_ctl) % CACHE_LINE_SIZE == 0,
+              "area_ctl size should be of integral cache lines");
 #endif

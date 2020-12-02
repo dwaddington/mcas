@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <common/exceptions.h>
 
 namespace ccpm
 {
@@ -57,8 +58,16 @@ namespace ccpm
 		status_t allocate(
 			void * & ptr_
 			, std::size_t bytes_
-			, std::size_t // alignment
+			, std::size_t alignment_
 		) override;
+
+    void * allocate(std::size_t bytes_, std::size_t alignment_) {
+      void * ptr = nullptr;
+      if(allocate(ptr, bytes_, alignment_) != 0)
+        throw General_exception("ccpm::cca::allocate failed");
+      PNOTICE("allocated: %p", ptr);
+      return ptr;
+    }
 
 		status_t free(
 			void * & ptr_
@@ -76,6 +85,13 @@ namespace ccpm
 		status_t remaining(
 			std::size_t & out_size_
 		) const override;
+
+    void set_root(
+      const void * ptr,
+      const std::size_t len
+    );
+
+    iovec get_root() const;
 
 		void print(std::ostream &, const std::string &title = "cca") const;
 	};
