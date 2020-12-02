@@ -65,9 +65,16 @@ namespace ccpm
       void * ptr = nullptr;
       if(allocate(ptr, bytes_, alignment_) != 0)
         throw General_exception("ccpm::cca::allocate failed");
-      PNOTICE("allocated: %p", ptr);
       return ptr;
     }
+
+    void * allocate_root(std::size_t bytes_, std::size_t alignment_ = 8) {
+      void * ptr = nullptr;
+      if(allocate(ptr, bytes_, alignment_) != 0)
+        throw General_exception("ccpm::cca::allocate failed");
+      set_root(ptr, bytes_);
+      return ptr;
+    }    
 
 		status_t free(
 			void * & ptr_
