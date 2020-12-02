@@ -183,15 +183,18 @@ int MCAS_client::get_capability(Capability cap) const
 
 IKVStore::pool_t MCAS_client::create_pool(const std::string &name,
                                           const size_t       size,
-                                          uint32_t           flags,
-                                          uint64_t           expected_obj_count)
+                                          const uint32_t     flags,
+                                          const uint64_t     expected_obj_count,
+                                          const void *       base)
 {
-  return _connection->create_pool(name, size, flags, expected_obj_count);
+  return _connection->create_pool(name, size, flags, expected_obj_count, base);
 }
 
-IKVStore::pool_t MCAS_client::open_pool(const std::string &name, uint32_t flags)
+IKVStore::pool_t MCAS_client::open_pool(const std::string &name,
+                                        const uint32_t flags,
+                                        const void * base)
 {
-  return _connection->open_pool(name, flags);
+  return _connection->open_pool(name, flags, base);
 }
 
 status_t MCAS_client::close_pool(const IKVStore::pool_t pool)

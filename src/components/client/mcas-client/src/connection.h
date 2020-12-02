@@ -140,12 +140,15 @@ public:
     while (tick() > 0) sleep(1);
   }
 
-  pool_t open_pool(const std::string name, const unsigned int flags);
+  pool_t open_pool(const std::string name,
+                   const unsigned int flags,
+                   const void * base);
 
   pool_t create_pool(const std::string  name,
                      const size_t       size,
                      const unsigned int flags,
-                     const uint64_t     expected_obj_count);
+                     const uint64_t     expected_obj_count,
+                     const void *       base);
 
   status_t close_pool(const pool_t pool);
 

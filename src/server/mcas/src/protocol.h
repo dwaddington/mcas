@@ -252,8 +252,12 @@ struct Message_pool_request : public Message {
 
  private:
   using data_t = char; /* most trailing data is typed uint8_t, this is typed charr */
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const {
+    return static_cast<const data_t*>(static_cast<const void*>(this + 1));
+  }
+  auto data() {
+    return static_cast<data_t*>(static_cast<void*>(this + 1));
+  }
 
   Message_pool_request(size_t             buffer_size,
                        uint64_t           auth_id,
@@ -263,11 +267,11 @@ struct Message_pool_request : public Message {
                        const std::string& pool_name,
                        uint64_t           pool_id_,
                        uint32_t           flags_,
-                       void *             base_addr_)
+                       const void *       base_addr_)
       : Message(auth_id, (sizeof *this), id, op_),
         _pool_size(pool_size),
         _expected_object_count(expected_object_count),
-        _base_addr(base_addr_),
+        _base_addr(const_cast<void*>(base_addr_)),
         _pool_id(pool_id_),
         _flags(flags_)
   {
@@ -294,7 +298,7 @@ struct Message_pool_request : public Message {
                        OP_TYPE            op_,
                        const std::string& pool_name,
                        uint32_t           flags_,
-                       void *             base_addr_ = nullptr)
+                       const void *       base_addr_ = nullptr)
       : Message_pool_request(buffer_size,
                              auth_id,
                              pool_size,
@@ -333,11 +337,11 @@ struct Message_pool_request : public Message {
   auto base_addr() const { return _base_addr; }
   
 private:
-  size_t   _pool_size; /*< size of pool in bytes */
-  size_t   _expected_object_count;
-  void *   _base_addr; /*< virtual base address to use in ADO space */
-  uint64_t _pool_id;
-  uint64_t _flags;
+  size_t       _pool_size; /*< size of pool in bytes */
+  size_t       _expected_object_count;
+  void *       _base_addr; /*< virtual base address to use in ADO space */
+  uint64_t     _pool_id;
+  uint64_t     _flags;
 } __attribute__((packed));
 
 

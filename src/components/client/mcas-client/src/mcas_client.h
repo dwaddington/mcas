@@ -119,9 +119,12 @@ class MCAS_client
   virtual pool_t create_pool(const std::string &name,
                              const size_t       size,
                              const unsigned int flags              = 0,
-                             const uint64_t     expected_obj_count = 0) override;
+                             const uint64_t     expected_obj_count = 0,
+                             const void *       base = nullptr) override;
 
-  virtual pool_t open_pool(const std::string &name, const unsigned int flags = 0) override;
+  virtual pool_t open_pool(const std::string &name,
+                           const unsigned int flags = 0,
+                           const void * base = nullptr) override;
 
   virtual status_t close_pool(const pool_t pool) override;
 
