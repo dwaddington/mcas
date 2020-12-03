@@ -213,6 +213,26 @@ auto ccpm::cca::remaining(
 	return _top.empty() ? E_FAIL : S_OK;
 }
 
+void ccpm::cca::set_root(
+  const void * ptr,
+  const std::size_t len
+)
+{
+  if(_top.size() == 0)
+    throw std::runtime_error("unexpected empty top vector");
+  auto& first_top = _top[0];
+  iovec iov{const_cast<void*>(ptr), len};
+  first_top->set_root(iov);
+}
+
+iovec ccpm::cca::get_root() const
+{
+  if(_top.size() == 0)
+    throw std::runtime_error("unexpected empty top vector");
+  return _top[0]->get_root();
+}
+
+
 void ccpm::cca::print(std::ostream &o_, const std::string &title_) const
 {
 	o_ << title_ << ": " << "\n";

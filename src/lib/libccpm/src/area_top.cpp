@@ -615,6 +615,16 @@ bool ccpm::area_top::contains(const void *p) const
 	return _ctl && _ctl->contains(p);
 }
 
+void ccpm::area_top::set_root(const iovec& iov)
+{
+  _ctl->set_root(iov);
+}
+
+iovec ccpm::area_top::get_root() const
+{
+  return _ctl->get_root();
+}
+
 void ccpm::level_hints::print(
 	std::ostream &o_
 	, level_ix_t level_
