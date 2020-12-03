@@ -65,7 +65,8 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 using namespace component;
 
 /* Note: currently the ADO does not support intake of new memory mappings 
-   on pool expansion - only single segment pools are supported 
+   resulting from pool expansion - only single segment pools are supported
+   at the moment. 
 */
 
 /* Globals */
