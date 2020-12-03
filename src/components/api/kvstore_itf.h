@@ -45,7 +45,7 @@ namespace component
   }
 
 /**
- * Key-value interface for pluggable MCAS back ends
+ * Key-value interface for pluggable backend (e.g. mapstore, hstore, hstore-cc)
  */
 class IKVStore : public component::IBase {
  public:
@@ -304,10 +304,13 @@ class IKVStore : public component::IBase {
    * @param reconfigured_size [out] new size of pool
    *
    * @return S_OK on success or E_POOL_NOT_FOUND. Components that do not support
-   * this return E_NOT_SUPPORTED.
+   * this return E_NOT_SUPPORTED (e.g. MCAS client)
    */
-  virtual status_t grow_pool(const pool_t pool, const size_t increment_size, size_t& reconfigured_size)
+  virtual status_t grow_pool(const pool_t pool,
+                             const size_t increment_size,
+                             size_t& reconfigured_size)
   {
+    PERR("grow_pool: not supported");
     return E_NOT_SUPPORTED;
   }
 
@@ -423,8 +426,8 @@ class IKVStore : public component::IBase {
    *
    * @return S_OK on success, E_POOL_NOT_FOUND, E_INVALID_ARG, E_KEY_NOT_FOUND
    */
-  virtual status_t get_attribute(pool_t           pool,
-                                 Attribute        attr,
+  virtual status_t get_attribute(pool_t                 pool,
+                                 Attribute              attr,
                                  std::vector<uint64_t>& out_value,
                                  const std::string*     key = nullptr) = 0;
 
@@ -440,7 +443,9 @@ class IKVStore : public component::IBase {
    * @return S_OK on success, E_POOL_NOT_FOUND, E_KEY_NOT_FOUND, E_LOCKED
    * (unable to take both locks)
    */
-  virtual status_t swap_keys(const pool_t pool, const std::string key0, const std::string key1)
+  virtual status_t swap_keys(const pool_t pool,
+                             const std::string key0,
+                             const std::string key1)
   {
     return E_NOT_SUPPORTED;
   }
@@ -471,7 +476,12 @@ class IKVStore : public component::IBase {
    * @param handle memory handle
    *
    */
-  virtual status_t allocate_direct_memory(void*& vaddr, size_t len, memory_handle_t& handle) { return E_NOT_SUPPORTED; }
+  virtual status_t allocate_direct_memory(void*& vaddr,
+                                          size_t len,
+                                          memory_handle_t& handle)
+  {
+    return E_NOT_SUPPORTED;
+  }
 
   /**
    * Free memory for zero copy DMA
@@ -480,8 +490,10 @@ class IKVStore : public component::IBase {
    *
    * @return S_OK on success
    */
-
-  virtual status_t free_direct_memory(memory_handle_t handle) { return E_NOT_SUPPORTED; }
+  virtual status_t free_direct_memory(memory_handle_t handle)
+  {
+    return E_NOT_SUPPORTED;
+  }
 
   /**
    * Register memory for zero copy DMA
@@ -491,7 +503,11 @@ class IKVStore : public component::IBase {
    *
    * @return Memory handle or NULL on not supported.
    */
-  virtual memory_handle_t register_direct_memory(void* vaddr, size_t len) { return nullptr; }
+  virtual memory_handle_t register_direct_memory(void* vaddr,
+                                                 size_t len)
+  {
+    return nullptr;
+  }
 
   /**
    * Direct memory regions should be unregistered before the memory is released
@@ -501,7 +517,10 @@ class IKVStore : public component::IBase {
    *
    * @return S_OK on success
    */
-  virtual status_t unregister_direct_memory(memory_handle_t handle) { return E_NOT_SUPPORTED; }
+  virtual status_t unregister_direct_memory(memory_handle_t handle)
+  {
+    return E_NOT_SUPPORTED;
+  }
 
   /**
    * Take a lock on an object. If the object does not exist and inout_value_len
@@ -669,10 +688,6 @@ class IKVStore : public component::IBase {
       return k;
     }
 
-    // inline unsigned char operator[] (const unsigned index) {
-    //   return static_cast<const char*>(key)[index];
-    // }
-
   };
 
   /**
@@ -682,7 +697,10 @@ class IKVStore : public component::IBase {
    *
    * @return Pool iterator or nullptr
    */
-  virtual pool_iterator_t open_pool_iterator(const pool_t pool) { return nullptr; }
+  virtual pool_iterator_t open_pool_iterator(const pool_t pool)
+  {
+    return nullptr;
+  }
 
   /**
    * Deference pool iterator position and optionally increment
@@ -718,7 +736,11 @@ class IKVStore : public component::IBase {
    *
    * @return S_OK on success, E_INVAL (bad iterator)
    */
-  virtual status_t close_pool_iterator(const pool_t pool, pool_iterator_t iter) { return E_NOT_IMPL; }
+  virtual status_t close_pool_iterator(const pool_t pool,
+                                       pool_iterator_t iter)
+  {
+    return E_NOT_IMPL;
+  }
 
   /**
    * Free server-side allocated memory
