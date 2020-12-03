@@ -136,7 +136,7 @@ pub enum KeyLifetimeFlags {
     NoImplicitUnlock = 0x22,
 }
 
-#[repr(u64)]
+#[repr(u32)]
 pub enum ShardOption {
     IncRef = 0x1,
     DecRef = 0x2,

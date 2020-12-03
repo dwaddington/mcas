@@ -226,7 +226,7 @@ extern "C"
   }
                            
   status_t callback_configure(void * callback_ptr,
-                              uint64_t option)
+                              uint32_t option)
   {
     assert(callback_ptr);
     auto p_this = reinterpret_cast<ADO_rust_wrapper_plugin *>(callback_ptr);
