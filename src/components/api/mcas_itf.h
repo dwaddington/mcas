@@ -77,10 +77,10 @@ public:
   using pool_t          = component::IKVStore::pool_t;
   using key_t           = IKVStore::key_t;
   using Attribute       = IKVStore::Attribute;
+  using byte            = gsl::byte;
   
   template <typename T>
     using basic_string_view = std::experimental::basic_string_view<T>;
-  using byte = gsl::byte;
 
   static constexpr key_t           KEY_NONE           = IKVStore::KEY_NONE;
   static constexpr memory_handle_t MEMORY_HANDLE_NONE = IKVStore::HANDLE_NONE;
@@ -97,6 +97,13 @@ public:
         FLAGS_MAX_VALUE   = IKVStore::FLAGS_MAX_VALUE,
   };
 
+  struct Addr {
+    explicit Addr(addr_t addr_) : addr(addr_) {}
+    Addr() = delete;
+    addr_t addr;
+  };
+  
+  
   /* per-shard statistics */
   struct Shard_stats {
     uint64_t op_request_count;
@@ -158,6 +165,7 @@ public:
    * @param size Size of pool in bytes (for keys,values and metadata)
    * @param flags Creation flags
    * @param expected_obj_count Expected maximum object count (optimization)
+   * @param base Optional base address
    *
    * @return Pool handle
    */
@@ -165,7 +173,7 @@ public:
                                     const size_t       size,
                                     const unsigned int flags              = 0,
                                     const uint64_t     expected_obj_count = 0,
-                                    const void *       base = nullptr) = 0;
+                                    const Addr         base = Addr{0}) = 0;
 
   /**
    * Open an existing pool. If the ADO is configured for the shard then
@@ -173,12 +181,13 @@ public:
    *
    * @param pool_name Name of object pool
    * @param flags Optional flags e.g., FLAGS_READ_ONLY
+   * @param base Optional base address
    *
    * @return Pool handle
    */
   virtual IMCAS::pool_t open_pool(const std::string& pool_name,
                                   const unsigned int flags = 0,
-                                  const void * base = nullptr) = 0;
+                                  const Addr base = Addr{0}) = 0;
 
   /**
    * Close pool handle

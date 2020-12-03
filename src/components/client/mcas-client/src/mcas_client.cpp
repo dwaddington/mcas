@@ -185,16 +185,16 @@ IKVStore::pool_t MCAS_client::create_pool(const std::string &name,
                                           const size_t       size,
                                           const uint32_t     flags,
                                           const uint64_t     expected_obj_count,
-                                          const void *       base)
+                                          const Addr         base)
 {
-  return _connection->create_pool(name, size, flags, expected_obj_count, base);
+  return _connection->create_pool(name, size, flags, expected_obj_count, base.addr);
 }
 
 IKVStore::pool_t MCAS_client::open_pool(const std::string &name,
                                         const uint32_t flags,
-                                        const void * base)
+                                        const Addr base)
 {
-  return _connection->open_pool(name, flags, base);
+  return _connection->open_pool(name, flags, base.addr);
 }
 
 status_t MCAS_client::close_pool(const IKVStore::pool_t pool)

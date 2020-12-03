@@ -940,11 +940,11 @@ void Connection_handler::read_complete(void *param, buffer_t *iob)
 
 Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
                                                          const unsigned int flags,
-                                                         const void * base)
+                                                         const addr_t base)
 {
   API_LOCK();
 
-  PMAJOR("open pool: %s (flags=%u, base=%p)", name.c_str(), flags, base);
+  PMAJOR("Open pool: %s (flags=%u, base=0x%lx)", name.c_str(), flags, base);
 
   /* send pool request message */
 
@@ -1012,9 +1012,11 @@ Connection_handler::create_pool(const std::string  name,
                                 const size_t       size,
                                 const unsigned int flags,
                                 const uint64_t     expected_obj_count,
-                                const void *       base)
+                                const addr_t       base)
 {
   API_LOCK();
+
+  PMAJOR("Create pool: %s (flags=%u, base=0x%lx)", name.c_str(), flags, base);
 
   /* send pool request message */
   const auto iobs = make_iob_ptr_send();
@@ -1026,8 +1028,15 @@ Connection_handler::create_pool(const std::string  name,
 
   try {
     const auto msg = new (iobs->base())
-      protocol::Message_pool_request(iobs->length(), auth_id(), /* auth id */
-                                     request_id(), size, expected_obj_count, mcas::protocol::OP_CREATE, name, flags);
+      protocol::Message_pool_request(iobs->length(),
+                                     auth_id(),
+                                     request_id(),
+                                     size,
+                                     expected_obj_count,
+                                     mcas::protocol::OP_CREATE,
+                                     name,
+                                     flags,
+                                     base);
     assert(msg->op());
 
     post_recv(&*iobr);
@@ -1091,12 +1100,16 @@ status_t Connection_handler::delete_pool(const std::string &name)
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
 
-  const auto msg = new (iobs->base()) mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(),
-                                                                           0,  // size
-                                                                           0,  // exp obj count
-                                                                           mcas::protocol::OP_DELETE, name,
-                                                                           0  // flags
-                                                                           );
+  const auto msg = new (iobs->base())
+    mcas::protocol::Message_pool_request(iobs->length(),
+                                         auth_id(),
+                                         request_id(),
+                                         0, // size
+                                         0, // exp obj count
+                                         mcas::protocol::OP_DELETE,
+                                         name,
+                                         0, // flags
+                                         0); // base
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);

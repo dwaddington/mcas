@@ -62,6 +62,8 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
   assert(kvs);
   assert(handler);
 
+  PNOTICE("base=%p", desc.base_addr);
+  
   /* ADO processes are instantiated on a per-pool basis.  First
      check if an ADO process already exists.
   */
@@ -110,9 +112,11 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       ado = _i_ado_mgr->create(handler->auth_id(), debug_level(), kvs, pool_id,
                                desc.name,                // pool name
                                desc.size,                // pool_size,
-                               desc.flags,               // const unsigned int pool_flags,
-                               desc.expected_obj_count,  // const uint64_t expected_obj_count,
-                               _ado_path, args, 0);
+                               desc.flags,
+                               desc.expected_obj_count,
+                               _ado_path,
+                               args,
+                               0);
 
       CPLOG(2, "ADO process launched OK.");
 

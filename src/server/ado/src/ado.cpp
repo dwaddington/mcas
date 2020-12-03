@@ -64,10 +64,23 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 
 using namespace component;
 
+/* note: currently the ADO does not support intake of new memory mappings 
+   on pool expansion */
+
 /* Globals */
-static std::vector<std::pair<void*, size_t>> g_shared_memory_mappings;
+namespace global
+{
+static std::vector<std::tuple<void*, void*, size_t>> shared_memory_mappings;
+static void * base_addr = nullptr;
+static int64_t base_offset = 0; /* added to shard address gives local address */
+}
+
 
 /* Helpers */
+template <typename T = void>
+auto shard_to_local(const void * shard_addr) {
+  return reinterpret_cast<T*>(reinterpret_cast<addr_t>(shard_addr) + global::base_offset);
+}
 
 bool check_xpmem_kernel_module()
 {
@@ -87,8 +100,9 @@ public:
     : _i_plugins{}
   {
     for(const auto& ppath : plugin_vector) {
-      _i_plugins.push_back(make_itf_ref(static_cast<IADO_plugin*>(load_component(ppath.c_str(),
-                                                                                 interface::ado_plugin))));
+      _i_plugins.push_back(make_itf_ref
+                           (static_cast<IADO_plugin*>(load_component(ppath.c_str(),
+                                                                     interface::ado_plugin))));
       if( ! _i_plugins.back() )
         throw General_exception("unable to load ADO plugin (%s)", ppath.c_str());
 
@@ -190,8 +204,7 @@ int main(int argc, char* argv[])
       unsigned debug_level;
       std::string cpu_mask;
       std::vector<std::string> ado_params;
-      bool use_log = false;
-      void * base_addr = nullptr;
+      bool use_log = false;      
 
       try {
         namespace po = boost::program_options;
@@ -216,7 +229,7 @@ int main(int argc, char* argv[])
           }
 
           if (vm.count("base")) {
-            base_addr = reinterpret_cast<void*>(strtoull(vm["base"].as<std::string>().c_str(),nullptr, 16));
+            global::base_addr = reinterpret_cast<void*>(strtoull(vm["base"].as<std::string>().c_str(),nullptr, 16));
           }
           use_log = vm.count("log") > 0;
           po::notify(vm);
@@ -436,10 +449,9 @@ int main(int argc, char* argv[])
           if (set_cpu_affinity_mask(m) == -1)
             throw Logic_exception("bad mask parameter");
         }
-        if( 2 < debug_level )
-          {
-            PLOG("CPU_MASK: ADO process mask: [%s]", m.string_form().c_str());
-          }
+        if( 2 < debug_level ) {
+          PLOG("CPU_MASK: ADO process mask: [%s]", m.string_form().c_str());
+        }
       }
 
       PLOG("ADO process: main thread (%lu) debug_level:%d", pthread_self(), debug_level);
@@ -495,7 +507,7 @@ int main(int argc, char* argv[])
               assert(memory_type != 0xFF);
 
               /* set base address for mapping */
-              auto mapping_base = base_addr ? base_addr : mm->shard_addr;
+              auto mapping_base = global::base_addr ? global::base_addr : mm->shard_addr;
               void * mm_addr;
               
               if(memory_type == 1) { /* DRAM case, e.g. mapstore */
@@ -528,14 +540,18 @@ int main(int argc, char* argv[])
                                                     mapping_base);
               }
 
-              /* TODO: improve error handling */
               if(mm_addr == MAP_FAILED)
                 throw General_exception("mcasmod: mmap_exposed_memory failed unexpectly (base=%p).", mapping_base);
 
               PMAJOR("ADO: mapped memory %lx size:%lu addr=%p", mm->token, mm->size, mm_addr);
 
               /* record mapping information for clean up */
-              g_shared_memory_mappings.push_back(std::make_pair(mm_addr, mm->size));
+              global::shared_memory_mappings.push_back(std::make_tuple(mm->shard_addr,
+                                                                       mm_addr,
+                                                                       mm->size));
+
+              global::base_offset = 
+                reinterpret_cast<addr_t>(mm_addr) - reinterpret_cast<addr_t>(mm->shard_addr);
 
               /* register memory with plugins */
               if(plugin_mgr.register_mapped_memory(mm->shard_addr, mm_addr, mm->size) != S_OK)
@@ -552,11 +568,22 @@ int main(int argc, char* argv[])
               common::Fd_open fd(::open(std::string(mm->pool_name(), mm->pool_name_len).c_str(), O_RDWR));
 
               int flags = MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE;
-              common::memory_mapped mme(mm->iov.iov_base, mm->iov.iov_len, PROT_READ|PROT_WRITE, flags, fd.fd(), mm->offset);
+              common::memory_mapped mme(mm->iov.iov_base,
+                                        mm->iov.iov_len,
+                                        PROT_READ|PROT_WRITE,
+                                        flags,
+                                        fd.fd(),
+                                        mm->offset);
+              
               if ( ! mme )
               {
                 flags &= ~MAP_SYNC;
-                mme = common::memory_mapped(mm->iov.iov_base, mm->iov.iov_len, PROT_READ|PROT_WRITE, flags, fd.fd(), mm->offset);
+                mme = common::memory_mapped(mm->iov.iov_base,
+                                            mm->iov.iov_len,
+                                            PROT_READ|PROT_WRITE,
+                                            flags,
+                                            fd.fd(),
+                                            mm->offset);
               }
               if ( ! mme )
               {
@@ -569,13 +596,17 @@ int main(int argc, char* argv[])
                 );
               }
 
-              PMAJOR("ADO: mapped region %u pool %.*s addr=%p:%zu", unsigned(mm->region_id), int(mm->pool_name_len), mm->pool_name(), mm->iov.iov_base, mm->iov.iov_len);
+              PMAJOR("ADO: mapped region %u pool %.*s addr=%p:%zu",
+                     unsigned(mm->region_id), int(mm->pool_name_len),
+                     mm->pool_name(), mm->iov.iov_base, mm->iov.iov_len);
 
               /* ADO does not use common::memory_mapped */
               auto mme_local = mme.release();
 
               /* record mapping information for clean up */
-              g_shared_memory_mappings.push_back(std::make_pair(mme_local.iov_base, mme_local.iov_len));
+              global::shared_memory_mappings.push_back(std::make_tuple(mm->iov.iov_base, // CLEM to check
+                                                                       mme_local.iov_base,
+                                                                       mme_local.iov_len));
 
               /* register memory with plugins */
               if(plugin_mgr.register_mapped_memory(mm->iov.iov_base, mme_local.iov_base, mm->iov.iov_len) != S_OK)
@@ -606,16 +637,17 @@ int main(int argc, char* argv[])
               auto work_request_id = wr->work_key;
 
               IADO_plugin::value_space_t values;
-              values.append(wr->get_value_addr(),wr->value_len);
+              values.append(shard_to_local(wr->get_value_addr()), wr->value_len);
               if(wr->detached_value_len > 0) {
                 assert(wr->get_detached_value_addr() != nullptr);
-                values.append(wr->get_detached_value_addr(), wr->detached_value_len);
+                values.append(shard_to_local(wr->get_detached_value_addr()),
+                              wr->detached_value_len);
               }
 
               /* forward to plugins */
               status_t rc =
                 plugin_mgr.do_work(work_request_id,
-                                   wr->get_key(),
+                                   shard_to_local<const char>(wr->get_key()),
                                    wr->get_key_len(),
                                    values,
                                    wr->get_invocation_data(),
@@ -691,8 +723,8 @@ int main(int argc, char* argv[])
 
       /* clean up: free shared memory mappings */
       /* TODO do we need to unregister with kernel module ? */
-      for(auto& mp : g_shared_memory_mappings) {
-        if(::munmap(mp.first, mp.second) != 0)
+      for(auto& mp : global::shared_memory_mappings) {
+        if(::munmap(std::get<1>(mp), std::get<2>(mp)) != 0)
           throw Logic_exception("unmap of shared memory failed");
       }
 

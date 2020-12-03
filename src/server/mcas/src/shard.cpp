@@ -622,7 +622,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         static unsigned count = 0;
         count++;
 
-        CPLOG(1,"POOL CREATE: op=%u name=%s size=%lu obj-count=%lu (%u) base_addr=%p",
+        CPLOG(1,"POOL CREATE: op=%u name=%s size=%lu obj-count=%lu (%u) base_addr=0x%lx",
               msg->op(), msg->pool_name(), msg->pool_size(), msg->expected_object_count(),
               count, msg->base_addr());
 
@@ -678,7 +678,8 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         if (pool && ado_enabled()) { /* if ADO is enabled start ADO process */
           IADO_proxy *ado  = nullptr;
           pool_desc_t desc = {pool_name, msg->pool_size(), msg->flags(),
-                              msg->expected_object_count(), false, msg->base_addr()};
+                              msg->expected_object_count(), false,
+                              reinterpret_cast<void*>(msg->base_addr())};
           
           conditional_bootstrap_ado_process(_i_kvstore.get(), handler, pool, ado, desc);
         }
@@ -721,7 +722,8 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
           IADO_proxy *ado  = nullptr;
           
           pool_desc_t desc = {pool_name, msg->pool_size(), msg->flags(),
-                              msg->expected_object_count(), true, msg->base_addr()};
+                              msg->expected_object_count(), true,
+                              reinterpret_cast<void*>(msg->base_addr())};
           
           conditional_bootstrap_ado_process(_i_kvstore.get(), handler, pool, ado, desc);
         }
@@ -1113,7 +1115,7 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//   GET LOCATE   //
+//   GET LOCATE    //
 /////////////////////
 void Shard::io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
@@ -1635,7 +1637,7 @@ auto Shard::offset_to_sg_list(
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//   LOCATE   //
+//   LOCATE        //
 /////////////////////
 void Shard::io_response_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
@@ -1644,7 +1646,8 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
         msg->get_size(), msg->request_id());
 
   nupm::region_descriptor regions;
-  auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
+  auto status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
+  
   if (status == S_OK) {
     const auto rb = region_breaks(regions.address_map);
     auto sgr = offset_to_sg_list(t, rb);
@@ -1687,7 +1690,7 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//   RELEASE   //
+//   RELEASE       //
 /////////////////////
 void Shard::io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
@@ -1709,7 +1712,7 @@ void Shard::io_response_release(Connection_handler *handler, const protocol::Mes
 
 /////////////////////////////////////////////////////////////////////////////
 //   RELEASE_WITH_FLUSH   //
-/////////////////////
+////////////////////////////
 void Shard::io_response_release_with_flush(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   const char *tag = "RELEASE_WITH_FLUSH";
@@ -1718,7 +1721,8 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
         msg->get_size(), msg->request_id());
 
   nupm::region_descriptor regions;
-  auto                 status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
+  auto status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
+  
   if (status == S_OK) {
     const auto rb = region_breaks(regions.address_map);
 
