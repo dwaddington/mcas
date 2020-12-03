@@ -959,7 +959,8 @@ Map_store::~Map_store() {
 
 IKVStore::pool_t Map_store::create_pool(const std::string &name,
                                         const size_t nsize, unsigned int flags,
-                                        uint64_t /*args*/) {
+                                        uint64_t /*args*/,
+                                        IKVStore::Addr /*base addr unused */) {
   if (flags & IKVStore::FLAGS_READ_ONLY)
     throw API_exception("read only create_pool not supported on map-store component");
 
@@ -1003,7 +1004,8 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
 }
 
 IKVStore::pool_t Map_store::open_pool(const std::string &name,
-                                      unsigned int /*flags*/) {
+                                      unsigned int /*flags*/,
+                                      component::IKVStore::Addr /* base_addr_unused */) {
   const std::string &key = name;
 
   Pool_handle *ph = nullptr;

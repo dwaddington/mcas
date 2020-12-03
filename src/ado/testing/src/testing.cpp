@@ -32,7 +32,7 @@ using std::experimental::string_view;
 
 status_t ADO_testing_plugin::register_mapped_memory(void *shard_vaddr, void *local_vaddr, size_t len)
 {
-  PLOG("ADO_testing_plugin: register_mapped_memory (%p, %p, %lu)", shard_vaddr, local_vaddr, len);
+  PLOG("ADO_testing_plugin: register_mapped_memory (shard=%p, local=%p, %lu)", shard_vaddr, local_vaddr, len);
   /* we would need a mapping if we are not using the same virtual
      addresses as the Shard process */
   return S_OK;
@@ -486,6 +486,25 @@ namespace
     return S_OK;
   }
 
+  status_t baseAddr(
+    IADO_plugin * // ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & // args_
+    , const string_view key_
+    , value_space_t & values_
+    , response_buffer_vector_t & //response_buffers_
+  )
+  {
+    PMAJOR("baseAddr: key(%.*s) value at %p (%lu)",
+            boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
+    ASSERT_TRUE(strncmp(key_.data(), "BaseAddr", 8) == 0, "data corrupt");
+    ASSERT_TRUE(values_[0].len == 4096, "value length invalid");
+    ASSERT_FALSE(reinterpret_cast<uint64_t>(values_[0].ptr) < 0xBB00000000, "value address corrupt");
+    memset(values_[0].ptr, 0xEE, values_[0].len);
+    return S_OK;
+  }
+
+
   
   status_t basicAdoResponse(
     IADO_plugin * // ap_
@@ -677,6 +696,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-Erase", erase },
     { "RUN!TEST-BasicAdoResponse", basicAdoResponse },
     { "RUN!TEST-RepeatInvokeAdo", repeatInvokeAdo },
+    { "RUN!TEST-BaseAddr", baseAddr },
     { "BLAST ME!", other }, // used by ado-perf
     { "put", other }, // used by ado-perf
     { "erase", erase }, // used by ado-perf

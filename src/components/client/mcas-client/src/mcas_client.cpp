@@ -47,7 +47,7 @@ MCAS_client::MCAS_client(const unsigned                      debug_level,
   _connection(std::make_unique<mcas::client::Connection_handler>(debug_level, _transport.get(), patience_, other_)),
   _open_connection(*_connection)
 {
-  CPLOG(1, "Extra config: %s", other_.c_str());
+  CPLOG(3, "Extra config: %s", other_.c_str());
 }
 
 Open_connection::Open_connection(mcas::client::Connection_handler &_connection)
@@ -181,17 +181,20 @@ int MCAS_client::get_capability(Capability cap) const
   }
 }
 
-IKVStore::pool_t MCAS_client::create_pool(const std::string &name,
-                                          const size_t       size,
-                                          uint32_t           flags,
-                                          uint64_t           expected_obj_count)
+IKVStore::pool_t MCAS_client::create_pool(const std::string &  name,
+                                          const size_t         size,
+                                          const uint32_t       flags,
+                                          const uint64_t       expected_obj_count,
+                                          const IKVStore::Addr base)
 {
-  return _connection->create_pool(name, size, flags, expected_obj_count);
+  return _connection->create_pool(name, size, flags, expected_obj_count, base.addr);
 }
 
-IKVStore::pool_t MCAS_client::open_pool(const std::string &name, uint32_t flags)
+IKVStore::pool_t MCAS_client::open_pool(const std::string &  name,
+                                        const uint32_t       flags,
+                                        const IKVStore::Addr base)
 {
-  return _connection->open_pool(name, flags);
+  return _connection->open_pool(name, flags, base.addr);
 }
 
 status_t MCAS_client::close_pool(const IKVStore::pool_t pool)
@@ -200,9 +203,15 @@ status_t MCAS_client::close_pool(const IKVStore::pool_t pool)
   return _connection->close_pool(pool);
 }
 
-status_t MCAS_client::delete_pool(const std::string &name) { return _connection->delete_pool(name); }
+status_t MCAS_client::delete_pool(const std::string &name)
+{
+  return _connection->delete_pool(name);
+}
 
-status_t MCAS_client::delete_pool(IKVStore::pool_t pool) { return _connection->delete_pool(pool); }
+status_t MCAS_client::delete_pool(IKVStore::pool_t pool)
+{
+  return _connection->delete_pool(pool);
+}
 
 status_t MCAS_client::configure_pool(const IKVStore::pool_t pool, const std::string &json)
 {

@@ -35,6 +35,7 @@
 #define MCAS_PATH "libcomponent-mcasclient.so"
 
 #define HT_SIZE_FACTOR 1 /* already factor 3 in hstore */
+#define PREFIX "KVStore-perf: "
 
 Data * Experiment::g_data;
 std::mutex Experiment::g_write_lock;
@@ -247,17 +248,17 @@ int Experiment::initialize_store(unsigned core)
   }
   catch ( const Exception &e )
   {
-    PERR("error during load_component: %s. Aborting experiment.", e.cause());
+    PERR(PREFIX "error during load_component: %s. Aborting experiment.", e.cause());
     throw;
   }
   catch ( const std::exception &e )
   {
-    PERR("error during load_component: %s. Aborting experiment.", e.what());
+    PERR(PREFIX "error during load_component: %s. Aborting experiment.", e.what());
     throw;
   }
   catch(...)
   {
-    PERR("%s", "error during load_component.");
+    PERR(PREFIX "%s", "error during load_component.");
     return 1;
   }
 
@@ -268,7 +269,7 @@ int Experiment::initialize_store(unsigned core)
 
   if (!comp)
   {
-    PERR("%s", "comp loaded, but returned invalid value");
+    PERR(PREFIX "%s", "comp loaded, but returned invalid value");
     return 1;
   }
 
@@ -356,17 +357,17 @@ int Experiment::initialize_store(unsigned core)
   }
   catch ( const Exception &e )
   {
-    PERR("factory creation step failed, aborting experiment: %s", e.cause());
+    PERR(PREFIX "factory creation step failed, aborting experiment: %s", e.cause());
     throw;
   }
   catch ( const std::exception &e )
   {
-    PERR("factory creation step failed, aborting experiment: %s", e.what());
+    PERR(PREFIX "factory creation step failed, aborting experiment: %s", e.what());
     throw;
   }
   catch(...)
     {
-      PERR("%s", "factory creation step failed");
+      PERR(PREFIX "%s", "factory creation step failed");
       return 1;
     }
 
@@ -379,7 +380,7 @@ try
   if ( auto rc = initialize_store(core) )
   {
     auto e = "initialize returned error " + std::to_string(rc);
-    PERR("%s", e.c_str());
+    PERR(PREFIX "%s", e.c_str());
     throw std::runtime_error(e);
   }
 
@@ -391,15 +392,15 @@ try
     }
   }
   catch ( const Exception &e ) {
-    PERR("failed during direct memory setup: %s.", e.cause());
+    PERR(PREFIX "failed during direct memory setup: %s.", e.cause());
     throw;
   }
   catch ( const std::exception &e ) {
-    PERR("failed during direct memory setup: %s.", e.what());
+    PERR(PREFIX "failed during direct memory setup: %s.", e.what());
     throw;
   }
   catch(...) {
-    PERR("%s", "failed during direct memory setup");
+    PERR(PREFIX "%s", "failed during direct memory setup");
     throw;
   }
 
@@ -436,21 +437,21 @@ try
     {
       if ( ! might_be_dax )
       {
-        PERR("open+delete existing pool %s failed: %s.", poolname.c_str(), e.cause());
+        PERR(PREFIX "open+delete existing pool %s failed: %s.", poolname.c_str(), e.cause());
       }
     }
     catch ( const std::exception &e )
     {
       if ( ! might_be_dax )
       {
-        PERR("open+delete existing pool %s failed: %s.", poolname.c_str(), e.what());
+        PERR(PREFIX "open+delete existing pool %s failed: %s.", poolname.c_str(), e.what());
       }
     }
     catch(...)
     {
       if ( ! might_be_dax )
       {
-        PERR("open+delete existing pool %s failed.", poolname.c_str());
+        PERR(PREFIX "open+delete existing pool %s failed.", poolname.c_str());
         std::cerr << "open+delete existing pool failed" << std::endl;
       }
     }
@@ -462,23 +463,23 @@ try
     _pool = _store->create_pool(_pool_path + _pool_name_local, _pool_size, _pool_flags, _pool_num_objects * HT_SIZE_FACTOR);
     if ( _pool == component::IKVStore::POOL_ERROR )
     {
-      PERR("create_pool failed");
+      PERR(PREFIX "create_pool failed");
       throw std::runtime_error("create_pool failed: returned IKVStore::POOL_ERROR. Aborting experiment.");
     }
   }
   catch ( const Exception &e )
   {
-    PERR("create_pool failed: %s. Aborting experiment.", e.cause());
+    PERR(PREFIX "create_pool failed: %s. Aborting experiment.", e.cause());
     throw;
   }
   catch ( const std::exception &e )
   {
-    PERR("create_pool failed: %s. Aborting experiment.", e.what());
+    PERR(PREFIX "create_pool failed: %s. Aborting experiment.", e.what());
     throw;
   }
   catch(...)
   {
-    PERR("%s", "create_pool failed! Aborting experiment.");
+    PERR(PREFIX "%s", "create_pool failed! Aborting experiment.");
     throw;
   }
 
@@ -506,17 +507,17 @@ try
   }
   catch ( const Exception &e )
   {
-    PERR("initialize_custom failed: %s. Aborting experiment.", e.cause());
+    PERR(PREFIX "initialize_custom failed: %s. Aborting experiment.", e.cause());
     throw;
   }
   catch ( const std::exception &e )
   {
-    PERR("initialize_custom failed: %s. Aborting experiment.", e.what());
+    PERR(PREFIX "initialize_custom failed: %s. Aborting experiment.", e.what());
     throw;
   }
   catch ( ... )
   {
-    PERR("initialize_custom failed: %s. Aborting experiment.", "(non-exception)");
+    PERR(PREFIX "initialize_custom failed: %s. Aborting experiment.", "(non-exception)");
     throw;
   }
 
@@ -610,17 +611,17 @@ try
   }
   catch ( const Exception &e )
   {
-    PERR("cleanup_custom failed: %s. Aborting experiment.", e.cause());
+    PERR(PREFIX "cleanup_custom failed: %s. Aborting experiment.", e.cause());
     throw;
   }
   catch ( const std::exception &e )
   {
-    PERR("cleanup_custom failed: %s. Aborting experiment.", e.what());
+    PERR(PREFIX "cleanup_custom failed: %s. Aborting experiment.", e.what());
     throw;
   }
   catch(...)
   {
-      PERR("%s", "cleanup_custom failed!");
+      PERR(PREFIX "%s", "cleanup_custom failed!");
     throw;
   }
 
@@ -632,20 +633,20 @@ try
 
       if (rc != S_OK)
       {
-        PERR("close_pool returned error code %d", rc);
+        PERR(PREFIX "close_pool returned error code %d", rc);
         throw std::runtime_error("close_pool returned error code " + std::to_string(rc));
       }
     }
     catch(...)
     {
-      PERR("%s", "close_pool failed!");
+      PERR(PREFIX "%s", "close_pool failed!");
       throw;
     }
   }
 }
 catch ( ... )
 {
-PERR("cleanup of core %u was incomplete.", core);
+PERR(PREFIX "cleanup of core %u was incomplete.", core);
 }
 
 void Experiment::_debug_print(unsigned core, std::string text, bool limit_to_core0)
@@ -675,7 +676,7 @@ unsigned Experiment::_get_core_index(unsigned core)
   if (index == _core_list.end())
   {
     auto e = "_get_core_index couldn't find core " + std::to_string(core_int);
-    PERR("%s! Exiting.", e.c_str());
+    PERR(PREFIX "%s! Exiting.", e.c_str());
     throw std::runtime_error(e);
   }
 
@@ -689,7 +690,7 @@ rapidjson::Document Experiment::_get_report_document()
   if (_report_filename.empty())
   {
     auto e = "filename for report is empty";
-    PERR("%s!", e);
+    PERR(PREFIX "%s!", e);
     throw std::runtime_error(e);
   }
 
@@ -700,7 +701,7 @@ rapidjson::Document Experiment::_get_report_document()
     {
       auto er = errno;
       auto e = std::string("get_report_document failed fopen call opening '") + _report_filename + "'";
-      PERR("%s: %s", e.c_str(), std::strerror(er));
+      PERR(PREFIX "%s: %s", e.c_str(), std::strerror(er));
       throw std::system_error(std::error_code(er, std::system_category()), e);
     }
 
@@ -720,13 +721,13 @@ rapidjson::Document Experiment::_get_report_document()
     if (document.HasParseError())
     {
       auto e = " parsing error in document, code = " + std::to_string(document.GetParseError());
-      PERR("%s", e.c_str());
+      PERR(PREFIX "%s", e.c_str());
       throw std::runtime_error(e);
     }
   }
   catch(...)
   {
-    PERR("%s", "failed while reading in existing json document");
+    PERR(PREFIX "%s", "failed while reading in existing json document");
     throw;
   }
 
@@ -777,7 +778,7 @@ void Experiment::_initialize_experiment_report(rapidjson::Document& document)
   }
   catch(...)
   {
-    PERR("%s", "failed during write to json document");
+    PERR(PREFIX "%s", "failed during write to json document");
   }
 
   try
@@ -787,7 +788,7 @@ void Experiment::_initialize_experiment_report(rapidjson::Document& document)
   }
   catch(...)
   {
-    PERR("%s", "failed while writing to ofstream");
+    PERR(PREFIX "%s", "failed while writing to ofstream");
     throw;
   }
 }
@@ -799,7 +800,7 @@ void Experiment::_report_document_save(rapidjson::Document& document, unsigned c
   if (_test_name.empty())
   {
     auto e = "_test_name is empty";
-    PERR("%s!", e);
+    PERR(PREFIX "%s!", e);
     throw std::logic_error(e);
   }
 
@@ -829,7 +830,7 @@ void Experiment::_report_document_save(rapidjson::Document& document, unsigned c
   }
   catch(...)
   {
-    PERR("%s", "failed during write to json document");
+    PERR(PREFIX "%s", "failed during write to json document");
   }
 
   _debug_print(core, "_report_document_save: writing to ofstream");
@@ -840,7 +841,7 @@ void Experiment::_report_document_save(rapidjson::Document& document, unsigned c
   }
   catch(...)
   {
-    PERR("%s", "failed while writing to ofstream");
+    PERR(PREFIX "%s", "failed while writing to ofstream");
     throw;
   }
 
@@ -891,7 +892,7 @@ BinStatistics Experiment::_compute_bin_statistics_from_vectors(std::vector<doubl
 {
   if (data.size() != data_bins.size())
   {
-    PERR("data size %lu and data_bins size %lu aren't the same!", data.size(), data_bins.size());
+    PERR(PREFIX "data size %lu and data_bins size %lu aren't the same!", data.size(), data_bins.size());
   }
 
   BinStatistics stats(bin_count, bin_min, bin_max);
@@ -960,7 +961,7 @@ std::string Experiment::create_report(const std::string component_)
   }
   else
   {
-    PERR("couldn't open report file %s to write.", output_file_name.c_str());
+    PERR(PREFIX "couldn't open report file %s to write.", output_file_name.c_str());
   }
 
   return output_file_name;
@@ -1086,7 +1087,7 @@ void Experiment::_populate_pool_to_capacity(unsigned core, component::IKVStore::
       {
         std::ostringstream e;
         e << "put or put_direct returned " << rc << " (-55 is out of space)";
-        PERR("%s: %s.", __func__, e.str().c_str());
+        PERR(PREFIX "%s: %s.", __func__, e.str().c_str());
         throw std::runtime_error(e.str());
       }
 
@@ -1102,7 +1103,7 @@ void Experiment::_populate_pool_to_capacity(unsigned core, component::IKVStore::
       {
         std::ostringstream e;
         e << "readback get or get_direct returned " << rc << " (-55 is out of space)";
-        PERR("%s: %s.", __func__, e.str().c_str());
+        PERR(PREFIX "%s: %s.", __func__, e.str().c_str());
         throw std::runtime_error(e.str());
       }
 
@@ -1112,14 +1113,14 @@ void Experiment::_populate_pool_to_capacity(unsigned core, component::IKVStore::
     {
       std::ostringstream s;
       s << __func__ << ": " << "failed at put call " << current << "/" << _pool_num_objects << ": " << e.what();
-      PERR("%s", s.str().c_str());
+      PERR(PREFIX "%s", s.str().c_str());
       throw;
     }
     catch(...)
     {
       std::ostringstream s;
       s << "populate_pool_to_capacity failed at put call " << current << "/" << _pool_num_objects;
-      PERR("%s", s.str().c_str());
+      PERR(PREFIX "%s", s.str().c_str());
       throw;
     }
 
@@ -1233,7 +1234,7 @@ void Experiment::_enforce_maximum_pool_size(unsigned core, std::size_t i_)
     }
     catch(...)
     {
-      PERR("%s", "failed during erase step");
+      PERR(PREFIX "%s", "failed during erase step");
       throw;
     }
 
@@ -1275,14 +1276,14 @@ void Experiment::_erase_pool_entries_in_range(pool_entry_offset_t start, pool_en
       if (rc != S_OK)
       {
         auto e = "IKVStore::erase returned " + std::to_string(rc);
-        PERR("%s.", e.c_str());
+        PERR(PREFIX "%s.", e.c_str());
         throw std::runtime_error(e);
       }
     }
   }
   catch ( ... )
   {
-    PERR("%s", "erase step failed");
+    PERR(PREFIX "%s", "erase step failed");
     throw;
   }
 }

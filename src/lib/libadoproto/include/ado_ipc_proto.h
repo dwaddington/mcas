@@ -252,10 +252,10 @@ struct Map_memory_named : public Message {
 
   using string_view = std::experimental::string_view;
   Map_memory_named(size_t buffer_size,
-    unsigned region_id_,
-    string_view pool_name_,
-    std::size_t offset_,
-             ::iovec iov_)
+                   unsigned region_id_,
+                   string_view pool_name_,
+                   std::size_t offset_,
+                   ::iovec iov_)
     : Message(id), region_id(region_id_), iov(iov_), offset(offset_), pool_name_len(pool_name_.size())
   {
     if(sizeof(Map_memory) + pool_name_len > buffer_size)

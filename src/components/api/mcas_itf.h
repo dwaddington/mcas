@@ -77,10 +77,11 @@ public:
   using pool_t          = component::IKVStore::pool_t;
   using key_t           = IKVStore::key_t;
   using Attribute       = IKVStore::Attribute;
-
+  using Addr            = IKVStore::Addr;
+  using byte            = gsl::byte;
+  
   template <typename T>
     using basic_string_view = std::experimental::basic_string_view<T>;
-  using byte = gsl::byte;
 
   static constexpr key_t           KEY_NONE           = IKVStore::KEY_NONE;
   static constexpr memory_handle_t MEMORY_HANDLE_NONE = IKVStore::HANDLE_NONE;
@@ -97,6 +98,7 @@ public:
         FLAGS_MAX_VALUE   = IKVStore::FLAGS_MAX_VALUE,
   };
 
+  
   /* per-shard statistics */
   struct Shard_stats {
     uint64_t op_request_count;
@@ -151,29 +153,36 @@ public:
   virtual int thread_safety() const = 0;
 
   /**
-   * Create an object pool
+   * Create an object pool.  If the ADO is configured for the shard then
+   * the ADO process is instantiated "attached" to the pool.
    *
-   * @param ppol_name Unique pool name
+   * @param pool_name Unique pool name
    * @param size Size of pool in bytes (for keys,values and metadata)
    * @param flags Creation flags
    * @param expected_obj_count Expected maximum object count (optimization)
+   * @param base Optional base address
    *
    * @return Pool handle
    */
   virtual IMCAS::pool_t create_pool(const std::string& pool_name,
                                     const size_t       size,
                                     const unsigned int flags              = 0,
-                                    const uint64_t     expected_obj_count = 0) = 0;
+                                    const uint64_t     expected_obj_count = 0,
+                                    const Addr         base = Addr{0}) = 0;
 
   /**
-   * Open an existing pool
+   * Open an existing pool. If the ADO is configured for the shard then
+   * the ADO process is instantiated "attached" to the pool.
    *
    * @param pool_name Name of object pool
-   * @param flags Open flags e.g., FLAGS_READ_ONLY
+   * @param flags Optional flags e.g., FLAGS_READ_ONLY
+   * @param base Optional base address
    *
    * @return Pool handle
    */
-  virtual IMCAS::pool_t open_pool(const std::string& pool_name, const unsigned int flags = 0) = 0;
+  virtual IMCAS::pool_t open_pool(const std::string& pool_name,
+                                  const unsigned int flags = 0,
+                                  const Addr base = Addr{0}) = 0;
 
   /**
    * Close pool handle

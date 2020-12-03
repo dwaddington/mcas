@@ -138,7 +138,8 @@ int hstore::get_capability(const Capability cap) const
 auto hstore::create_pool(const std::string & name_,
                          const std::size_t size_,
                          flags_t flags_,
-                         const uint64_t expected_obj_count_) -> pool_t
+                         const uint64_t expected_obj_count_,
+                         component::IKVStore::Addr) -> pool_t
 try
 {
   CPLOG(1, PREFIX "pool_name=%s size %zu", LOCATION, name_.c_str(), size_);
@@ -186,7 +187,8 @@ catch ( const std::bad_alloc &e )
 }
 
 auto hstore::open_pool(const std::string &name_,
-                       flags_t flags) -> pool_t
+                       flags_t flags,
+                       component::IKVStore::Addr) -> pool_t
 {
   auto path = pool_path(name_);
   try {

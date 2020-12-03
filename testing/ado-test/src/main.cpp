@@ -18,13 +18,13 @@
 #define ASSERT_OK(X) ASSERT_EQ(S_OK, (X))
 
 struct Options {
-  unsigned    debug_level;
+  unsigned debug_level;
   unsigned patience;
   boost::optional<std::string> device;
   boost::optional<std::string> src_addr;
   std::string server;
-  unsigned    port;
-  bool        async;
+  unsigned port;
+  bool async;
 } g_options;
 
 class ADO_test : public ::testing::Test {
@@ -574,10 +574,10 @@ TEST_F(ADO_test, RepeatInvokeAdo)
                                 0,                 /* flags */
                                 50);              /* obj count */
 
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
   /* add index to pool */
   ASSERT_TRUE(mcas->configure_pool(pool, "AddIndex::VolatileTree") == S_OK);
-
-  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   mcas->erase(pool, testname);
 
@@ -585,8 +585,6 @@ TEST_F(ADO_test, RepeatInvokeAdo)
   status_t                                    rc;
 
   for(unsigned i=0;i<10;i++) {
-    std::stringstream ss;
-    ss << "RUN!" << i;
     rc = mcas->invoke_ado(pool,
                           testname,
                           "RUN!TEST-RepeatInvokeAdo",
@@ -596,6 +594,37 @@ TEST_F(ADO_test, RepeatInvokeAdo)
     
     ASSERT_TRUE(rc == S_OK);
   }
+ 
+  ASSERT_OK(mcas->close_pool(pool));
+
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
+
+
+TEST_F(ADO_test, BaseAddr)
+{
+  const std::string testname = "BaseAddr";
+  const std::string poolname = "THIS_IS_A_TEST_POOL";
+  mcas->delete_pool(poolname);
+
+  auto pool = mcas->create_pool(poolname, MiB(1), /* size */
+                                0, /* flags */
+                                50, /* obj count */
+                                IMCAS::Addr{0xBB00000000});
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  mcas->erase(pool, testname);
+
+  std::vector<IMCAS::ADO_response> response;
+  status_t rc;
+
+  rc = mcas->invoke_ado(pool,
+                        testname,
+                        "RUN!TEST-BaseAddr",
+                        IMCAS::ADO_FLAG_CREATE_ON_DEMAND,
+                        response,
+                        KiB(4));
  
   ASSERT_OK(mcas->close_pool(pool));
 
