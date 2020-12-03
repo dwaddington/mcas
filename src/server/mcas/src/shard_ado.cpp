@@ -383,14 +383,16 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
     /* handle ADO_FLAG_CREATE_ONLY - no invocation to ADO is made */
     if (msg->flags & IMCAS::ADO_FLAG_CREATE_ONLY) {
       std::vector<uint64_t> answer;
-      std::string           key(msg->key());
+      std::string           key(msg->key(), msg->get_key_len());
 
       /* if pair exists, return with error */
       if (_i_kvstore->get_attribute(msg->pool_id(), IKVStore::Attribute::VALUE_LEN, answer, &key) !=
           IKVStore::E_KEY_NOT_FOUND) {
         error_func(E_ALREADY_EXISTS, "ADO!ALREADY_EXISTS");
-        PLOG("%s server error ADO!ALREADY_EXISTS", __func__);
-        if (debug_level() > 1) PWRN("process_ado_request: ADO_FLAG_CREATE_ONLY, key already exists");
+        
+        if (debug_level() > 1)
+          PWRN("process_ado_request: ADO_FLAG_CREATE_ONLY, key already exists");
+        
         return;
       }
 
@@ -427,6 +429,7 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
       auto response     = new (response_iob->base())
         protocol::Message_ado_response(response_iob->length(), S_OK, handler->auth_id(), msg->request_id());
 
+      PNOTICE("****** appending respone %p %lu key=(%s)", value, value_len, key.c_str());
       response->append_response(&value, sizeof(value), 0 /* layer id */);
       response->set_status(S_OK);
       response_iob->set_length(response->message_size());

@@ -630,8 +630,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
       if (pool_mgr.check_for_open_pool(pool_name, pool)) {
         if (msg->flags() & IMCAS::ADO_FLAG_CREATE_ONLY) {
           if (debug_level())
-            PWRN("request to create pool denied, create only specified on "
-                 "existing pool");
+            PWRN("request to create pool denied, create only specified on existing pool");
           response->pool_id = IKVStore::POOL_ERROR;
           response->set_status(E_FAIL);
         }

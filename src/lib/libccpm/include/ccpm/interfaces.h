@@ -116,7 +116,7 @@ public:
    *                        the crash+reconstitute case, consititutes acceptance.
    *                    (c) allocator has persisted the ptr. Caller will know upon
    *                        successful return (normal case) or discovery of a
-   *                        non-null value (crash+reconstitute case) taht it owns
+   *                        non-null value (crash+reconstitute case) that it owns
    *                        the area.
    *
    *                    The pointer shall be altered iff the function returns S_OK.

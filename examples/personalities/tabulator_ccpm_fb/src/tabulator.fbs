@@ -1,0 +1,39 @@
+// Example tabulator
+namespace Proto;
+
+struct Value {
+  min: double;
+  max: double;
+  mean: double;
+}
+
+table UpdateRequest {
+  sample: double;
+}
+
+table UpdateReply {
+  status: int;
+}
+
+table QueryRequest {
+}
+
+table QueryReply {
+  status: int;
+  value: Value;
+}
+
+union Element
+{
+  UpdateRequest,
+  UpdateReply, 
+  QueryRequest,
+  QueryReply, 
+}
+
+table Message
+{
+  element : Element;
+}
+
+root_type Message;
