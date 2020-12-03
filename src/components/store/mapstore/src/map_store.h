@@ -81,10 +81,12 @@ public:
 
   virtual pool_t create_pool(const std::string &name, const size_t size,
                              unsigned int flags = 0,
-                             uint64_t expected_obj_count = 0) override;
+                             uint64_t expected_obj_count = 0,
+                             component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}) override;
 
   virtual pool_t open_pool(const std::string &name,
-                           unsigned int flags = 0) override;
+                           unsigned int flags = 0,
+                           component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}) override;
 
   virtual status_t close_pool(const pool_t pid) override;
 

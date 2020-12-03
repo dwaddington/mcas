@@ -77,6 +77,7 @@ public:
   using pool_t          = component::IKVStore::pool_t;
   using key_t           = IKVStore::key_t;
   using Attribute       = IKVStore::Attribute;
+  using Addr            = IKVStore::Addr;
   using byte            = gsl::byte;
   
   template <typename T>
@@ -97,12 +98,6 @@ public:
         FLAGS_MAX_VALUE   = IKVStore::FLAGS_MAX_VALUE,
   };
 
-  struct Addr {
-    explicit Addr(addr_t addr_) : addr(addr_) {}
-    Addr() = delete;
-    addr_t addr;
-  };
-  
   
   /* per-shard statistics */
   struct Shard_stats {

@@ -500,6 +500,7 @@ namespace
     ASSERT_TRUE(strncmp(key_.data(), "BaseAddr", 8) == 0, "data corrupt");
     ASSERT_TRUE(values_[0].len == 4096, "value length invalid");
     ASSERT_FALSE(reinterpret_cast<uint64_t>(values_[0].ptr) < 0xBB00000000, "value address corrupt");
+    memset(values_[0].ptr, 0xEE, values_[0].len);
     return S_OK;
   }
 

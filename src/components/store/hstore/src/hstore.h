@@ -153,11 +153,14 @@ public:
   pool_t create_pool(const std::string &name,
                      std::size_t size,
                      component::IKVStore::flags_t flags,
-                     std::uint64_t expected_obj_count
+                     std::uint64_t expected_obj_count,
+                     component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}
                      ) override;
 
   pool_t open_pool(const std::string &name,
-                   component::IKVStore::flags_t flags) override;
+                   component::IKVStore::flags_t flags,
+                   component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}
+                   ) override;
 
   status_t delete_pool(const std::string &name) override;
 

@@ -902,7 +902,7 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
       if(security != doc.MemberEnd() && doc["security"].IsString()) {
         std::string option(doc["security"].GetString());
 
-        PNOTICE("!!!!! option=%s", option.c_str());
+        //PNOTICE("!!!!! option=%s", option.c_str());
         /* tls:auth indicates TLS authentication */
         if(option == "tls:auth") {
           _options.tls = true;

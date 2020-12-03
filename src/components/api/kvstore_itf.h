@@ -45,7 +45,7 @@ namespace component
   }
 
 /**
- * Key-value interface
+ * Key-value interface for pluggable MCAS back ends
  */
 class IKVStore : public component::IBase {
  public:
@@ -70,6 +70,13 @@ class IKVStore : public component::IBase {
 
   static constexpr memory_handle_t HANDLE_NONE = nullptr;
   static constexpr key_t           KEY_NONE    = nullptr;
+
+  struct Addr {
+    explicit Addr(addr_t addr_) : addr(addr_) {}
+    Addr() = delete;
+    addr_t addr;
+  };
+  
 
   enum {
     THREAD_MODEL_UNSAFE,
@@ -204,14 +211,17 @@ class IKVStore : public component::IBase {
    * @param size Size of object pool in bytes
    * @param flags Creation flags
    * @param expected_obj_count [optional] Expected number of objects in pool
+   * @param base_address_unused Needed for IKVStore and IMCAS unification
    *
    * @return Pool handle or POOL_ERROR
    */
   virtual pool_t create_pool(const std::string& name,
                              const size_t       size,
                              flags_t            flags              = 0,
-                             uint64_t           expected_obj_count = 0)
+                             uint64_t           expected_obj_count = 0,
+                             const Addr         base_addr_unused = Addr{0})
   {
+    PERR("create_pool not implemented");
     return POOL_ERROR;
   }
 
@@ -219,9 +229,10 @@ class IKVStore : public component::IBase {
                              const std::string& name,
                              const size_t       size,
                              flags_t            flags              = 0,
-                             uint64_t           expected_obj_count = 0) __attribute__((deprecated))
+                             uint64_t           expected_obj_count = 0,
+                             const Addr         base_addr_unused = Addr{0}) __attribute__((deprecated))
   {
-    return create_pool(path + name, size, flags, expected_obj_count);
+    return create_pool(path + name, size, flags, expected_obj_count, base_addr_unused);
   }
 
   /**
@@ -229,16 +240,24 @@ class IKVStore : public component::IBase {
    *
    * @param name Name of object pool
    * @param flags Open flags e.g., FLAGS_READ_ONLY
+   * @param base_address_unused Needed for IKVStore and IMCAS unification
    *
    * @return Pool handle or POOL_ERROR if pool cannot be opened, or flags
    * unsupported
    */
-  virtual pool_t open_pool(const std::string& name, flags_t flags = 0) { return POOL_ERROR; }
-
-  virtual pool_t open_pool(const std::string& path, const std::string& name, flags_t flags = 0)
-      __attribute__((deprecated))
+  virtual pool_t open_pool(const std::string& name,
+                           flags_t flags = 0,
+                           const Addr base_addr_unused = Addr{0})
   {
-    return open_pool(path + name, flags);
+    return POOL_ERROR;
+  }
+
+  virtual pool_t open_pool(const std::string& path,
+                           const std::string& name,
+                           flags_t flags = 0,
+                           const Addr base_addr_unused = Addr{0}) __attribute__((deprecated))
+  {
+    return open_pool(path + name, flags, base_addr_unused);
   }
 
   /**
