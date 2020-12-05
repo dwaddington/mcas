@@ -47,11 +47,47 @@ void track_pre(const void \*, std::size_t);
 void track_post(const void \*, std::size_t);
 ```
 
-There is no support for tracking objects other than EASTL containers, but there are incomplete examples at
-
-Tracking a class for which all member initialization and modification is controlled, can be done by mofifying the class member functions to include track_pre and track_post.
+Tracking a class for which all member initialization and modification is controlled can be done by (1) mofifying the the class to derive from a "tracker" and (2) modifying class member functions to include appropriate calls to track_pre and track_post.
 Tracking non-class types can sometimes be simplified by "boxing" the types into classes, as Java does. There are incomplete examples at
 
  - src/lib/EASTL/include/EASTL/internal/tracked.h
  - src/lib/libccpm/include/ccpm/value_tracked.h
 
+The tracking is triggered by calls to track_pre (before write) and track_post (after write).
+If you have a class which includes an allocator or tracker:
+
+```
+this->tracker.track_pre(&x, sizeof x)
+++x;
+this->tracker.track_post(&x, sizeof x)
+```
+
+and if you ithe class class derives from a tracker:
+
+```
+this->track_pre(&x, sizeof x)
+++x;
+this->track_post(&x, sizeof x)
+```
+
+A "modifier" helper which has track_pre in the constructor and track_post in the destructor, improves the syntax:
+
+{
+	auto m = make_modifier(*this, x);
+	++x;
+}
+
+The code in src/lib/EASTL/include/EASTL/internal/tracked.h has a class called Modifiier and function make_modifier which illustrates this.
+
+If x is of class type, and the class controls all modifications, the calls to track_pre and track_psot can be contained entirely within the class.
+
+```
+++x; /* fails if class of x does not support operator++, else should do the right thing. */
+```
+
+That is what I tried to do in test5: "box" an integer (in Java terms) including the tracker in the object.
+The class value_tracked in src/lib/ilibccpm/include/ccpm/value_tracked.h does some of this.
+There is another example, possibly more complete, in src/lib/EASTL/include/EASTL/internal/tracked.h.
+
+git reset --hard HEAD~1
+git reset --hard HEAD~1
