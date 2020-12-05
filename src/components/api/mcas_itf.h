@@ -296,7 +296,7 @@ public:
                              const unsigned int  flags = IMCAS::FLAGS_NONE)
   {
     (void)out_handle; // unused
-    return async_put(pool, key, value.data(), value.length(), flags);
+    return async_put(pool, key, value.data(), value.length(), out_handle, flags);
   }
 
   /**
