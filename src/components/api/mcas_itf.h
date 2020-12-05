@@ -335,7 +335,9 @@ public:
                        void*&              out_value, /* release with free_memory() API */
                        size_t&             out_value_len) = 0;
 
-  virtual status_t get(const IMCAS::pool_t pool, const std::string& key, std::string& out_value)
+  virtual status_t get(const IMCAS::pool_t pool,
+                       const std::string& key,
+                       std::string& out_value)
   {
     void*  val      = nullptr;
     size_t val_size = 0;
@@ -349,8 +351,50 @@ public:
     return s;
   }
 
+
   /**
    * Read an object value directly into client-provided memory.
+   *
+   * @param pool Pool handle
+   * @param key Object key
+   * @param out_value Client provided buffer for value
+   * @param out_value_len [in] size of value memory in bytes [out] size of value
+   * @param out_handle Async work handle
+   * @param handle Memory registration handle
+   *
+   * @return S_OK, S_MORE if only a portion of value is read, E_BAD_ALIGNMENT on
+   * invalid alignment, or other error code
+   */
+  virtual status_t get_direct(const IMCAS::pool_t          pool,
+                              const std::string&           key,
+                              void*                        out_value,
+                              size_t&                      out_value_len,
+                              const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
+
+  /**
+   * Asynchronous get operation.  Use check_async_completion to check for
+   * completion.  This operation is not normally needed since gets are
+   * typically very fast.
+   *
+   * @param pool Pool handle
+   * @param key Object key
+   * @param value Value
+   * @param value_len Value length in bytes
+   * @param out_handle Async work handle
+   * @param flags Additional flags
+   *
+   * @return S_OK or other error code
+   */
+  virtual status_t async_get(const IMCAS::pool_t pool,
+                             const std::string&  key,
+                             void*&              out_value, /* release with free_memory() API */
+                             size_t&             out_value_len,
+                             async_handle_t&     out_handle) = 0;
+
+
+
+  /**
+   * Asynchronously read an object value directly into client-provided memory.
    *
    * @param pool Pool handle
    * @param key Object key
@@ -366,14 +410,8 @@ public:
                                     const std::string&           key,
                                     void*                        out_value,
                                     size_t&                      out_value_len,
-                                    async_handle_t             & out_handle,
+                                    async_handle_t&              out_handle,
                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
-
-  virtual status_t get_direct(const IMCAS::pool_t          pool,
-                              const std::string&           key,
-                              void*                        out_value,
-                              size_t&                      out_value_len,
-                              const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   /**
    * Read memory directly into client-provided memory.
@@ -634,7 +672,7 @@ public:
 
 
   /**
-   * Used to invoke an operation on an active data object
+   * Used to asynchronously invoke an operation on an ADO
    *
    * Roughly, the shard locates a data value by key and calls ADO (with accessors to both the key and data).
    *
@@ -643,18 +681,19 @@ public:
    * @param request Request data
    * @param request_len Length of request in bytes
    * @param flags Flags for invocation (see ADO_FLAG_XXX)
+   * @param out_response Response passed back from ADO invocation
    * @param out_async_handle Handle to task for later result collection
    * @param value_size Optional parameter to define value size to create for on-demand
    *
    * @return S_OK on success
    */
-  virtual status_t async_invoke_ado(const IMCAS::pool_t        pool,
+  virtual status_t async_invoke_ado(const IMCAS::pool_t           pool,
                                     const basic_string_view<byte> key,
                                     const basic_string_view<byte> request,
-                                    const ado_flags_t          flags,
-                                    std::vector<ADO_response>& out_response,
-                                    async_handle_t&            out_async_handle,
-                                    const size_t               value_size = 0) = 0;
+                                    const ado_flags_t             flags,
+                                    std::vector<ADO_response>&    out_response,
+                                    async_handle_t&               out_async_handle,
+                                    const size_t                  value_size = 0) = 0;
 
   inline status_t async_invoke_ado(const IMCAS::pool_t        pool,
                                    const std::string&         key,
@@ -701,17 +740,17 @@ public:
    * @param value_len Length of value data in bytes
    * @param root_len Length to allocate for root value (with ADO_FLAG_DETACHED)
    * @param flags Flags for invocation (ADO_FLAG_NO_OVERWRITE, ADO_FLAG_DETACHED)
-   * @param out_response Responses from invocation
+   * @param out_response Response passed back from ADO invocation
    *
    * @return S_OK on success
    */
-  virtual status_t invoke_put_ado(const IMCAS::pool_t        pool,
+  virtual status_t invoke_put_ado(const IMCAS::pool_t           pool,
                                   const basic_string_view<byte> key,
                                   const basic_string_view<byte> request,
                                   const basic_string_view<byte> value,
-                                  const size_t               root_len,
-                                  const ado_flags_t          flags,
-                                  std::vector<ADO_response>& out_response) = 0;
+                                  const size_t                  root_len,
+                                  const ado_flags_t             flags,
+                                  std::vector<ADO_response>&    out_response) = 0;
 
   virtual status_t invoke_put_ado(const IMCAS::pool_t        pool,
                                   const std::string&         key,
@@ -751,7 +790,7 @@ public:
   }
 
   /**
-   * Used to invoke a combined put + ADO operation on an active data object.
+   * Used to asynchronously invoke a combined put + ADO operation on an active data object.
    *
    * Roughly, the shard writes a data value by key and calls ADO (with accessors to both the key and data).
    *
@@ -763,7 +802,8 @@ public:
    * @param value_len Length of value data in bytes
    * @param root_len Length to allocate for root value (with ADO_FLAG_DETACHED)
    * @param flags Flags for invocation (ADO_FLAG_NO_OVERWRITE, ADO_FLAG_DETACHED)
-   * @param out_response Responses from invocation
+   * @param out_response Responses from ADO invocation
+   * @param out_async_handle Handle to task for later result collection
    *
    * @return S_OK on success
    */
