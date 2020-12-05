@@ -291,7 +291,7 @@ public:
                 offset_t &                        out_matched_offset,
                 std::string &                     out_matched_key);
 
-  status_t invoke_ado(const component::IKVStore::pool_t            pool,
+  status_t invoke_ado(const component::IMCAS::pool_t               pool,
                       basic_string_view<byte>                      key,
                       basic_string_view<byte>                      request,
                       const unsigned int                           flags,
@@ -306,13 +306,22 @@ public:
                             component::IMCAS::async_handle_t &           out_async_handle,
                             const size_t                                 value_size);
 
-  status_t invoke_put_ado(const component::IKVStore::pool_t            pool,
+  status_t invoke_put_ado(const component::IMCAS::pool_t               pool,
                           basic_string_view<byte>                      key,
                           basic_string_view<byte>                      request,
                           basic_string_view<byte>                      value,
                           size_t                                       root_len,
                           const unsigned int                           flags,
                           std::vector<component::IMCAS::ADO_response> &out_response);
+
+  status_t invoke_put_ado_async(const component::IMCAS::pool_t                  pool,
+                                const basic_string_view<byte>                   key,
+                                const basic_string_view<byte>                   request,
+                                const basic_string_view<byte>                   value,
+                                const size_t                                    root_len,
+                                const component::IMCAS::ado_flags_t             flags,
+                                std::vector<component::IMCAS::ADO_response>&    out_response,
+                                component::IMCAS::async_handle_t&               out_async_handle);
 
   bool check_message_size(size_t size) const { return size > _max_message_size; }
 

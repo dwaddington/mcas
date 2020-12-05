@@ -2225,7 +2225,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
                                           const basic_string_view<byte>     key,
                                           const basic_string_view<byte>     request,
                                           const unsigned int                flags,
-                                          std::vector<IMCAS::ADO_response> &out_response,
+                                          std::vector<IMCAS::ADO_response>& out_response,
                                           const size_t                      value_size)
   {
     API_LOCK();
@@ -2308,7 +2308,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
                                                 const basic_string_view<byte>                key,
                                                 const basic_string_view<byte>                request,
                                                 const component::IMCAS::ado_flags_t          flags,
-                                                std::vector<component::IMCAS::ADO_response> &out_response,
+                                                std::vector<component::IMCAS::ADO_response>& out_response,
                                                 component::IMCAS::async_handle_t &           out_async_handle,
                                                 const size_t                                 value_size)
   {
@@ -2321,8 +2321,14 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     assert(iobr);
 
     try {
-      const auto msg = new (iobs->base()) mcas::protocol::Message_ado_request(
-                                                                              iobs->length(), auth_id(), request_id(), pool, key, request, flags, value_size);
+      const auto msg = new (iobs->base()) mcas::protocol::Message_ado_request(iobs->length(),
+                                                                              auth_id(),
+                                                                              request_id(),
+                                                                              pool,
+                                                                              key,
+                                                                              request,
+                                                                              flags,
+                                                                              value_size);
       iobs->set_length(msg->message_size());
 
       post_recv(&*iobr);
@@ -2351,7 +2357,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
                                               const basic_string_view<byte>     value,
                                               const size_t                      root_len,
                                               const unsigned int                flags,
-                                              std::vector<IMCAS::ADO_response> &out_response)
+                                              std::vector<IMCAS::ADO_response>& out_response)
   {
     API_LOCK();
 
@@ -2365,8 +2371,15 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     status_t status;
 
     try {
-      const auto msg = new (iobs->base()) mcas::protocol::Message_put_ado_request(
-                                                                                  iobs->length(), auth_id(), request_id(), pool, key, request, value, root_len, flags);
+      const auto msg = new (iobs->base()) mcas::protocol::Message_put_ado_request(iobs->length(),
+                                                                                  auth_id(),
+                                                                                  request_id(),
+                                                                                  pool,
+                                                                                  key,
+                                                                                  request,
+                                                                                  value,
+                                                                                  root_len,
+                                                                                  flags);
 
       iobs->set_length(msg->message_size());
 
@@ -2421,6 +2434,57 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     }
 
     return status;
+  }
+
+  status_t Connection_handler::invoke_put_ado_async(const component::IMCAS::pool_t                  pool,
+                                                    const basic_string_view<byte>                   key,
+                                                    const basic_string_view<byte>                   request,
+                                                    const basic_string_view<byte>                   value,
+                                                    const size_t                                    root_len,
+                                                    const component::IMCAS::ado_flags_t             flags,
+                                                    std::vector<component::IMCAS::ADO_response>&    out_response,
+                                                    component::IMCAS::async_handle_t&               out_async_handle)
+  {
+    API_LOCK();
+
+    auto iobs = make_iob_ptr_send();
+    auto iobr = make_iob_ptr_recv();
+
+    assert(iobs);
+    assert(iobr);
+
+    try {
+      const auto msg = new (iobs->base()) mcas::protocol::Message_put_ado_request(iobs->length(),
+                                                                                  auth_id(),
+                                                                                  request_id(),
+                                                                                  pool,
+                                                                                  key,
+                                                                                  request,
+                                                                                  value,
+                                                                                  root_len,
+                                                                                  flags);
+      iobs->set_length(msg->message_size());
+
+      post_recv(&*iobr);
+      post_send(&*iobs, msg, __func__);
+
+      out_async_handle = new async_buffer_set_invoke(debug_level(), std::move(iobs), std::move(iobr), &out_response);
+
+      return S_OK;
+    }
+    catch (const Exception &e) {
+      PLOG("%s:%u ADO response Exception %s", __FILE__, __LINE__, e.cause());
+      return E_FAIL;
+    }
+    catch (const std::exception &e) {
+      PLOG("%s:%u ADO response exception %s", __FILE__, __LINE__, e.what());
+      return E_FAIL;
+    }
+    catch (...) {
+      return E_FAIL;
+    }
+
+    return S_OK;
   }
 
   auto Connection_handler::make_iob_ptr(buffer_t::completion_t completion_) -> iob_ptr

@@ -751,6 +751,74 @@ public:
   }
 
   /**
+   * Used to invoke a combined put + ADO operation on an active data object.
+   *
+   * Roughly, the shard writes a data value by key and calls ADO (with accessors to both the key and data).
+   *
+   * @param pool Pool handle
+   * @param key Key
+   * @param request Request data
+   * @param request_len Length of request data in bytes
+   * @param value Value data
+   * @param value_len Length of value data in bytes
+   * @param root_len Length to allocate for root value (with ADO_FLAG_DETACHED)
+   * @param flags Flags for invocation (ADO_FLAG_NO_OVERWRITE, ADO_FLAG_DETACHED)
+   * @param out_response Responses from invocation
+   *
+   * @return S_OK on success
+   */
+  virtual status_t async_invoke_put_ado(const IMCAS::pool_t           pool,
+                                        const basic_string_view<byte> key,
+                                        const basic_string_view<byte> request,
+                                        const basic_string_view<byte> value,
+                                        const size_t                  root_len,
+                                        const ado_flags_t             flags,
+                                        std::vector<ADO_response>&    out_response,
+                                        async_handle_t&               out_async_handle) = 0;
+
+  virtual status_t async_invoke_put_ado(const IMCAS::pool_t        pool,
+                                        const std::string&         key,
+                                        const void*                request,
+                                        const size_t               request_len,
+                                        const void*                value,
+                                        const size_t               value_len,
+                                        const size_t               root_len,
+                                        const ado_flags_t          flags,
+                                        std::vector<ADO_response>& out_response,
+                                        async_handle_t&            out_async_handle)
+  {
+    return
+      async_invoke_put_ado(pool,
+        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(static_cast<const byte *>(request), request_len),
+        basic_string_view<byte>(static_cast<const byte *>(value), value_len),
+                           root_len, flags, out_response, out_async_handle);
+  }
+
+  inline status_t async_invoke_put_ado(const IMCAS::pool_t        pool,
+                                       const std::string&         key,
+                                       const std::string&         request,
+                                       const std::string&         value,
+                                       const size_t               root_len,
+                                       const ado_flags_t          flags,
+                                       std::vector<ADO_response>& out_response,
+                                       async_handle_t&            out_async_handle)
+  {
+    return async_invoke_put_ado(pool,
+                                key,
+                                request.data(),
+                                request.length(),
+                                value.data(),
+                                value.length(),
+                                root_len,
+                                flags,
+                                out_response,
+                                out_async_handle);
+  }
+
+
+
+  /**
    * Debug routine
    *
    * @param pool Pool handle
