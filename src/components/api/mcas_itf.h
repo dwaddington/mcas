@@ -230,7 +230,7 @@ public:
    * @param key Object key
    * @param value Value data
    * @param value_len Size of value in bytes
-   * @param flags Additional flags
+   * @param flags Optional flags
    *
    * @return S_OK or error code
    */
@@ -258,7 +258,7 @@ public:
    * @param value Value
    * @param value_len Value length in bytes
    * @param handle Memory registration handle
-   * @param flags Additional flags
+   * @param flags Optional flags
    *
    * @return S_OK or error code
    */
@@ -270,15 +270,15 @@ public:
                               const unsigned int    flags  = IMCAS::FLAGS_NONE) = 0;
 
   /**
-   * Asynchronous put operation.  Use poll_async_completion to check for
-   * completion.
+   * Asynchronous put operation.  Use check_async_completion to check for
+   * completion. This operation is not normally used, simple put is fast.
    *
    * @param pool Pool handle
    * @param key Object key
    * @param value Value
    * @param value_len Value length in bytes
    * @param out_handle Async work handle
-   * @param flags Additional flags
+   * @param flags Optional flags
    *
    * @return S_OK or other error code
    */
@@ -296,11 +296,11 @@ public:
                              const unsigned int  flags = IMCAS::FLAGS_NONE)
   {
     (void)out_handle; // unused
-    return put(pool, key, value.data(), value.length(), flags);
+    return async_put(pool, key, value.data(), value.length(), flags);
   }
 
   /**
-   * Asynchronous put operation.  Use poll_async_completion to check for
+   * Asynchronous put_direct operation.  Use check_async_completion to check for
    * completion.
    *
    * @param pool Pool handle
@@ -309,7 +309,7 @@ public:
    * @param value_len Value length in bytes
    * @param handle Memory registration handle
    * @param out_handle Async handle
-   * @param flags Additional flags
+   * @param flags Optional flags
    *
    * @return S_OK or other error code
    */
@@ -372,28 +372,6 @@ public:
                               const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   /**
-   * Asynchronous get operation.  Use check_async_completion to check for
-   * completion.  This operation is not normally needed since gets are
-   * typically very fast.
-   *
-   * @param pool Pool handle
-   * @param key Object key
-   * @param value Value
-   * @param value_len Value length in bytes
-   * @param out_handle Async work handle
-   * @param flags Additional flags
-   *
-   * @return S_OK or other error code
-   */
-  virtual status_t async_get(const IMCAS::pool_t pool,
-                             const std::string&  key,
-                             void*&              out_value, /* release with free_memory() API */
-                             size_t&             out_value_len,
-                             async_handle_t&     out_handle) = 0;
-
-
-
-  /**
    * Asynchronously read an object value directly into client-provided memory.
    *
    * @param pool Pool handle
@@ -425,22 +403,18 @@ public:
    *
    * @return S_OK, or error code
    */
-  virtual status_t async_get_direct_offset(
-                                           const IMCAS::pool_t pool,
+  virtual status_t async_get_direct_offset(const IMCAS::pool_t pool,
                                            const offset_t offset,
                                            size_t &size,
                                            void* out_buffer,
                                            async_handle_t& out_handle,
-                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-                                           ) = 0;
+                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
-  virtual status_t get_direct_offset(
-                                     const IMCAS::pool_t pool,
+  virtual status_t get_direct_offset(const IMCAS::pool_t pool,
                                      const offset_t offset,
                                      size_t &size,
                                      void* out_buffer,
-                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-                                     ) = 0;
+                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   /**
    * Write memory directly into client-provided memory.
@@ -454,22 +428,18 @@ public:
    *
    * @return S_OK, or error code
    */
-  virtual status_t async_put_direct_offset(
-                                           const IMCAS::pool_t pool,
+  virtual status_t async_put_direct_offset(const IMCAS::pool_t pool,
                                            const offset_t offset,
                                            size_t &size,
                                            const void *const buffer,
                                            async_handle_t& out_handle,
-                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-                                           ) = 0;
+                                           const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
-  virtual status_t put_direct_offset(
-                                     const IMCAS::pool_t pool,
+  virtual status_t put_direct_offset(const IMCAS::pool_t pool,
                                      const offset_t offset,
                                      size_t &size,
                                      const void *const buffer,
-                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE
-                                     ) = 0;
+                                     const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   /**
    * Check for completion from asynchronous invocation
@@ -637,12 +607,12 @@ public:
    *
    * @return S_OK on success
    */
-  virtual status_t invoke_ado(const IMCAS::pool_t        pool,
+  virtual status_t invoke_ado(const IMCAS::pool_t           pool,
                               const basic_string_view<byte> key,
                               const basic_string_view<byte> request,
-                              const ado_flags_t          flags,
-                              std::vector<ADO_response>& out_response,
-                              const size_t               value_size = 0) = 0;
+                              const ado_flags_t             flags,
+                              std::vector<ADO_response>&    out_response,
+                              const size_t                  value_size = 0) = 0;
 
   virtual status_t invoke_ado(const IMCAS::pool_t        pool,
                               const std::string&         key,
@@ -898,12 +868,12 @@ public:
                         "nic_device) not implemented");
   }
 
-  IMCAS* mcas_create(const unsigned debug_level,
-                     const unsigned patience,
+  IMCAS* mcas_create(const unsigned     debug_level,
+                     const unsigned     patience,
                      const std::string& owner,
                      const std::string& dest_addr_with_port,
                      const std::string& nic_device,
-                     const std::string other = "")
+                     const std::string  other = "")
   {
     return mcas_create(debug_level, patience, owner, nic_device, boost::optional<std::string>(), dest_addr_with_port, other);
   }
