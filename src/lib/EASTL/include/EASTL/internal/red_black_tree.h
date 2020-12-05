@@ -98,10 +98,10 @@ namespace eastl
 		typedef rbtree_node_base<Tracker> this_type;
 
 	public:
-		tracked<this_type*, Tracker, true ? 'T' : 'r'> mpNodeRight;  // Declared first because it is used most often.
-		tracked<this_type*, Tracker, true ? 'T' : 'l'> mpNodeLeft;
-		tracked<this_type*, Tracker, true ? 'T' : 'p'> mpNodeParent;
-		tracked<RBTreeColor, Tracker, 'C'> mColor; // We only need one bit here, would be nice if we could stuff that bit somewhere else.
+		value_tracked<this_type*, Tracker, true ? 'T' : 'r'> mpNodeRight;  // Declared first because it is used most often.
+		value_tracked<this_type*, Tracker, true ? 'T' : 'l'> mpNodeLeft;
+		value_tracked<this_type*, Tracker, true ? 'T' : 'p'> mpNodeParent;
+		value_tracked<RBTreeColor, Tracker, 'C'> mColor; // We only need one bit here, would be nice if we could stuff that bit somewhere else.
 		rbtree_node_base(const Tracker &t) : mpNodeRight(nullptr, t), mpNodeLeft(nullptr, t), mpNodeParent(nullptr, t), mColor(RBTreeColor(), t) {}
 	};
 

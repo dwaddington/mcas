@@ -26,6 +26,7 @@
 
 #include <EASTL/internal/config.h>
 #include <EASTL/algorithm.h>
+#include <EASTL/tracker.h>
 
 #ifdef _MSC_VER
 	#pragma warning(push, 0)
@@ -55,7 +56,7 @@
 	#pragma once // Some compilers (e.g. VC++) benefit significantly from using this. We've measured 3-4% build speed improvements in apps as a result.
 #endif
 
-
+#include <EASTL/internal/tracked.h>
 
 namespace eastl
 {
@@ -93,11 +94,13 @@ namespace eastl
 	///
 	/// This is a default implementation that works for any number of words.
 	///
-	template <size_t NW, typename WordType> // Templated on the number of words used to hold the bitset and the word type.
+	template <size_t NW, typename WordType, typename TrackerType> // Templated on the number of words used to hold the bitset and the word type.
 	struct BitsetBase
+		: public TrackerType
 	{
 		typedef WordType                 word_type;
-		typedef BitsetBase<NW, WordType> this_type;
+		typedef TrackerType              tracker_type;
+		typedef BitsetBase<NW, WordType, TrackerType> this_type;
 	  #if EASTL_BITSET_SIZE_T
 		typedef size_t                   size_type;
 	  #else
@@ -114,8 +117,8 @@ namespace eastl
 		word_type mWord[NW];
 
 	public:
-		BitsetBase();
-		BitsetBase(uint32_t value); // This exists only for compatibility with std::bitset, which has a 'long' constructor.
+		BitsetBase(tracker_type t = tracker_type());
+		BitsetBase(uint32_t value, tracker_type t = tracker_type()); // This exists only for compatibility with std::bitset, which has a 'long' constructor.
 	  //BitsetBase(uint64_t value); // Disabled because it causes conflicts with the 32 bit version with existing user code. Use from_uint64 to init from a uint64_t instead.
 
 		void operator&=(const this_type& x);
@@ -151,19 +154,23 @@ namespace eastl
 		size_type DoFindLast() const;                       // Returns NW * kBitsPerWord (the bit count) if no bits are set.
 		size_type DoFindPrev(size_type last_find) const;    // Returns NW * kBitsPerWord (the bit count) if no bits are set.
 
+		auto make_modifier() { return Modifier<tracker_type>(*this, mWord, sizeof mWord, 'B'); }
+		auto make_modifier(size_type i) { return Modifier<tracker_type>(*this, mWord[i], sizeof mWord[i], 'b'); }
 	}; // class BitsetBase
 
 
 
-	/// BitsetBase<1, WordType>
+	/// BitsetBase<1, WordType, TrackerType>
 	/// 
 	/// This is a specialization for a bitset that fits within one word.
 	///
-	template <typename WordType>
-	struct BitsetBase<1, WordType>
+	template <typename WordType, typename TrackerType>
+	struct BitsetBase<1, WordType, TrackerType>
+		: public TrackerType
 	{
 		typedef WordType                word_type;
-		typedef BitsetBase<1, WordType> this_type;
+		typedef TrackerType             tracker_type;
+		typedef BitsetBase<1, WordType, TrackerType> this_type;
 	  #if EASTL_BITSET_SIZE_T
 		typedef size_t                  size_type;
 	  #else
@@ -180,8 +187,8 @@ namespace eastl
 		word_type mWord[1]; // Defined as an array of 1 so that bitset can treat this BitsetBase like others.
 
 	public:
-		BitsetBase();
-		BitsetBase(uint32_t value);
+		BitsetBase(tracker_type t = tracker_type());
+		BitsetBase(uint32_t value, tracker_type t = tracker_type());
 	  //BitsetBase(uint64_t value); // Disabled because it causes conflicts with the 32 bit version with existing user code. Use from_uint64 instead.
 
 		void operator&=(const this_type& x);
@@ -217,20 +224,24 @@ namespace eastl
 		size_type DoFindLast() const;                       // Returns 1 * kBitsPerWord (the bit count) if no bits are set.
 		size_type DoFindPrev(size_type last_find) const;    // Returns 1 * kBitsPerWord (the bit count) if no bits are set.
 
-	}; // BitsetBase<1, WordType>
+		auto make_modifier() { return Modifier<tracker_type>(*this, mWord, sizeof mWord, 'B'); }
+		auto make_modifier(size_type i) { return Modifier<tracker_type>(*this, mWord[i], sizeof mWord[i], 'b'); }
+	}; // BitsetBase<1, WordType, TrackerType>
 
 
 
-	/// BitsetBase<2, WordType>
+	/// BitsetBase<2, WordType, TrackerType>
 	/// 
 	/// This is a specialization for a bitset that fits within two words.
 	/// The difference here is that we avoid branching (ifs and loops).
 	///
-	template <typename WordType>
-	struct BitsetBase<2, WordType>
+	template <typename WordType, typename TrackerType>
+	struct BitsetBase<2, WordType, TrackerType>
+		: public TrackerType
 	{
 		typedef WordType                 word_type;
-		typedef BitsetBase<2, WordType>  this_type;
+		typedef TrackerType              tracker_type;
+		typedef BitsetBase<2, WordType, TrackerType> this_type;
 	  #if EASTL_BITSET_SIZE_T
 		typedef size_t                   size_type;
 	  #else
@@ -247,8 +258,8 @@ namespace eastl
 		word_type mWord[2];
 
 	public:
-		BitsetBase();
-		BitsetBase(uint32_t value);
+		BitsetBase(tracker_type t = tracker_type());
+		BitsetBase(uint32_t value, tracker_type t = tracker_type());
 	  //BitsetBase(uint64_t value); // Disabled because it causes conflicts with the 32 bit version with existing user code. Use from_uint64 instead.
 
 		void operator&=(const this_type& x);
@@ -284,7 +295,9 @@ namespace eastl
 		size_type DoFindLast() const;                       // Returns 2 * kBitsPerWord (the bit count) if no bits are set.
 		size_type DoFindPrev(size_type last_find) const;    // Returns 2 * kBitsPerWord (the bit count) if no bits are set.
 
-	}; // BitsetBase<2, WordType>
+		auto make_modifier() { return Modifier<tracker_type>(*this, mWord, sizeof mWord, 'B'); }
+		auto make_modifier(size_type i) { return Modifier<tracker_type>(*this, mWord[i], sizeof mWord[i], 'b'); }
+	}; // BitsetBase<2, WordType, TrackerType>
 
 
 
@@ -306,12 +319,12 @@ namespace eastl
 	///   and the compiler must support the type. By default the WordType is
 	///   the largest native register type that the target platform supports.
 	///
-	template <size_t N, typename WordType = EASTL_BITSET_WORD_TYPE_DEFAULT>
-	class bitset : private BitsetBase<BITSET_WORD_COUNT(N, WordType), WordType>
+	template <size_t N, typename WordType = EASTL_BITSET_WORD_TYPE_DEFAULT, typename TrackerType = DummyTracker>
+	class bitset : private BitsetBase<BITSET_WORD_COUNT(N, WordType), WordType, TrackerType>
 	{
 	public:
-		typedef BitsetBase<BITSET_WORD_COUNT(N, WordType), WordType>  base_type;
-		typedef bitset<N, WordType>                                   this_type;
+		typedef BitsetBase<BITSET_WORD_COUNT(N, WordType), WordType, TrackerType> base_type;
+		typedef bitset<N, WordType, TrackerType>                      this_type;
 		typedef WordType                                              word_type;
 		typedef typename base_type::size_type                         size_type;
 
@@ -322,7 +335,7 @@ namespace eastl
 			kBitsPerWordShift = ((kBitsPerWord == 8) ? 3 : ((kBitsPerWord == 16) ? 4 : ((kBitsPerWord == 32) ? 5 : (((kBitsPerWord == 64) ? 6 : 7))))),
 			kSize             = N,                               // The number of bits the bitset holds
 			kWordSize         = sizeof(word_type),               // The size of individual words the bitset uses to hold the bits.
-			kWordCount        = BITSET_WORD_COUNT(N, WordType)   // The number of words the bitset uses to hold the bits. sizeof(bitset<N, WordType>) == kWordSize * kWordCount.
+			kWordCount        = BITSET_WORD_COUNT(N, WordType)   // The number of words the bitset uses to hold the bits. sizeof(bitset<N, WordType, TrackerType>) == kWordSize * kWordCount.
 		};
 
 		using base_type::mWord;
@@ -346,15 +359,17 @@ namespace eastl
 		/// would be non-conforming.
 		///
 		class reference
+			: private TrackerType
 		{
 		protected:
-			friend class bitset<N, WordType>;
+			friend class bitset<N, WordType, TrackerType>;
 
 			word_type* mpBitWord;
 			size_type  mnBitIndex;
 		
 			reference(){} // The C++ standard specifies that this is private.
 	
+			auto make_modifier() const { return Modifier<TrackerType>(*this, mpBitWord, sizeof *mpBitWord, 'b'); }
 		public:
 			reference(const bitset& x, size_type i);
 
@@ -371,8 +386,8 @@ namespace eastl
 	public:
 		friend class reference;
 
-		bitset();
-		bitset(uint32_t value);
+		bitset(TrackerType tr = TrackerType());
+		bitset(uint32_t value, TrackerType tr = TrackerType());
 	  //bitset(uint64_t value); // Disabled because it causes conflicts with the 32 bit version with existing user code. Use from_uint64 instead.
 
 		// We don't define copy constructor and operator= because 
@@ -493,11 +508,12 @@ namespace eastl
 		if(x)
 		{
 			uint32_t n = 1;
+			unsigned xw = x;
 
-			if((x & 0x0000000F) == 0) { n +=  4; x >>=  4; }
-			if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+			if((xw & 0x0000000F) == 0) { n +=  4; xw >>=  4; }
+			if((xw & 0x00000003) == 0) { n +=  2; xw >>=  2; }
 
-			return (uint32_t)(n - (x & 1));
+			return (uint32_t)(n - (xw & 1));
 		}
 
 		return 8;
@@ -508,12 +524,13 @@ namespace eastl
 		if(x)
 		{
 			uint32_t n = 1;
+			unsigned xw = x;
 
-			if((x & 0x000000FF) == 0) { n +=  8; x >>=  8; }
-			if((x & 0x0000000F) == 0) { n +=  4; x >>=  4; }
-			if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+			if((xw & 0x000000FF) == 0) { n +=  8; xw >>=  8; }
+			if((xw & 0x0000000F) == 0) { n +=  4; xw >>=  4; }
+			if((xw & 0x00000003) == 0) { n +=  2; xw >>=  2; }
 
-			return (uint32_t)(n - (x & 1));
+			return (uint32_t)(n - (xw & 1));
 		}
 
 		return 16;
@@ -524,13 +541,14 @@ namespace eastl
 		if(x)
 		{
 			uint32_t n = 1;
+			unsigned xw = x;
 
-			if((x & 0x0000FFFF) == 0) { n += 16; x >>= 16; }
-			if((x & 0x000000FF) == 0) { n +=  8; x >>=  8; }
-			if((x & 0x0000000F) == 0) { n +=  4; x >>=  4; }
-			if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+			if((xw & 0x0000FFFF) == 0) { n += 16; xw >>= 16; }
+			if((xw & 0x000000FF) == 0) { n +=  8; xw >>=  8; }
+			if((xw & 0x0000000F) == 0) { n +=  4; xw >>=  4; }
+			if((xw & 0x00000003) == 0) { n +=  2; xw >>=  2; }
 
-			return (n - (x & 1));
+			return (n - (xw & 1));
 		}
 
 		return 32;
@@ -581,10 +599,11 @@ namespace eastl
 		if(x)
 		{
 			uint32_t n = 0;
+			unsigned xw = x;
 
-			if(x & 0xFFF0) { n +=  4; x >>=  4; }
-			if(x & 0xFFFC) { n +=  2; x >>=  2; }
-			if(x & 0xFFFE) { n +=  1;           }
+			if(xw & 0xFFF0) { n +=  4; xw >>=  4; }
+			if(xw & 0xFFFC) { n +=  2; xw >>=  2; }
+			if(xw & 0xFFFE) { n +=  1;            }
 
 			return n;
 		}
@@ -597,11 +616,12 @@ namespace eastl
 		if(x)
 		{
 			uint32_t n = 0;
+			unsigned xw = x;
 
-			if(x & 0xFF00) { n +=  8; x >>=  8; }
-			if(x & 0xFFF0) { n +=  4; x >>=  4; }
-			if(x & 0xFFFC) { n +=  2; x >>=  2; }
-			if(x & 0xFFFE) { n +=  1;           }
+			if(xw & 0xFF00) { n +=  8; xw >>=  8; }
+			if(xw & 0xFFF0) { n +=  4; xw >>=  4; }
+			if(xw & 0xFFFC) { n +=  2; xw >>=  2; }
+			if(xw & 0xFFFE) { n +=  1;            }
 
 			return n;
 		}
@@ -687,27 +707,30 @@ namespace eastl
 	// For our tests (~NW < 16), the latter (using []) access resulted in faster code. 
 	///////////////////////////////////////////////////////////////////////////
 
-	template <size_t NW, typename WordType>
-	inline BitsetBase<NW, WordType>::BitsetBase()
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline BitsetBase<NW, WordType, TrackerType>::BitsetBase(TrackerType tr)
+		: TrackerType(tr)
 	{
 		reset();
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline BitsetBase<NW, WordType>::BitsetBase(uint32_t value)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline BitsetBase<NW, WordType, TrackerType>::BitsetBase(uint32_t value, TrackerType tr)
+		: TrackerType(tr)
 	{
 		// This implementation assumes that sizeof(value) <= sizeof(word_type).
 		//EASTL_CT_ASSERT(sizeof(value) <= sizeof(word_type)); Disabled because we now have support for uint8_t and uint16_t word types. It would be nice to have a runtime assert that tested this.
 
 		reset();
+		auto m = make_modifier(0);
 		mWord[0] = static_cast<word_type>(value);
 	}
 
 
 	/*
-	template <size_t NW, typename WordType>
-	inline BitsetBase<NW, WordType>::BitsetBase(uint64_t value)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline BitsetBase<NW, WordType, TrackerType>::BitsetBase(uint64_t value)
 	{
 		reset();
 
@@ -724,35 +747,39 @@ namespace eastl
 	*/
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::operator&=(const this_type& x)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::operator&=(const this_type& x)
 	{
+		auto m = make_modifier();
 		for(size_t i = 0; i < NW; i++)
 			mWord[i] &= x.mWord[i];
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::operator|=(const this_type& x)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::operator|=(const this_type& x)
 	{
+		auto m = make_modifier();
 		for(size_t i = 0; i < NW; i++)
 			mWord[i] |= x.mWord[i];
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::operator^=(const this_type& x)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::operator^=(const this_type& x)
 	{
+		auto m = make_modifier();
 		for(size_t i = 0; i < NW; i++)
 			mWord[i] ^= x.mWord[i];
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::operator<<=(size_type n)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::operator<<=(size_type n)
 	{
 		const size_type nWordShift = (size_type)(n >> kBitsPerWordShift);
 
+		auto m = make_modifier();
 		if(nWordShift)
 		{
 			for(int i = (int)(NW - 1); i >= 0; --i)
@@ -770,11 +797,12 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::operator>>=(size_type n)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::operator>>=(size_type n)
 	{
 		const size_type nWordShift = (size_type)(n >> kBitsPerWordShift);
 
+		auto m = make_modifier();
 		if(nWordShift)
 		{
 			for(size_t i = 0; i < NW; ++i)
@@ -790,27 +818,30 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::flip()
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::flip()
 	{
+		auto m = make_modifier();
 		for(size_t i = 0; i < NW; i++)
 			mWord[i] = ~mWord[i];
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::set()
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::set()
 	{
+		auto m = make_modifier();
 		for(size_t i = 0; i < NW; i++)
 			mWord[i] = static_cast<word_type>(~static_cast<word_type>(0));
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::set(size_type i, bool value)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::set(size_type i, bool value)
 	{
+		auto m = make_modifier(i >> kBitsPerWordShift);
 		if(value)
 			mWord[i >> kBitsPerWordShift] |=  (static_cast<word_type>(1) << (i & kBitsPerWordMask));
 		else
@@ -818,9 +849,10 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::reset()
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::reset()
 	{
+		auto m = make_modifier(0);
 		if(NW > 16) // This is a constant expression and should be optimized away.
 		{
 			// This will be fastest if compiler intrinsic function optimizations are enabled.
@@ -834,8 +866,8 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline bool BitsetBase<NW, WordType>::operator==(const this_type& x) const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline bool BitsetBase<NW, WordType, TrackerType>::operator==(const this_type& x) const
 	{
 		for(size_t i = 0; i < NW; i++)
 		{
@@ -846,8 +878,8 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline bool BitsetBase<NW, WordType>::any() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline bool BitsetBase<NW, WordType, TrackerType>::any() const
 	{
 		for(size_t i = 0; i < NW; i++)
 		{
@@ -858,9 +890,9 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::size_type
-	BitsetBase<NW, WordType>::count() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::size_type
+	BitsetBase<NW, WordType, TrackerType>::count() const
 	{
 		size_type n = 0;
 
@@ -889,17 +921,19 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::from_uint32(uint32_t value)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::from_uint32(uint32_t value)
 	{
+		auto m = make_modifier(0);
 		reset();
 		mWord[0] = static_cast<word_type>(value);
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline void BitsetBase<NW, WordType>::from_uint64(uint64_t value)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline void BitsetBase<NW, WordType, TrackerType>::from_uint64(uint64_t value)
 	{
+		auto m = make_modifier(0);
 		reset();
 
 		#if(EA_PLATFORM_WORD_SIZE == 4)
@@ -914,8 +948,8 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline unsigned long BitsetBase<NW, WordType>::to_ulong() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline unsigned long BitsetBase<NW, WordType, TrackerType>::to_ulong() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			for(size_t i = 1; i < NW; ++i)
@@ -928,8 +962,8 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline uint32_t BitsetBase<NW, WordType>::to_uint32() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline uint32_t BitsetBase<NW, WordType, TrackerType>::to_uint32() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			// Verify that high words or bits are not set and thus that to_uint32 doesn't lose information.
@@ -949,8 +983,8 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline uint64_t BitsetBase<NW, WordType>::to_uint64() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline uint64_t BitsetBase<NW, WordType, TrackerType>::to_uint64() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			// Verify that high words are not set and thus that to_uint64 doesn't lose information.
@@ -972,25 +1006,25 @@ namespace eastl
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::word_type&
-	BitsetBase<NW, WordType>::DoGetWord(size_type i)
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::word_type&
+	BitsetBase<NW, WordType, TrackerType>::DoGetWord(size_type i)
 	{
 		return mWord[i >> kBitsPerWordShift];
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::word_type
-	BitsetBase<NW, WordType>::DoGetWord(size_type i) const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::word_type
+	BitsetBase<NW, WordType, TrackerType>::DoGetWord(size_type i) const
 	{
 		return mWord[i >> kBitsPerWordShift];
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::size_type 
-	BitsetBase<NW, WordType>::DoFindFirst() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::size_type
+	BitsetBase<NW, WordType, TrackerType>::DoFindFirst() const
 	{
 		for(size_type word_index = 0; word_index < NW; ++word_index)
 		{
@@ -1008,9 +1042,9 @@ namespace eastl
 EA_DISABLE_GCC_WARNING(-Warray-bounds)
 #endif
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::size_type 
-	BitsetBase<NW, WordType>::DoFindNext(size_type last_find) const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::size_type
+	BitsetBase<NW, WordType, TrackerType>::DoFindNext(size_type last_find) const
 	{
 		// Start looking from the next bit.
 		++last_find;
@@ -1048,9 +1082,9 @@ EA_RESTORE_GCC_WARNING()
 
 
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::size_type 
-	BitsetBase<NW, WordType>::DoFindLast() const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::size_type
+	BitsetBase<NW, WordType, TrackerType>::DoFindLast() const
 	{
 		for(size_type word_index = (size_type)NW; word_index > 0; --word_index)
 		{
@@ -1064,9 +1098,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t NW, typename WordType>
-	inline typename BitsetBase<NW, WordType>::size_type 
-	BitsetBase<NW, WordType>::DoFindPrev(size_type last_find) const
+	template <size_t NW, typename WordType, typename TrackerType>
+	inline typename BitsetBase<NW, WordType, TrackerType>::size_type
+	BitsetBase<NW, WordType, TrackerType>::DoFindPrev(size_type last_find) const
 	{
 		if(last_find > 0)
 		{
@@ -1098,29 +1132,33 @@ EA_RESTORE_GCC_WARNING()
 
 
 	///////////////////////////////////////////////////////////////////////////
-	// BitsetBase<1, WordType>
+	// BitsetBase<1, WordType, TrackerType>
 	///////////////////////////////////////////////////////////////////////////
 
-	template <typename WordType>
-	inline BitsetBase<1, WordType>::BitsetBase()
+	template <typename WordType, typename TrackerType>
+	inline BitsetBase<1, WordType, TrackerType>::BitsetBase(TrackerType tr)
+		: TrackerType(tr)
 	{
+		auto m = make_modifier();
 		mWord[0] = 0;
 	}
 
 
-	template <typename WordType>
-	inline BitsetBase<1, WordType>::BitsetBase(uint32_t value)
+	template <typename WordType, typename TrackerType>
+	inline BitsetBase<1, WordType, TrackerType>::BitsetBase(uint32_t value, TrackerType tr)
+		: TrackerType(tr)
 	{
 		// This implementation assumes that sizeof(value) <= sizeof(word_type).
 		//EASTL_CT_ASSERT(sizeof(value) <= sizeof(word_type)); Disabled because we now have support for uint8_t and uint16_t word types. It would be nice to have a runtime assert that tested this.
 
+		auto m = make_modifier(0);
 		mWord[0] = static_cast<word_type>(value);
 	}
 
 
 	/*
-	template <typename WordType>
-	inline BitsetBase<1, WordType>::BitsetBase(uint64_t value)
+	template <typename WordType, typename TrackerType>
+	inline BitsetBase<1, WordType, TrackerType>::BitsetBase(uint64_t value)
 	{
 		#if(EA_PLATFORM_WORD_SIZE == 4)
 			EASTL_ASSERT(value <= 0xffffffff);
@@ -1132,61 +1170,68 @@ EA_RESTORE_GCC_WARNING()
 	*/
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::operator&=(const this_type& x)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::operator&=(const this_type& x)
 	{
+		auto m = make_modifier();
 		mWord[0] &= x.mWord[0];
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::operator|=(const this_type& x)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::operator|=(const this_type& x)
 	{
+		auto m = make_modifier();
 		mWord[0] |= x.mWord[0];
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::operator^=(const this_type& x)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::operator^=(const this_type& x)
 	{
+		auto m = make_modifier();
 		mWord[0] ^= x.mWord[0];
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::operator<<=(size_type n)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::operator<<=(size_type n)
 	{
+		auto m = make_modifier();
 		mWord[0] <<= n;
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::operator>>=(size_type n)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::operator>>=(size_type n)
 	{
+		auto m = make_modifier();
 		mWord[0] >>= n;
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::flip()
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::flip()
 	{
+		auto m = make_modifier();
 		mWord[0] = ~mWord[0];
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::set()
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::set()
 	{
 		mWord[0] = static_cast<word_type>(~static_cast<word_type>(0));
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::set(size_type i, bool value)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::set(size_type i, bool value)
 	{
+		auto m = make_modifier();
 		if(value)
 			mWord[0] |=  (static_cast<word_type>(1) << i);
 		else
@@ -1194,30 +1239,31 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::reset()
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::reset()
 	{
+		auto m = make_modifier();
 		mWord[0] = 0;
 	}
 
 
-	template <typename WordType>
-	inline bool BitsetBase<1, WordType>::operator==(const this_type& x) const
+	template <typename WordType, typename TrackerType>
+	inline bool BitsetBase<1, WordType, TrackerType>::operator==(const this_type& x) const
 	{
 		return mWord[0] == x.mWord[0];
 	}
 
 
-	template <typename WordType>
-	inline bool BitsetBase<1, WordType>::any() const
+	template <typename WordType, typename TrackerType>
+	inline bool BitsetBase<1, WordType, TrackerType>::any() const
 	{
 		return mWord[0] != 0;
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::size_type
-	BitsetBase<1, WordType>::count() const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::size_type
+	BitsetBase<1, WordType, TrackerType>::count() const
 	{
 		#if defined(__GNUC__) && (((__GNUC__ * 100) + __GNUC_MINOR__) >= 304) && !defined(EA_PLATFORM_ANDROID) // GCC 3.4 or later
 			#if(EA_PLATFORM_WORD_SIZE == 4)
@@ -1236,16 +1282,18 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::from_uint32(uint32_t value)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::from_uint32(uint32_t value)
 	{
+		auto m = make_modifier();
 		mWord[0] = static_cast<word_type>(value);
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<1, WordType>::from_uint64(uint64_t value)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<1, WordType, TrackerType>::from_uint64(uint64_t value)
 	{
+		auto m = make_modifier();
 		#if(EA_PLATFORM_WORD_SIZE == 4)
 			EASTL_ASSERT(value <= 0xffffffff);
 			mWord[0] = static_cast<word_type>(value);   // This potentially loses data, but that's what the user is requesting.
@@ -1255,8 +1303,8 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline unsigned long BitsetBase<1, WordType>::to_ulong() const
+	template <typename WordType, typename TrackerType>
+	inline unsigned long BitsetBase<1, WordType, TrackerType>::to_ulong() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			#if((EA_PLATFORM_WORD_SIZE > 4) && defined(EA_PLATFORM_MICROSOFT)) // If we are using 64 bit words but ulong is less than 64 bits... Microsoft platforms alone use a 32 bit long under 64 bit platforms.
@@ -1270,8 +1318,8 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline uint32_t BitsetBase<1, WordType>::to_uint32() const
+	template <typename WordType, typename TrackerType>
+	inline uint32_t BitsetBase<1, WordType, TrackerType>::to_uint32() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			#if(EA_PLATFORM_WORD_SIZE > 4) // If we are using 64 bit words...
@@ -1285,41 +1333,41 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline uint64_t BitsetBase<1, WordType>::to_uint64() const
+	template <typename WordType, typename TrackerType>
+	inline uint64_t BitsetBase<1, WordType, TrackerType>::to_uint64() const
 	{
 		// This implementation is the same regardless of the word size, and there is no possibility of overflow_error.
 		return static_cast<uint64_t>(mWord[0]);
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::word_type&
-	BitsetBase<1, WordType>::DoGetWord(size_type)
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::word_type&
+	BitsetBase<1, WordType, TrackerType>::DoGetWord(size_type)
 	{
 		return mWord[0];
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::word_type
-	BitsetBase<1, WordType>::DoGetWord(size_type) const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::word_type
+	BitsetBase<1, WordType, TrackerType>::DoGetWord(size_type) const
 	{
 		return mWord[0];
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::size_type
-	BitsetBase<1, WordType>::DoFindFirst() const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::size_type
+	BitsetBase<1, WordType, TrackerType>::DoFindFirst() const
 	{
 		return GetFirstBit(mWord[0]);
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::size_type 
-	BitsetBase<1, WordType>::DoFindNext(size_type last_find) const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::size_type
+	BitsetBase<1, WordType, TrackerType>::DoFindNext(size_type last_find) const
 	{
 		if(++last_find < kBitsPerWord)
 		{
@@ -1333,17 +1381,17 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::size_type 
-	BitsetBase<1, WordType>::DoFindLast() const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::size_type
+	BitsetBase<1, WordType, TrackerType>::DoFindLast() const
 	{
 		return GetLastBit(mWord[0]);
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<1, WordType>::size_type 
-	BitsetBase<1, WordType>::DoFindPrev(size_type last_find) const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<1, WordType, TrackerType>::size_type
+	BitsetBase<1, WordType, TrackerType>::DoFindPrev(size_type last_find) const
 	{
 		if(last_find > 0)
 		{
@@ -1360,31 +1408,35 @@ EA_RESTORE_GCC_WARNING()
 
 
 	///////////////////////////////////////////////////////////////////////////
-	// BitsetBase<2, WordType>
+	// BitsetBase<2, WordType, TrackerType>
 	///////////////////////////////////////////////////////////////////////////
 
-	template <typename WordType>
-	inline BitsetBase<2, WordType>::BitsetBase()
+	template <typename WordType, typename TrackerType>
+	inline BitsetBase<2, WordType, TrackerType>::BitsetBase(TrackerType tr)
+		: TrackerType(tr)
 	{
+		auto m = make_modifier();
 		mWord[0] = 0;
 		mWord[1] = 0;
 	}
 
 
-	template <typename WordType>
-	inline BitsetBase<2, WordType>::BitsetBase(uint32_t value)
+	template <typename WordType, typename TrackerType>
+	inline BitsetBase<2, WordType, TrackerType>::BitsetBase(uint32_t value, TrackerType tr)
+		: TrackerType(tr)
 	{
 		// This implementation assumes that sizeof(value) <= sizeof(word_type).
 		//EASTL_CT_ASSERT(sizeof(value) <= sizeof(word_type)); Disabled because we now have support for uint8_t and uint16_t word types. It would be nice to have a runtime assert that tested this.
 
+		auto m = make_modifier();
 		mWord[0] = static_cast<word_type>(value);
 		mWord[1] = 0;
 	}
 
 
 	/*
-	template <typename WordType>
-	inline BitsetBase<2, WordType>::BitsetBase(uint64_t value)
+	template <typename WordType, typename TrackerType>
+	inline BitsetBase<2, WordType, TrackerType>::BitsetBase(uint64_t value)
 	{
 		#if(EA_PLATFORM_WORD_SIZE == 4)
 			mWord[0] = static_cast<word_type>(value);
@@ -1397,33 +1449,37 @@ EA_RESTORE_GCC_WARNING()
 	*/
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::operator&=(const this_type& x)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::operator&=(const this_type& x)
 	{
+		auto m = make_modifier();
 		mWord[0] &= x.mWord[0];
 		mWord[1] &= x.mWord[1];
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::operator|=(const this_type& x)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::operator|=(const this_type& x)
 	{
+		auto m = make_modifier();
 		mWord[0] |= x.mWord[0];
 		mWord[1] |= x.mWord[1];
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::operator^=(const this_type& x)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::operator^=(const this_type& x)
 	{
+		auto m = make_modifier();
 		mWord[0] ^= x.mWord[0];
 		mWord[1] ^= x.mWord[1];
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::operator<<=(size_type n)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::operator<<=(size_type n)
 	{
+		auto m = make_modifier();
 		if(n) // to avoid a shift by kBitsPerWord, which is undefined
 		{
 			if(EASTL_UNLIKELY(n >= kBitsPerWord))   // parent expected to handle high bits and n >= 64
@@ -1440,9 +1496,10 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::operator>>=(size_type n)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::operator>>=(size_type n)
 	{
+		auto m = make_modifier();
 		if(n) // to avoid a shift by kBitsPerWord, which is undefined
 		{
 			if(EASTL_UNLIKELY(n >= kBitsPerWord))   // parent expected to handle n >= 64
@@ -1458,27 +1515,30 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::flip()
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::flip()
 	{
+		auto m = make_modifier();
 		mWord[0] = ~mWord[0];
 		mWord[1] = ~mWord[1];
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::set()
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::set()
 	{
+		auto m = make_modifier();
 		mWord[0] = ~static_cast<word_type>(0);
 		mWord[1] = ~static_cast<word_type>(0);
 		// We let the parent class turn off any upper bits.
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::set(size_type i, bool value)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::set(size_type i, bool value)
 	{
+		auto m = make_modifier();
 		if(value)
 			mWord[i >> kBitsPerWordShift] |=  (static_cast<word_type>(1) << (i & kBitsPerWordMask));
 		else
@@ -1486,31 +1546,32 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::reset()
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::reset()
 	{
+		auto m = make_modifier();
 		mWord[0] = 0;
 		mWord[1] = 0;
 	}
 
 
-	template <typename WordType>
-	inline bool BitsetBase<2, WordType>::operator==(const this_type& x) const
+	template <typename WordType, typename TrackerType>
+	inline bool BitsetBase<2, WordType, TrackerType>::operator==(const this_type& x) const
 	{
 		return (mWord[0] == x.mWord[0]) && (mWord[1] == x.mWord[1]);
 	}
 
 
-	template <typename WordType>
-	inline bool BitsetBase<2, WordType>::any() const
+	template <typename WordType, typename TrackerType>
+	inline bool BitsetBase<2, WordType, TrackerType>::any() const
 	{
 		// Or with two branches: { return (mWord[0] != 0) || (mWord[1] != 0); }
 		return (mWord[0] | mWord[1]) != 0; 
 	}
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::size_type
-	BitsetBase<2, WordType>::count() const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::size_type
+	BitsetBase<2, WordType, TrackerType>::count() const
 	{
 		#if defined(__GNUC__) && (((__GNUC__ * 100) + __GNUC_MINOR__) >= 304) // GCC 3.4 or later
 			#if(EA_PLATFORM_WORD_SIZE == 4)
@@ -1525,17 +1586,19 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::from_uint32(uint32_t value)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::from_uint32(uint32_t value)
 	{
+		auto m = make_modifier();
 		mWord[0] = static_cast<word_type>(value);
 		mWord[1] = 0;
 	}
 
 
-	template <typename WordType>
-	inline void BitsetBase<2, WordType>::from_uint64(uint64_t value)
+	template <typename WordType, typename TrackerType>
+	inline void BitsetBase<2, WordType, TrackerType>::from_uint64(uint64_t value)
 	{
+		auto m = make_modifier();
 		#if(EA_PLATFORM_WORD_SIZE == 4)
 			mWord[0] = static_cast<word_type>(value);
 			mWord[1] = static_cast<word_type>(value >> 32);
@@ -1546,8 +1609,8 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline unsigned long BitsetBase<2, WordType>::to_ulong() const
+	template <typename WordType, typename TrackerType>
+	inline unsigned long BitsetBase<2, WordType, TrackerType>::to_ulong() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			if(mWord[1])
@@ -1557,8 +1620,8 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline uint32_t BitsetBase<2, WordType>::to_uint32() const
+	template <typename WordType, typename TrackerType>
+	inline uint32_t BitsetBase<2, WordType, TrackerType>::to_uint32() const
 	{
 		#if EASTL_EXCEPTIONS_ENABLED
 			// Verify that high words or bits are not set and thus that to_uint32 doesn't lose information.
@@ -1576,8 +1639,8 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline uint64_t BitsetBase<2, WordType>::to_uint64() const
+	template <typename WordType, typename TrackerType>
+	inline uint64_t BitsetBase<2, WordType, TrackerType>::to_uint64() const
 	{
 		#if(EA_PLATFORM_WORD_SIZE == 4)
 			// There can't possibly be an overflow_error here.
@@ -1594,25 +1657,25 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::word_type&
-	BitsetBase<2, WordType>::DoGetWord(size_type i)
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::word_type&
+	BitsetBase<2, WordType, TrackerType>::DoGetWord(size_type i)
 	{
 		return mWord[i >> kBitsPerWordShift];
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::word_type
-	BitsetBase<2, WordType>::DoGetWord(size_type i) const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::word_type
+	BitsetBase<2, WordType, TrackerType>::DoGetWord(size_type i) const
 	{
 		return mWord[i >> kBitsPerWordShift];
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::size_type 
-	BitsetBase<2, WordType>::DoFindFirst() const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::size_type
+	BitsetBase<2, WordType, TrackerType>::DoFindFirst() const
 	{
 		size_type fbiw = GetFirstBit(mWord[0]);
 
@@ -1628,9 +1691,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::size_type 
-	BitsetBase<2, WordType>::DoFindNext(size_type last_find) const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::size_type
+	BitsetBase<2, WordType, TrackerType>::DoFindNext(size_type last_find) const
 	{
 		// If the last find was in the first word, we must check it and then possibly the second.
 		if(++last_find < (size_type)kBitsPerWord)
@@ -1667,9 +1730,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::size_type 
-	BitsetBase<2, WordType>::DoFindLast() const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::size_type
+	BitsetBase<2, WordType, TrackerType>::DoFindLast() const
 	{
 		size_type lbiw = GetLastBit(mWord[1]);
 
@@ -1685,9 +1748,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <typename WordType>
-	inline typename BitsetBase<2, WordType>::size_type 
-	BitsetBase<2, WordType>::DoFindPrev(size_type last_find) const
+	template <typename WordType, typename TrackerType>
+	inline typename BitsetBase<2, WordType, TrackerType>::size_type
+	BitsetBase<2, WordType, TrackerType>::DoFindPrev(size_type last_find) const
 	{
 		// If the last find was in the second word, we must check it and then possibly the first.
 		if(last_find > (size_type)kBitsPerWord)
@@ -1729,19 +1792,21 @@ EA_RESTORE_GCC_WARNING()
 	// bitset::reference
 	///////////////////////////////////////////////////////////////////////////
 
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType>::reference::reference(const bitset& x, size_type i)
-		: mpBitWord(&const_cast<bitset&>(x).DoGetWord(i)),
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType>::reference::reference(const bitset& x, size_type i)
+		: TrackerType(x),
+		  mpBitWord(&const_cast<bitset&>(x).DoGetWord(i)),
 		  mnBitIndex(i & kBitsPerWordMask)
 	{   // We have an issue here because the above is casting away the const-ness of the source bitset.
 		// Empty
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::reference&
-	bitset<N, WordType>::reference::operator=(bool value)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::reference&
+	bitset<N, WordType, TrackerType>::reference::operator=(bool value)
 	{
+		auto m = make_modifier();
 		if(value)
 			*mpBitWord |=  (static_cast<word_type>(1) << (mnBitIndex & kBitsPerWordMask));
 		else
@@ -1750,10 +1815,11 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::reference&
-	bitset<N, WordType>::reference::operator=(const reference& x)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::reference&
+	bitset<N, WordType, TrackerType>::reference::operator=(const reference& x)
 	{
+		auto m = make_modifier();
 		if(*x.mpBitWord & (static_cast<word_type>(1) << (x.mnBitIndex & kBitsPerWordMask)))
 			*mpBitWord |=  (static_cast<word_type>(1) << (mnBitIndex & kBitsPerWordMask));
 		else
@@ -1762,25 +1828,26 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::reference::operator~() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::reference::operator~() const
 	{
 		return (*mpBitWord & (static_cast<word_type>(1) << (mnBitIndex & kBitsPerWordMask))) == 0;
 	}
 
 
 	//Defined inline in the class because Metrowerks fails to be able to compile it here.
-	//template <size_t N, typename WordType>
-	//inline bitset<N, WordType>::reference::operator bool() const
+	//template <size_t N, typename WordType, typename TrackerType>
+	//inline bitset<N, WordType, TrackerType>::reference::operator bool() const
 	//{
 	//    return (*mpBitWord & (static_cast<word_type>(1) << (mnBitIndex & kBitsPerWordMask))) != 0;
 	//}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::reference&
-	bitset<N, WordType>::reference::flip()
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::reference&
+	bitset<N, WordType, TrackerType>::reference::flip()
 	{
+		auto m = make_modifier();
 		*mpBitWord ^= static_cast<word_type>(1) << (mnBitIndex & kBitsPerWordMask);
 		return *this;
 	}
@@ -1792,26 +1859,27 @@ EA_RESTORE_GCC_WARNING()
 	// bitset
 	///////////////////////////////////////////////////////////////////////////
 
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType>::bitset()
-		: base_type()
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType>::bitset(TrackerType tr)
+		: base_type(tr)
 	{
 		// Empty. The base class will set all bits to zero.
 	}
 
 	EA_DISABLE_VC_WARNING(6313)
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType>::bitset(uint32_t value)
-		: base_type(value)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType>::bitset(uint32_t value, TrackerType tr)
+		: base_type(value, tr)
 	{
 		if((N & kBitsPerWordMask) || (N == 0)) // If there are any high bits to clear... (If we didn't have this check, then the code below would do the wrong thing when N == 32.
 			mWord[kWordCount - 1] &= ~(static_cast<word_type>(~static_cast<word_type>(0)) << (N & kBitsPerWordMask)); // This clears any high unused bits.
+		this->track_post(mWord, sizeof mWord, 'B');
 	}
 	EA_RESTORE_VC_WARNING()
 
 	/*
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType>::bitset(uint64_t value)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType>::bitset(uint64_t value)
 		: base_type(value)
 	{
 		if((N & kBitsPerWordMask) || (N == 0)) // If there are any high bits to clear...
@@ -1820,37 +1888,38 @@ EA_RESTORE_GCC_WARNING()
 	*/
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::operator&=(const this_type& x)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::operator&=(const this_type& x)
 	{
 		base_type::operator&=(x);
 		return *this;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::operator|=(const this_type& x)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::operator|=(const this_type& x)
 	{
 		base_type::operator|=(x);
 		return *this;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::operator^=(const this_type& x)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::operator^=(const this_type& x)
 	{
 		base_type::operator^=(x);
 		return *this;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::operator<<=(size_type n)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::operator<<=(size_type n)
 	{
+		auto m = this->make_modifier();
 		if(EASTL_LIKELY((intptr_t)n < (intptr_t)N))
 		{
 			EA_DISABLE_VC_WARNING(6313)
@@ -1865,10 +1934,11 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::operator>>=(size_type n)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::operator>>=(size_type n)
 	{
+		auto m = this->make_modifier();
 		if(EASTL_LIKELY(n < N))
 			base_type::operator>>=(n);
 		else
@@ -1877,10 +1947,11 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::set()
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::set()
 	{
+		auto m = this->make_modifier();
 		base_type::set(); // This sets all bits.
 		if((N & kBitsPerWordMask) || (N == 0)) // If there are any high bits to clear... (If we didn't have this check, then the code below would do the wrong thing when N == 32.
 			mWord[kWordCount - 1] &= ~(static_cast<word_type>(~static_cast<word_type>(0)) << (N & kBitsPerWordMask)); // This clears any high unused bits. We need to do this so that shift operations proceed correctly.
@@ -1888,10 +1959,11 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::set(size_type i, bool value)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::set(size_type i, bool value)
 	{
+		auto m = this->make_modifier();
 		if(i < N)
 			base_type::set(i, value);
 		else
@@ -1910,19 +1982,20 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::reset()
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::reset()
 	{
 		base_type::reset();
 		return *this;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::reset(size_type i)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::reset(size_type i)
 	{
+		auto m = this->make_modifier();
 		if(EASTL_LIKELY(i < N))
 			DoGetWord(i) &= ~(static_cast<word_type>(1) << (i & kBitsPerWordMask));
 		else
@@ -1941,11 +2014,12 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 		
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::flip()
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::flip()
 	{
 		EA_DISABLE_VC_WARNING(6313)
+		auto m = this->make_modifier();
 		base_type::flip();
 		if((N & kBitsPerWordMask) || (N == 0)) // If there are any high bits to clear... (If we didn't have this check, then the code below would do the wrong thing when N == 32.
 			mWord[kWordCount - 1] &= ~(static_cast<word_type>(~static_cast<word_type>(0)) << (N & kBitsPerWordMask)); // This clears any high unused bits. We need to do this so that shift operations proceed correctly.
@@ -1954,10 +2028,11 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type&
-	bitset<N, WordType>::flip(size_type i)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type&
+	bitset<N, WordType, TrackerType>::flip(size_type i)
 	{
+		auto m = this->make_modifier();
 		if(EASTL_LIKELY(i < N))
 			DoGetWord(i) ^= (static_cast<word_type>(1) << (i & kBitsPerWordMask));
 		else
@@ -1975,17 +2050,17 @@ EA_RESTORE_GCC_WARNING()
 	}
 		
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type
-	bitset<N, WordType>::operator~() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type
+	bitset<N, WordType, TrackerType>::operator~() const
 	{
 		return this_type(*this).flip();
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::reference
-	bitset<N, WordType>::operator[](size_type i)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::reference
+	bitset<N, WordType, TrackerType>::operator[](size_type i)
 	{
 		#if EASTL_ASSERT_ENABLED
 			if(EASTL_UNLIKELY(!(i < N)))
@@ -1996,8 +2071,8 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::operator[](size_type i) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::operator[](size_type i) const
 	{
 		#if EASTL_ASSERT_ENABLED
 			if(EASTL_UNLIKELY(!(i < N)))
@@ -2008,23 +2083,24 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline const typename bitset<N, WordType>::word_type* bitset<N, WordType>::data() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline const typename bitset<N, WordType, TrackerType>::word_type* bitset<N, WordType, TrackerType>::data() const
 	{
 		return base_type::mWord;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::word_type* bitset<N, WordType>::data()
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::word_type* bitset<N, WordType, TrackerType>::data()
 	{
 		return base_type::mWord;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline void bitset<N, WordType>::from_uint32(uint32_t value)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline void bitset<N, WordType, TrackerType>::from_uint32(uint32_t value)
 	{
+		auto m = this->make_modifier();
 		base_type::from_uint32(value);
 
 		if((N & kBitsPerWordMask) || (N == 0)) // If there are any high bits to clear... (If we didn't have this check, then the code below would do the wrong thing when N == 32.
@@ -2032,9 +2108,10 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline void bitset<N, WordType>::from_uint64(uint64_t value)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline void bitset<N, WordType, TrackerType>::from_uint64(uint64_t value)
 	{
+		auto m = this->make_modifier();
 		base_type::from_uint64(value);
 
 		if((N & kBitsPerWordMask) || (N == 0)) // If there are any high bits to clear... (If we didn't have this check, then the code below would do the wrong thing when N == 32.
@@ -2042,59 +2119,59 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	// template <size_t N, typename WordType>
-	// inline unsigned long bitset<N, WordType>::to_ulong() const
+	// template <size_t N, typename WordType, typename TrackerType>
+	// inline unsigned long bitset<N, WordType, TrackerType>::to_ulong() const
 	// {
 	//     return base_type::to_ulong();
 	// }
 
 
-	// template <size_t N, typename WordType>
-	// inline uint32_t bitset<N, WordType>::to_uint32() const
+	// template <size_t N, typename WordType, typename TrackerType>
+	// inline uint32_t bitset<N, WordType, TrackerType>::to_uint32() const
 	// {
 	//     return base_type::to_uint32();
 	// }
 
 
-	// template <size_t N, typename WordType>
-	// inline uint64_t bitset<N, WordType>::to_uint64() const
+	// template <size_t N, typename WordType, typename TrackerType>
+	// inline uint64_t bitset<N, WordType, TrackerType>::to_uint64() const
 	// {
 	//     return base_type::to_uint64();
 	// }
 
 
-	// template <size_t N, typename WordType>
-	// inline typename bitset<N, WordType>::size_type
-	// bitset<N, WordType>::count() const
+	// template <size_t N, typename WordType, typename TrackerType>
+	// inline typename bitset<N, WordType, TrackerType>::size_type
+	// bitset<N, WordType, TrackerType>::count() const
 	// {
 	//     return base_type::count();
 	// }
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::size_type
-	bitset<N, WordType>::size() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::size_type
+	bitset<N, WordType, TrackerType>::size() const
 	{
 		return (size_type)N;
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::operator==(const this_type& x) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::operator==(const this_type& x) const
 	{
 		return base_type::operator==(x);
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::operator!=(const this_type& x) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::operator!=(const this_type& x) const
 	{
 		return !base_type::operator==(x);
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::test(size_type i) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::test(size_type i) const
 	{
 		if(EASTL_UNLIKELY(i < N))
 			return (DoGetWord(i) & (static_cast<word_type>(1) << (i & kBitsPerWordMask))) != 0;
@@ -2111,46 +2188,46 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	// template <size_t N, typename WordType>
-	// inline bool bitset<N, WordType>::any() const
+	// template <size_t N, typename WordType, typename TrackerType>
+	// inline bool bitset<N, WordType, TrackerType>::any() const
 	// {
 	//     return base_type::any();
 	// }
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::all() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::all() const
 	{
 		return count() == size();
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bool bitset<N, WordType>::none() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bool bitset<N, WordType, TrackerType>::none() const
 	{
 		return !base_type::any();
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type
-	bitset<N, WordType>::operator<<(size_type n) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type
+	bitset<N, WordType, TrackerType>::operator<<(size_type n) const
 	{
 		return this_type(*this).operator<<=(n);
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::this_type
-	bitset<N, WordType>::operator>>(size_type n) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::this_type
+	bitset<N, WordType, TrackerType>::operator>>(size_type n) const
 	{
 		return this_type(*this).operator>>=(n);
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::size_type
-	bitset<N, WordType>::find_first() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::size_type
+	bitset<N, WordType, TrackerType>::find_first() const
 	{
 		const size_type i = base_type::DoFindFirst();
 
@@ -2162,9 +2239,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::size_type
-	bitset<N, WordType>::find_next(size_type last_find) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::size_type
+	bitset<N, WordType, TrackerType>::find_next(size_type last_find) const
 	{
 		const size_type i = base_type::DoFindNext(last_find);
 
@@ -2176,9 +2253,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::size_type
-	bitset<N, WordType>::find_last() const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::size_type
+	bitset<N, WordType, TrackerType>::find_last() const
 	{
 		const size_type i = base_type::DoFindLast();
 
@@ -2190,9 +2267,9 @@ EA_RESTORE_GCC_WARNING()
 	}
 
 
-	template <size_t N, typename WordType>
-	inline typename bitset<N, WordType>::size_type
-	bitset<N, WordType>::find_prev(size_type last_find) const
+	template <size_t N, typename WordType, typename TrackerType>
+	inline typename bitset<N, WordType, TrackerType>::size_type
+	bitset<N, WordType, TrackerType>::find_prev(size_type last_find) const
 	{
 		const size_type i = base_type::DoFindPrev(last_find);
 
@@ -2209,25 +2286,25 @@ EA_RESTORE_GCC_WARNING()
 	// global operators
 	///////////////////////////////////////////////////////////////////////////
 
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType> operator&(const bitset<N, WordType>& a, const bitset<N, WordType>& b)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType> operator&(const bitset<N, WordType, TrackerType>& a, const bitset<N, WordType, TrackerType>& b)
 	{
 		// We get betting inlining when we don't declare temporary variables.
-		return bitset<N, WordType>(a).operator&=(b);
+		return bitset<N, WordType, TrackerType>(a).operator&=(b);
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType> operator|(const bitset<N, WordType>& a, const bitset<N, WordType>& b)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType> operator|(const bitset<N, WordType, TrackerType>& a, const bitset<N, WordType, TrackerType>& b)
 	{
-		return bitset<N, WordType>(a).operator|=(b);
+		return bitset<N, WordType, TrackerType>(a).operator|=(b);
 	}
 
 
-	template <size_t N, typename WordType>
-	inline bitset<N, WordType> operator^(const bitset<N, WordType>& a, const bitset<N, WordType>& b)
+	template <size_t N, typename WordType, typename TrackerType>
+	inline bitset<N, WordType, TrackerType> operator^(const bitset<N, WordType, TrackerType>& a, const bitset<N, WordType, TrackerType>& b)
 	{
-		return bitset<N, WordType>(a).operator^=(b);
+		return bitset<N, WordType, TrackerType>(a).operator^=(b);
 	}
 
 

@@ -369,7 +369,7 @@ namespace eastl
 	{
 		T * pDest           = pDestination;
 		const T* const pEnd = pDestination + n;
-		auto m = make_modifier(a, pDestination, (pDest - pDestination) * sizeof *pDestination);
+		auto m = make_modifier_n(a, *pDestination, (pDest - pDestination));
 		while(pDest < pEnd)
 			*pDest++ = c;
 		return pDestination + n;

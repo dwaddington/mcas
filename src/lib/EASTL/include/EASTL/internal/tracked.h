@@ -54,9 +54,21 @@ namespace eastl
 		};
 
 	template <typename Tracker>
-		Modifier<Tracker> make_modifier(const Tracker &r_, const void *p_, std::size_t s_)
+		Modifier<Tracker> make_modifier_range(const Tracker &r_, const void *p_, std::size_t s_, char id_ = '?')
 		{
-			return Modifier<Tracker>(r_, p_, s_);
+			return Modifier<Tracker>(r_, p_, s_, id_);
+		}
+
+	template <typename Tracker, typename Object>
+		Modifier<Tracker> make_modifier_n(const Tracker &r_, const Object &o_, std::size_t n, char id_ = '?')
+		{
+			return make_modifier_range(r_, &o_, n * (sizeof o_), id_);
+		}
+
+	template <typename Tracker, typename Object>
+		Modifier<Tracker> make_modifier(const Tracker &r_, const Object &o_, char id_ = '?')
+		{
+			return make_modifier_n(r_, o_, 1, id_);
 		}
 
 	template <typename Tracker>
@@ -70,19 +82,19 @@ namespace eastl
 			auto memcpy(void *dst, const void *src, std::size_t ct) const
 			{
 				/* TODO: should write an object to coordinate calls to track_pre and track_post. */
-				auto m = make_modifier(*this, dst, ct);
+				auto m = make_modifier_range(*this, dst, ct);
 				return ::memcpy(dst, src, ct);
 			}
 
 			auto memmove(void *dst, const void *src, std::size_t ct) const
 			{
-				auto m = make_modifier(*this, dst, ct);
+				auto m = make_modifier_range(*this, dst, ct);
 				return ::memmove(dst, src, ct);
 			}
 
 			auto memset(void *dst, int c, std::size_t ct) const
 			{
-				auto m = make_modifier(*this, dst, ct);
+				auto m = make_modifier_range(*this, dst, ct);
 				return ::memset(dst, c, ct);
 			}
 		};
@@ -259,12 +271,15 @@ namespace eastl
 		}
 
 	/* strong tracked */
-	template <typename Type, typename Tracker, char ID='?'>
-		class tracked
+	template <typename Type, typename Tracker, char ID='?', bool IsClass = std::is_class<Type>::value>
+		struct value_tracked;
+
+	template<typename Type, typename Tracker, char ID>
+		struct value_tracked<Type, Tracker, ID, false>
 			: public Tracker
 		{
-		public:
 			using modifier_type = Modifier<Tracker>;
+			using tracker_type = Tracker;
 		private:
 			/* Note: consider making type privately inherited if it is a class/struct,
 			 * to accomodate empty classes
@@ -279,22 +294,21 @@ namespace eastl
 			{
 				Tracker::track_post(&_t, sizeof _t, ID);
 			}
-		public:
 
-		private:
 			/* internal constructor */
-			tracked(const Type &t_, tracked_temp, const Tracker &r_) noexcept
+			value_tracked(const Type &t_, tracked_temp, const Tracker &r_) noexcept
 				: Tracker(r_)
 				, _t(t_)
 			{
 			}
+
 		public:
 			/* "Rule of five" declarations */
 			/* If this fails because there is no suitable Destructible<Tracker> constructor,
 			 * the tracker presumably has internal state and cannot be used with the
 			 * specifed type, e.g. deque, string, string_view.
 			 */
-			tracked(const Type &t_, const Tracker &r_ = Destructible<Tracker>()) noexcept
+			value_tracked(const Type &t_, const Tracker &r_ = Destructible<Tracker>()) noexcept
 				: Tracker(r_)
 				, _t(t_)
 			{
@@ -306,14 +320,14 @@ namespace eastl
 				track_1();
 			}
 
-			tracked(const tracked<Type, Tracker, ID> &other_) noexcept
+			value_tracked(const value_tracked<Type, Tracker, ID> &other_) noexcept
 				: Tracker(other_)
 				, _t(other_._t)
 			{
 				track_1();
 			}
 
-			tracked(tracked<Type, Tracker, ID> &&other_) noexcept
+			value_tracked(value_tracked<Type, Tracker, ID> &&other_) noexcept
 				: Tracker(other_)
 				, _t((other_.track_0(), std::move(other_._t)))
 			{
@@ -327,7 +341,7 @@ namespace eastl
 				return modifier_type(*this, &_t, sizeof _t, ID);
 			}
 
-			tracked &operator=(const Type &t_) noexcept
+			value_tracked &operator=(const Type &t_) noexcept
 			{
 				auto m = make_modifier();
 				_t = t_;
@@ -335,7 +349,7 @@ namespace eastl
 			}
 
 			/* ERROR: why not subsumed by the looser, templated version, which immediately follows? */
-			tracked &operator=(const tracked<Type, Tracker, ID> &other_) noexcept
+			value_tracked &operator=(const value_tracked<Type, Tracker, ID> &other_) noexcept
 			{
 				auto m = make_modifier();
 				_t = other_._t;
@@ -343,17 +357,17 @@ namespace eastl
 			}
 
 			template <typename U, char I>
-				tracked &operator=(const tracked<Type, U, I> &other_) noexcept
+				value_tracked &operator=(const value_tracked<Type, U, I> &other_) noexcept
 				{
 					auto m = make_modifier();
 					_t = other_._t;
 					return *this;
 				}
 
-			~tracked() = default;
+			~value_tracked() = default;
 
 			/* zero-argument constructor */
-			tracked() = default;
+			value_tracked() = default;
 			/* Read access to the value */
 			operator Type() const
 			{
@@ -370,21 +384,21 @@ namespace eastl
 				return _t;
 			}
 			/* scalars */
-			tracked<Type, Tracker, ID> &operator++()
+			value_tracked<Type, Tracker, ID> &operator++()
 			{
 				auto m = make_modifier();
 				++_t;
 				return *this;
 			}
 			template <typename U>
-				tracked<Type, Tracker, ID> &operator+=(const U &u)
+				value_tracked<Type, Tracker, ID> &operator+=(const U &u)
 				{
 					auto m = make_modifier();
 					_t += u;
 					return *this;
 				}
 			template <typename U>
-				tracked<Type, Tracker, ID> &operator-=(const U &u)
+				value_tracked<Type, Tracker, ID> &operator-=(const U &u)
 				{
 					auto m = make_modifier();
 					_t -= u;
@@ -397,7 +411,7 @@ namespace eastl
 				++_t;
 				return t;
 			}
-			tracked<Type, Tracker, ID> &operator--()
+			value_tracked<Type, Tracker, ID> &operator--()
 			{
 				auto m = make_modifier();
 				--_t;
@@ -429,13 +443,13 @@ namespace eastl
 			}
 
 			template <typename U>
-				tracked<U *, Tracker, ID> ptr_cast() const
+				value_tracked<U *, Tracker, ID> ptr_cast() const
 				{
-					return tracked<U *, Tracker, ID>(static_cast<U *>(_t), tracked_temp{}, *this);
+					return value_tracked<U *, Tracker, ID>(static_cast<U *>(_t), tracked_temp{}, *this);
 				}
 
 			template <typename U, typename V, char I>
-				void swap(tracked<U, V, I> &b) noexcept
+				void swap(value_tracked<U, V, I> &b) noexcept
 				{
 					auto m = make_modifier();
 					auto mb = b.make_modifier();
@@ -443,19 +457,211 @@ namespace eastl
 				}
 
 			template <typename U, typename V, char I>
-				friend class eastl::tracked;
+				friend class eastl::value_tracked;
 
-			void swap(tracked<Type, Tracker, ID> &a, tracked<Type, Tracker, ID> &b) noexcept;
+			void swap(value_tracked<Type, Tracker, ID> &a, value_tracked<Type, Tracker, ID> &b) noexcept;
+		};
+
+	template<typename Type, typename Tracker, char ID>
+		struct value_tracked<Type, Tracker, ID, true>
+			: public Tracker
+			, public Type
+		{
+			using modifier_type = Modifier<Tracker>;
+			using tracker_type = Tracker;
+		private:
+#if 0
+			/* Note: consider making type privately inherited if it is a class/struct,
+			 * to accomodate empty classes
+			 */
+			Type _t;
+#endif
+			void track_0() noexcept
+			{
+				auto &t = static_cast<const Type &>(*this);
+				Tracker::track_pre(&t, sizeof t, ID);
+			}
+			void track_1() noexcept
+			{
+				auto &t = static_cast<const Type &>(*this);
+				Tracker::track_post(&t, sizeof t, ID);
+			}
+
+			/* internal constructor */
+			value_tracked(const Type &t_, tracked_temp, const Tracker &r_) noexcept
+				: Tracker(r_)
+				, Type(t_)
+			{
+			}
+
+		public:
+			/* "Rule of five" declarations */
+			/* If this fails because there is no suitable Destructible<Tracker> constructor,
+			 * the tracker presumably has internal state and cannot be used with the
+			 * specifed type, e.g. deque, string, string_view.
+			 */
+			value_tracked(const Type &t_, const Tracker &r_ = Destructible<Tracker>()) noexcept
+				: Tracker(r_)
+				, Type(t_)
+			{
+				/* Constructors are an exception to the rule that all tracking
+				 * must include a pre and post call. Creation of data out of
+				 * raw bytes should not care about the previous value of the
+				 * raw bytes.
+				 */
+				track_1();
+			}
+
+			value_tracked(const value_tracked<Type, Tracker, ID> &other_) noexcept
+				: Tracker(other_)
+				, Type(other_)
+			{
+				track_1();
+			}
+
+			value_tracked(value_tracked<Type, Tracker, ID> &&other_) noexcept
+				: Tracker(other_)
+				, Type((other_.track_0(), std::move(other_.t())))
+			{
+				track_1();
+				/* the source may have been altered too */
+				other_.track_1();
+			}
+
+			modifier_type make_modifier()
+			{
+				return make_modifier(*this, value(), ID);
+			}
+
+			value_tracked &operator=(const Type &t_) noexcept
+			{
+				auto m = make_modifier();
+				value(make_modifier()) = t_;
+				return *this;
+			}
+
+			/* ERROR: why not subsumed by the looser, templated version, which immediately follows? */
+			value_tracked &operator=(const value_tracked<Type, Tracker, ID> &other_) noexcept
+			{
+				auto m = make_modifier();
+				value(make_modifier()) = other_.t();
+				return *this;
+			}
+
+			template <typename U, char I>
+				value_tracked &operator=(const value_tracked<Type, U, I> &other_) noexcept
+				{
+					auto m = make_modifier();
+					value(make_modifier()) = other_.t();
+					return *this;
+				}
+
+			~value_tracked() = default;
+
+			/* zero-argument constructor */
+			value_tracked() = default;
+			/* Read access to the value */
+			operator Type() const
+			{
+				return *this;
+			}
+			/* explicit read access */
+			const Type &value() const
+			{
+				return *this;
+			}
+			/* explicit write access */
+			Type &value(const modifier_type &)
+			{
+				return *this;
+			}
+			/* scalars */
+			value_tracked<Type, Tracker, ID> &operator++()
+			{
+				auto m = make_modifier();
+				++value(m);
+				return *this;
+			}
+			template <typename U>
+				value_tracked<Type, Tracker, ID> &operator+=(const U &u)
+				{
+					auto m = make_modifier();
+					value(m) += u;
+					return *this;
+				}
+			template <typename U>
+				value_tracked<Type, Tracker, ID> &operator-=(const U &u)
+				{
+					auto m = make_modifier();
+					value(m) -= u;
+					return *this;
+				}
+			Type operator++(int)
+			{
+				auto t = value();
+				auto m = make_modifier();
+				++value(m);
+				return t;
+			}
+			value_tracked<Type, Tracker, ID> &operator--()
+			{
+				auto m = make_modifier();
+				--value(m);
+				return *this;
+			}
+			Type operator--(int)
+			{
+				auto t = value();
+				auto m = make_modifier();
+				--value(m);
+				return t;
+			}
+
+			/* pointers */
+			std::remove_pointer_t<const Type> &operator*() const
+			{
+				return *value();
+			}
+
+			std::remove_pointer_t<Type> &deref(modifier_type &m)
+			{
+				/* presume that the non-const version is the target of a store */
+				return *value(m);
+			}
+
+			const Type &operator->() const
+			{
+				return value();
+			}
+
+			template <typename U>
+				value_tracked<U *, Tracker, ID> ptr_cast() const
+				{
+					return value_tracked<U *, Tracker, ID>(static_cast<U *>(value()), tracked_temp{}, *this);
+				}
+
+			template <typename U, typename V, char I>
+				void swap(value_tracked<U, V, I> &b) noexcept
+				{
+					auto m = make_modifier();
+					auto mb = b.make_modifier();
+					eastl::swap(value(m), b.value(mb));
+				}
+
+			template <typename U, typename V, char I>
+				friend class eastl::value_tracked;
+
+			void swap(value_tracked<Type, Tracker, ID> &a, value_tracked<Type, Tracker, ID> &b) noexcept;
 		};
 
 	template <typename Type, typename Tracker, char ID>
-		bool operator==(const tracked<Type, Tracker, ID> &a, const tracked<Type, Tracker, ID> &b)
+		bool operator==(const value_tracked<Type, Tracker, ID> &a, const value_tracked<Type, Tracker, ID> &b)
 		{
 			return Type(a) == Type(b);
 		}
 
 	template <typename T, typename Tracker, char ID>
-		struct iterator_traits<tracked<T*, Tracker, ID>>
+		struct iterator_traits<value_tracked<T*, Tracker, ID>>
 		{
 			typedef EASTL_ITC_NS::random_access_iterator_tag iterator_category;
 			typedef T                                        value_type;
@@ -465,7 +671,7 @@ namespace eastl
 		};
 
 	template <typename T, typename Tracker, char ID>
-		struct iterator_traits<tracked<const T*, Tracker, ID>>
+		struct iterator_traits<value_tracked<const T*, Tracker, ID>>
 		{
 			typedef EASTL_ITC_NS::random_access_iterator_tag iterator_category;
 			typedef T                                        value_type;
@@ -475,7 +681,7 @@ namespace eastl
 		};
 
 	template <typename Type, typename Tracker, char ID>
-		inline void swap(tracked<Type, Tracker, ID> &a, tracked<Type, Tracker, ID> &b) noexcept
+		inline void swap(value_tracked<Type, Tracker, ID> &a, value_tracked<Type, Tracker, ID> &b) noexcept
 		{
 			a.swap(b);
 		}

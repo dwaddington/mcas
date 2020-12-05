@@ -97,7 +97,7 @@ namespace eastl
 	template <typename Tracker>
 	struct ListNodeBase
 	{
-		using tracked_type = tracked<ListNodeBase<Tracker>*, Tracker, 'L'>;
+		using tracked_type = value_tracked<ListNodeBase<Tracker>*, Tracker, 'L'>;
 		tracked_type mpNext;
 		tracked_type mpPrev;
 
@@ -135,8 +135,8 @@ namespace eastl
 		template <typename LN, typename Allocator>
 		struct ListNodeBaseProxy
 		{
-			tracked<LN*, Tracker, 'L'> mpNext;
-			tracked<LN*, Tracker, 'L'> mpPrev;
+			value_tracked<LN*, Tracker, 'L'> mpNext;
+			value_tracked<LN*, Tracker, 'L'> mpPrev;
 		};
 
 		template <typename T>
@@ -230,7 +230,7 @@ namespace eastl
 	protected:
 		base_node_type mNode;
 		#if EASTL_LIST_SIZE_CACHE
-			tracked<size_type, tracker_type, 'S'>  mSize;
+			value_tracked<size_type, tracker_type, 'S'>  mSize;
 		#endif
 		allocator_type mAllocator;  // To do: Use base class optimization to make this go away.
 
