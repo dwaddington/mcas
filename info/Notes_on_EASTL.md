@@ -72,10 +72,12 @@ this->track_post(&x, sizeof x)
 
 A "modifier" helper which has track_pre in the constructor and track_post in the destructor, improves the syntax:
 
+```
 {
 	auto m = make_modifier(*this, x);
 	++x;
 }
+```
 
 The code in src/lib/EASTL/include/EASTL/internal/tracked.h has a class called Modifiier and function make_modifier which illustrates this.
 
@@ -85,9 +87,7 @@ If x is of class type, and the class controls all modifications, the calls to tr
 ++x; /* fails if class of x does not support operator++, else should do the right thing. */
 ```
 
-That is what I tried to do in test5: "box" an integer (in Java terms) including the tracker in the object.
 The class value_tracked in src/lib/ilibccpm/include/ccpm/value_tracked.h does some of this.
 There is another example, possibly more complete, in src/lib/EASTL/include/EASTL/internal/tracked.h.
-
-git reset --hard HEAD~1
-git reset --hard HEAD~1
+Both versions declare a "tracked_value" template which combines an object and a tracker.
+The non-class template instantiation "boxes" (in Java terms) an object of a fundamental type.
