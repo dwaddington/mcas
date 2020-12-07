@@ -430,6 +430,19 @@ status_t MCAS_client::invoke_put_ado(const IKVStore::pool_t            pool,
   return _connection->invoke_put_ado(pool, key, request, value, root_len, flags, out_response);
 }
 
+status_t MCAS_client::async_invoke_put_ado(const IMCAS::pool_t           pool,
+                                           const basic_string_view<byte> key,
+                                           const basic_string_view<byte> request,
+                                           const basic_string_view<byte> value,
+                                           const size_t                  root_len,
+                                           const ado_flags_t             flags,
+                                           std::vector<ADO_response>&    out_response,
+                                           async_handle_t&               out_async_handle)
+{
+  return _connection->invoke_put_ado_async(pool, key, request, value, root_len, flags, out_response, out_async_handle);
+}
+
+
 /**
  * Factory entry point
  *

@@ -258,6 +258,15 @@ class MCAS_client
                                   const size_t                      root_len,
                                   const ado_flags_t                 flags,
                                   std::vector<IMCAS::ADO_response> &out_response) override;
+  
+  virtual status_t async_invoke_put_ado(const IMCAS::pool_t           pool,
+                                        const basic_string_view<byte> key,
+                                        const basic_string_view<byte> request,
+                                        const basic_string_view<byte> value,
+                                        const size_t                  root_len,
+                                        const ado_flags_t             flags,
+                                        std::vector<ADO_response>&    out_response,
+                                        async_handle_t&               out_async_handle) override;
 
  private:
 
