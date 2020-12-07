@@ -60,10 +60,10 @@ jobs:
     #    uses a compiled language
 
     - run: | 
-           | cd deps ; ./install-apts-ubuntu-18.sh ; cd ..
-           | mkdir build; cd build; cmake -DBUILD_KERNEL_SUPPORT=OFF -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist -DTBB_CI_BUILD=ON ..
-           | make bootstrap
-           | make
+        cd deps ; ./install-apts-ubuntu-18.sh ; cd ..
+        mkdir build; cd build; cmake -DBUILD_KERNEL_SUPPORT=OFF -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist -DTBB_CI_BUILD=ON ..
+        make bootstrap
+        make
       
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
