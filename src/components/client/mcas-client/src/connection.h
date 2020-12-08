@@ -28,6 +28,7 @@
 #include <common/utils.h>
 #include <common/byte_buffer.h>
 #include <gsl/gsl_byte>
+#include <gsl/pointers>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -123,6 +124,14 @@ private:
   };
 
   State _state = State::INITIALIZE;
+
+  template <typename MT>
+    status_t invoke_ado_common(
+      const iob_ptr & iobs
+      , const MT *msg
+      , std::vector<component::IMCAS::ADO_response>& out_response
+      , unsigned int flags
+    );
 
 public:
   using pool_t = uint64_t;
@@ -325,6 +334,11 @@ public:
 
   bool check_message_size(size_t size) const { return size > _max_message_size; }
 
+  status_t receive_and_process_ado_response(
+    const iob_ptr & iobr
+    , std::vector<component::IMCAS::ADO_response> & out_response
+  );
+
 private:
   /**
    * FSM tick call
@@ -387,7 +401,7 @@ private:
 public:
 
   template <typename MT>
-  MT *msg_recv(const buffer_t *iob, const char *desc)
+  gsl::not_null<const MT *>msg_recv(const buffer_t *iob, const char *desc)
   {
     /*
      * First, cast the response buffer to Message (checking version).

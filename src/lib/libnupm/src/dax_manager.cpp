@@ -379,7 +379,9 @@ dax_manager::dax_manager(
   , _arenas()
   , _reentrant_lock()
 {
-  /* Maximum expected need is about 6 TiB (12 515GiB DIMMs */
+  /* Maximum expected need is about 6 TiB (12 512GiB DIMMs).
+   * Start, arbitrarily, at 0x10000000000
+   */
   char *free_address_begin = reinterpret_cast<char *>(uintptr_t(1) << 40);
   auto free_address_end    = free_address_begin + (std::size_t(1) << 40);
   auto i = boost::icl::interval<char *>::right_open(free_address_begin, free_address_end);
