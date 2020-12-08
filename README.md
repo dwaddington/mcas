@@ -6,7 +6,7 @@ conventional key-value store, MCAS provides the ability to provide
 custom in-store compute (termed Active Data Objects), ultimately
 reducing data movement across the network and improving performance.
 MCAS gives the ADO plugin direct access to persistent memory to
-in-place operations without data copying can be performed.
+enable in-place operations without the need to copy data.
 
 The key attributes of the solution are:
 
