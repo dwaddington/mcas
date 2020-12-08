@@ -41,6 +41,7 @@ protected:
   ~Registrar_memory_direct() {}
 public:
   using memory_handle_t = IKVStore::memory_handle_t;
+  
   /**
    * Register memory for zero copy DMA
    *
@@ -52,7 +53,7 @@ public:
   virtual memory_handle_t register_direct_memory(void* vaddr, const size_t len) = 0;
 
   /**
-   * Durict memory regions should be unregistered before the memory is released
+   * Direct memory regions should be unregistered before the memory is released
    * on the client side.
    *
    * @param vaddr Address of region to unregister.
