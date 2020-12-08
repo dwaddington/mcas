@@ -28,10 +28,10 @@ add_custom_target(
 #         COMMAND /usr/bin/clang-tidy -header-filter=.* ${ALL_SOURCE_FILES} -- -std=c++11 ${istring} 
 # )
 
-# add_custom_target(
-#         check
-#         COMMAND scan-build
-#         make
-# )
+add_custom_target(
+        ${PROJECT_NAME}-check
+        COMMAND scan-build
+        make
+)
 
 
