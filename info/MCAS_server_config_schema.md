@@ -234,7 +234,7 @@ Three back ends are available:
  - hstore: a persistent KV store
  - hstore-cc: a variation fo hstore with less steady-state speed but faster crash build.
 
-Lists of cores are comma-separated list of cores and/or ranges of cores, on which to pin ADO threads. Cores are integer strings; a range of cores is either an inclusive ranet of cores separated byu a hyphen, e.g. 4-6, or an initial core and count of cores separated by a colon, e.g 4:3.
+Lists of cores are comma-separated list of cores and/or ranges of cores, on which to pin ADO threads. Cores are integer strings; a range of cores is either an inclusive range of cores separated by a hyphen, e.g. 4-6, or an initial core and count of cores separated by a colon, e.g 4:3.
 
 The elements ado_core, and ado_manager_core are optional, but are recommended to be present, and to identify disjoint sets of cores, in order to improve cache locality.
 

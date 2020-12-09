@@ -141,8 +141,8 @@ namespace eastl
 		#endif
 
 	protected:
-		tracked<T*, tracker_type, 'V'>                               mpBegin;
-		tracked<T*, tracker_type, 'V'>                               mpEnd;
+		value_tracked<T*, tracker_type, 'V'>                               mpBegin;
+		value_tracked<T*, tracker_type, 'V'>                               mpEnd;
 		eastl::compressed_pair<weak_tracked<T*, tracker_type, 'V'>, allocator_type> mCapacityAllocator;
 
 		auto & internalCapacityPtr() EA_NOEXCEPT { return mCapacityAllocator.first(); }
@@ -833,7 +833,7 @@ namespace eastl
 			DoInsertValuesEnd(n - (size_type(mpEnd - mpBegin)));
 		else
 		{
-			/* Note: three possible ways to convert mpEnd from a "tracked<>" to
+			/* Note: three possible ways to convert mpEnd from a "value_tracked<>" to
 			 * something acceptable to eastl::destruct:
 			 *  &*mpEnd 
 			 *  mpEnd.value()
