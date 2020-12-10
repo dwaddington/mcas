@@ -1,3 +1,12 @@
+# Release v0.6 (upcoming)
+
+## Key new features
+* GPU-direct example
+
+# Release v0.5.1
+
+* Fixes to examples
+
 # Release v0.5.0 (major release)
 
 ## Key new features

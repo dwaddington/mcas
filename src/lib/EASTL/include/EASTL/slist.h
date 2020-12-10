@@ -87,7 +87,7 @@ namespace eastl
 	template <typename Tracker>
 	struct SListNodeBase
 	{
-		tracked<SListNodeBase*, Tracker, 'S'> mpNext;
+		value_tracked<SListNodeBase*, Tracker, 'S'> mpNext;
 	} EASTL_LIST_PROXY_MAY_ALIAS;
 
 
@@ -112,7 +112,7 @@ namespace eastl
 		template <typename SLN>
 		struct SListNodeBaseProxy
 		{
-			tracked<SLN*, Tracker, 'S'> mpNext;
+			value_tracked<SLN*, Tracker, 'S'> mpNext;
 		};
 
 		template <typename T, typename R>
@@ -186,7 +186,7 @@ namespace eastl
 	protected:
 		base_node_type mNode;
 		#if EASTL_SLIST_SIZE_CACHE
-			tracked<size_type, typename Allocator::tracker_type, 'S'>  mSize;
+			value_tracked<size_type, typename Allocator::tracker_type, 'S'>  mSize;
 		#endif
 		allocator_type mAllocator;  // To do: Use base class optimization to make this go away.
 	public:

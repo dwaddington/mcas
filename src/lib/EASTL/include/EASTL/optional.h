@@ -151,7 +151,7 @@ namespace eastl
 				eastl::aligned_storage_t<sizeof(value_type), eastl::alignment_of_v<value_type>> val;
 				char empty_val;
 			};
-			tracked<bool, Tracker, 'O'> engaged = false;
+			value_tracked<bool, Tracker, 'O'> engaged = false;
 		};
 
 
