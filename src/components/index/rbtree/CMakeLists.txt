@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
-project(component-indexrbtree CXX)
+project(component-index-rbtree CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
