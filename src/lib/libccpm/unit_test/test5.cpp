@@ -21,6 +21,7 @@
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Weffc++"
+#include <EASTL/bitset.h>
 #include <EASTL/iterator.h>
 #include <EASTL/list.h>
 #include <EASTL/vector.h>
@@ -122,6 +123,108 @@ protected:
 
 bool Log_test::pmem_simulated = std::getenv("PMEM_IS_PMEM_FORCE");
 bool Log_test::pmem_effective = ! std::getenv("PMEM_IS_PMEM_FORCE") || std::getenv("PMEM_IS_PMEM_FORCE") == std::string("0");
+
+TEST_F(Log_test, CCBitset)
+{
+/* operations to test
+ *   emplace()
+ *   insert() - 5 versions
+ *   erase()
+ *   clear()
+ *   assign() - 3 versions
+ */
+	auto kvstore = std::unique_ptr<component::IKVStore>(instantiate());
+	ASSERT_TRUE(kvstore.get());
+	auto pool = create_pool(kvstore.get(), pool_name(), MiB(10));
+	ASSERT_LT(0, int64_t(pool));
+
+	void *heap_area;
+	std::size_t heap_size = MiB(5);
+	component::IKVStore::key_t heap_lock{};
+	{
+		/* An odd "insert or locate" interface. */
+		auto r = kvstore->lock(pool, "heap", component::IKVStore::STORE_LOCK_WRITE, heap_area, heap_size, heap_lock);
+		ASSERT_EQ(S_OK_CREATED, r);
+	}
+
+	void *bitset_area;
+	using cc_bitset = ccpm::container_cc<eastl::bitset<52, std::uint64_t, ccpm::allocator_tl::tracker_type>>;
+
+	std::size_t bitset_size = sizeof(cc_bitset);
+	component::IKVStore::key_t container_lock{};
+	{
+		/* An odd "insert or locate" interface. */
+		auto r = kvstore->lock(pool, "vector", component::IKVStore::STORE_LOCK_WRITE, bitset_area, bitset_size, container_lock);
+		ASSERT_EQ(S_OK_CREATED, r);
+	}
+
+	ccpm::cca mr(ccpm::region_vector_t(heap_area, heap_size));
+	auto ccv = new (bitset_area) cc_bitset(mr);
+
+	(*ccv->container)[3] = true;
+	(*ccv->container)[4] = true;
+	(*ccv->container)[5] = true;
+
+	/* now 3 4 5 */
+    ASSERT_EQ(3, ccv->container->count());
+    ASSERT_EQ(false, (*ccv->container)[2]);
+    ASSERT_EQ(true, (*ccv->container)[3]);
+    ASSERT_EQ(true, (*ccv->container)[5]);
+    ASSERT_EQ(false, (*ccv->container)[6]);
+	ccv->commit();
+	(*ccv->container)[7] = true;
+	ASSERT_EQ(true, (*ccv->container)[7]);
+    ASSERT_EQ(4, ccv->container->count());
+	/* 3 4 5 7 */
+	{
+		ccv->container->flip(4);
+		ASSERT_EQ(3, ccv->container->count());
+		ccv->container->set(6);
+	}
+	ASSERT_EQ(4, ccv->container->count());
+	ASSERT_EQ(true, ccv->container->test(3));
+	ASSERT_EQ(true, ccv->container->test(5));
+	ASSERT_EQ(true, ccv->container->test(6));
+	ASSERT_EQ(true, ccv->container->test(7));
+	/* 3 5 6 7 */
+	ccv->container->set(2);
+	/* 2 3 5 6 7 */
+	/* Is the container as expected? */
+	{
+		ASSERT_EQ(5, ccv->container->count());
+		std::vector<int> v{2,3,5,6,7};
+		for ( auto i : v )
+		{
+			ASSERT_EQ(true, ccv->container->test(i));
+			ASSERT_EQ(true, (*ccv->container)[i]);
+		}
+	}
+
+	ccv->rollback();
+
+	{
+		/* Is the rolled back container as expected? */
+		ASSERT_EQ(3, ccv->container->count());
+		ASSERT_EQ(false, (*ccv->container)[2]);
+		ASSERT_EQ(true, (*ccv->container)[3]);
+		ASSERT_EQ(true, (*ccv->container)[5]);
+		ASSERT_EQ(false, (*ccv->container)[6]);
+	}
+
+	/* placement delete */
+	ccv->~cc_bitset();
+
+	{
+		auto r = kvstore->unlock(pool, container_lock);
+		ASSERT_EQ(S_OK, r);
+	}
+
+	{
+		auto r = kvstore->unlock(pool, heap_lock);
+		ASSERT_EQ(S_OK, r);
+	}
+	close_pool(kvstore.get(), pool);
+}
 
 TEST_F(Log_test, CCVectorOfComposite)
 {

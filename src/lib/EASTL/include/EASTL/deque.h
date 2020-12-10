@@ -231,12 +231,12 @@ namespace eastl
  * But DequeBase iterator is contained in a Deque, and so is tracked.
  * Need provide tracked and non-tracked versions of the same class.
  */
-		using internal_ptr = typename std::conditional<kTracked, tracked<T*, Tracker, '1'>, T *>::type;
+		using internal_ptr = typename std::conditional<kTracked, value_tracked<T*, Tracker, '1'>, T *>::type;
 
 		internal_ptr mpCurrent;          // Where we currently point. Declared first because it's used most often.
 		internal_ptr mpBegin;            // The beginning of the current subarray.
 		internal_ptr mpEnd;              // The end of the current subarray. To consider: remove this member, as it is always equal to 'mpBegin + kDequeSubarraySize'. Given that deque subarrays usually consist of hundreds of bytes, this isn't a massive win. Also, now that we are implementing a zero-allocation new deque policy, mpEnd may in fact not be equal to 'mpBegin + kDequeSubarraySize'.
-		using internal_array_ptr = typename std::conditional<kTracked, tracked<T**, Tracker, 'A'>, T **>::type;
+		using internal_array_ptr = typename std::conditional<kTracked, value_tracked<T**, Tracker, 'A'>, T **>::type;
 		internal_array_ptr mpCurrentArrayPtr;  // Pointer to current subarray. We could alternatively implement this as a list node iterator if the deque used a linked list.
 
 		struct Increment {};
@@ -298,8 +298,8 @@ namespace eastl
 		};
 
 	protected:
-		tracked<T**, tracker_type, 'D'>       mpPtrArray;         // Array of pointers to subarrays.
-		tracked<size_type, tracker_type, 'S'> mnPtrArraySize;     // Possibly we should store this as T** mpArrayEnd.
+		value_tracked<T**, tracker_type, 'D'>       mpPtrArray;         // Array of pointers to subarrays.
+		value_tracked<size_type, tracker_type, 'S'> mnPtrArraySize;     // Possibly we should store this as T** mpArrayEnd.
 		internal_iterator            mItBegin;           // Where within the subarrays is our beginning.
 		internal_iterator            mItEnd;             // Where within the subarrays is our end.
 		allocator_type          mAllocator;         // To do: Use base class optimization to make this go away.

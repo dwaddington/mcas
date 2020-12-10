@@ -217,21 +217,21 @@ EA_RESTORE_ALL_VC_WARNINGS()
 				 * were altered until Vsnprintf8 returns. Assume the worst, that all
 				 * n bytes are at least addressible, and will be altered.
 				 */
-				auto m = make_modifier(Allocator(), pDestination, n * sizeof *pDestination);
+				auto m = make_modifier_n(Allocator(), *pDestination, n);
 				return Vsnprintf8(pDestination, n, pFormat, arguments);
 			}
 
 		template <typename Allocator>
 		inline int Vsnprintf(char16_t* pDestination, size_t n, const char16_t* pFormat, va_list arguments)
 			{
-				auto m = make_modifier(Allocator(), pDestination, n * sizeof *pDestination);
+				auto m = make_modifier(Allocator(), *pDestination, n);
 				return Vsnprintf16(pDestination, n, pFormat, arguments);
 			}
 
 		template <typename Allocator>
 		inline int Vsnprintf(char32_t* pDestination, size_t n, const char32_t* pFormat, va_list arguments)
 			{
-				auto m = make_modifier(Allocator(), pDestination, n * sizeof *pDestination);
+				auto m = make_modifier(Allocator(), *pDestination, n);
 				return Vsnprintf32(pDestination, n, pFormat, arguments);
 			}
 
@@ -346,8 +346,8 @@ namespace eastl
 		struct HeapLayout
 		{
 			weak_tracked<value_type*, tracker_type, 'b'> mpBegin;  // Begin of string.
-			tracked<size_type, tracker_type, 's'> mnSize;     // Size of the string. Number of characters currently in the string, not including the trailing '0'
-			tracked<size_type, tracker_type, 'k'> mnCapacity; // Capacity of the string. Number of characters string can hold, not including the trailing '0'
+			value_tracked<size_type, tracker_type, 's'> mnSize;     // Size of the string. Number of characters currently in the string, not including the trailing '0'
+			value_tracked<size_type, tracker_type, 'k'> mnCapacity; // Capacity of the string. Number of characters string can hold, not including the trailing '0'
 		};
 
 		template <typename CharT, size_t = sizeof(CharT)>
@@ -372,7 +372,7 @@ namespace eastl
 			// padding after mnSize if sizeof(value_type) != 1; Also ensures both layouts are the same size.
 			struct SSOSize : SSOPadding<value_type>
 			{
-				tracked<char, tracker_type, 'm'> mnRemainingSize;
+				value_tracked<char, tracker_type, 'm'> mnRemainingSize;
 			};
 
 			value_type mData[SSO_CAPACITY]; // Local buffer for string data.
@@ -499,8 +499,8 @@ namespace eastl
 			}
 			inline void Move(Layout& dst, Layout& src) EA_NOEXCEPT
 			{
-				auto mdst = make_modifier(Destructible<tracker_type>(), &dst.raw, sizeof dst.raw);
-				auto msrc = make_modifier(Destructible<tracker_type>(), &src.raw, sizeof src.raw);
+				auto mdst = make_modifier(Destructible<tracker_type>(), dst.raw);
+				auto msrc = make_modifier(Destructible<tracker_type>(), src.raw);
 				auto tr = Destructible<tracker_type>();
 				eastl::swap(dst.raw, src.raw);
 			}
@@ -1413,7 +1413,7 @@ namespace eastl
 		else if(n < internalLayout().GetSize())
 		{
 			internalLayout().SetSize(n);
-			auto m = make_modifier(get_allocator(), internalLayout().EndPtr(), sizeof *internalLayout().EndPtr());
+			auto m = make_modifier(get_allocator(), *internalLayout().EndPtr());
 			*internalLayout().EndPtr() = 0;
 		}
 
@@ -1447,7 +1447,7 @@ namespace eastl
 
 				pointer pNewEnd = CharStringUninitializedCopy(get_allocator(), internalLayout().BeginPtr(), internalLayout().EndPtr(), pNewBegin);
 				{
-					auto m = make_modifier(get_allocator(), pNewEnd, sizeof *pNewEnd);
+					auto m = make_modifier(get_allocator(), *pNewEnd);
 					*pNewEnd = 0;
 				}
 
@@ -1731,7 +1731,7 @@ namespace eastl
 		{
 			pointer pNewEnd = CharStringUninitializedFillN(get_allocator(), internalLayout().EndPtr(), n, c);
 			{
-				auto m = make_modifier(get_allocator(), pNewEnd, sizeof *pNewEnd);
+				auto m = make_modifier(get_allocator(), *pNewEnd);
 				*pNewEnd = 0;
 			}
 			internalLayout().SetSize(nSize + n);
@@ -1765,7 +1765,7 @@ namespace eastl
 				pointer pNewEnd = CharStringUninitializedCopy(get_allocator(), internalLayout().BeginPtr(), internalLayout().EndPtr(), pNewBegin);
 				pNewEnd         = CharStringUninitializedCopy(get_allocator(), pBegin,  pEnd,  pNewEnd);
 				{
-					auto m = make_modifier(get_allocator(), pNewEnd, sizeof *pNewEnd);
+					auto m = make_modifier(get_allocator(), *pNewEnd);
 					*pNewEnd        = 0;
 				}
 
@@ -1778,7 +1778,7 @@ namespace eastl
 			{
 				pointer pNewEnd = CharStringUninitializedCopy(get_allocator(), pBegin, pEnd, internalLayout().EndPtr());
 				{
-					auto m = make_modifier(get_allocator(), pNewEnd, sizeof *pNewEnd);
+					auto m = make_modifier(get_allocator(), *pNewEnd);
 					*pNewEnd = 0;
 				}
 				internalLayout().SetSize(nOldSize + n);
@@ -2029,8 +2029,8 @@ namespace eastl
 	{
 		if(get_allocator() == x.get_allocator())
 		{
-			auto mt = make_modifier(get_allocator(), &internalLayout(), sizeof internalLayout());
-			auto mx = make_modifier(get_allocator(), &x.internalLayout(), sizeof x.internalLayout());
+			auto mt = make_modifier(get_allocator(), internalLayout());
+			auto mx = make_modifier(get_allocator(), x.internalLayout());
 			eastl::swap(internalLayout(), x.internalLayout());
 		}
 		else
@@ -3318,7 +3318,7 @@ namespace eastl
 
 		CharStringUninitializedCopy(get_allocator(), pBegin, pEnd, internalLayout().BeginPtr());
 		internalLayout().SetSize(n);
-		auto m = make_modifier(get_allocator(), internalLayout().EndPtr(), *internalLayout().EndPtr());
+		auto m = make_modifier(get_allocator(), *internalLayout().EndPtr());
 		*internalLayout().EndPtr() = 0;
 	}
 

@@ -32,7 +32,9 @@
 #include <asm/set_memory.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+#if RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,0)
+#define check_access(X,Y) access_ok(X, Y)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 #define check_access(X,Y) access_ok(VERIFY_READ, X, Y)
 #else
 #define check_access(X,Y) access_ok(X, Y)
