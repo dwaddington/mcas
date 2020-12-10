@@ -17,9 +17,9 @@ For the host-->mcas direction, DRAM buffer-bouncing can be faster.
 
 ## Resources
 
-Details about GPU-Direct: https://docs.nvidia.com/cuda/gpudirect-rdma/index.html
-CUDA Programming Guide: http://developer.download.nvidia.com/compute/DevZone/docs/html/C/doc/CUDA_C_Programming_Guide.pdf
-Notes from gdrcopy: https://github.com/NVIDIA/gdrcopy
+* Details about GPU-Direct: https://docs.nvidia.com/cuda/gpudirect-rdma/index.html
+* CUDA Programming Guide: http://developer.download.nvidia.com/compute/DevZone/docs/html/C/doc/CUDA_C_Programming_Guide.pdf
+* Notes from gdrcopy: https://github.com/NVIDIA/gdrcopy
 
 ## Run
 
