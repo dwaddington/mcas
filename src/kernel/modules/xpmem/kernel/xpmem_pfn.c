@@ -249,10 +249,18 @@ xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
 	 */
 	if (xpmem_vaddr_to_pte_offset(src_mm, vaddr, NULL) == NULL &&
 	    cpu_to_node(task_cpu(current)) != cpu_to_node(task_cpu(src_task))) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+#if defined RHEL_RELEASE_CODE && defined RHEL_RELEASE_VERSION
+  #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0) || RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,0)
 		saved_mask = current->cpus_mask;
-#else
+  #else
 		saved_mask = current->cpus_allowed;
+  #endif
+#else
+  #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+		saved_mask = current->cpus_mask;
+  #else
+		saved_mask = current->cpus_allowed;
+  #endif
 #endif
 		set_cpus_allowed_ptr(current, cpumask_of(task_cpu(src_task)));
 	}

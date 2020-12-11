@@ -122,8 +122,8 @@ namespace eastl
 			hash_node(hash_node&&) = default;
 
 			Value        mValue;
-			tracked<hash_node*, Tracker, 'H'>   mpNext;
-			tracked<eastl_size_t, Tracker, 'c'> mnHashCode;      // See config.h for the definition of eastl_size_t, which defaults to size_t.
+			value_tracked<hash_node*, Tracker, 'H'>   mpNext;
+			value_tracked<eastl_size_t, Tracker, 'c'> mnHashCode;      // See config.h for the definition of eastl_size_t, which defaults to size_t.
 		} EASTL_MAY_ALIAS;
 
 		template <typename Value, typename Tracker>
@@ -134,7 +134,7 @@ namespace eastl
 			hash_node(hash_node&&) = default;
 
 			Value      mValue;
-			tracked<hash_node*, Tracker, 'H'> mpNext;
+			value_tracked<hash_node*, Tracker, 'H'> mpNext;
 		} EASTL_MAY_ALIAS;
 
 	#ifdef EA_COMPILER_MSVC_2015
@@ -878,9 +878,9 @@ namespace eastl
 		};
 
 	protected:
-		tracked<node_type**, tracker_type, 'H'>    mpBucketArray;
-		tracked<size_type, tracker_type, 'S'>      mnBucketCount;
-		tracked<size_type, tracker_type, 'S'>      mnElementCount;
+		value_tracked<node_type**, tracker_type, 'H'>    mpBucketArray;
+		value_tracked<size_type, tracker_type, 'S'>      mnBucketCount;
+		value_tracked<size_type, tracker_type, 'S'>      mnElementCount;
 		RehashPolicy   mRehashPolicy;  // To do: Use base class optimization to make this go away.
 		allocator_type mAllocator;     // To do: Use base class optimization to make this go away.
 

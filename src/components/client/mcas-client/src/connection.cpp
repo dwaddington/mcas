@@ -469,29 +469,7 @@ public:
       if (c->test_completion(&*iobr) == false) {
         return E_BUSY;
       }
-      const auto response_msg = c->msg_recv<const mcas::protocol::Message_ado_response>(&*iobr, __func__);
-      assert(response_msg);
-      auto status = response_msg->get_status();
-
-      if (status == S_OK) {
-        auto &out_response = *out_ado_response;
-        out_response.clear();
-
-        /* unmarshal responses */
-        for (uint32_t i = 0; i < response_msg->get_response_count(); i++) {
-          void *   out_data     = nullptr;
-          size_t   out_data_len = 0;
-          uint32_t out_layer_id = 0;
-          response_msg->client_get_response(i, out_data, out_data_len, out_layer_id);
-
-#ifdef DEBUG_NPC_RESPONSES
-          PLOG("Response:");
-          hexdump(out_data, out_data_len);
-#endif
-          out_response.emplace_back(out_data, out_data_len, out_layer_id);
-        }
-      }
-      return status;
+      return c->receive_and_process_ado_response(iobr, *out_ado_response); 
     }
     else {
       throw API_exception("invalid async handle, task already completed?");
@@ -1288,60 +1266,6 @@ auto Connection_handler::locate(const pool_t pool_, const std::size_t offset_, c
   std::vector<locate_element> addr_list(cursor, cursor + response->element_count());
 
   return std::tuple<uint64_t, std::vector<locate_element>>(response->key, std::move(addr_list));
-}
-
-std::tuple<uint64_t, uint64_t, std::size_t> Connection_handler::get_locate(const pool_t   pool,
-                                                                           const void *   key,
-                                                                           const size_t   key_len,
-                                                                           const unsigned flags)
-{
-  const auto iobr = make_iob_ptr_recv();
-  const auto iobs = make_iob_ptr_send();
-
-  /* send advance leader message */
-  const auto msg = new (iobs->base()) protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                                   protocol::OP_GET_LOCATE, key, key_len, 0, flags);
-
-  post_recv(&*iobr);
-  sync_inject_send(&*iobs, msg, __func__);
-  /* wait for response from header before posting the value */
-  wait_for_completion(&*iobr);
-
-  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
-
-  if (response_msg->get_status() != S_OK) {
-    throw remote_fail(msg->get_status());
-  }
-  return std::tuple<uint64_t, uint64_t, std::size_t>{response_msg->addr, response_msg->key,
-      response_msg->data_length()};
-}
-
-std::tuple<uint64_t, uint64_t> Connection_handler::put_locate(const pool_t   pool,
-                                                              const void *   key,
-                                                              const size_t   key_len,
-                                                              const size_t   value_len,
-                                                              const unsigned flags)
-{
-  const auto iobr = make_iob_ptr_recv();
-  const auto iobs = make_iob_ptr_send();
-
-  /* send advance leader message */
-  const auto msg = new (iobs->base()) protocol::Message_IO_request(
-                                                                   iobs->length(), auth_id(), request_id(), pool, protocol::OP_PUT_LOCATE, key, key_len, value_len, flags);
-
-  post_recv(&*iobr);
-  sync_inject_send(&*iobs, msg, __func__);
-  /* wait for response from header before posting the value */
-  wait_for_completion(&*iobr);
-
-  const auto response_msg = msg_recv<const mcas::protocol::Message_IO_response>(&*iobr, __func__);
-
-  /* if response is not OK, don't follow with the value */
-  if (response_msg->get_status() != S_OK) {
-    throw remote_fail(msg->get_status());
-  }
-
-  return std::tuple<uint64_t, uint64_t>{response_msg->addr, response_msg->key};
 }
 
 IMCAS::async_handle_t Connection_handler::put_locate_async(const pool_t                        pool,
@@ -2223,6 +2147,76 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     return status;
   }
 
+  status_t Connection_handler::receive_and_process_ado_response(
+    const iob_ptr & iobr_
+    , std::vector<IMCAS::ADO_response> & out_response_
+  )
+  {
+    const auto response_msg = msg_recv<const mcas::protocol::Message_ado_response>(&*iobr_, __func__);
+    status_t status = response_msg->get_status();
+
+    out_response_.clear();
+    if (status == S_OK) {
+      /* unmarshal responses */
+      for (uint32_t i = 0; i < response_msg->get_response_count(); i++) {
+        void *   out_data     = nullptr;
+        size_t   out_data_len = 0;
+        uint32_t out_layer_id = 0;
+        response_msg->client_get_response(i, out_data, out_data_len, out_layer_id);
+
+#if defined DEBUG_NPC_RESPONSES
+        if (out_data_len > 0) {
+          PLOG("%s: Response:", __func__);
+          hexdump(out_data, out_data_len);
+        }
+        else {
+          PLOG("%s: Response (inline): %p", __func__, out_data);
+        }
+#endif
+        out_response_.emplace_back(out_data, out_data_len, out_layer_id);
+      }
+    }
+    else {
+      /* Note: Previously, only synchronous invoke_ado path had this error handling. Likely an oversight */
+      if (response_msg->get_response_count() > 0) {
+        void *   err_msg      = nullptr;
+        size_t   err_msg_len  = 0;
+        uint32_t out_layer_id = 0;
+        response_msg->client_get_response(0, err_msg, err_msg_len, out_layer_id);
+        PLOG("%s:%u ADO response status %d %.*s", __FILE__, __LINE__, status, int(err_msg_len),
+             static_cast<const char *>(err_msg));
+        ::free(err_msg);
+      }
+    }
+    return status;
+  }
+
+  template <typename MT>
+    status_t Connection_handler::invoke_ado_common(
+      const iob_ptr & iobs_
+      , const MT *msg_
+      , std::vector<IMCAS::ADO_response>& out_response_
+      , unsigned int flags
+    )
+    {
+      iobs_->set_length(msg_->message_size());
+
+      if (flags & IMCAS::ADO_FLAG_ASYNC) {
+        sync_send(&*iobs_, msg_, __func__);
+        /* do not wait for response */
+        return S_OK;
+      }
+
+      const auto iobr = make_iob_ptr_recv();
+      assert(iobr);
+
+      post_recv(&*iobr);
+      sync_send(&*iobs_, msg_, __func__);
+      wait_for_completion(&*iobr); /* wait for response */
+
+      return receive_and_process_ado_response(iobr, out_response_);
+    }
+
   status_t Connection_handler::invoke_ado(const IKVStore::pool_t            pool,
                                           const basic_string_view<byte>     key,
                                           const basic_string_view<byte>     request,
@@ -2235,6 +2229,8 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     const auto iobs = make_iob_ptr_send();
     assert(iobs);
 
+    status_t status;
+
     try {
       const auto msg = new (iobs->base())
         mcas::protocol::Message_ado_request(iobs->length(),
@@ -2245,65 +2241,17 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
                                             request,
                                             flags,
                                             value_size);
-      
-      iobs->set_length(msg->message_size());
-
-      if (flags & IMCAS::ADO_FLAG_ASYNC) {
-        sync_send(&*iobs, msg, __func__);
-        /* do not wait for response */
-        return S_OK;
-      }
-
-      const auto iobr = make_iob_ptr_recv();
-      assert(iobr);
-
-      post_recv(&*iobr);
-      sync_send(&*iobs, msg, __func__);
-      wait_for_completion(&*iobr); /* wait for response */
-
-      const auto response_msg = msg_recv<const mcas::protocol::Message_ado_response>(&*iobr, __func__);
-
-      status_t status = response_msg->get_status();
-
-      out_response.clear();
-
-      if (status == S_OK) {
-        /* unmarshall responses */
-        for (uint32_t i = 0; i < response_msg->get_response_count(); i++) {
-          void *   out_data     = nullptr;
-          size_t   out_data_len = 0;
-          uint32_t out_layer_id = 0;
-          response_msg->client_get_response(i, out_data, out_data_len, out_layer_id);
-
-#if defined DEBUG_NPC_RESPONSES
-          PLOG("%s: Response:", __func__);
-          hexdump(out_data, out_data_len);
-#endif
-          out_response.emplace_back(out_data, out_data_len, out_layer_id);
-        }
-      }
-      else {
-        if (response_msg->get_response_count() > 0) {
-          void *   err_msg      = nullptr;
-          size_t   err_msg_len  = 0;
-          uint32_t out_layer_id = 0;
-          response_msg->client_get_response(0, err_msg, err_msg_len, out_layer_id);
-          PLOG("%s:%u ADO response status %d %.*s", __FILE__, __LINE__, status, int(err_msg_len),
-               static_cast<const char *>(err_msg));
-          ::free(err_msg);
-        }
-      }
-
-      return status;
+      status = invoke_ado_common(iobs, msg, out_response, flags);
     }
     catch (const Exception &e) {
       PLOG("%s:%u ADO response Exception %s", __FILE__, __LINE__, e.cause());
-      return E_FAIL;
+      status =  E_FAIL;
     }
     catch (const std::exception &e) {
       PLOG("%s:%u ADO response exception %s", __FILE__, __LINE__, e.what());
-      return E_FAIL;
+      status =  E_FAIL;
     }
+    return status;
   }
 
   status_t Connection_handler::invoke_ado_async(const component::IMCAS::pool_t               pool,
@@ -2368,8 +2316,6 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
     const auto iobs = make_iob_ptr_send();
     assert(iobs);
 
-    out_response.clear();
-
     status_t status;
 
     try {
@@ -2383,48 +2329,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
                                                                                   root_len,
                                                                                   flags);
 
-      iobs->set_length(msg->message_size());
-
-      if (flags & IMCAS::ADO_FLAG_ASYNC) {
-        sync_send(&*iobs, msg, __func__);
-        /* do not wait for response */
-        return S_OK;
-      }
-
-      const auto iobr = make_iob_ptr_recv();
-      assert(iobr);
-
-      post_recv(&*iobr);
-      sync_send(&*iobs, msg, __func__);
-      wait_for_completion(&*iobr); /* wait for response */
-
-      const auto response_msg = msg_recv<const mcas::protocol::Message_ado_response>(&*iobr, __func__);
-
-      status = response_msg->get_status();
-
-      if (status == S_OK) {
-        out_response.clear();
-
-        /* unmarshal responses */
-        for (uint32_t i = 0; i < response_msg->get_response_count(); i++) {
-          void *   out_data     = nullptr;
-          size_t   out_data_len = 0;
-          uint32_t out_layer_id = 0;
-          response_msg->client_get_response(i, out_data, out_data_len, out_layer_id);
-
-#ifdef DEBUG_NPC_RESPONSES
-          if (out_data_len > 0) {
-            PLOG("Response:", __func__);
-            hexdump(out_data, out_data_len);
-          }
-          else {
-            PLOG("Response (inline): %p", __func__, out_data);
-          }
-#endif
-
-          out_response.emplace_back(out_data, out_data_len, out_layer_id);
-        }
-      }
+      status = invoke_ado_common(iobs, msg, out_response, flags);
     }
     catch (const Exception &e) {
       PLOG("%s %s fail %s", __FILE__, __func__, e.cause());

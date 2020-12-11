@@ -25,7 +25,9 @@ namespace ccpm
 	/* Stuff needed for a crash-consistent container */
 	template <typename Container>
 		struct container_cc
-			// : public cca /* proxy for a memory resource (in C++17 parlance), for more memory */
+#if 0
+			: public cca /* proxy for a memory resource (in C++17 parlance), for more memory */
+#endif
 			: public log /* a log, which uses the memory resource, for rollback */
 		{
 		private:
