@@ -1961,7 +1961,7 @@ status_t Shard::process_configure(const protocol::Message_IO_request *msg)
     status_t hr = S_OK;
 
     /* optionally, iterate key space for rebuilding */
-    if(index->iterate_key_space_on_load()) {
+    if(index && index->iterate_key_space_on_load()) {
       if ((hr = _i_kvstore->map_keys(msg->pool_id(),
                                      [p](const std::string &key)
                                      {
