@@ -122,10 +122,13 @@ status_t ADO_proxy::bootstrap_ado(bool opened_existing)
   if (_kvs->get_attribute(_pool_id, IKVStore::Attribute::MEMORY_TYPE, attrs) != S_OK)
     throw Logic_exception("get_attributes failed on storage engine");
 
-  _ipc->send_bootstrap(_auth_id, _pool_name, _pool_size, _pool_flags, boost::numeric_cast<unsigned int>(attrs[0]),
-                       _expected_obj_count, opened_existing);
+  auto hr = _ipc->send_bootstrap(_auth_id, _pool_name, _pool_size, _pool_flags, boost::numeric_cast<unsigned int>(attrs[0]),
+                                 _expected_obj_count, opened_existing);
 
-  auto hr = _ipc->recv_bootstrap_response();
+  if (hr != S_OK)
+    throw General_exception("send_bootstrap failed");
+  
+  hr = _ipc->recv_bootstrap_response();
   if (hr == S_OK)
     PMAJOR("ADO_proxy::bootstrap response OK.");
   else
@@ -136,31 +139,27 @@ status_t ADO_proxy::bootstrap_ado(bool opened_existing)
 
 status_t ADO_proxy::send_op_event(component::ADO_op op)
 {
-  _ipc->send_op_event(op);
-  return S_OK;
+  return _ipc->send_op_event(op);
 }
 
 status_t ADO_proxy::send_cluster_event(const std::string& sender,
                                        const std::string& type,
                                        const std::string& content)
 {
-  _ipc->send_cluster_event(sender, type, content);
-  return S_OK;
+  return _ipc->send_cluster_event(sender, type, content);
 }
 
 
 status_t ADO_proxy::send_memory_map(uint64_t token, size_t size, void *value_vaddr)
 {
   PLOG("ADO_proxy: sending memory map request");
-  _ipc->send_memory_map(token, size, value_vaddr);
-  return S_OK;
+  return _ipc->send_memory_map(token, size, value_vaddr);
 }
 
 status_t ADO_proxy::send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, ::iovec iov)
 {
   PLOG("ADO_proxy:%s sending", __func__);
-  _ipc->send_memory_map_named(region_id, pool_name, offset, iov);
-  return S_OK;
+  return _ipc->send_memory_map_named(region_id, pool_name, offset, iov);
 }
 
 status_t ADO_proxy::send_work_request(const uint64_t work_request_key,
@@ -176,47 +175,46 @@ status_t ADO_proxy::send_work_request(const uint64_t work_request_key,
 {
   _outstanding_wr++;
 
-  _ipc->send_work_request(work_request_key, key, key_len, value, value_len, detached_value, detached_value_len,
-                          invocation_data, invocation_data_len, new_root);
-  return S_OK;
+  return _ipc->send_work_request(work_request_key, key, key_len, value, value_len, detached_value, detached_value_len,
+                                 invocation_data, invocation_data_len, new_root);
 }
 
-void ADO_proxy::send_table_op_response(const status_t             s,
-                                       const void *               value_addr,
-                                       size_t                     value_len,
-                                       const char *               key_ptr,
-                                       component::IKVStore::key_t key_handle)
+status_t ADO_proxy::send_table_op_response(const status_t             s,
+                                           const void *               value_addr,
+                                           size_t                     value_len,
+                                           const char *               key_ptr,
+                                           component::IKVStore::key_t key_handle)
 {
-  _ipc->send_table_op_response(s, value_addr, value_len, key_ptr, key_handle);
+  return _ipc->send_table_op_response(s, value_addr, value_len, key_ptr, key_handle);
 }
 
-void ADO_proxy::send_find_index_response(const status_t     status,
-                                         const offset_t     matched_position,
-                                         const std::string &matched_key)
+status_t ADO_proxy::send_find_index_response(const status_t     status,
+                                             const offset_t     matched_position,
+                                             const std::string &matched_key)
 {
-  _ipc->send_find_index_response(status, matched_position, matched_key);
+  return _ipc->send_find_index_response(status, matched_position, matched_key);
 }
 
-void ADO_proxy::send_vector_response(const status_t status, const component::IADO_plugin::Reference_vector &rv)
+status_t ADO_proxy::send_vector_response(const status_t status, const component::IADO_plugin::Reference_vector &rv)
 {
-  _ipc->send_vector_response(status, rv);
+  return _ipc->send_vector_response(status, rv);
 }
 
-void ADO_proxy::send_iterate_response(const status_t                              status,
-                                      const component::IKVStore::pool_iterator_t  iterator,
-                                      const component::IKVStore::pool_reference_t reference)
+status_t ADO_proxy::send_iterate_response(const status_t                              status,
+                                          const component::IKVStore::pool_iterator_t  iterator,
+                                          const component::IKVStore::pool_reference_t reference)
 {
-  _ipc->send_iterate_response(status, iterator, reference);
+  return _ipc->send_iterate_response(status, iterator, reference);
 }
 
-void ADO_proxy::send_pool_info_response(const status_t status, const std::string &info)
+status_t ADO_proxy::send_pool_info_response(const status_t status, const std::string &info)
 {
-  _ipc->send_pool_info_response(status, info);
+  return _ipc->send_pool_info_response(status, info);
 }
 
-void ADO_proxy::send_unlock_response(const status_t status) 
+status_t ADO_proxy::send_unlock_response(const status_t status) 
 { 
-  _ipc->send_unlock_response(status); 
+  return _ipc->send_unlock_response(status); 
 }
 
 bool ADO_proxy::check_work_completions(uint64_t &                                        request_key,
@@ -286,9 +284,9 @@ bool ADO_proxy::check_configure_request(const void* buffer, uint64_t& options)
   return _ipc->recv_configure_request(static_cast<const Buffer_header *>(buffer), options);
 }
 
-void ADO_proxy::send_configure_response(const status_t status)
+status_t ADO_proxy::send_configure_response(const status_t status)
 {
-  _ipc->send_configure_response(status); 
+  return _ipc->send_configure_response(status); 
 }
 
 status_t ADO_proxy::recv_callback_buffer(Buffer_header *&out_buffer)
@@ -451,7 +449,7 @@ void ADO_proxy::launch(unsigned debug_level)
 
     PLOG("cmd:%s", std::accumulate(args.begin(), args.end(), std::string(),
                                    [](const std::string &a, const std::string &b) { return a + " " + b; })
-                                   .c_str());
+         .c_str());
 
     c.push_back(nullptr);
 

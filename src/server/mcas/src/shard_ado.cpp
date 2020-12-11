@@ -62,8 +62,6 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
   assert(kvs);
   assert(handler);
 
-  PNOTICE("base=%p", desc.base_addr);
-  
   /* ADO processes are instantiated on a per-pool basis.  First
      check if an ADO process already exists.
   */
@@ -176,13 +174,16 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
         if (_backend == "mapstore") {
           /* uses XPMEM kernel module */
           xpmem_segid_t seg_id = ::xpmem_make(r.iov_base, r.iov_len, XPMEM_PERMIT_MODE, reinterpret_cast<void*>(0666));
-          if (seg_id == -1) throw Logic_exception("xpmem_make failed unexpectedly");
-          ado->send_memory_map(std::uint64_t(seg_id), r.iov_len, r.iov_base);
+          if (seg_id == -1)
+            throw Logic_exception("xpmem_make failed unexpectedly");
+          
+          if (ado->send_memory_map(std::uint64_t(seg_id), r.iov_len, r.iov_base) != S_OK)
+            throw Logic_exception("initial send_memory_map failed");
         }
         else {
-          if ( regions.data_file.size() != 0 )
-          {
-            ado->send_memory_map_named(0, regions.data_file, offset, r);
+          if ( regions.data_file.size() != 0 ) {
+            if (ado->send_memory_map_named(0, regions.data_file, offset, r) != S_OK)
+              throw Logic_exception("initial send_memory_map_named failed");
           }
           else
           {
@@ -195,7 +196,8 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
             if (nupm::expose_memory(token, r.iov_base, r.iov_len) != S_OK)
               throw Logic_exception("nupm::expose_memory failed unexpectedly");
 
-            ado->send_memory_map(token, r.iov_len, r.iov_base);
+            if (ado->send_memory_map(token, r.iov_len, r.iov_base) != S_OK)
+              throw Logic_exception("initial send_memory_map failed");
           }
         }
 
@@ -343,8 +345,9 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
   wmb();
 
   /* now send the work request */
-  ado->send_work_request(wr_key, key_ptr, msg->get_key_len(), value, value_len, detached_val_ptr, detached_val_len,
-                         msg->request(), msg->request_len(), new_root);
+  if (ado->send_work_request(wr_key, key_ptr, msg->get_key_len(), value, value_len, detached_val_ptr, detached_val_len,
+                             msg->request(), msg->request_len(), new_root) != S_OK)
+    throw General_exception("send_work_request failed");
 
   CPLOG(2, "Shard_ado: sent work request (len=%lu, key=%lx)", msg->request_len(), wr_key);
 }
@@ -366,7 +369,7 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
       protocol::Message_ado_response(response_iob->length(), status, handler->auth_id(), msg->request_id());
       response->append_response(const_cast<char*>(message), strlen(message), 0);
       response_iob->set_length(response->message_size());
-      PLOG("%s server error message %s", __func__, message);
+      CPLOG(1, "%s server error message %s", __func__, message);
       handler->post_send_buffer(response_iob, response, __func__);
     };
 
@@ -383,13 +386,13 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
       std::ostringstream o;
       o << "ADO!NOT_ENABLED mgr '" << (_i_ado_mgr ? "present" : "missing") << "' load count " << _ado_plugins.size();
       error_func(E_INVAL, o.str().c_str());
-      PLOG("%s server error ADO!NOT_ENABLED", __func__);
+      CPLOG(1, "%s server error ADO!NOT_ENABLED", __func__);
       return;
     }
 
     if (msg->flags & IMCAS::ADO_FLAG_DETACHED) { /* not valid for plain invoke_ado */
       error_func(E_INVAL, "ADO!INVALID_ARGS");
-      PLOG("%s server error ADO!INVALID_ARGS circuit", __func__);
+      CPLOG(1, "%s server error ADO!INVALID_ARGS circuit", __func__);
       return;
     }
 
@@ -427,7 +430,7 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
         ss << "ADO!ALREADY_LOCKED(" << msg->key() << ")";
         error_func(E_LOCKED, ss.str().c_str());
         if (debug_level() > 1) PWRN("process_ado_request: key already locked (ADO_FLAG_CREATE_ONLY)");
-        PLOG("%s server error lock", __func__);
+        CPLOG(1, "%s server error lock", __func__);
         return;
       }
 
@@ -445,11 +448,10 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
       auto response     = new (response_iob->base())
         protocol::Message_ado_response(response_iob->length(), S_OK, handler->auth_id(), msg->request_id());
 
-      PNOTICE("****** appending respone %p %lu key=(%s)", value, value_len, key.c_str());
       response->append_response(&value, sizeof(value), 0 /* layer id */);
       response->set_status(S_OK);
       response_iob->set_length(response->message_size());
-      PLOG("%s server response count %zu", __func__, response->get_response_count());
+      CPLOG(2, "%s server response count %zu", __func__, response->get_response_count());
       handler->post_send_buffer(response_iob, response, __func__);
 
       return;  // end of ADO_FLAG_CREATE_ONLY condition
@@ -506,9 +508,10 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
     _outstanding_work.insert(wr_key);                       /* save request by index on key-handle */
 
     /* now send the work request */
-    ado->send_work_request(wr_key, key_ptr, msg->get_key_len(), value, value_len,
-                           nullptr, /* no payload */
-                           0, msg->request(), msg->request_len(), (s == S_OK_CREATED));
+    if (ado->send_work_request(wr_key, key_ptr, msg->get_key_len(), value, value_len,
+                               nullptr, /* no payload */
+                               0, msg->request(), msg->request_len(), (s == S_OK_CREATED)) != S_OK)
+      throw General_exception("send_work_request failed");
 
     CPLOG(2, "Shard_ado: sent work request (len=%lu, key=%lx, key_ptr=%p)",
           msg->request_len(), wr_key, static_cast<const void*>(key_ptr));
@@ -709,7 +712,8 @@ void Shard::process_messages_from_ado()
                    "exists");
 
             if (align_or_flags & IKVStore::FLAGS_CREATE_ONLY) {
-              ado->send_table_op_response(E_ALREADY_EXISTS, nullptr, 0, nullptr);
+              if (ado->send_table_op_response(E_ALREADY_EXISTS, nullptr, 0, nullptr) != S_OK)
+                throw General_exception("send_table_op_response failed");
               break;
             }
           }
@@ -734,7 +738,8 @@ void Shard::process_messages_from_ado()
               CPLOG(2, "Shard_ado: lock on key (%s, value_len=%lu) failed rc=%d",
                     key.c_str(), value_len, rc);
 
-              ado->send_table_op_response(rc);
+              if (ado->send_table_op_response(rc) != S_OK)
+                throw General_exception("send_table_op_response failed");
             }
             else {
               CPLOG(2, "Shard_ado: locked KV pair (keyhandle=%p, value=%p, len=%lu) invoke_completion_unlock=%d",
@@ -749,7 +754,8 @@ void Shard::process_messages_from_ado()
               }
               else if (invoke_completion_unlock) { /* unlock on ADO invoke completion */
                 if (work_id == 0) {
-                  ado->send_table_op_response(E_INVAL);
+                  if (ado->send_table_op_response(E_INVAL) != S_OK)
+                    throw General_exception("send_table_op_response failed");
                 }
                 else {
                   try {
@@ -757,7 +763,8 @@ void Shard::process_messages_from_ado()
                   }
                   catch (const std::range_error&) {
                     PWRN("Shard_ado: too many locks");
-                    ado->send_table_op_response(E_MAX_REACHED);
+                    if (ado->send_table_op_response(E_MAX_REACHED) != S_OK)
+                      throw General_exception("send_table_op_response failed");
                   }
                 }
               }
@@ -767,12 +774,15 @@ void Shard::process_messages_from_ado()
 
               assert(reinterpret_cast<uint64_t>(addr) <= 1);
 
-              ado->send_table_op_response(S_OK, static_cast<void*>(value), value_len, key_ptr, key_handle);
+              if (ado->send_table_op_response(S_OK, static_cast<void*>(value), value_len, key_ptr, key_handle) != S_OK)
+                throw General_exception("send_table_op_response failed");            
             }
           } break;
         case ADO_op::ERASE: {
           CPLOG(2, "Shard_ado: received table op erase");
-          ado->send_table_op_response(_i_kvstore->erase(ado->pool_id(), key));
+
+          if (ado->send_table_op_response(_i_kvstore->erase(ado->pool_id(), key)) != S_OK)
+            throw General_exception("send_table_op_response failed");
           break;
         }
         case ADO_op::VALUE_RESIZE: 
@@ -784,7 +794,8 @@ void Shard::process_messages_from_ado()
             auto work_item = _outstanding_work.find(work_id);
 
             if (work_item == _outstanding_work.end()) {
-              ado->send_table_op_response(E_INVAL);
+              if (ado->send_table_op_response(E_INVAL) != S_OK)
+                throw General_exception("send_table_op_response failed");
               break;
             }
 
@@ -794,7 +805,8 @@ void Shard::process_messages_from_ado()
 
             if (!wr) {
               PWRN("unable to get request from work_id");
-              ado->send_table_op_response(E_INVAL);
+              if (ado->send_table_op_response(E_INVAL) != S_OK)
+                throw General_exception("send_table_op_response failed");
               break;
             }
 
@@ -831,10 +843,10 @@ void Shard::process_messages_from_ado()
               wr->key_handle = new_key_handle;
             }
 
-            ado->send_table_op_response(rc, new_value, new_value_len, nullptr);
+            if (ado->send_table_op_response(rc, new_value, new_value_len, nullptr) != S_OK)
+              throw General_exception("send_table_op_response failed");
+            
             CPLOG(1, "Shard_ado: resize_value response (%d)", rc);
-
-
             
             break;
           }
@@ -877,14 +889,18 @@ void Shard::process_messages_from_ado()
           CPLOG(2, "Shard_ado: allocate_pool_memory align_or_flags=%lu rc=%d addr=%p",
                 align_or_flags, rc, out_addr);
 
-          ado->send_table_op_response(rc, out_addr);
+          if (ado->send_table_op_response(rc, out_addr) != S_OK)
+            throw General_exception("send_table_op_response failed");
+            
           break;
         }
         case ADO_op::FREE_POOL_MEMORY: {
           assert(work_id == 0); /* work request is not needed */
 
           if (value_len == 0) {
-            ado->send_table_op_response(E_INVAL);
+            if (ado->send_table_op_response(E_INVAL) != S_OK)
+              throw General_exception("send_table_op_response failed");
+            
             break;
           }
 
@@ -893,7 +909,9 @@ void Shard::process_messages_from_ado()
 
           if (rc != S_OK) PWRN("Shard_ado: Table operation OP_FREE failed");
 
-          ado->send_table_op_response(rc);
+          if (ado->send_table_op_response(rc) != S_OK)
+            throw General_exception("send_table_op_response failed");
+          
           break;
         }
         default:
@@ -948,7 +966,9 @@ void Shard::process_messages_from_ado()
           OStreamWrapper         osw(ss);
           Writer<OStreamWrapper> writer(osw);
           doc.Accept(writer);
-          ado->send_pool_info_response(S_OK, ss.str());
+
+          if (ado->send_pool_info_response(S_OK, ss.str()) != S_OK)
+            throw General_exception("send_table_op_response failed");
         }
         catch (...) {
           throw Logic_exception("pool info JSON creation failed");
@@ -980,7 +1000,8 @@ void Shard::process_messages_from_ado()
         }
 
         if (!iterator) { /* still no iterator, component doesn't support */
-          ado->send_iterate_response(E_NOT_IMPL, iterator, ref);
+          if (ado->send_iterate_response(E_NOT_IMPL, iterator, ref) != S_OK)
+            throw General_exception("send_iterate_response failed");
         }
         else {
           status_t rc;
@@ -998,7 +1019,8 @@ void Shard::process_messages_from_ado()
 
           CPLOG(2, "Shard_ado: iterator timestamp (%lu seconds)", ref.timestamp.seconds());
 
-          ado->send_iterate_response(rc, iterator, ref);
+          if (ado->send_iterate_response(rc, iterator, ref) != S_OK)
+            throw General_exception("send_iterate_response failed");
         }
       }
       else if (ado->check_vector_ops(buffer, t_begin, t_end)) {
@@ -1032,7 +1054,8 @@ void Shard::process_messages_from_ado()
         rc               = _i_kvstore->allocate_pool_memory(ado->pool_id(), buffer_size, 0, buffer);
 
         if (rc != S_OK) {
-          ado->send_vector_response(rc, IADO_plugin::Reference_vector());
+          if (ado->send_vector_response(rc, IADO_plugin::Reference_vector()) != S_OK)
+            throw General_exception("send_vector_response failed");
         }
         else {
           /* populate vector */
@@ -1041,7 +1064,9 @@ void Shard::process_messages_from_ado()
 
           if (t_begin.is_defined() && t_end.is_defined()) {
             rc = _i_kvstore->map(ado->pool_id(),
-                                 [count, &check, &ptr](const void* key, const size_t key_len, const void* value,
+                                 [count, &check, &ptr](const void* key,
+                                                       const size_t key_len,
+                                                       const void* value,
                                                        const size_t value_len) -> int {
                                    assert(key);
                                    assert(key_len);
@@ -1059,7 +1084,10 @@ void Shard::process_messages_from_ado()
           }
           else {
             rc = _i_kvstore->map(ado->pool_id(),
-                                 [count, &check, &ptr](const void* key, const size_t key_len, const void* value, const size_t value_len,
+                                 [count, &check, &ptr](const void* key,
+                                                       const size_t key_len,
+                                                       const void* value,
+                                                       const size_t value_len,
                                                        const common::tsc_time_t  // timestamp
                                                        ) -> int {
                                    assert(key);
@@ -1078,7 +1106,8 @@ void Shard::process_messages_from_ado()
                                  t_begin, t_end);
           }
 
-          ado->send_vector_response(rc, IADO_plugin::Reference_vector(count, buffer, buffer_size));
+          if (ado->send_vector_response(rc, IADO_plugin::Reference_vector(count, buffer, buffer_size)) != S_OK)
+            throw General_exception("send_vector_response failed");
         }
       }
       else if (ado->check_index_ops(buffer, key_expression, begin_pos, find_type, max_comp)) {
@@ -1087,7 +1116,8 @@ void Shard::process_messages_from_ado()
 
         if (!i_kvindex) {
           PWRN("ADO index operation: no index enabled");
-          ado->send_find_index_response(E_NO_INDEX, 0, "noindex");
+          if (ado->send_find_index_response(E_NO_INDEX, 0, "noindex") != S_OK)
+            throw General_exception("send_find_index_response failed");
         }
         else {
           std::string matched_key;
@@ -1096,7 +1126,8 @@ void Shard::process_messages_from_ado()
           rc = i_kvindex->find(key_expression, begin_pos, IKVIndex::convert_find_type(find_type), matched_pos,
                                matched_key, MAX_INDEX_COMPARISONS);
 
-          ado->send_find_index_response(rc, matched_pos, matched_key);
+          if (ado->send_find_index_response(rc, matched_pos, matched_key) != S_OK)
+            throw General_exception("send_find_index_response failed");
         }
       }
       /* UNLOCK request */
@@ -1106,7 +1137,8 @@ void Shard::process_messages_from_ado()
 
         if (key_handle == nullptr) {
           CPWRN(1, "ADO callback: bad key (nullptr)");
-          ado->send_unlock_response(E_INVAL);
+          if (ado->send_unlock_response(E_INVAL) != S_OK)
+            throw General_exception("send_unlock_response failed");
         }
         else {
           auto rc = _i_kvstore->unlock(ado->pool_id(), key_handle);
@@ -1116,7 +1148,9 @@ void Shard::process_messages_from_ado()
             if(rc == S_OK)
               ado->remove_deferred_unlock(work_id, key_handle);
           }
-          ado->send_unlock_response(rc);
+
+          if (ado->send_unlock_response(rc) != S_OK)
+            throw General_exception("send_unlock_response failed");
         }
       }
       else if (ado->check_configure_request(buffer, options)) {
@@ -1124,7 +1158,8 @@ void Shard::process_messages_from_ado()
         if (options & IADO_plugin::CONFIG_SHARD_INC_REF) ado->add_ref();
         if (options & IADO_plugin::CONFIG_SHARD_DEC_REF) ado->release_ref();
 
-        ado->send_configure_response(S_OK);
+        if (ado->send_configure_response(S_OK) != S_OK)
+          throw General_exception("send_configure_response failed");
       }
       else {
         throw Logic_exception("Shard_ado: bad op request from ADO plugin");

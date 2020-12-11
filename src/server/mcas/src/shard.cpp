@@ -328,7 +328,8 @@ void Shard::service_cluster_signals()
     for (auto &proxy : _ado_map) {
       CPLOG(2, "Sending cluster event to ADO (%p)...", static_cast<void *>(proxy.second));
 
-      proxy.second->send_cluster_event(cmsg->_sender, cmsg->_type, cmsg->_content);
+      if (proxy.second->send_cluster_event(cmsg->_sender, cmsg->_type, cmsg->_content) != S_OK)
+        throw General_exception("send_cluster_event to ADO failed");
     }
 
     delete cmsg;
@@ -787,7 +788,8 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
                    we can't block here though - the shard
                    thread must keep going to avoid cross-client
                    degradation */
-                ado_itf->send_op_event(ADO_op::POOL_DELETE);
+                if (ado_itf->send_op_event(ADO_op::POOL_DELETE) != S_OK)
+                  throw General_exception("send_op_event to ADO failed");
               }
               else {
                 /* close and delete pool */
