@@ -287,7 +287,7 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
     }
     if (key_handle == IKVStore::KEY_NONE) throw Logic_exception("lock gave KEY_NONE");
 
-    new_root = (s == S_OK_CREATED) ? true : false;
+    new_root = (s == S_OK_CREATED);
   }
 
   void*  detached_val_ptr = nullptr;
@@ -352,14 +352,16 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
   CPLOG(2, "Shard_ado: sent work request (len=%lu, key=%lx)", msg->request_len(), wr_key);
 }
 
-void Shard::process_ado_request(Connection_handler* handler, const protocol::Message_ado_request* msg)
+void Shard::process_ado_request(Connection_handler* handler,
+                                const protocol::Message_ado_request* msg)
 {
+  using namespace component;
+  
   try {
     // PLOG("%s: enter", __func__);
     //    PNOTICE("invoke ADO recv (rid=%lu)", msg->request_id());
 
     handler->msg_recv_log(msg, __func__);
-    using namespace component;
 
     IADO_proxy* ado;
 
@@ -531,6 +533,69 @@ void Shard::process_ado_request(Connection_handler* handler, const protocol::Mes
   }
 }
 
+void Shard::signal_ado(Connection_handler* handler,
+                       const uint64_t client_request_id,                             
+                       const component::IKVStore::pool_t pool,
+                       const std::string& key,
+                       const component::IKVStore::lock_type_t lock_type,
+                       component::IKVStore::key_t key_handle)
+{
+  using namespace component;
+
+  if(!ado_enabled()) return; /* check if ADO is disabled */
+  
+  const char* key_ptr = nullptr;
+  void * value = nullptr;
+  size_t value_len = 0;
+  auto key_len = key.length();
+
+  auto ado = _ado_pool_map.get_proxy(pool);
+  if (ado == nullptr)
+    throw General_exception("unexpectedly failed to get ADO proxy in async_signal_ado");
+  
+  if (key_handle == IKVStore::KEY_NONE) {
+    if(_i_kvstore->lock(pool,
+                        key,
+                        lock_type,
+                        value,
+                        value_len,
+                        key_handle,
+                        &key_ptr) != S_OK) {
+      PWRN("async_signal_ado failed to take lock");
+      return;
+    }
+  }
+
+  /* create ADO signal work request */
+  auto wr = _wr_allocator.allocate();
+  
+  *wr = {handler, pool, key_handle, key_ptr,
+         key_len, lock_type, client_request_id,
+         component::IMCAS::ADO_FLAG_ASYNC /* flags */};
+
+  auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
+  _outstanding_work.insert(wr_key); /* save request by index on key-handle */
+
+  static const std::string msg = "ADO::Signal";
+  
+  /* now send the work request */
+  if (ado->send_work_request(wr_key,
+                             key_ptr, key_len, /* key info */
+                             value, value_len, /* value info */
+                             nullptr, 0, /* no detached payload */
+                             msg.data(),
+                             msg.length(),
+                             false /* new root */) != S_OK)
+    throw General_exception("send_work_request failed");
+  
+  CPLOG(2, "Shard_ado: sent async signal to ADO (value=%p value_len=%lu)",
+        value, value_len);
+
+  /* when the work completes, the locks will be released.  no additional reply
+     is sent to the client because of the ADO_FLAG_ASYNC flag */
+}
+
+
 
 void Shard::close_all_ado()
 {
@@ -567,7 +632,9 @@ void Shard::process_messages_from_ado()
     /* ADO work completion */
     /*---------------------*/
     while (ado->check_work_completions(request_key, response_status, response_buffers)) {
-      if (response_status > S_USER0 || response_status < E_ERROR_BASE) response_status = E_FAIL;
+
+      if (response_status > S_USER0 || response_status < E_ERROR_BASE)
+        response_status = E_FAIL;
 
       CPLOG(2, "Shard_ado: check_work_completions(response_status=%d, response_count=%lu",
             response_status, response_buffers.size());
@@ -626,7 +693,7 @@ void Shard::process_messages_from_ado()
         /* if the ADO operation response is bad, save it for
            later, otherwise don't do anything */
         if (response_status < S_OK) {
-          if (debug_level() > 2) PWRN("Shard_ado: saving ADO completion failure");
+          PWRN("Shard_ado: saving ADO completion failure");
           _failed_async_requests.push_back(request_record);
         }
         else {
@@ -982,7 +1049,6 @@ void Shard::process_messages_from_ado()
             throw Logic_exception("unable to delete pool after POOL DELETE op event");
 
           CPLOG(2, "POOL DELETE op event completion");
-
           break;
         }
         case ADO_op::CLOSE: {

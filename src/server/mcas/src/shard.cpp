@@ -85,8 +85,9 @@ public:
 struct locked_key
 {
   common::moveable_ptr<component::IKVStore> _store;
-  IKVStore::pool_t _pool;
-  component::IKVStore::key_t _lock_handle;
+  IKVStore::pool_t                          _pool;
+  component::IKVStore::key_t                _lock_handle;
+  
   locked_key(component::IKVStore *store_, IKVStore::pool_t pool_, component::IKVStore::key_t lh_)
     : _store(store_)
     , _pool(pool_)
@@ -96,10 +97,9 @@ struct locked_key
   locked_key &operator=(const locked_key &) = delete;
   ~locked_key()
   {
-    if ( _store )
-      {
-        _store->unlock(_pool, _lock_handle);
-      }
+    if ( _store ) {
+      _store->unlock(_pool, _lock_handle);
+    }
   }
   component::IKVStore::key_t release()
   {
@@ -1009,8 +1009,7 @@ void Shard::release_pending_rename(const void *target)
 }
 
 /* like respond2, but omits the final post */
-auto Shard::respond1(
-                     const Connection_handler *handler_,
+auto Shard::respond1(const Connection_handler *handler_,
                      buffer_t *iob_,
                      const protocol::Message_IO_request *msg_,
                      int status_) -> protocol::Message_IO_response *
@@ -1023,8 +1022,7 @@ auto Shard::respond1(
   return response;
 }
 
-void Shard::respond2(
-                     Connection_handler *handler_,
+void Shard::respond2(Connection_handler *handler_,
                      buffer_t *iob_,
                      const protocol::Message_IO_request *msg_,
                      int status_,
@@ -1037,7 +1035,9 @@ void Shard::respond2(
 /////////////////////////////////////////////////////////////////////////////
 //   PUT ADVANCE   //
 /////////////////////
-void Shard::io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_advance(Connection_handler *handler,
+                                    const protocol::Message_IO_request *msg,
+                                    buffer_t *iob)
 {
   CPLOG(2, "PUT_ADVANCE: (%p) key=(%.*s) value_len=%zu request_id=%lu", static_cast<const void *>(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1118,7 +1118,9 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
 /////////////////////////////////////////////////////////////////////////////
 //   GET LOCATE    //
 /////////////////////
-void Shard::io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_get_locate(Connection_handler *handler,
+                                   const protocol::Message_IO_request *msg,
+                                   buffer_t *iob)
 {
   CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", static_cast<const void *>(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1182,7 +1184,9 @@ void Shard::io_response_get_locate(Connection_handler *handler, const protocol::
 /////////////////////////////////////////////////////////////////////////////
 //   GET RELEASE   //
 /////////////////////
-void Shard::io_response_get_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_get_release(Connection_handler *handler,
+                                    const protocol::Message_IO_request *msg,
+                                    buffer_t *iob)
 {
   auto target = reinterpret_cast<const void *>(msg->addr);
   CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", static_cast<const void *>(this),
@@ -1200,9 +1204,11 @@ void Shard::io_response_get_release(Connection_handler *handler, const protocol:
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//   PUT LOCATE   //
+//   PUT LOCATE    //
 /////////////////////
-void Shard::io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_locate(Connection_handler *handler,
+                                   const protocol::Message_IO_request *msg,
+                                   buffer_t *iob)
 {
   CPLOG(2, "PUT_LOCATE: (%p) key=(%.*s) value_len=0x%zu request_id=%lu", static_cast<const void *>(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1333,10 +1339,22 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
       }
 
       add_index_key(msg->pool_id(), k);
+
+      /* experimental ado signalling */
+      if(_exp_ado_signal) {
+        signal_ado(handler,
+                   msg->request_id(),
+                   msg->pool_id(),
+                   k,
+                   IKVStore::lock_type_t::STORE_LOCK_WRITE,
+                   IKVStore::KEY_NONE);
+      }
     }
     /* update stats */
     ++_stats.op_put_count;
-    respond2(handler, iob, msg, status, __func__);
+
+    if(!_exp_ado_signal)
+      respond2(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1564,21 +1582,27 @@ std::vector<::iovec> region_breaks(const std::vector<::iovec> regions_)
 }
 }  // namespace
 
-auto Shard::offset_to_sg_list(
-                              range<std::uint64_t> t
-                              , const std::vector<::iovec> &region_breaks_
-                              ) -> sg_result
+auto Shard::offset_to_sg_list(range<std::uint64_t> t,
+                              const std::vector<::iovec> &region_breaks_) -> sg_result
 {
   CPLOG(2, "region break count %zu", region_breaks_.size());
   for (const auto &e : region_breaks_) {
     CPLOG(2, "region break %p len 0x%zx", e.iov_base, e.iov_len);
   }
-  auto it_begin = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.first, [](const uint64_t a, const iovec &b) {
-                                                                                            return a < reinterpret_cast<std::uint64_t>(b.iov_base);
-                                                                                          });
-  auto it_end   = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.second, [](const uint64_t a, const iovec &b) {
-                                                                                             return a < reinterpret_cast<std::uint64_t>(b.iov_base);
-                                                                                           });
+  
+  auto it_begin = std::upper_bound(region_breaks_.begin(),
+                                   region_breaks_.end(),
+                                   t.first,
+                                   [](const uint64_t a, const iovec &b) {
+                                     return a < reinterpret_cast<std::uint64_t>(b.iov_base);
+                                   });
+  
+  auto it_end   = std::upper_bound(region_breaks_.begin(),
+                                   region_breaks_.end(),
+                                   t.second,
+                                   [](const uint64_t a, const iovec &b) {
+                                     return a < reinterpret_cast<std::uint64_t>(b.iov_base);
+                                   });
 
   CPLOG(2, "it_begin %zu it_end %zu", it_begin - region_breaks_.begin(), it_end - region_breaks_.begin());
 
@@ -1732,8 +1756,7 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
       for ( const auto &e : sgr.sg_list )
         {
           auto s = _i_kvstore->flush_pool_memory(msg->pool_id(), reinterpret_cast<const void *>(e.addr), e.len);
-          if ( status == S_OK )
-            {
+          if ( status == S_OK ) {
               status = s;
             }
         }
@@ -1957,10 +1980,10 @@ status_t Shard::process_configure(const protocol::Message_IO_request *msg)
               p->second->insert(key);
               return 0;
             })) != S_OK) {
-        hr = _i_kvstore->map(msg->pool_id(), [p](const void *key, const size_t key_len, const void *  // value
-                                                 ,
-                                                 const size_t  // value_len
-                                                 ) {
+        hr = _i_kvstore->map(msg->pool_id(),
+                             [p](const void *key,
+                                 const size_t key_len,
+                                 const void * /* value */, const size_t /* value_len */) {
                                std::string k(static_cast<const char *>(key), key_len);
                                p->second->insert(k);
                                return 0;

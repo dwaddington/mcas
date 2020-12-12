@@ -123,16 +123,16 @@ class Shard : public Shard_transport, private common::log_source {
     unsigned int flags;
     size_t       expected_obj_count;
     bool         opened_existing;
-    void *       base_addr;
+    void*        base_addr;
   };
 
   using pool_t              = component::IKVStore::pool_t;
   using buffer_t            = Shard_transport::buffer_t;
   using index_map_t         = std::unordered_map<pool_t, component::Itf_ref<component::IKVIndex>>;
-  using locked_value_map_t  = std::unordered_map<const void *, lock_info_t>;
+  using locked_value_map_t  = std::unordered_map<const void* , lock_info_t>;
   using spaces_shared_map_t = std::map<range<std::uint64_t>, space_lock_info_t>;
-  using rename_map_t        = std::unordered_map<const void *, rename_info_t>;
-  using task_list_t         = std::list<Shard_task *>;
+  using rename_map_t        = std::unordered_map<const void* , rename_info_t>;
+  using task_list_t         = std::list<Shard_task* >;
 
  public:
   using string_view = std::experimental::string_view;
@@ -142,7 +142,7 @@ class Shard : public Shard_transport, private common::log_source {
         const std::string &dax_config,
         unsigned           debug_level,
         bool               forced_exit,
-        const char *       profile_file,
+        const char*        profile_file,
         bool               triggered_profile);
 
   Shard(const Shard &) = delete;
@@ -232,7 +232,15 @@ class Shard : public Shard_transport, private common::log_source {
   void process_tasks(unsigned &idle);
 
   void service_cluster_signals();
-
+  
+  void signal_ado(Connection_handler* handler,
+                  const uint64_t client_request_id,
+                  const component::IKVStore::pool_t pool,
+                  const std::string& key,
+                  const component::IKVStore::lock_type_t lock_type,
+                  component::IKVStore::key_t key_handle = component::IKVStore::KEY_NONE);
+                        
+                        
   static auto respond1(
     const Connection_handler *           handler_,
     buffer_t                           * iob_,
@@ -364,7 +372,8 @@ class Shard : public Shard_transport, private common::log_source {
   } _wr_allocator;
 
   using ado_pool_map_t =
-      std::unordered_map<component::IKVStore::pool_t, std::pair<component::IADO_proxy *, Connection_handler *>>;
+      std::unordered_map<component::IKVStore::pool_t,
+                         std::pair<component::IADO_proxy *, Connection_handler *>>;
 
   using work_request_key_t = uint64_t;
 
@@ -376,6 +385,7 @@ class Shard : public Shard_transport, private common::log_source {
   inline const std::string &net_addr() const { return _net_addr; }
 
   /* Shard class members */
+  const unsigned                                    _exp_ado_signal = true;
   const std::string                                 _net_addr;
   const unsigned int                                _port;
   std::unique_ptr<index_map_t>                      _index_map;
