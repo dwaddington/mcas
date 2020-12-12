@@ -18,12 +18,12 @@ BraceWrapping:
   BeforeElse:     true
   BeforeCatch:    true
 BinPackParameters: false
-ConstructorInitializerAllOnOneLineOrOnePerLine: false
 BreakBeforeInheritanceComma: true
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ColumnLimit: 100
 SortIncludes: false
 ExperimentalAutoDetectBinPacking: true
+PenaltyBreakBeforeFirstCallParameter: 200
 
 #------------------------------------------
 # THIS IS A DUMP OF THE BASE GOOGLE STYLE
