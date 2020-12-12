@@ -542,7 +542,8 @@ void Shard::signal_ado(Connection_handler* handler,
 {
   using namespace component;
 
-  if(!ado_enabled()) return; /* check if ADO is disabled */
+  assert(ado_enabled());
+  PNOTICE("EXPERIMENTAL: signal_ado!!!!");
   
   const char* key_ptr = nullptr;
   void * value = nullptr;

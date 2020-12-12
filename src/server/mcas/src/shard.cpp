@@ -1320,7 +1320,7 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
   {
     int status = S_OK;
     if (UNLIKELY(msg->is_scbe())) {
-      // short-circuit backend
+      // short-circuit backend - testing only
       CPLOG(2, "PUT: short-circuited backend");
     }
     else {
@@ -1341,19 +1341,19 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
       add_index_key(msg->pool_id(), k);
 
       /* experimental ado signalling */
-      if(_exp_ado_signal) {
+      if(ado_signal_enabled()) {
         signal_ado(handler,
                    msg->request_id(),
                    msg->pool_id(),
                    k,
-                   IKVStore::lock_type_t::STORE_LOCK_WRITE,
+                   IKVStore::lock_type_t::STORE_LOCK_READ,
                    IKVStore::KEY_NONE);
       }
     }
     /* update stats */
     ++_stats.op_put_count;
 
-    if(!_exp_ado_signal)
+    if(!ado_signal_enabled())
       respond2(handler, iob, msg, status, __func__);
   }
 }

@@ -292,7 +292,9 @@ class Shard : public Shard_transport, private common::log_source {
     , const std::vector<::iovec> &region_breaks
   ) -> sg_result;
 
-  inline bool ado_enabled() const { return (_i_ado_mgr && _ado_plugins.size() > 0); }
+  inline bool ado_enabled() const { return (_i_ado_mgr && (_ado_plugins.size() > 0)); }
+
+  inline bool ado_signal_enabled() const { return ado_enabled() && _exp_ado_signal; }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }
 
