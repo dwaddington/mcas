@@ -136,13 +136,13 @@ class Shard : public Shard_transport, private common::log_source {
  public:
   using string_view = std::experimental::string_view;
 
-  Shard(const Config_file &config_file,
-        unsigned           shard_index,
-        const std::string &dax_config,
-        unsigned           debug_level,
-        bool               forced_exit,
-        const char*        profile_file,
-        bool               triggered_profile);
+  Shard(const Config_file & config_file,
+        unsigned            shard_index,
+        const std::string & dax_config,
+        unsigned            debug_level,
+        bool                forced_exit,
+        const char *        profile_file,
+        bool                triggered_profile);
 
   Shard(const Shard &) = delete;
   Shard &operator=(const Shard &) = delete;
@@ -390,7 +390,7 @@ class Shard : public Shard_transport, private common::log_source {
   /* Shard class members */
   const std::string                                 _net_addr;
   const unsigned int                                _port;
-  std::unique_ptr<index_map_t>                      _index_map;
+  std::unique_ptr<index_map_t>                      _index_map; /* depends on _i_kvstore therefore should be cleaned up first */
   bool                                              _thread_exit;
   bool                                              _forced_exit;
   unsigned                                          _core;
@@ -414,6 +414,7 @@ class Shard : public Shard_transport, private common::log_source {
   Shard_security                                    _security;
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;
+  std::string                                       _dax_config;
   std::future<void>                                 _thread;
 };
 

@@ -171,6 +171,7 @@ Shard::Shard(const Config_file &config_file,
               debug_level_),
     _cluster_signal_queue(),
     _backend(config_file.get_shard_required(config::default_backend, shard_index)),
+    _dax_config(dax_config),
     _thread(std::async(std::launch::async,
                        &Shard::thread_entry,
                        this,
@@ -268,9 +269,7 @@ void Shard::initialize_components(const std::string &backend,
     if (backend == "hstore" || backend == "hstore-cc") {
       if (dax_config.empty()) throw General_exception("hstore backend requires dax configuration");
 
-      _i_kvstore.reset(
-                       fact->create(
-                                    0
+      _i_kvstore.reset(fact->create(0
                                     , {
                                        {+component::IKVStore_factory::k_debug, std::to_string(debug_level())}
                                        , {+component::IKVStore_factory::k_dax_config, dax_config}
@@ -283,16 +282,8 @@ void Shard::initialize_components(const std::string &backend,
     }
   }
 
-  /* optional ADO components */
+  /* ADO manager proxy */
   {
-#if 0
-    /* check XPMEM kernel module */
-    if (!check_mcas_module()) {
-      PMAJOR("MCAS kernel module not found. Disabling ADO.");
-      return;
-    }
-#endif
-
     IBase *comp = load_component("libcomponent-adomgrproxy.so", ado_manager_proxy_factory);
     if (comp) {
       auto fact = make_itf_ref(static_cast<IADO_manager_proxy_factory *>(comp->query_interface(IADO_manager_proxy_factory::iid())));
@@ -1758,8 +1749,8 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
         {
           auto s = _i_kvstore->flush_pool_memory(msg->pool_id(), reinterpret_cast<const void *>(e.addr), e.len);
           if ( status == S_OK ) {
-              status = s;
-            }
+            status = s;
+          }
         }
 
       release_space_shared(t);
@@ -1782,7 +1773,7 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
 
     if (_index_map == nullptr) { /* index does not exist */
       PLOG("Shard: cannot perform regex request, no index!! use "
-           "configure('AddIndex::VolatileTree') ");
+           "configure('AddIndex::VolatileTree') or similar for dynamic loading ");
       const auto                       iob      = handler->allocate_send();
       protocol::Message_INFO_response *response = new (iob->base()) protocol::Message_INFO_response(handler->auth_id());
 
@@ -1954,49 +1945,71 @@ status_t Shard::process_configure(const protocol::Message_IO_request *msg)
 
   std::string command(msg->cmd());
 
+  /* dynamic loading of secondary index.  loading this 
+     way (as oppposed to via shard configuration) will
+     cause a rebuild by iterating the key space in the main
+     storage engine 
+     e.g. AddIndex::rbtree, AddIndex::customtree
+  */
   if (command.substr(0, 10) == "AddIndex::") {
     std::string index_str = command.substr(10);
 
-    /* TODO: use shard configuration */
-    if (index_str == "VolatileTree") {
-      if (_index_map == nullptr) _index_map.reset(new index_map_t());
+    if(index_str == "VolatileTree") /* backwards compatability */
+      index_str = "rbtree";
 
-      /* create index component and put into shard index map */
-      IBase *comp = load_component("libcomponent-indexrbtree.so", rbtreeindex_factory);
-      if (!comp) throw General_exception("unable to load libcomponent-indexrbtree.so");
-      auto factory = make_itf_ref(static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid())));
-      assert(factory);
+    /* derive name of component library from the AddIndex:: parameter */
+    std::string dll_string = "libcomponent-index-";
+    dll_string += index_str;
+    dll_string += ".so";
+    
+    if (_index_map == nullptr)
+      _index_map.reset(new index_map_t());
 
-      std::ostringstream ss;
-      ss << "auth_id:" << msg->auth_id();
-      auto index = component::make_itf_ref(static_cast<component::IKVIndex *>(factory->create(ss.str(), "")));
-      assert(index);
-      auto p = _index_map->insert(std::make_pair(msg->pool_id(), std::move(index))).first;
-      factory.reset(nullptr);
+    /* create index component and put into shard index map */
+    IBase *comp = load_component(dll_string.c_str(), index_factory);
+    if (!comp) {
+      PWRN("unable to load %s as secondary index", dll_string.c_str());
+      return E_FAIL;
+    }
+    
+    auto factory = make_itf_ref(static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid())));
+    assert(factory);
 
-      CPLOG(1, "Shard: rebuilding volatile index ...");
+    /* note, the second parameter to the factory, here "dynamic" should be passed to the constructor
+       and used to control rebuilding */
+    auto index = component::make_itf_ref(factory->create_dynamic(_dax_config));
+    assert(index);
 
-      status_t hr;
-      if ((hr = _i_kvstore->map_keys(msg->pool_id(), [p](const std::string &key) {
-              p->second->insert(key);
-              return 0;
-            })) != S_OK) {
+    /* save mapping of pool id to index instance */
+    auto p = _index_map->insert(std::make_pair(msg->pool_id(), std::move(index))).first;
+    factory.reset(nullptr);
+
+    CPLOG(1, "Shard: rebuilding secondary index ...");
+
+    status_t hr = S_OK;
+
+    /* optionally, iterate key space for rebuilding */
+    if(index && index->iterate_key_space_on_load()) {
+      if ((hr = _i_kvstore->map_keys(msg->pool_id(),
+                                     [p](const std::string &key)
+                                     {
+                                       p->second->insert(key);
+                                       return 0;
+                                     })) != S_OK) {
+        
+        /* alternative when map_keys method optimization is not supported on main engine */
         hr = _i_kvstore->map(msg->pool_id(),
                              [p](const void *key,
-                                 const size_t key_len,
-                                 const void * /* value */, const size_t /* value_len */) {
+                                 const size_t key_len, const void *,  // value
+                                 const size_t) {  // value_len
                                std::string k(static_cast<const char *>(key), key_len);
                                p->second->insert(k);
                                return 0;
                              });
       }
+    }
 
-      return hr;
-    }
-    else {
-      PWRN("unknown index (%s)", index_str.c_str());
-      return E_BAD_PARAM;
-    }
+    return hr;
   }
   else if (command == "RemoveIndex::") {
     try {
