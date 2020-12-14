@@ -8,27 +8,23 @@
 using namespace component;
 using namespace std;
 
-RamRBTree::RamRBTree(const std::string& owner, const std::string& name)
-	: RamRBTree{}
+Rbtree_secondary_index::Rbtree_secondary_index()
+  : _index{}
 {
-	(void)owner; // unused
-	(void)name; // unused;
 }
 
-RamRBTree::RamRBTree() : _index{} {}
+Rbtree_secondary_index::~Rbtree_secondary_index() {}
 
-RamRBTree::~RamRBTree() {}
-
-void RamRBTree::insert(const string& key)
+void Rbtree_secondary_index::insert(const string& key)
 {
   _index.insert(key);
 }
 
-void RamRBTree::erase(const std::string& key) { _index.erase(key); }
+void Rbtree_secondary_index::erase(const std::string& key) { _index.erase(key); }
 
-void RamRBTree::clear() { _index.clear(); }
+void Rbtree_secondary_index::clear() { _index.clear(); }
 
-string RamRBTree::get(offset_t position) const
+string Rbtree_secondary_index::get(offset_t position) const
 {
   if (position >= _index.size()) {
     throw out_of_range("Position out of range");
@@ -39,14 +35,14 @@ string RamRBTree::get(offset_t position) const
   return *it;
 }
 
-size_t RamRBTree::count() const { return _index.size(); }
+size_t Rbtree_secondary_index::count() const { return _index.size(); }
 
-status_t RamRBTree::find(const std::string& key_expression,
-                         offset_t           begin_position,
-                         find_t             find_type,
-                         offset_t&          out_matched_pos,
-                         std::string&       out_matched_key,
-                         unsigned           max_comparisons)
+status_t Rbtree_secondary_index::find(const std::string& key_expression,
+                                      offset_t           begin_position,
+                                      find_t             find_type,
+                                      offset_t&          out_matched_pos,
+                                      std::string&       out_matched_key,
+                                      unsigned           max_comparisons)
 {
   if (begin_position >= _index.size()) {
     return E_FAIL;
@@ -64,7 +60,7 @@ status_t RamRBTree::find(const std::string& key_expression,
       {
         std::regex r(key_expression);
         for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
-          string key = RamRBTree::get(out_matched_pos);
+          string key = Rbtree_secondary_index::get(out_matched_pos);
           if (regex_match(key, r)) {
             out_matched_key = key;
             return S_OK;
@@ -79,7 +75,7 @@ status_t RamRBTree::find(const std::string& key_expression,
     case FIND_TYPE_EXACT:
       for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
         PLOG("Getting from position %lu", out_matched_pos);
-        string key = RamRBTree::get(out_matched_pos);
+        string key = Rbtree_secondary_index::get(out_matched_pos);
         if (key.compare(key_expression) == 0) {
           out_matched_key = key;
           return S_OK;
@@ -92,7 +88,7 @@ status_t RamRBTree::find(const std::string& key_expression,
       break;
     case FIND_TYPE_PREFIX:
       for (out_matched_pos = begin_position; out_matched_pos <= end_position; out_matched_pos++) {
-        string key = RamRBTree::get(out_matched_pos);
+        string key = Rbtree_secondary_index::get(out_matched_pos);
         if (key.find(key_expression) != string::npos) {
           out_matched_key = key;
           return S_OK;
@@ -123,8 +119,8 @@ status_t RamRBTree::find(const std::string& key_expression,
  */
 extern "C" void* factory_createInstance(component::uuid_t component_id)
 {
-  if (component_id == RamRBTree_factory::component_id()) {
-    return static_cast<void*>(new RamRBTree_factory());
+  if (component_id == Rbtree_secondary_index_factory::component_id()) {
+    return static_cast<void*>(new Rbtree_secondary_index_factory());
   }
   else
     return NULL;

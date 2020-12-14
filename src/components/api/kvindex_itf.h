@@ -15,10 +15,12 @@
 #define __API_KVINDEX_ITF__
 
 #include <api/components.h>
+#include <api/kvstore_itf.h>
 #include <assert.h>
 #include <common/exceptions.h>
 #include <sys/uio.h> /* iovec */
 
+#include <string>
 #include <cstdlib>
 #include <functional>
 #include <vector>
@@ -55,6 +57,19 @@ class IKVIndex : public component::IBase {
 
   using offset_t = uint64_t;
 
+
+  /** 
+   * Returning true indicates that the shard should iterate the key space
+   * to populate the index.
+   * 
+   * 
+   * @return true to iterate/rebuild key space
+   */
+  virtual bool iterate_key_space_on_load()
+  {
+    return true;
+  }
+  
   /**
    * Insert a key into the index
    *
@@ -118,23 +133,25 @@ class IKVIndex_factory : public component::IBase {
   DECLARE_INTERFACE_UUID(0xfac5c747,0x0f5b,0x44a6,0x982b,0x36,0x54,0x1a,0x62,0x64,0xfc);
   // clang-format on
 
-  virtual IKVIndex* create(const std::string& owner, const std::string& param)
-  {
-    throw API_exception("factory::create(owner,param) not implemented");
-  };
+  /** 
+   * create_dynamic is called in response to a configure AddIndex:: call
+   * 
+   */
+  virtual IKVIndex* create_dynamic(const std::string& dax_config) = 0;
 
-  virtual IKVIndex* create(const std::string& owner, const std::string& param, const std::string& param2)
+
+  /** 
+   * create_configured is used when the secondary index is defined in configuration file 
+   * 
+   * @param primary_index 
+   * 
+   * @return 
+   */
+  virtual IKVIndex* create_configured(IKVStore * primary_index)
   {
-    throw API_exception("factory::create(owner,param,param2) not implemented");
+    throw API_exception("factory::create_configure not implemented");
   }
 
-  virtual IKVIndex* create(unsigned           debug_level,
-                           const std::string& owner,
-                           const std::string& param,
-                           const std::string& param2)
-  {
-    throw API_exception("factory::create(debug_level,owner,param,param2) not implemented");
-  }
 };
 
 #pragma GCC diagnostic pop

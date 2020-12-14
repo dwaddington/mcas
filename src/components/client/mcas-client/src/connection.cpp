@@ -269,8 +269,10 @@ public:
     c->post_read(std::begin(_v), std::end(_v), std::begin(_desc), _addr, key_, &*_iobrd);
     /* End */
   }
+  
   DELETE_COPY(async_buffer_set_get_locate);
-  int                  move_along(Connection_handler *c) override
+  
+  int move_along(Connection_handler *c) override
   {
     if (_iobrd) {
       if (!c->test_completion(&*_iobrd)) {

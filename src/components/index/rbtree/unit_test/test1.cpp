@@ -42,8 +42,8 @@ component::IKVIndex *KVIndex_test::_kvindex;
 TEST_F(KVIndex_test, Instantiate)
 {
   /* create object instance through factory */
-  component::IBase *comp = component::load_component(
-      "libcomponent-indexrbtree.so", component::rbtreeindex_factory);
+  component::IBase *comp = component::load_component("libcomponent-index-rbtree.so",
+                                                     component::index_factory);
 
   ASSERT_TRUE(comp);
   auto fact =
@@ -51,7 +51,7 @@ TEST_F(KVIndex_test, Instantiate)
       static_cast<IKVIndex_factory *>(comp->query_interface(IKVIndex_factory::iid()))
     );
 
-  _kvindex = fact->create("owner", "name");
+  _kvindex = fact->create_dynamic("");
 }
 
 TEST_F(KVIndex_test, InsertPerf)
