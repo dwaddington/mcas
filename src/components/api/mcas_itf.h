@@ -142,7 +142,8 @@ public:
   static constexpr ado_flags_t ADO_FLAG_READ_ONLY = 0x20;
   /*< zero any newly allocated value memory */
   static constexpr ado_flags_t ADO_FLAG_ZERO_NEW_VALUE = 0x40;
-  
+  /*< internal use only: on return provide IO response */
+  static constexpr ado_flags_t ADO_FLAG_INTERNAL_IO_RESPONSE = 0x80;
 
 public:
   /**

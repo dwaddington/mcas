@@ -631,6 +631,33 @@ TEST_F(ADO_test, BaseAddr)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(ADO_test, PutSignal)
+{
+  const std::string testname = "PutSignal";
+  const std::string poolname = "THIS_IS_A_TEST_POOL";
+  mcas->delete_pool(poolname);
+
+  auto pool = mcas->create_pool(poolname, MiB(1), /* size */
+                                0, /* flags */
+                                50, /* obj count */
+                                IMCAS::Addr{0xBB00000000});
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  mcas->erase(pool, testname);
+
+  std::vector<IMCAS::ADO_response> response;
+  status_t rc;
+
+  rc = mcas->put(pool,
+                 "someKey",
+                 "someValue");
+  ASSERT_OK(rc);
+  
+  ASSERT_OK(mcas->close_pool(pool));
+
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
 
 
 

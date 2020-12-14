@@ -543,7 +543,7 @@ void Shard::signal_ado(Connection_handler* handler,
   using namespace component;
 
   assert(ado_enabled());
-  PNOTICE("EXPERIMENTAL: signal_ado!!!!");
+  PNOTICE("EXPERIMENTAL: signal_ado!!!! (key=%s)", key.c_str());
   
   const char* key_ptr = nullptr;
   void * value = nullptr;
@@ -568,11 +568,11 @@ void Shard::signal_ado(Connection_handler* handler,
   }
 
   /* create ADO signal work request */
-  auto wr = _wr_allocator.allocate();
+  work_request_t* wr = _wr_allocator.allocate();
   
   *wr = {handler, pool, key_handle, key_ptr,
          key_len, lock_type, client_request_id,
-         component::IMCAS::ADO_FLAG_ASYNC /* flags */};
+         IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE /* flag to indicate signal */};
 
   auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
   _outstanding_work.insert(wr_key); /* save request by index on key-handle */
@@ -589,8 +589,8 @@ void Shard::signal_ado(Connection_handler* handler,
                              false /* new root */) != S_OK)
     throw General_exception("send_work_request failed");
   
-  CPLOG(2, "Shard_ado: sent async signal to ADO (value=%p value_len=%lu)",
-        value, value_len);
+  CPLOG(2, "Shard_ado: sent signal to ADO (value=%p value_len=%lu, key=%s %lu)",
+        value, value_len, key_ptr, key_len);
 
   /* when the work completes, the locks will be released.  no additional reply
      is sent to the client because of the ADO_FLAG_ASYNC flag */
@@ -703,35 +703,53 @@ void Shard::process_messages_from_ado()
       }
       /* for sync, give response, unless the client is disconnected */
       else if (handler->client_connected()) {
+        
         auto iob = handler->allocate_send();
-
-        assert(iob->base());
-        auto response_msg = new (iob->base()) protocol::Message_ado_response(iob->length(),
-                                                                             response_status,
-                                                                             handler->auth_id(),
-                                                                             request_record->request_id);
-
-        /* TODO: for the moment copy pool buffers in, we should
-           be able to do zero copy though.
-        */
-        size_t appended_buffer_size = 0;
-
-        for (auto& rb : response_buffers) {
-          assert(rb.ptr);
-          try
-          {
-            response_msg->append_response(rb.ptr, boost::numeric_cast<uint32_t>(rb.len), rb.layer_id);
-          } catch ( const std::exception &e ) { PLOG("%s: exception building response: %s", __func__, e.what()); throw; }
-          appended_buffer_size += rb.len;
-        }
-
         assert(iob);
-        assert(response_msg);
-        iob->set_length(response_msg->message_size());
+        assert(iob->base());
+        
+        if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE) {
 
-        CPLOG(2,"Shard_ado: posting ADO response");
+          /* translate back to IO response */
+          auto response_msg  = new (iob->base()) protocol::Message_IO_response(iob->length(),
+                                                                               handler->auth_id(),
+                                                                               request_record->request_id);
+          response_msg->set_status(response_status);
 
-        handler->post_send_buffer(iob, response_msg, __func__);
+          iob->set_length(response_msg->base_message_size());
+          
+          CPLOG(2,"Shard_ado: posting translated IO response");
+          
+          handler->post_send_buffer(iob, response_msg, __func__);
+        }
+        else {
+          /* send ADO response */
+          
+          auto response_msg = new (iob->base()) protocol::Message_ado_response(iob->length(),
+                                                                               response_status,
+                                                                               handler->auth_id(),
+                                                                               request_record->request_id);
+
+          /* TODO: for the moment copy pool buffers in, we should
+             be able to do zero copy though.
+          */
+          size_t appended_buffer_size = 0;
+          
+          for (auto& rb : response_buffers) {
+            assert(rb.ptr);
+            try
+              {
+                response_msg->append_response(rb.ptr, boost::numeric_cast<uint32_t>(rb.len), rb.layer_id);
+              } catch ( const std::exception &e ) { PLOG("%s: exception building response: %s", __func__, e.what()); throw; }
+            appended_buffer_size += rb.len;
+          }
+          
+          iob->set_length(response_msg->message_size());
+          
+          CPLOG(2,"Shard_ado: posting ADO response");
+          
+          handler->post_send_buffer(iob, response_msg, __func__);
+        }
       }
 
       /* clean up response buffers that were temporarily allocated from the pool

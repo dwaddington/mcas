@@ -504,6 +504,20 @@ namespace
     return S_OK;
   }
 
+  status_t adoSignal(
+    IADO_plugin * // ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & // args_
+    , const string_view key_
+    , value_space_t & values_
+    , response_buffer_vector_t & //response_buffers_
+  )
+  {
+    PMAJOR("ADO::Signal: key(%.*s) value at %p (%lu)",
+            boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
+    return S_OK;
+  }
+
 
   
   status_t basicAdoResponse(
@@ -697,6 +711,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-BasicAdoResponse", basicAdoResponse },
     { "RUN!TEST-RepeatInvokeAdo", repeatInvokeAdo },
     { "RUN!TEST-BaseAddr", baseAddr },
+    { "ADO::Signal", adoSignal },
     { "BLAST ME!", other }, // used by ado-perf
     { "put", other }, // used by ado-perf
     { "erase", erase }, // used by ado-perf
