@@ -649,11 +649,10 @@ TEST_F(ADO_test, PutSignal)
   std::vector<IMCAS::ADO_response> response;
   status_t rc;
 
-  rc = mcas->put(pool,
-                 "someKey",
-                 "someValue");
-  ASSERT_OK(rc);
-  
+  for (unsigned i = 0; i < 10; i++) {
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(64)));
+  }
+
   ASSERT_OK(mcas->close_pool(pool));
 
   ASSERT_OK(mcas->delete_pool(poolname));

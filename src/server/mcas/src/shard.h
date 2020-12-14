@@ -74,7 +74,6 @@ using Shard_transport = Fabric_transport;
 class Shard : public Shard_transport, private common::log_source {
  private:
   static constexpr size_t TWO_STAGE_THRESHOLD = KiB(8); /* above this two stage protocol is used */
-
   static constexpr const char *const _cname = "Shard";
 
  private:
@@ -294,7 +293,9 @@ class Shard : public Shard_transport, private common::log_source {
 
   inline bool ado_enabled() const { return (_i_ado_mgr && (_ado_plugins.size() > 0)); }
 
-  inline bool ado_signal_enabled() const { return ado_enabled() && _exp_ado_signal; }
+  /* ADO signaling helpers */
+  inline bool ado_signal_enabled() const { return ado_enabled() && (_ado_signal_mask != Ado_signal::NONE); }
+  inline bool ado_signal_post_put() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT); }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }
 
@@ -387,7 +388,6 @@ class Shard : public Shard_transport, private common::log_source {
   inline const std::string &net_addr() const { return _net_addr; }
 
   /* Shard class members */
-  const unsigned                                    _exp_ado_signal = true;
   const std::string                                 _net_addr;
   const unsigned int                                _port;
   std::unique_ptr<index_map_t>                      _index_map;
@@ -410,6 +410,7 @@ class Shard : public Shard_transport, private common::log_source {
   const std::string                                 _ado_path;
   std::vector<std::string>                          _ado_plugins;
   std::map<std::string, std::string>                _ado_params;
+  Ado_signal                                        _ado_signal_mask = Ado_signal::NONE;  
   Shard_security                                    _security;
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;

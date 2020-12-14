@@ -513,7 +513,7 @@ namespace
     , response_buffer_vector_t & //response_buffers_
   )
   {
-    PMAJOR("ADO::Signal: key(%.*s) value at %p (%lu)",
+    PNOTICE("ADO::Signal: key(%.*s) value at %p (%lu)",
             boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
     return S_OK;
   }

@@ -161,6 +161,7 @@ Shard::Shard(const Config_file &config_file,
     _ado_path(config_file.get_ado_path() ? *config_file.get_ado_path() : ""),
     _ado_plugins(config_file.get_shard_ado_plugins(shard_index)),
     _ado_params(config_file.get_shard_ado_params(shard_index)),
+    _ado_signal_mask(config_file.get_shard_ado_signals(shard_index)),        
     _security(config_file.security_get_cert_path(),
               config_file.security_get_key_path(),
               config_file.get_shard_optional(config::security_mode, shard_index),
@@ -1324,9 +1325,9 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
       CPLOG(2, "PUT: short-circuited backend");
     }
     else {
-      const std::string k = msg->skey();
+      const std::string key = msg->skey();
 
-      status = _i_kvstore->put(msg->pool_id(), k, msg->value(), msg->get_value_len(), msg->flags());
+      status = _i_kvstore->put(msg->pool_id(), key, msg->value(), msg->get_value_len(), msg->flags());
 
       if (debug_level() > 2) {
         if (status == E_ALREADY_EXISTS) {
@@ -1338,14 +1339,14 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
         }
       }
 
-      add_index_key(msg->pool_id(), k);
+      add_index_key(msg->pool_id(), key);
 
       /* experimental ado signalling */
-      if(ado_signal_enabled()) {
+      if(ado_signal_post_put()) {
         signal_ado(handler,
                    msg->request_id(),
                    msg->pool_id(),
-                   k,
+                   key,
                    IKVStore::lock_type_t::STORE_LOCK_READ,
                    IKVStore::KEY_NONE);
       }

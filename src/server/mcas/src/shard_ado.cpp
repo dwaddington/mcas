@@ -543,7 +543,6 @@ void Shard::signal_ado(Connection_handler* handler,
   using namespace component;
 
   assert(ado_enabled());
-  PNOTICE("EXPERIMENTAL: signal_ado!!!! (key=%s)", key.c_str());
   
   const char* key_ptr = nullptr;
   void * value = nullptr;
@@ -592,8 +591,8 @@ void Shard::signal_ado(Connection_handler* handler,
   CPLOG(2, "Shard_ado: sent signal to ADO (value=%p value_len=%lu, key=%s %lu)",
         value, value_len, key_ptr, key_len);
 
-  /* when the work completes, the locks will be released.  no additional reply
-     is sent to the client because of the ADO_FLAG_ASYNC flag */
+  /* when the work completes, the locks will be released.  The ADO 
+     response is converted to an IO response */
 }
 
 
@@ -715,7 +714,6 @@ void Shard::process_messages_from_ado()
                                                                                handler->auth_id(),
                                                                                request_record->request_id);
           response_msg->set_status(response_status);
-
           iob->set_length(response_msg->base_message_size());
           
           CPLOG(2,"Shard_ado: posting translated IO response");
