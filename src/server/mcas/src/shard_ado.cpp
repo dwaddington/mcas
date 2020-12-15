@@ -533,12 +533,86 @@ void Shard::process_ado_request(Connection_handler* handler,
   }
 }
 
-void Shard::signal_ado(Connection_handler* handler,
+void Shard::signal_ado_async_nolock(const char * tag,
+                                    Connection_handler* handler,
+                                    const uint64_t client_request_id,
+                                    const component::IKVStore::pool_t pool,
+                                    const std::string& key)
+{
+  using namespace component;
+  assert(tag);
+  assert(handler);
+  assert(ado_enabled());
+  
+  CPLOG(3, "%s: %s %lu %lu", __func__, key.c_str(), client_request_id, pool);
+
+  const char* key_ptr = nullptr;
+  void * value = nullptr;
+  size_t value_len = 0;
+  auto key_len = key.length();
+  component::IKVStore::key_t key_handle = IKVStore::KEY_NONE;
+
+  auto ado = _ado_pool_map.get_proxy(pool);
+  if (ado == nullptr)
+    throw General_exception("unexpectedly failed to get ADO proxy in async_signal_ado");
+
+  if(_i_kvstore->lock(pool,
+                      key,
+                      IKVStore::lock_type_t::STORE_LOCK_READ,
+                      value,
+                      value_len,
+                      key_handle,
+                      &key_ptr) != S_OK) {
+    /* key may not exist, i.e. bad call to erase */
+    return;
+  }
+
+  if(_i_kvstore->unlock(pool, key_handle) != S_OK)
+    throw Logic_exception("immediate unlock in %s failed", __func__);
+  
+  /* create ADO signal work request */
+  work_request_t* wr = _wr_allocator.allocate();
+  
+  *wr = {handler,
+         pool,
+         IKVStore::KEY_NONE /* prevent attempts to unlock implicitly */,
+         key_ptr,
+         key_len,
+         IKVStore::lock_type_t::STORE_LOCK_NONE,
+         client_request_id,
+         IMCAS::ADO_FLAG_ASYNC /* flag to indicate no reply */};
+
+  auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
+  _outstanding_work.insert(wr_key); /* save request by index on key-handle */
+
+  std::string msg = "ADO::Signal::";
+  msg += tag;
+  
+  /* now send the work request */
+  if (ado->send_work_request(wr_key,
+                             key_ptr, key_len, /* key info */
+                             value, value_len, /* value info */
+                             nullptr, 0, /* no detached payload */
+                             msg.data(),
+                             msg.length(),
+                             false /* new root */) != S_OK)
+    throw General_exception("send_work_request failed");
+  
+  CPLOG(2, "Shard_ado: sent signal to ADO (value=%p value_len=%lu, key=%s %lu)",
+        value, value_len, key_ptr, key_len);
+
+  /* when the work completes, the locks will be released.  The ADO 
+     response is converted to an IO response */
+
+}
+
+
+void Shard::signal_ado(const char * tag,
+                       Connection_handler* handler,
                        const uint64_t client_request_id,                             
                        const component::IKVStore::pool_t pool,
                        const std::string& key,
-                       const component::IKVStore::lock_type_t lock_type,
-                       component::IKVStore::key_t key_handle)
+                       const component::IKVStore::lock_type_t lock_type)
 {
   using namespace component;
 
@@ -548,22 +622,21 @@ void Shard::signal_ado(Connection_handler* handler,
   void * value = nullptr;
   size_t value_len = 0;
   auto key_len = key.length();
+  component::IKVStore::key_t key_handle = IKVStore::KEY_NONE;
 
   auto ado = _ado_pool_map.get_proxy(pool);
   if (ado == nullptr)
     throw General_exception("unexpectedly failed to get ADO proxy in async_signal_ado");
   
-  if (key_handle == IKVStore::KEY_NONE) {
-    if(_i_kvstore->lock(pool,
-                        key,
-                        lock_type,
-                        value,
-                        value_len,
-                        key_handle,
-                        &key_ptr) != S_OK) {
-      PWRN("async_signal_ado failed to take lock");
-      return;
-    }
+  if(_i_kvstore->lock(pool,
+                      key,
+                      lock_type,
+                      value,
+                      value_len,
+                      key_handle,
+                      &key_ptr) != S_OK) {
+    PWRN("Shard_ado: signal_ado failed to take lock");
+    return;
   }
 
   /* create ADO signal work request */
@@ -576,7 +649,8 @@ void Shard::signal_ado(Connection_handler* handler,
   auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
   _outstanding_work.insert(wr_key); /* save request by index on key-handle */
 
-  static const std::string msg = "ADO::Signal";
+  std::string msg = "ADO::Signal::";
+  msg += tag;
   
   /* now send the work request */
   if (ado->send_work_request(wr_key,

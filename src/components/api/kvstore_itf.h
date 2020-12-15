@@ -834,8 +834,7 @@ class IKVStore_factory : public component::IBase {
 
   virtual IKVStore* create(const std::string& owner, const std::string& param, const std::string& param2)
   {
-    throw API_exception("IKVstore_factory::create(owner,param,param2) "
-                        "not implemented");
+    throw API_exception("IKVstore_factory::create(owner,param,param2) not implemented");
   }
 
   virtual IKVStore* create(unsigned           debug_level,
@@ -843,8 +842,7 @@ class IKVStore_factory : public component::IBase {
                            const std::string& param,
                            const std::string& param2)
   {
-    throw API_exception("IKVstore_factory::create(debug_level,owner,param,"
-                        "param2) not implemented");
+    throw API_exception("IKVstore_factory::create(debug_level,owner,param,param2) not implemented");
   }
 
   using map_create = std::map<std::string, std::string>;
@@ -864,8 +862,7 @@ class IKVStore_factory : public component::IBase {
   /* this is the preferred create method - the others will be deprecated */
   virtual IKVStore* create(unsigned debug_level, const map_create& params)
   {
-    throw API_exception("IKVstore_factory::create(debug_level,param-map) "
-                        "not implemented");
+    throw API_exception("IKVstore_factory::create(debug_level,param-map) not implemented");
   }
 };
 

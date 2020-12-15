@@ -232,26 +232,30 @@ class Shard : public Shard_transport, private common::log_source {
 
   void service_cluster_signals();
   
-  void signal_ado(Connection_handler* handler,
+  void signal_ado(const char * tag,
+                  Connection_handler* handler,
                   const uint64_t client_request_id,
                   const component::IKVStore::pool_t pool,
                   const std::string& key,
-                  const component::IKVStore::lock_type_t lock_type,
-                  component::IKVStore::key_t key_handle = component::IKVStore::KEY_NONE);
-                        
-                        
-  static auto respond1(
-    const Connection_handler *           handler_,
-    buffer_t                           * iob_,
-    const protocol::Message_IO_request * msg_,
-    int                                  status_) -> protocol::Message_IO_response *;
+                  const component::IKVStore::lock_type_t lock_type);
 
-  static void respond2(Connection_handler * handler,
-    buffer_t                           * iob,
-    const protocol::Message_IO_request * msg,
-    int                                  status,
-    const char *                         func);
+  void signal_ado_async_nolock(const char * tag,
+                               Connection_handler* handler,
+                               const uint64_t client_request_id,
+                               const component::IKVStore::pool_t pool,
+                               const std::string& key);                        
+                        
+  static auto respond1(const Connection_handler *           handler_,
+                       buffer_t                           * iob_,
+                       const protocol::Message_IO_request * msg_,
+                       int                                  status_) -> protocol::Message_IO_response *;
 
+  static void respond2(Connection_handler *                 handler,
+                       buffer_t                           * iob,
+                       const protocol::Message_IO_request * msg,
+                       int                                  status,
+                       const char *                         func);
+  
   component::IKVIndex *lookup_index(const pool_t pool_id)
   {
     if (_index_map) {
@@ -296,6 +300,7 @@ class Shard : public Shard_transport, private common::log_source {
   /* ADO signaling helpers */
   inline bool ado_signal_enabled() const { return ado_enabled() && (_ado_signal_mask != Ado_signal::NONE); }
   inline bool ado_signal_post_put() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT); }
+  inline bool ado_signal_post_erase() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_ERASE); }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }
 

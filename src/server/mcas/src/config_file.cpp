@@ -842,9 +842,14 @@ Ado_signal Config_file::get_shard_ado_signals(rapidjson::SizeType i) const
     auto array = shard[config::ado_signals].GetArray();
     for (auto itr = array.Begin(); itr != array.End(); ++itr) {
 
+      auto filter = itr->GetString();
+
       /* interpret strings */
-      if (itr->GetString() == std::string(Ado_signal_POST_PUT)) {
+      if (filter == std::string(Ado_signal_POST_PUT)) {
         result |= mcas::Ado_signal::POST_PUT;
+      }
+      else if(filter == std::string(Ado_signal_POST_ERASE)) {
+        result |= mcas::Ado_signal::POST_ERASE;
       }
     }
   }

@@ -69,8 +69,9 @@ namespace mcas
  */
 enum class Ado_signal : unsigned long
   {
-   NONE     = (1u << 0),
-   POST_PUT = (1u << 1),
+   NONE        = (1UL << 0),
+   POST_ERASE   = (1UL << 1),
+   POST_PUT    = (1UL << 2),
   };
 
 inline bool operator& (const Ado_signal src, Ado_signal tgt) {
@@ -82,7 +83,9 @@ inline Ado_signal& operator|= (Ado_signal& tgt, const Ado_signal src) {
   return tgt;
 }
 
+static constexpr const char * Ado_signal_POST_ERASE = "post-erase";
 static constexpr const char * Ado_signal_POST_PUT = "post-put";
+
 
 
 class Config_file : private common::log_source

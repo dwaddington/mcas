@@ -644,13 +644,16 @@ TEST_F(ADO_test, PutSignal)
 
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
-  mcas->erase(pool, testname);
-
   std::vector<IMCAS::ADO_response> response;
   status_t rc;
 
   for (unsigned i = 0; i < 10; i++) {
-    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(64)));
+    auto key = common::random_string(8);
+    ASSERT_OK(mcas->put(pool, key, common::random_string(64)));
+
+    /* erase every other */
+    if(i%2 == 0)
+      ASSERT_OK(mcas->erase(pool, key));
   }
 
   ASSERT_OK(mcas->close_pool(pool));

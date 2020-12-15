@@ -986,7 +986,8 @@ void Shard::release_pending_rename(const void *target)
     if (_i_kvstore->swap_keys(info.pool, info.from, info.to) != S_OK)
       throw Logic_exception("%s swap_keys failed", __func__);
 
-    if (_i_kvstore->erase(info.pool, info.from) != S_OK) throw Logic_exception("%s erase failed", __func__);
+    if (_i_kvstore->erase(info.pool, info.from) != S_OK)
+      throw Logic_exception("%s erase failed", __func__);
 
     _pending_renames.erase(target);
 
@@ -1332,20 +1333,20 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
 
       add_index_key(msg->pool_id(), key);
 
-      /* experimental ado signalling */
-      if(ado_signal_post_put()) {
-        signal_ado(handler,
+      /* optional ado signaling of put event */
+      if (ado_signal_post_put()) {
+        signal_ado("post-put",
+                   handler,
                    msg->request_id(),
                    msg->pool_id(),
                    key,
-                   IKVStore::lock_type_t::STORE_LOCK_READ,
-                   IKVStore::KEY_NONE);
+                   IKVStore::lock_type_t::STORE_LOCK_READ);
       }
     }
     /* update stats */
     ++_stats.op_put_count;
 
-    if(!ado_signal_enabled())
+    if (!ado_signal_post_put())
       respond2(handler, iob, msg, status, __func__);
   }
 }
@@ -1482,16 +1483,36 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
 /////////////////////
 void Shard::io_response_erase(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  std::string k = msg->skey();
+  std::string key = msg->skey();
 
-  auto status = _i_kvstore->erase(msg->pool_id(), k);
+  status_t status;
+  
+  if (ado_signal_post_erase()) {
 
-  if (status == S_OK)
-    remove_index_key(msg->pool_id(), k);
-  else
+    /* actually it may not have been erase by the time the
+       notification goes through.  We're just sending an
+       asynchronous notification of erase to the ADO.
+       if we want a pre-erase with guarantees we'll have to
+       support a "deferred" erase (similar to unlock).
+    */
+    signal_ado_async_nolock("post-erase", 
+                            handler,
+                            msg->request_id(),
+                            msg->pool_id(),
+                            key);
+  }  
+
+  status = _i_kvstore->erase(msg->pool_id(), key);
+
+  if (status == S_OK) {
+    remove_index_key(msg->pool_id(), key);
+  }
+  else {
     _stats.op_failed_request_count++;
+  }
 
   _stats.op_erase_count++;
+
   respond2(handler, iob, msg, status, __func__);
 }
 
