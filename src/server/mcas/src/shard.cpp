@@ -1362,9 +1362,8 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
 
   if (msg->is_scbe()) {
     CPLOG(2, "GET: short-circuited backend");
-    {
-      respond2(handler, iob, msg, S_OK, __func__);
-    }
+    
+    respond2(handler, iob, msg, S_OK, __func__);
   }
   else {
     ::iovec value_out{nullptr, 0};
