@@ -647,13 +647,11 @@ TEST_F(ADO_test, PutSignal)
   std::vector<IMCAS::ADO_response> response;
   status_t rc;
 
+  std::vector<std::string> keys;
   for (unsigned i = 0; i < 10; i++) {
     auto key = common::random_string(8);
+    keys.push_back(key);
     ASSERT_OK(mcas->put(pool, key, common::random_string(64)));
-
-    /* erase every other */
-    if(i%2 == 0)
-      ASSERT_OK(mcas->erase(pool, key));
   }
 
   /* put direct */
@@ -666,9 +664,18 @@ TEST_F(ADO_test, PutSignal)
     ASSERT_FALSE(mr == IMCAS::MEMORY_HANDLE_NONE);
 
     ASSERT_OK(mcas->put_direct(pool, "BiGKey", buffer, len, mr));
+    ASSERT_OK(mcas->put_direct(pool, "BiGKey-Copy", buffer, len, mr));
 
     mcas->unregister_direct_memory(mr);
   }
+
+  for(auto k: keys) {
+    /* erase every other */
+    ASSERT_OK(mcas->erase(pool, k));
+  }
+
+  ASSERT_OK(mcas->erase(pool, "BiGKey"));
+  ASSERT_OK(mcas->erase(pool, "BiGKey-Copy"));
 
   ASSERT_OK(mcas->close_pool(pool));
 

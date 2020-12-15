@@ -192,6 +192,17 @@ class Shard : public Shard_transport, private common::log_source {
   void add_pending_rename(const pool_t pool_id, const void *target, const std::string &from, const std::string &to);
   void release_pending_rename(const void *target);
 
+  inline void add_target_keyname(const void *target, const std::string& skey) {
+    _target_keyname_map[target] = skey;
+  }
+
+  inline std::string release_target_keyname(const void *target) {
+    auto r = _target_keyname_map[target];
+    _target_keyname_map.erase(target);
+    return r;
+  }
+
+
   void initialize_components(const std::string &backend,
                              const std::string &index,
                              const std::string &dax_config,
@@ -408,6 +419,7 @@ class Shard : public Shard_transport, private common::log_source {
   std::vector<Connection_handler *>                 _handlers;
   locked_value_map_t                                _locked_values_shared;
   locked_value_map_t                                _locked_values_exclusive;
+  std::map<const void*, std::string>                _target_keyname_map;
   spaces_shared_map_t                               _spaces_shared;
   rename_map_t                                      _pending_renames;
   task_list_t                                       _tasks; /*< list of deferred tasks */

@@ -845,12 +845,13 @@ Ado_signal Config_file::get_shard_ado_signals(rapidjson::SizeType i) const
       auto filter = itr->GetString();
 
       /* interpret strings */
-      if (filter == std::string(Ado_signal_POST_PUT)) {
+      if (filter == std::string(Ado_signal_POST_PUT))
         result |= mcas::Ado_signal::POST_PUT;
-      }
-      else if(filter == std::string(Ado_signal_POST_ERASE)) {
+      else if(filter == std::string(Ado_signal_POST_PUT_DIRECT))
+        result |= mcas::Ado_signal::POST_PUT_DIRECT;
+      else if(filter == std::string(Ado_signal_POST_ERASE))
         result |= mcas::Ado_signal::POST_ERASE;
-      }
+      
     }
   }
   return result;

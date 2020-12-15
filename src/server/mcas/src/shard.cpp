@@ -153,6 +153,7 @@ Shard::Shard(const Config_file &config_file,
     _handlers{},
     _locked_values_shared{},
     _locked_values_exclusive{},
+    _target_keyname_map{},
     _spaces_shared{},
     _pending_renames{},
     _tasks{},
@@ -1089,6 +1090,10 @@ void Shard::io_response_put_advance(Connection_handler *handler,
           /* register clean and rename tasks for value */
           add_locked_value_exclusive(pool_id, lk.release(), target, target_len, std::move(mr));
           add_pending_rename(pool_id, target, k, actual_key);
+
+          /* record key for signaling */
+          if (ado_signal_enabled())
+            add_target_keyname(target, k);
         }
       catch ( const std::exception &e )
         {
@@ -1255,6 +1260,9 @@ void Shard::io_response_put_locate(Connection_handler *handler,
           /* register clean and rename tasks for value */
           add_locked_value_exclusive(pool_id, lk.release(), target, target_len, std::move(mr));
           add_pending_rename(pool_id, target, k, actual_key);
+
+          if (ado_signal_enabled())
+            add_target_keyname(target, actual_key);
         }
       catch ( const std::exception &e )
         {
@@ -1295,15 +1303,13 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
 
   ++_stats.op_put_count;
 
-  /* PROBLEM: we don't have the key anymore, so we can't re-lock it
-     do we need to store the key somewhere and map to 'target' */
-  if (false || ado_signal_post_put_direct()) {
-    PNOTICE("signal post-put-direct: %s", msg->skey().c_str());
+  if (ado_signal_post_put_direct()) {
+    auto skey = release_target_keyname(target); /* recover key and remove entry from map */
     signal_ado("post-put-direct",
                handler,
                msg->request_id(),
                msg->pool_id(),
-               msg->skey(),
+               skey,
                IKVStore::lock_type_t::STORE_LOCK_READ);
     /* note: client will be signalled on return on this ADO call,
        therefore if the ADO operation stalls, the client will be stalled.
