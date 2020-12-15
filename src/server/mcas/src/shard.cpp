@@ -1282,7 +1282,9 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
   auto target = reinterpret_cast<const void *>(msg->addr);
   CPLOG(2, "PUT_RELEASE: (%p) addr=(%p) request_id=%lu", static_cast<const void *>(this),
         target, msg->request_id());
+
   int status = S_OK;
+  
   try {
     release_locked_value_exclusive(target);
     release_pending_rename(target);
@@ -1290,8 +1292,26 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
   catch (const Logic_exception &) {
     status = E_INVAL;
   }
+
   ++_stats.op_put_count;
-  respond2(handler, iob, msg, status, __func__);
+
+  /* PROBLEM: we don't have the key anymore, so we can't re-lock it
+     do we need to store the key somewhere and map to 'target' */
+  if (false || ado_signal_post_put_direct()) {
+    PNOTICE("signal post-put-direct: %s", msg->skey().c_str());
+    signal_ado("post-put-direct",
+               handler,
+               msg->request_id(),
+               msg->pool_id(),
+               msg->skey(),
+               IKVStore::lock_type_t::STORE_LOCK_READ);
+    /* note: client will be signalled on return on this ADO call,
+       therefore if the ADO operation stalls, the client will be stalled.
+     */
+  }
+  else {
+    respond2(handler, iob, msg, status, __func__);
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1341,6 +1361,9 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
                    msg->pool_id(),
                    key,
                    IKVStore::lock_type_t::STORE_LOCK_READ);
+        /* note: client will be signalled on return on this ADO call,
+           therefore if the ADO operation stalls, the client will be stalled.
+        */
       }
     }
     /* update stats */

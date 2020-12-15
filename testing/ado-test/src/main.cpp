@@ -656,6 +656,20 @@ TEST_F(ADO_test, PutSignal)
       ASSERT_OK(mcas->erase(pool, key));
   }
 
+  /* put direct */
+  {
+    size_t len = MiB(8);
+    void * buffer = ::aligned_alloc(4096, len);
+    memset(buffer, 0xEF, len);
+
+    auto mr = mcas->register_direct_memory(buffer, len);
+    ASSERT_FALSE(mr == IMCAS::MEMORY_HANDLE_NONE);
+
+    ASSERT_OK(mcas->put_direct(pool, "BiGKey", buffer, len, mr));
+
+    mcas->unregister_direct_memory(mr);
+  }
+
   ASSERT_OK(mcas->close_pool(pool));
 
   ASSERT_OK(mcas->delete_pool(poolname));
