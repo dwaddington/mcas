@@ -20,26 +20,31 @@
 #include <gsl/span>
 #include <sys/uio.h>
 
+/* For minimal difference with older code; implement span as as iovec */
 #define MCAS_SPAN_USES_IOVEC 1
 
 namespace common
 {
 	/* span of a const area. No equivalent in ::iovec, so always use span */
 	using const_byte_span = gsl::span<const gsl::byte>;
-	inline const_byte_span make_const_byte_span(const void *base, std::size_t len) { return const_byte_span(static_cast<const_byte_span::pointer>(base), len); }
+	inline const_byte_span make_const_byte_span(const void *base, std::size_t len)
+    {
+      return const_byte_span(static_cast<const_byte_span::pointer>(base), len);
+    }
 }
 
 namespace
 {
 	/* Accessors: Non-member in order to match ::iovec accessors */
-	/* Start of area as a void, for use with %p format and converion to arbitrary type */
+	/* Start of area as a void *, for use with %p format and for conversion to an arbitrary type */
 	inline const void *base(const common::const_byte_span &r) { return r.data(); }
+    /* Length of area in bytes, for use in byte-based address calculations and comparisons */
 	inline std::size_t size(const common::const_byte_span &r) { return r.size(); }
-	/* Start of area as byte *, for use in byte-based arithmetic address calculations */
+	/* Start of area as byte *, for use in byte-based address calculations and comparisons */
 	inline const gsl::byte *data(const common::const_byte_span &r) { return r.data(); }
-	/* End of area as byte *, for use in byte-based arithmetic address calculations */
+	/* End of area as byte *, for use in byte-based address calculations and comparisons */
 	inline const gsl::byte *data_end(const common::const_byte_span &r) { return r.data() + r.size(); }
-	/* end of are as a void *, for use with %p format */
+	/* End of are as a void *, for use with %p format */
 	inline const void *end(const common::const_byte_span &r) { return ::data_end(r); }
 }
 

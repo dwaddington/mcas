@@ -305,9 +305,23 @@ public:
                            const bool                  new_root,
                            response_buffer_vector_t&   response_buffers)
    {
-     return do_work(work_id, byte_string_view(common::pointer_cast<const byte_string_view::value_type>(key), key_len), values, byte_string_view(static_cast<byte_string_view::const_pointer>(in_work_request), in_work_request_len), new_root, response_buffers);
+     return do_work(
+       work_id
+       , byte_string_view(common::pointer_cast<const byte_string_view::value_type>(key), key_len)
+       , values
+       , byte_string_view(static_cast<byte_string_view::const_pointer>(in_work_request), in_work_request_len)
+       , new_root
+       , response_buffers
+     );
    }
 
+  /**
+   * Alternate version of do_work, with key and work_request parameters passed as views
+   * with the goal of more colosely tying each pointer with its associated length.
+   *
+   * This do_work cannot replace the earliers version, as doing so would break esisting
+   * ADO implementations. An implementation must override one of the two versions of do_work.
+   */
   virtual status_t do_work(const uint64_t              work_id,
                            byte_string_view            key,
                            IADO_plugin::value_space_t& values,
@@ -315,7 +329,16 @@ public:
                            const bool                  new_root,
                            response_buffer_vector_t&   response_buffers)
    {
-     return do_work(work_id, common::pointer_cast<const char>(key.data()), key.size(), values, in_work_request.data(), in_work_request.size(), new_root, response_buffers);
+     return do_work(
+       work_id
+       , common::pointer_cast<const char>(key.data())
+       , key.size()
+       , values
+       , in_work_request.data()
+       , in_work_request.size()
+       , new_root
+       , response_buffers
+     );
    }
 
   /**
