@@ -48,12 +48,17 @@ namespace common
 	unsigned _debug_level;
   public:
     ~log_source() {}
-   	explicit log_source(const unsigned debug_level_)
+    explicit log_source(const unsigned debug_level_)
       : _debug_level(debug_level_)
     {}
     unsigned debug_level() const { return _debug_level; }
     log_source(const log_source &other) = default;
   };
+  /* g++ formast checking wants an argument formatted with %p to be a void *,
+   * or at least not a char *. Function to turn any pointer into an type
+   * acceptable to %p/
+   */
+  template <typename T> const void *p_fmt(const T t) { return static_cast<const void *>(t); }
 }
 
 #define NORMAL_CYAN "\033[36m"

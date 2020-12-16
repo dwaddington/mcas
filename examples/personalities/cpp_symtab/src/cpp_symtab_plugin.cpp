@@ -111,7 +111,7 @@ status_t ADO_symtab_plugin::do_work(const uint64_t work_request_id,
       if(cb_allocate_pool_memory(buffer_increment, 8, buffer)!=S_OK)
         throw std::runtime_error("unable to allocate new region");
       PLOG("Expanding memory .. %p", buffer);
-      string_table.expand(::iovec{buffer, buffer_increment});
+      string_table.expand(common::make_byte_span(buffer, buffer_increment));
       goto retry;
     }
 

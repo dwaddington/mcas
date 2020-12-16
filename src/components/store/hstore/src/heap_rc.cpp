@@ -32,7 +32,7 @@
  * which manifests as incorrect key and data values as seen on the ADO side.
  */
 heap_rc::heap_rc(
-	unsigned debug_level_, ::iovec pool0_full_, ::iovec pool0_heap_, unsigned numa_node_, const std::string & id_, const std::string & backing_file_
+	unsigned debug_level_, byte_span pool0_full_, byte_span pool0_heap_, unsigned numa_node_, const string_view id_, const string_view backing_file_
 )
 	: _pool0_full(pool0_full_)
 	, _pool0_heap(pool0_heap_)
@@ -42,23 +42,23 @@ heap_rc::heap_rc(
 	, _tracked_anchor(debug_level_, &_tracked_anchor, &_tracked_anchor, sizeof(_tracked_anchor), sizeof(_tracked_anchor))
 	, _eph(std::make_unique<heap_rc_ephemeral>(debug_level_, id_, backing_file_))
 {
-	void *last = static_cast<char *>(pool0_heap_.iov_base) + pool0_heap_.iov_len;
+	void *last = ::end(pool0_heap_);
 	if ( 0 < debug_level_ )
 	{
-		PLOG("%s: split %p .. %p) into segments", __func__, pool0_heap_.iov_base, last);
+		PLOG("%s: split %p .. %p) into segments", __func__, ::base(pool0_heap_), last);
 
-		PLOG("%s: pool0 full %p: 0x%zx", __func__, _pool0_full.iov_base, _pool0_full.iov_len);
-		PLOG("%s: pool0 heap %p: 0x%zx", __func__, _pool0_heap.iov_base, _pool0_heap.iov_len);
+		PLOG("%s: pool0 full %p: 0x%zx", __func__, ::base(_pool0_full), ::size(_pool0_full));
+		PLOG("%s: pool0 heap %p: 0x%zx", __func__, ::base(_pool0_heap), ::size(_pool0_heap));
 	}
 	/* cursor now locates the best-aligned region */
 	_eph->add_managed_region(_pool0_full, _pool0_heap, _numa_node);
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
-		, " pool ", _pool0_full.iov_base, " .. ", iov_limit(_pool0_full)
-		, " size ", _pool0_full.iov_len
+		, " pool ", ::base(_pool0_full), " .. ", ::end(_pool0_full)
+		, " size ", ::size(_pool0_full)
 		, " new"
 	);
-	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, false);
+	VALGRIND_CREATE_MEMPOOL(::base(_pool0_heap), 0, false);
 	persister_nupm::persist(this, sizeof(*this));
 }
 
@@ -68,10 +68,10 @@ heap_rc::heap_rc(
 heap_rc::heap_rc(
 	unsigned debug_level_
 	, const std::unique_ptr<dax_manager> &dax_manager_
-	, const std::string & id_
-    , const std::string & backing_file_
-	, const ::iovec *iov_addl_first_
-	, const ::iovec *iov_addl_last_
+	, const string_view id_
+    , const string_view backing_file_
+	, const byte_span *iov_addl_first_
+	, const byte_span *iov_addl_last_
 )
 	: _pool0_full(this->_pool0_full)
 	, _pool0_heap(this->_pool0_heap)
@@ -84,13 +84,13 @@ heap_rc::heap_rc(
 	_eph->add_managed_region(_pool0_full, _pool0_heap, _numa_node);
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
-		, " pool ", _pool0_full.iov_base, " .. ", iov_limit(_pool0_full)
-		, " size ", _pool0_full.iov_len
+		, " pool ", ::base(_pool0_full), " .. ", ::end(_pool0_full)
+		, " size ", ::size(_pool0_full)
 		, " reconstituting"
 	);
 
-	VALGRIND_MAKE_MEM_DEFINED(_pool0_heap.iov_base, _pool0_heap.iov_len);
-	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, true);
+	VALGRIND_MAKE_MEM_DEFINED(::base(_pool0_heap), ::size(_pool0_heap));
+	VALGRIND_CREATE_MEMPOOL(::base(_pool0_heap), 0, true);
 
 	for ( auto r = iov_addl_first_; r != iov_addl_last_; ++r )
 	{
@@ -101,8 +101,8 @@ heap_rc::heap_rc(
 	{
 		auto r = open_region(dax_manager_, _more_region_uuids[i], _numa_node);
 		_eph->add_managed_region(r, r, _numa_node);
-		VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
-		VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
+		VALGRIND_MAKE_MEM_DEFINED(::base(r), ::size(r));
+		VALGRIND_CREATE_MEMPOOL(::base(r), 0, true);
 	}
 	_tracked_anchor.recover(debug_level_, _eph.get(), _numa_node);
 }
@@ -113,9 +113,9 @@ heap_rc::~heap_rc()
 	quiesce();
 }
 
-::iovec heap_rc::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
+auto heap_rc::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_) -> byte_span
 {
-	auto iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_).address_map;
+	auto & iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_).address_map();
 	if ( iovs.size() != 1 )
 	{
 		throw std::range_error("failed to re-open region " + std::to_string(uuid_));
@@ -128,23 +128,19 @@ auto heap_rc::regions() const -> nupm::region_descriptor
 	return _eph->get_managed_regions();
 }
 
-void *heap_rc::iov_limit(const ::iovec &r)
-{
-	return static_cast<char *>(r.iov_base) + r.iov_len;
-}
-
 namespace
 {
-	std::size_t region_size(const std::vector<::iovec> &v)
+	using byte_span = common::byte_span;
+	std::size_t region_size(const std::vector<byte_span> &v)
 	{
 		return
 			std::accumulate(
 				v.begin()
 				, v.end()
 				, std::size_t(0)
-				, [] (std::size_t s, const ::iovec &iov) -> std::size_t
+				, [] (std::size_t s, const byte_span &iov) -> std::size_t
 					{
-						return s + iov.iov_len;
+						return s + ::size(iov);
 					}
 			);
 	}
@@ -168,11 +164,11 @@ auto heap_rc::grow(
 		auto grown = false;
 		{
 			const auto old_regions = regions();
-			const auto &old_region_list = old_regions.address_map;
+			const auto &old_region_list = old_regions.address_map();
 			const auto old_list_size = old_region_list.size();
 			const auto old_size = region_size(old_region_list);
-			_eph->set_managed_regions(dax_manager_->resize_region(old_regions.id,  _numa_node, old_size + increment_));
-			const auto new_region_list = regions().address_map;
+			_eph->set_managed_regions(dax_manager_->resize_region(old_regions.id(),  _numa_node, old_size + increment_));
+			const auto new_region_list = regions().address_map();
 			const auto new_size = region_size(new_region_list);
 			const auto new_list_size = new_region_list.size();
 
@@ -184,8 +180,8 @@ auto heap_rc::grow(
 					_eph->add_managed_region(r, r, _numa_node);
 					hop_hash_log<trace_heap_summary>::write(
 						LOG_LOCATION
-						, " pool ", r.iov_base, " .. ", iov_limit(r)
-						, " size ", r.iov_len
+						, " pool ", ::base(r), " .. ", ::end(r)
+						, " size ", ::size(r)
 						, " grow"
 					);
 				}
@@ -206,7 +202,7 @@ auto heap_rc::grow(
 						/* Note: crash between here and "Slot persist done" may cause dax_manager_
 						 * to leak the region.
 						 */
-						auto rv = dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size).address_map;
+						auto rv = dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size).address_map();
 						{
 							auto &slot = _more_region_uuids[_more_region_uuids_size];
 							slot = uuid_next;
@@ -222,8 +218,8 @@ auto heap_rc::grow(
 							_eph->add_managed_region(r, r, _numa_node);
 							hop_hash_log<trace_heap_summary>::write(
 								LOG_LOCATION
-								, " pool ", r.iov_base, " .. ", iov_limit(r)
-								, " size ", r.iov_len
+								, " pool ", ::base(r), " .. ", ::end(r)
+								, " size ", ::size(r)
 								, " grow"
 							);
 						}
@@ -251,10 +247,10 @@ auto heap_rc::grow(
 
 void heap_rc::quiesce()
 {
-	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", _pool0_heap.iov_len, " allocated ", _eph->allocated());
+	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap), " allocated ", _eph->allocated());
 	_eph->write_hist<trace_heap_summary>(_pool0_heap);
-	VALGRIND_DESTROY_MEMPOOL(_pool0_heap.iov_base);
-	VALGRIND_MAKE_MEM_UNDEFINED(_pool0_heap.iov_base, _pool0_heap.iov_len);
+	VALGRIND_DESTROY_MEMPOOL(::base(_pool0_heap));
+	VALGRIND_MAKE_MEM_UNDEFINED(::base(_pool0_heap), ::size(_pool0_heap));
 	_eph.reset(nullptr);
 }
 
@@ -304,8 +300,8 @@ void *heap_rc::alloc(const std::size_t sz_, const std::size_t align_)
 		 * from std::bad_alloc.
 		 */
 
-		VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p, sz);
-		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_full.iov_base, " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
+		VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p, sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_full), " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
 		return p;
 	}
 	catch ( const std::bad_alloc & )
@@ -319,7 +315,7 @@ void *heap_rc::alloc(const std::size_t sz_, const std::size_t align_)
 		_eph->write_hist<true>(_pool0_heap);
 		/* Sometimes lack of space will cause heap to throw a General_exception with this explanation. */
 		/* Convert to bad_alloc. */
-		if ( e.cause() == std::string("region allocation out-of-space") )
+		if ( e.cause() == string_view("region allocation out-of-space") )
 		{
 			throw std::bad_alloc();
 		}
@@ -341,8 +337,8 @@ void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 		 * from std::bad_alloc.
 		 */
 
-		VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p, sz);
-		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_full.iov_base, " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
+		VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p, sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_full), " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
 		tracked_header *h = new (static_cast<char *>(p) + align - sizeof(tracked_header))
 			tracked_header(_eph->debug_level(), &_tracked_anchor, _tracked_anchor._next, sz, align);
 		persister_nupm::persist(h, sizeof *h);
@@ -355,9 +351,9 @@ void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 		PLOG(
 			"%s: TH %p prev %p next %p size %zu align %zu"
 			, __func__
-			, static_cast<const void *>(h)
-			, static_cast<const void *>(h->_prev)
-			, static_cast<const void *>(h->_next)
+			, common::p_fmt(h)
+			, common::p_fmt(h->_prev)
+			, common::p_fmt(h->_next)
 			, h->_size
 			, h->_align
 		);
@@ -375,7 +371,7 @@ void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 		_eph->write_hist<true>(_pool0_heap);
 		/* Sometimes lack of space will cause heap to throw a General_exception with this explanation. */
 		/* Convert to bad_alloc. */
-		if ( e.cause() == std::string("region allocation out-of-space") )
+		if ( e.cause() == string_view("region allocation out-of-space") )
 		{
 			throw std::bad_alloc();
 		}
@@ -390,8 +386,8 @@ void heap_rc::inject_allocation(const void * p, std::size_t sz_)
 	auto sz = (sz_ + alignment - 1U)/alignment * alignment;
 	/* NOTE: inject_allocation should take a const void* */
 	_eph->inject_allocation(const_cast<void *>(p), sz, _numa_node);
-	VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p, sz);
-	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p, " size ", sz);
+	VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p, sz);
+	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p, " size ", sz);
 }
 
 void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
@@ -399,8 +395,8 @@ void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
 	auto align = clean_align(alignment_, sizeof(void *));
 	sz_ = std::max(sz_, align);
 	auto sz = (sz_ + align - 1U)/align * align;
-	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p_);
-	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz);
+	VALGRIND_MEMPOOL_FREE(::base(_pool0_heap), p_);
+	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p_, " size ", sz);
 	return _eph->free(p_, sz, _numa_node);
 }
 
@@ -419,9 +415,9 @@ void heap_rc::free_tracked(
 		PLOG(
 			"%s: TH %p prev %p next %p size %zu align %zu"
 			, __func__
-			, static_cast<const void *>(h)
-			, static_cast<const void *>(h->_prev)
-			, static_cast<const void *>(h->_next)
+			, common::p_fmt(h)
+			, common::p_fmt(h->_prev)
+			, common::p_fmt(h->_next)
 			, h->_size
 			, h->_align
 		);
@@ -432,8 +428,8 @@ void heap_rc::free_tracked(
 
 	auto p = static_cast<char *>(p_) - h->_align;
 	assert(sz == h->_size);
-	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p);
-	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p, " size ", sz);
+	VALGRIND_MEMPOOL_FREE(::base(_pool0_heap), p);
+	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p, " size ", sz);
 	return _eph->free(p, sz, _numa_node);
 }
 

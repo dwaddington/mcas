@@ -19,11 +19,9 @@
 #include "hstore_config.h"
 #include "cptr.h"
 #include "fixed_string.h"
-#if 0
-#include "logging.h"
-#endif
 #include "persistent.h"
 #include "perishable_expiry.h"
+#include <common/pointer_cast.h>
 
 #include <algorithm> /* fill_n, copy */
 #include <array>
@@ -103,7 +101,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						std::copy(
 							first_
 							, last_
-							, static_cast<T *>(static_cast<void *>(&value[0]))
+							, common::pointer_cast<T>(&value[0])
 						)
 						, fill_len_
 						, T()
@@ -136,10 +134,6 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					static_cast<typename persistent_traits<ptr_t>::value_type>(
 						static_cast<void *>(persistent_load(this->P))
 					);
-#if 0
-				auto v = static_cast<void *>(this->P);
-				return static_cast<typename persistent_traits<ptr_t>::value_type>(v);
-#endif
 			}
 
 			template <typename IT, typename AL>
@@ -259,7 +253,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						std::copy(
 							first_
 							, last_
-							, static_cast<T *>(static_cast<void *>(&small.value[0]))
+							, common::pointer_cast<T>(&small.value[0])
 						)
 						, fill_len_
 						, T()
@@ -762,7 +756,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		static persist_fixed_string *pfs_from_cptr_ref(cptr_t &cptr_)
 		{
-			return static_cast<persist_fixed_string *>(static_cast<void *>(static_cast<large_t *>(&cptr_)));
+			return common::pointer_cast<persist_fixed_string>(static_cast<large_t *>(&cptr_));
 		}
 	};
 

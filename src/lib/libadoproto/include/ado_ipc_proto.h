@@ -16,6 +16,7 @@
 #include <api/ado_itf.h>
 #include <common/exceptions.h>
 #include <common/dump_utils.h>
+#include <common/pointer_cast.h>
 #include <algorithm>
 #include <experimental/string_view>
 #include <vector>
@@ -251,11 +252,12 @@ struct Map_memory_named : public Message {
   static constexpr const char *description = "mcas::ipc::Map_memory_named";
 
   using string_view = std::experimental::string_view;
+  using byte_span = common::byte_span;
   Map_memory_named(size_t buffer_size,
                    unsigned region_id_,
                    string_view pool_name_,
                    std::size_t offset_,
-                   ::iovec iov_)
+                   byte_span iov_)
     : Message(id), region_id(region_id_), iov(iov_), offset(offset_), pool_name_len(pool_name_.size())
   {
     if(sizeof(Map_memory) + pool_name_len > buffer_size)
@@ -264,12 +266,12 @@ struct Map_memory_named : public Message {
   }
 
   size_t   region_id;
-  ::iovec  iov;
+  byte_span iov;
   size_t   offset;
   size_t   pool_name_len;
   char    *pool_name()
   {
-    return static_cast<char *>(static_cast<void *>(this+1));
+    return common::pointer_cast<char>(this+1);
   }
 };
 
@@ -314,7 +316,7 @@ struct Work_request : public Message {
   inline size_t get_key_len() const { return key_len; }
   inline const char * get_key() const { return reinterpret_cast<const char*>(key_addr); }
   inline size_t get_invocation_data_len() const { return invocation_data_len; }
-  inline const char * get_invocation_data() const { return static_cast<const char*>(static_cast<const void *>(&data[0])); }
+  inline const char * get_invocation_data() const { return common::pointer_cast<const char>(&data[0]); }
   inline void * get_value_addr() const { return reinterpret_cast<void *>(value_addr); }
   inline void * get_detached_value_addr() const { return reinterpret_cast<void *>(detached_value_addr); }
 

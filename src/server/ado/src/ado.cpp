@@ -493,7 +493,7 @@ int main(int argc, char* argv[])
                 {
                 case chirp_t::SHUTDOWN:
                   PMAJOR("ADO: received Shutdown chirp in %p",
-                         static_cast<void *>(buffer));
+                         common::p_fmt(buffer));
                   plugin_mgr.shutdown();
                   exit = true;
                   break;
@@ -570,8 +570,7 @@ int main(int argc, char* argv[])
               common::Fd_open fd(::open(std::string(mm->pool_name(), mm->pool_name_len).c_str(), O_RDWR));
 
               int flags = MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE;
-              common::memory_mapped mme(mm->iov.iov_base,
-                                        mm->iov.iov_len,
+              common::memory_mapped mme(mm->iov,
                                         PROT_READ|PROT_WRITE,
                                         flags,
                                         fd.fd(),
@@ -580,8 +579,7 @@ int main(int argc, char* argv[])
               if ( ! mme )
               {
                 flags &= ~MAP_SYNC;
-                mme = common::memory_mapped(mm->iov.iov_base,
-                                            mm->iov.iov_len,
+                mme = common::memory_mapped(mm->iov,
                                             PROT_READ|PROT_WRITE,
                                             flags,
                                             fd.fd(),
@@ -592,26 +590,26 @@ int main(int argc, char* argv[])
                 throw General_exception(
                   "%s: %.*s mmap(%p, 0x%zx, %s, 0x%x=%s, %i, 0x%zu) failed unexpectly: %zu/%s"
                   , __func__, int(mm->pool_name_len), mm->pool_name()
-                  , mm->iov.iov_base, mm->iov.iov_len, "PROT_READ|PROT_WRITE", flags
+                  , ::base(mm->iov), ::size(mm->iov), "PROT_READ|PROT_WRITE", flags
                   , "MAP_SHARED_VALIDATE|MAP_FIXED", fd.fd(), mm->offset
-                  , mme.iov_len, ::strerror(int(mme.iov_len))
+                  , ::size(mme), ::strerror(int(::size(mme)))
                 );
               }
 
               PMAJOR("ADO: mapped region %u pool %.*s addr=%p:%zu",
                      unsigned(mm->region_id), int(mm->pool_name_len),
-                     mm->pool_name(), mm->iov.iov_base, mm->iov.iov_len);
+                     mm->pool_name(), ::base(mm->iov), ::size(mm->iov));
 
               /* ADO does not use common::memory_mapped */
               auto mme_local = mme.release();
 
               /* record mapping information for clean up */
-              global::shared_memory_mappings.push_back(std::make_tuple(mm->iov.iov_base, // CLEM to check
-                                                                       mme_local.iov_base,
-                                                                       mme_local.iov_len));
+              global::shared_memory_mappings.push_back(std::make_tuple(::base(mm->iov), // CLEM to check
+                                                                       ::base(mme_local),
+                                                                       ::size(mme_local)));
 
               /* register memory with plugins */
-              if(plugin_mgr.register_mapped_memory(mm->iov.iov_base, mme_local.iov_base, mm->iov.iov_len) != S_OK)
+              if(plugin_mgr.register_mapped_memory(::base(mm->iov), ::base(mme_local), ::size(mm->iov)) != S_OK)
                 throw General_exception("calling register_mapped_memory on ADO plugin failed");
 
               break;
@@ -624,7 +622,7 @@ int main(int argc, char* argv[])
               if(debug_level > 1)
                 PLOG("ADO process: RECEIVED Work_request: key=(%p:%.*s) value=%p "
                      "value_len=%lu invocation_len=%lu detached_value=%p (%.*s) len=%lu new=%d",
-                     static_cast<const void *>(wr->get_key()),
+                     common::p_fmt(wr->get_key()),
                      int(wr->get_key_len()),
                      wr->get_key(),
                      wr->get_value_addr(),

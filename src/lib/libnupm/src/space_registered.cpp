@@ -36,7 +36,7 @@ nupm::space_registered::space_registered(
   , dax_manager * dm_
   , common::fd_locked &&fd_
   , const string_view &name_
-  , const std::vector<::iovec> &mapping_
+  , const std::vector<byte_span> &mapping_
 )
   : _pu(ls_, name_)
   , _or(ls_, dm_, std::move(fd_), mapping_)

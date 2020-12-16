@@ -37,6 +37,7 @@
 
 #include <netdb.h> /* addrinfo */
 #include <netinet/in.h> /* sockaddr_in */
+#include <common/pointer_cast.h>
 #include <sys/select.h> /* pselect */
 
 #include <chrono> /* seconds */
@@ -206,7 +207,7 @@ namespace
       auto results = getaddrinfo_ptr(addr_str, port_);
       if ( auto rp = results.get() )
       {
-        auto addr_num = ntohl(static_cast<sockaddr_in *>(static_cast<void *>(rp->ai_addr))->sin_addr.s_addr);
+        auto addr_num = ntohl(common::pointer_cast<sockaddr_in>(rp->ai_addr)->sin_addr.s_addr);
         std::cerr << "fabric_server_factory (specified by " << server_addr_env << "=" << addr_str
           << ") listens on "
           << (addr_num >> 24 & 0xff) << "."

@@ -13,6 +13,7 @@
 #ifndef MCAS_REGISTERED_MEMORY_H
 #define MCAS_REGISTERED_MEMORY_H
 
+#include <common/byte_span.h>
 #include <common/logging.h>
 #include <common/moveable_ptr.h>
 
@@ -25,6 +26,7 @@ namespace mcas
 template <typename T>
 struct memory_registered : private common::log_source {
 private:
+  using const_byte_span = common::const_byte_span;
   common::moveable_ptr<T>     _t;
   typename T::memory_region_t _r;
 
@@ -39,7 +41,18 @@ private:
         _t(transport_),
         _r(_t->register_memory(base_, len_, key_, flags_))
   {
-    CPLOG(3, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
+    CPLOG(3, "%s %p (%p:0x%zx)", __func__, common::p_fmt(_r), base_, len_);
+  }
+  explicit memory_registered(unsigned      debug_level_,
+                             T *           transport_,
+                             const_byte_span region_,
+                             std::uint64_t key_,
+                             std::uint64_t flags_)
+      : common::log_source(debug_level_),
+        _t(transport_),
+        _r(_t->register_memory(region_, key_, flags_))
+  {
+    CPLOG(3, "%s %p (%p:0x%zx)", __func__, common::p_fmt(_r), ::base(region_), ::size(region_));
   }
 
   memory_registered(const memory_registered &) = delete;
@@ -49,16 +62,12 @@ private:
   ~memory_registered()
   {
     if (_t) {
-      CPLOG(3, "%s %p", __func__, static_cast<const void *>(_r));
+      CPLOG(3, "%s %p", __func__, common::p_fmt(_r));
       _t->deregister_memory(_r);
     }
   }
   auto mr() const { return _r; }
-#if 0
-  auto transport() const { return static_cast<void *>(_t); }
-#else
   T *transport() const { return _t; }
-#endif
   auto desc() const { return _t->get_memory_descriptor(_r); }
   auto key() const { return _t->get_memory_remote_key(_r); }
   auto get_memory_descriptor() const { return desc(); }

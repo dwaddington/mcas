@@ -13,6 +13,7 @@ add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 add_subdirectory(./unit_test)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)

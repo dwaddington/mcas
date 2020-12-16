@@ -23,6 +23,9 @@
 #define __STRUCTURED_COMPONENT_H__
 
 #include <api/ado_itf.h>
+#include <experimental/string_view>
+#include <common/byte_span.h>
+#include <gsl/gsl_byte>
 #include <cpp_list_proto_generated.h>
 #include <ccpm/interfaces.h>
 
@@ -30,6 +33,9 @@ class ADO_structured_plugin : public component::IADO_plugin
 {  
 private:
   static constexpr bool option_DEBUG = true;
+  using byte_span = common::byte_span;
+  using string_view = std::experimental::string_view;
+  using byte_string_view = std::experimental::basic_string_view<gsl::byte>;
 
 public:
   /** 
@@ -73,11 +79,9 @@ public:
 
 
   status_t do_work(const uint64_t work_key,
-                   const char * key,
-                   size_t key_len,
+                   byte_string_view key,
                    IADO_plugin::value_space_t& values,
-                   const void * in_work_request,
-                   const size_t in_work_request_len,
+                   byte_string_view in_work_request,
                    bool new_root,
                    response_buffer_vector_t& response_buffers) override;
 
@@ -91,9 +95,7 @@ private:
 
   status_t process_invoke_command(const structured_ADO_protocol::Invoke * command,
                                   const ccpm::region_vector_t& regions,
-                                  void*& out_work_response,
-                                  size_t& out_work_response_len);
-  
+                                  byte_span & out_work_response);
 
 };
 

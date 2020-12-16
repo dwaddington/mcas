@@ -156,7 +156,7 @@ status_t ADO_proxy::send_memory_map(uint64_t token, size_t size, void *value_vad
   return S_OK;
 }
 
-status_t ADO_proxy::send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, ::iovec iov)
+status_t ADO_proxy::send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, byte_span iov)
 {
   PLOG("ADO_proxy:%s sending", __func__);
   _ipc->send_memory_map_named(region_id, pool_name, offset, iov);
@@ -588,7 +588,7 @@ void ADO_proxy::release_life_locks()
   assert(_kvs);
   auto lock_count = _life_unlocks.size();
   for (auto &lock : _life_unlocks) {
-    PLOG("ADO_proxy: releasing lock pool_id=%lx lock=%p", _pool_id, static_cast<const void *>(lock));
+    PLOG("ADO_proxy: releasing lock pool_id=%lx lock=%p", _pool_id, common::p_fmt(lock));
     status_t rc = _kvs->unlock(_pool_id, lock);
     if (rc != S_OK) throw Logic_exception("release_life_locks: pool unlock failed (%d)", rc);
   }

@@ -25,6 +25,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/debug/
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include/)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/src)
 

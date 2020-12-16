@@ -29,6 +29,7 @@ namespace ccpm
 	{
 	private:
 		using top_vec_t = std::vector<std::unique_ptr<area_top>>;
+		using byte_span = common::byte_span;
 		top_vec_t _top;
 		top_vec_t::difference_type _last_top_allocate;
 		top_vec_t::difference_type _last_top_free;
@@ -72,9 +73,9 @@ namespace ccpm
       void * ptr = nullptr;
       if(allocate(ptr, bytes_, alignment_) != 0)
         throw General_exception("ccpm::cca::allocate failed");
-      set_root(ptr, bytes_);
+      set_root(common::make_byte_span(ptr, bytes_));
       return ptr;
-    }    
+    }
 
 		status_t free(
 			void * & ptr_
@@ -94,11 +95,10 @@ namespace ccpm
 		) const override;
 
     void set_root(
-      const void * ptr,
-      const std::size_t len
+      byte_span
     );
 
-    iovec get_root() const;
+    byte_span get_root() const;
 
 		void print(std::ostream &, const std::string &title = "cca") const;
 	};

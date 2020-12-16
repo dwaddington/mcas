@@ -10,6 +10,7 @@ add_definitions(-DCONFIG_DEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libthreadipc/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # TBB
 

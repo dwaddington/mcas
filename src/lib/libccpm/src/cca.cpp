@@ -214,18 +214,16 @@ auto ccpm::cca::remaining(
 }
 
 void ccpm::cca::set_root(
-  const void * ptr,
-  const std::size_t len
+  byte_span root
 )
 {
   if(_top.size() == 0)
     throw std::runtime_error("unexpected empty top vector");
   auto& first_top = _top[0];
-  iovec iov{const_cast<void*>(ptr), len};
-  first_top->set_root(iov);
+  first_top->set_root(root);
 }
 
-iovec ccpm::cca::get_root() const
+auto ccpm::cca::get_root() const -> byte_span
 {
   if(_top.size() == 0)
     throw std::runtime_error("unexpected empty top vector");

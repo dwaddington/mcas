@@ -58,14 +58,13 @@ Fabric_generic_grouped::~Fabric_generic_grouped()
 }
 
 auto Fabric_generic_grouped::register_memory(
-  const void * contig_addr
-  , std::size_t size
+  const_byte_span contig
   , std::uint64_t key
   , std::uint64_t flags
 ) -> memory_region_t
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.register_memory(contig_addr, size, key, flags);
+  return _cnxn.register_memory(contig, key, flags);
 }
 
 void Fabric_generic_grouped::deregister_memory(

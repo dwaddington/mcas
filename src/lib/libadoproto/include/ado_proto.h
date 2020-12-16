@@ -17,6 +17,7 @@
 #include "ado_proto_buffer.h"
 #include "channel_wrap.h"
 #include "uipc.h"
+#include <common/byte_span.h>
 #include <common/errors.h>
 #include <common/exceptions.h>
 #include <common/types.h>
@@ -45,6 +46,7 @@ using buffer_space_dedicated_ptr_t = ado_protocol_buffer::space_dedicated_ptr_t;
 
 class ADO_protocol_builder
 {
+  using byte_span = common::byte_span;
 public:
   static constexpr size_t MAX_MESSAGE_SIZE  = MB(2); //4096;
   static constexpr size_t QUEUE_SIZE        = 32;
@@ -148,7 +150,7 @@ public:
   void send_memory_map_named(unsigned region,
                        string_view pool_name,
                        std::size_t offset,
-                       ::iovec iov);
+                       byte_span iov);
 
   /* shard-side, must not block */
   void send_work_request(const uint64_t work_request_key,

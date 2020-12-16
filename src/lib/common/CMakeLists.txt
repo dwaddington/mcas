@@ -16,6 +16,7 @@ execute_process( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTUR
 
 set(CMAKE_INCLUDE_CURRENT_DIR true)
 include_directories(./include)
+include_directories(../GSL/include)
 
 if( ${ARCHITECTURE} STREQUAL "x86_64" )
   add_compile_options(-msse4.2)

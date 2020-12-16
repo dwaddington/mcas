@@ -24,6 +24,11 @@ namespace common
     {
       return static_cast<T *>(p);
     }
+  template <typename T>
+    const T *pointer_cast(const void *p)
+    {
+      return static_cast<const T *>(p);
+    }
 }
 
 #endif

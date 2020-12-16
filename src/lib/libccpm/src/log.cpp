@@ -13,6 +13,7 @@
 
 #include <ccpm/log.h>
 
+#include <common/pointer_cast.h>
 #include <libpmem.h>
 #include <cstring>
 #include <iostream>
@@ -173,14 +174,14 @@ namespace ccpm
 		char *data_space_current() { return _element_count ? (element_back()->_saved_address) : _data_space_end; }
 		char *_data_space_end;
 		element *element_first() {
-			return static_cast<element *>(static_cast<void *>(this+1));
+			return common::pointer_cast<element>(this+1);
 		}
 		element *element_last() {
-			return static_cast<element *>(static_cast<void *>(this+1)) + _element_count;
+			return common::pointer_cast<element>(this+1) + _element_count;
 		}
 		const element *element_last() const
 		{
-			return static_cast<const element *>(static_cast<const void *>(this+1)) + _element_count;
+			return common::pointer_cast<const element>(this+1) + _element_count;
 		}
 		const element *element_back() const
 		{
@@ -194,7 +195,7 @@ namespace ccpm
 		explicit block_header(block_header *ptr, std::size_t free_size)
 			: _previous(std::move(ptr))
 			, _element_count(0)
-			, _data_space_end(static_cast<char *>(static_cast<void *>(this+1)) + free_size)
+			, _data_space_end(common::pointer_cast<char>(this+1) + free_size)
 		{
 		}
 		block_header(const block_header &) = delete;
@@ -205,7 +206,7 @@ namespace ccpm
 		}
 		std::size_t size() const
 		{
-			return std::size_t(_data_space_end - static_cast<const char *>(static_cast<const void *>(this)));
+			return std::size_t(_data_space_end - common::pointer_cast<const char>(this));
 		}
 		void rollback(IHeap_expandable *heap_)
 		{
@@ -230,13 +231,13 @@ namespace ccpm
 			/* An element will fit if its size is 0 (save is elided) or there is
 			 * room enough room to store an element and all the data.
 			 */
-			return size == 0 || static_cast<const char *>(static_cast<const void *>(element_last() + 1)) <= data_space_current() - size;
+			return size == 0 || common::pointer_cast<const char>(element_last() + 1) <= data_space_current() - size;
 		}
 		bool fits_alloc() const
 		{
 			/* An element will fit if or there is room enough room to store an element
 			 */
-			return static_cast<const char *>(static_cast<const void *>(element_last() + 1)) <= data_space_current();
+			return common::pointer_cast<const char>(element_last() + 1) <= data_space_current();
 		}
 
 		void add(char *begin, std::size_t size)

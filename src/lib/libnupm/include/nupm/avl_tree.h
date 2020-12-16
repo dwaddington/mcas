@@ -536,9 +536,9 @@ class AVL_tree {
       indent(len);
       if (verbose) {
         static_cast<T *>(node)->dump();
-        printf("@[%p] bf=%x left=%p right=%p level=%d\n", static_cast<void *>(node),
-               unsigned(node->bf), static_cast<void *>(&*node->subtree[LEFT]),
-               static_cast<void *>(&*node->subtree[RIGHT]), level);
+        printf("@[%p] bf=%x left=%p right=%p level=%d\n", common::p_fmt(node),
+               unsigned(node->bf), common::p_fmt(&*node->subtree[LEFT]),
+               common::p_fmt(&*node->subtree[RIGHT]), level);
       }
       else {
         static_cast<T *>(node)->dump();

@@ -99,7 +99,7 @@ nupm::path_use::path_use(const common::log_source &ls_, const string_view &name_
     o << __func__ << ": instance already managing path (" << name_ << ")";
     throw std::range_error(o.str());
   }
-  CPLOG(3, "%s (%p): name: %s", __func__, static_cast<const void *>(this), _name.c_str());
+  CPLOG(3, "%s (%p): name: %s", __func__, common::p_fmt(this), _name.c_str());
 }
 
 nupm::path_use::~path_use()
@@ -112,14 +112,14 @@ nupm::path_use::~path_use()
   }
 }
 
-std::pair<std::vector<::iovec>, std::size_t> get_mapping(const fs::path &path_map)
+std::pair<std::vector<common::byte_span>, std::size_t> get_mapping(const fs::path &path_map)
 {
 	/* A region must always be mapped to the same address, as MCAS
 	 * MCAS software uses absolute addresses. Current design is to
 	 * save this in a file extended attribute, ahtough it could be
 	 * saved in a specially-named file.
 	 */
-	std::vector<::iovec> m;
+	std::vector<common::byte_span> m;
 	std::ifstream f(path_map.c_str());
 	std::size_t covered = 0;
 	std::uint64_t addr;
@@ -127,17 +127,17 @@ std::pair<std::vector<::iovec>, std::size_t> get_mapping(const fs::path &path_ma
 	f >> addr >> size;
 	while ( f.good() )
 	{
-		m.push_back(::iovec{reinterpret_cast<void *>(addr), size});
+		m.push_back(common::make_byte_span(reinterpret_cast<gsl::byte *>(addr), size));
 		covered += size;
 #if 0
-		PLOG("%s %s: %p, 0x%zx", __func__, path_map.c_str(), m.back().iov_base, m.back().iov_len);
+		PLOG("%s %s: %p, 0x%zx", __func__, path_map.c_str(), common::p_fmt(m.back().data()), m.back().size());
 #endif
 		f >> addr >> size;
 	}
 	return { m, covered };
 }
 
-std::vector<::iovec> get_mapping(const fs::path &path_map, const std::size_t expected_size)
+std::vector<common::byte_span> get_mapping(const fs::path &path_map, const std::size_t expected_size)
 {
 	auto r = get_mapping(path_map);
     if ( r.second != expected_size )
@@ -228,7 +228,7 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::st
 			{
 				throw std::runtime_error("multiple instances of path " + pd.string() + " in configuration");
 			}
-			CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
+			CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
 		}
 	}
 }
@@ -294,7 +294,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_none(
 		);
 }
 
-std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t base, bool force_reset)
+std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t base_, bool force_reset)
 {
 	/* Create and insert a space_registered.
 	 *   path_use : tracks usage of the path name to ensure no duplicate uses
@@ -308,14 +308,14 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
 				id
-				, space_registered(*this, this, common::fd_locked(::open(p.c_str(), O_RDWR, 0666)), id, base)
+				, space_registered(*this, this, common::fd_locked(::open(p.c_str(), O_RDWR, 0666)), id, base_)
 			)
 		);
 	if ( ! itb.second )
 	{
 		throw std::runtime_error("multiple instances of path " + p.string() + " in configuration");
 	}
-	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
+	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
 	return
 		std::make_unique<arena_dev>(
 			static_cast<log_source &>(*this)
@@ -329,7 +329,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 bool nupm::dax_manager::enter(
 	common::fd_locked && fd_
 	, const string_view & id_
-	, const std::vector<::iovec> &m_
+	, const std::vector<byte_span> &m_
 )
 {
 	auto itb =
@@ -343,7 +343,7 @@ bool nupm::dax_manager::enter(
 	{
 		PLOG("%s: failed to insert %.*s (duplicate instance?)", __func__, int(id_.size()), id_.begin());
 	}
-	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), itb.first->second._or.range()[0].iov_base);
+	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
 	return itb.second;
 }
 
@@ -352,8 +352,8 @@ void nupm::dax_manager::remove(const string_view & id_)
 	auto itb = _mapped_spaces.find(std::string(id_));
 	if ( itb != _mapped_spaces.end() )
 	{
-		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), static_cast<const void *>(&itb->second));
-		CPLOG(1, "%s: region %s at %p", __func__, itb->first.c_str(), itb->second._or.range()[0].iov_base);
+		CPLOG(2, "%s: _mapped_spaces found %.*s at %p", __func__, int(id_.size()), id_.begin(), common::p_fmt(&itb->second));
+		CPLOG(1, "%s: region %s at %p", __func__, itb->first.c_str(), ::base(itb->second._or.range()[0]));
 		_mapped_spaces.erase(itb);
 	}
 	else
@@ -382,9 +382,9 @@ dax_manager::dax_manager(
   /* Maximum expected need is about 6 TiB (12 512GiB DIMMs).
    * Start, arbitrarily, at 0x10000000000
    */
-  char *free_address_begin = reinterpret_cast<char *>(uintptr_t(1) << 40);
+  byte *free_address_begin = reinterpret_cast<byte *>(uintptr_t(1) << 40);
   auto free_address_end    = free_address_begin + (std::size_t(1) << 40);
-  auto i = boost::icl::interval<char *>::right_open(free_address_begin, free_address_end);
+  auto i = boost::icl::interval<byte *>::right_open(free_address_begin, free_address_end);
   _address_fs_available.insert(i);
 
   /* set up each configuration */
@@ -461,22 +461,22 @@ auto dax_manager::open_region(
 }
 
 auto dax_manager::create_region(
-  const string_view &name
-  , arena_id_t arena_id
-  , const size_t size
+  const string_view &name_
+  , arena_id_t arena_id_
+  , const size_t size_
 ) -> region_descriptor
 {
   guard_t           g(_reentrant_lock);
-  auto arena = lookup_arena(arena_id);
-  CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name.begin(), size, arena_id);
-  auto r = arena->region_create(name, this, size);
-  if ( r.address_map.empty() )
+  auto arena = lookup_arena(arena_id_);
+  CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name_.begin(), size_, arena_id_);
+  auto r = arena->region_create(name_, this, size_);
+  if ( r.address_map().empty() )
   {
-    CPLOG(2, "%s: %.*s size req 0x%zx create failed", __func__, int(name.size()), name.begin(), size);
+    CPLOG(2, "%s: %.*s size req 0x%zx create failed", __func__, int(name_.size()), name_.begin(), size_);
   }
   else
   {
-    CPLOG(2, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name.size()), name.begin(), size, r.address_map[0].iov_base, r.address_map[0].iov_len);
+    CPLOG(2, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name_.size()), name_.begin(), size_, ::base(r.address_map()[0]), ::size(r.address_map()[0]));
   }
   return r;
 }
@@ -516,15 +516,15 @@ size_t dax_manager::get_max_available(arena_id_t arena_id)
   return lookup_arena(arena_id)->get_max_available();
 }
 
-auto dax_manager::recover_metadata(const ::iovec iov_,
+auto dax_manager::recover_metadata(const byte_span iov_,
                                       bool        force_rebuild) -> DM_region_header *
 {
-  assert(iov_.iov_base);
-  DM_region_header *rh = static_cast<DM_region_header *>(iov_.iov_base);
+  assert(::base(iov_));
+  DM_region_header *rh = static_cast<DM_region_header *>(::base(iov_));
 
   if ( force_rebuild || ! rh->check_magic() ) {
     PLOG("%s::%s: rebuilding.", _cname, __func__);
-    rh = new (iov_.iov_base) DM_region_header(iov_.iov_len);
+    rh = new (::base(iov_)) DM_region_header(::size(iov_));
     PLOG("%s::%s: rebuilt.", _cname, __func__);
   }
   else {

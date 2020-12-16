@@ -19,6 +19,7 @@ class Immutable_allocator_base : public IHeap
 	const uint32_t MAGIC = 0xF005BA11;
 	const unsigned debug_level = 0;
 
+    using byte_span = common::byte_span;
 private:
 
   struct Immutable_slab {
@@ -45,7 +46,7 @@ public:
     assert(_root);
   }
 
-  explicit Immutable_allocator_base(::iovec& region)
+  explicit Immutable_allocator_base(common::byte_span & region)
   {
     region_vector_t regions;
     regions.push_back(region);
@@ -93,10 +94,9 @@ public:
   {
     if(regions.size() == 0)
       throw std::invalid_argument("invalid regions parameter");
-    
 
-    void * buffer = regions[0].iov_base;
-    size_t size = regions[0].iov_len;
+    void * buffer = ::base(regions[0]);
+    size_t size = ::size(regions[0]);
     assert(size > 0);
     assert(buffer);
 
@@ -217,14 +217,14 @@ public:
    *
    * @param[in]  region  New memory region
    */
-  void expand(::iovec region) {
+  void expand(byte_span region) {
     if(_root->linked_slab) {
       _root->linked_slab->expand(region);
       return;
     }
-    
+
     /* link in a new allocator */
-    _root->linked_slab = new Immutable_allocator_base(region); 
+    _root->linked_slab = new Immutable_allocator_base(region);
     pmem_persist(_root->linked_slab, sizeof(_root->linked_slab));
   }
 
@@ -235,8 +235,8 @@ public:
   void dump_info() const {
     PINF("-- Immutable Allocator --");
     PINF("magic    : %X", _root->magic);
-    PINF("range    : %p-%p (size %lu)", static_cast<const void *>(_root), static_cast<const void *>(_root->slab_end), _root->slab_end - reinterpret_cast<byte*>(_root));
-    PINF("next free: %p", static_cast<const void *>(_root->next_free.load()));
+    PINF("range    : %p-%p (size %lu)", common::p_fmt(_root), common::p_fmt(_root->slab_end), _root->slab_end - reinterpret_cast<byte*>(_root));
+    PINF("next free: %p", common::p_fmt(_root->next_free.load()));
     PINF("free     : %lu/%lu",
          _root->slab_end - reinterpret_cast<byte*>(_root->next_free.load()),
          _root->slab_end - reinterpret_cast<byte*>(_root));

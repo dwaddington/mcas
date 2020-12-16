@@ -20,7 +20,9 @@
 #include "persist_data.h"
 
 #include <nupm/region_descriptor.h>
-#include <sys/uio.h>
+#include <common/byte_span.h>
+#include <common/pointer_cast.h>
+#include <experimental/string_view>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -36,6 +38,8 @@ template <
     using heap_access_t = heap_access<Heap>;
   private:
     static constexpr std::uint64_t magic_value = Heap::magic_value(); // 0xc74892d72eed493a;
+    using byte_span = common::byte_span;
+    using string_view = std::experimental::string_view;
   public:
     using heap_type = Heap;
     using persist_data_type = PersistData;
@@ -61,8 +65,8 @@ template <
       , std::size_t size_
       , std::size_t expected_obj_count
       , unsigned numa_node_
-      , const std::string & id_
-      , const std::string & backing_file_
+      , string_view id_
+      , string_view backing_file_
     )
       : magic(0)
       , _uuid(uuid_)
@@ -74,8 +78,8 @@ template <
         , (&_persist_data.aspk())
         , &_persist_data.asx()
 #endif
-        , ::iovec{this, size_}
-        , ::iovec{this+1, adjust_size(size_)}
+        , byte_span(common::make_byte_span(this, size_))
+        , byte_span(common::make_byte_span(this+1, adjust_size(size_)))
         , numa_node_
         , id_
         , backing_file_
@@ -98,10 +102,10 @@ template <
     region(
       unsigned debug_level
       , const std::unique_ptr<dax_manager> & dax_manager_
-      , const std::string & id_
-      , const std::string & backing_file_
-      , const ::iovec *iov_addl_first_
-      , const ::iovec *iov_addl_last_
+      , string_view id_
+      , string_view backing_file_
+      , const byte_span *iov_addl_first_
+      , const byte_span *iov_addl_last_
     )
       : magic(0)
       , _uuid(this->_uuid)

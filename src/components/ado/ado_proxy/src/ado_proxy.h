@@ -18,6 +18,7 @@
 #include "docker.h"
 #include <api/ado_itf.h>
 #include <api/kvstore_itf.h>
+#include <common/byte_span.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/types.h>
@@ -95,7 +96,7 @@ public:
   status_t send_memory_map_named(unsigned region_id,
                                  string_view pool_name,
                                  std::size_t offset,
-                                 ::iovec iov) override;
+                                 byte_span iov) override;
   
   status_t send_work_request(const uint64_t work_request_key,
                              const char * key,

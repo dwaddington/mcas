@@ -26,6 +26,7 @@
 #include "region_descriptor.h"
 #include "space_opened.h"
 #include "space_registered.h"
+#include <common/byte_span.h>
 #include <common/fd_open.h>
 #include <common/logging.h>
 #include <common/memory_mapped.h>
@@ -37,7 +38,6 @@
 #include <mutex>
 #include <string>
 #include <vector>
-#include <sys/uio.h>
 
 /* Control of the space behind a single config_t entry.
  * No longer called a region because
@@ -52,9 +52,10 @@ class DM_region_header;
 
 struct registry_memory_mapped
 {
+  using byte_span = common::byte_span;
   using string_view = std::experimental::string_view;
   virtual ~registry_memory_mapped() {}
-  virtual bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<::iovec> &m) = 0;
+  virtual bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) = 0;
   virtual void remove(const string_view &id) = 0;
   virtual void * locate_free_address_range(std::size_t size) = 0;
 };
@@ -67,6 +68,7 @@ struct registry_memory_mapped
 struct dax_manager : protected common::log_source, private registry_memory_mapped {
  private:
   static constexpr const char *_cname = "dax_manager";
+  using byte = gsl::byte;
 
  public:
   using arena_id_t = unsigned;
@@ -177,13 +179,14 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   void deregister_range(const void *begin, std::size_t size);
   void * locate_free_address_range(std::size_t size) override;
  private:
+  using byte_span = common::byte_span;
   space_opened map_space(const std::string &path, addr_t base_addr);
   DM_region_header *recover_metadata(
-                         ::iovec iov,
+                         byte_span iov,
                          bool    force_rebuild = false);
   arena *lookup_arena(arena_id_t arena_id);
   /* callback for arena_dax to register mapped memory */
-  bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<::iovec> &m) override;
+  bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) override;
   void remove(const string_view & id) override;
   using path = std::experimental::filesystem::path;
   using directory_entry = std::experimental::filesystem::directory_entry;
@@ -199,7 +202,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   using mapped_spaces = std::map<std::string, space_registered>;
 
   ND_control                                _nd;
-  using AC = boost::icl::interval_set<char *>;
+  using AC = boost::icl::interval_set<byte *>;
   AC                                        _address_coverage;
   AC                                        _address_fs_available;
   mapped_spaces                             _mapped_spaces;

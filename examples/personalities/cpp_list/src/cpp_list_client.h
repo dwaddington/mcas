@@ -82,14 +82,14 @@ public:
     void * ptr = allocate_at(size, value_vaddr);
     memset(ptr, 0, size);
 
-    _regions.push_back({ptr,size});
+    _regions.push_back(common::make_byte_span(ptr,size));
 
     /* register for RDMA */
     _memory_handle = mcas->register_direct_memory(ptr, size);
     PLOG("registered direct memory (%p, %lu)", ptr, size);
     assert(_memory_handle != IMCAS::MEMORY_HANDLE_NONE);
   }
-  
+
   virtual ~Durable_object_memory()
   {
   }
@@ -99,7 +99,7 @@ public:
   inline component::IMCAS::pool_t pool() const { return _pool; }
   inline component::IMCAS * mcas() const { return _mcas; }
   inline const std::string& name() const { return _name; }
-  
+
 protected:
   const std::string                    _name;
   component::IMCAS *                   _mcas;
@@ -125,9 +125,9 @@ public:
 
   status_t copy_to_remote();
   status_t copy_from_remote();
-  
+
   status_t remote_push_front(const T& element);
-  status_t remote_sort();  
+  status_t remote_sort();
 };
 
 template <typename T>
@@ -146,8 +146,8 @@ status_t Durable_list<T>::copy_to_remote()
   /* copies complete memory - could be optimized to copy only used memory */
   return _mcas->put_direct(_pool,
                            _name,
-                           _regions[0].iov_base,
-                           _regions[0].iov_len,
+                           ::base(_regions[0]),
+                           ::size(_regions[0]),
                            _memory_handle);
 }
 
@@ -155,10 +155,11 @@ template <typename T>
 status_t Durable_list<T>::copy_from_remote()
 {
   /* copies complete memory - could be optimized to copy only used memory */
+  std::size_t s = ::size(_regions[0]);
   return _mcas->get_direct(_pool,
                            _name,
-                           _regions[0].iov_base,
-                           _regions[0].iov_len,
+                           ::base(_regions[0]),
+                           s,
                            _memory_handle);
 }
 
@@ -168,13 +169,13 @@ status_t Durable_list<T>::remote_push_front(const T& element)
 {
   using namespace flatbuffers;
   using Writer = nop::StreamWriter<std::stringstream>;
-  
+
   nop::Serializer<Writer> serializer;
   serializer.Write(element);
 
   flatbuffers::FlatBufferBuilder fbb;
   auto params = fbb.CreateString(serializer.writer().take().str());
-  auto method = fbb.CreateString("push_front");  
+  auto method = fbb.CreateString("push_front");
   auto cmd = CreateInvoke(fbb, method, params);
   auto msg = CreateMessage(fbb, Command_Invoke, cmd.Union());
   fbb.Finish(msg);
@@ -182,7 +183,7 @@ status_t Durable_list<T>::remote_push_front(const T& element)
   /* invoke */
   status_t rc;
   std::vector<component::IMCAS::ADO_response> response;
-  
+
   rc = _mcas->invoke_ado(_pool,
                          _name,
                          fbb.GetBufferPointer(),
@@ -203,7 +204,7 @@ void push_front(Durable_object_memory& obj,
 
   FlatBufferBuilder fbb;
   auto params = fbb.CreateString(serializer.writer().take().str());
-  auto method = fbb.CreateString("push_front");  
+  auto method = fbb.CreateString("push_front");
   auto cmd = CreateInvoke(fbb, method, params);
   auto msg = CreateMessage(fbb, Command_Invoke, cmd.Union());
   fbb.Finish(msg);
@@ -211,9 +212,9 @@ void push_front(Durable_object_memory& obj,
   /* invoke */
   status_t rc;
   std::vector<component::IMCAS::ADO_response> response;
-  
+
   assert(response.size() == 1);
-  
+
   rc = obj.mcas()->invoke_ado(obj.pool(),
                               obj.name(),
                               fbb.GetBufferPointer(),
@@ -241,7 +242,7 @@ status_t Durable_list<T>::remote_sort()
 
 //   status_t rc;
 //   std::string response;
-  
+
 //   /* delete anything prior */
 //   i_mcas->erase(pool, name);
 
@@ -250,7 +251,7 @@ status_t Durable_list<T>::remote_sort()
 
 //   assert(rc == S_OK);
 //   /* get virtual address from response */
-//   value_vaddr = *(reinterpret_cast<const uint64_t*>(response.data()));
+//   value_vaddr = *(reinterpret_cast<const uint64_t*>(::base(response)));
 //   PLOG("returned address: %lx", value_vaddr);
 
 //   /* allocate matching memory locally and populate if needed */
@@ -263,7 +264,7 @@ status_t Durable_list<T>::remote_sort()
 //   unsigned count = 1000;
 //   for(unsigned i=0;i<count;i++)
 //     myList.push_front((rdtsc() * i) % 10000); /* add something to list */
-  
+
 //   /* push data structure into mcas */
 //   /* If small, use put */
 //   //  rc = i_mcas->put(pool, name, regions[0].iov_base, regions[0].iov_len);
@@ -271,7 +272,7 @@ status_t Durable_list<T>::remote_sort()
 //   auto handle = i_mcas->register_direct_memory(regions[0].iov_base, regions[0].iov_len);
 //   rc = i_mcas->put_direct(pool, name, regions[0].iov_base, regions[0].iov_len, handle);
 //   assert(rc == S_OK);
-  
+
 //   PLOG("create invocation response: %d", rc);
 // }
 

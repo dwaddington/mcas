@@ -18,6 +18,7 @@
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
 #include <boost/optional.hpp>
+#include <common/pointer_cast.h>
 #include <gsl/gsl_byte> /* std::byte in c++20 */
 
 #include <experimental/string_view> /* std::string_view in c++20 */
@@ -625,7 +626,7 @@ public:
   {
     return
       invoke_ado(pool,
-        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(common::pointer_cast<const byte>(key.data()), key.size()),
         basic_string_view<byte>(static_cast<const byte *>(request), request_len),
         flags, out_response, value_size);
   }
@@ -676,8 +677,8 @@ public:
   {
     return
       async_invoke_ado(pool,
-        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
-        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(request.data())), request.length()),
+        basic_string_view<byte>(common::pointer_cast<const byte>(key.data()), key.size()),
+        basic_string_view<byte>(common::pointer_cast<const byte>(request.data()), request.length()),
         flags, out_response, out_async_handle, value_size);
   }
 
@@ -692,7 +693,7 @@ public:
   {
     return
       async_invoke_ado(pool,
-        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(common::pointer_cast<const byte>(key.data()), key.size()),
         basic_string_view<byte>(static_cast<const byte *>(request), request_len),
         flags, out_response, out_async_handle, value_size);
   }
@@ -735,7 +736,7 @@ public:
   {
     return
       invoke_put_ado(pool,
-        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(common::pointer_cast<const byte>(key.data()), key.size()),
         basic_string_view<byte>(static_cast<const byte *>(request), request_len),
         basic_string_view<byte>(static_cast<const byte *>(value), value_len),
         root_len, flags, out_response);
@@ -800,7 +801,7 @@ public:
   {
     return
       async_invoke_put_ado(pool,
-        basic_string_view<byte>(static_cast<const byte *>(static_cast<const void *>(key.data())), key.size()),
+        basic_string_view<byte>(common::pointer_cast<const byte>(key.data()), key.size()),
         basic_string_view<byte>(static_cast<const byte *>(request), request_len),
         basic_string_view<byte>(static_cast<const byte *>(value), value_len),
                            root_len, flags, out_response, out_async_handle);

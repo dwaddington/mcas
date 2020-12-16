@@ -120,7 +120,7 @@ template <typename T, typename Deallocator>
 				hop_hash_log::write(LOG_LOCATION,
 					, (why ? why : "(unaligned no reason)")
 					, " [", ptr
-					, "..", static_cast<void *>(ptr + s * sizeof(T))
+					, "..", common::p_fmt(ptr + s * sizeof(T))
 					, ")"
 				);
 			}

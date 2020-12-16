@@ -169,9 +169,9 @@ try
     );
 
   std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
-  _pools.emplace(rac.address_map.front().iov_base, s);
+  _pools.emplace(::base(rac.address_map().front()), s);
 
-  return to_pool_t(rac.address_map.front().iov_base);
+  return to_pool_t(::base(rac.address_map().front()));
 }
 catch ( const pool_error &e )
 {
@@ -196,26 +196,26 @@ auto hstore::open_pool(const std::string &name_,
 
     std::unique_lock<std::mutex> sessions_lk(_pools_mutex);
     /* open pools are indexed by the base address of their first (contiguous) segment */
-    if ( v.address_map.empty() )
+    if ( v.address_map().empty() )
     {
       return component::IKVStore::POOL_ERROR; /* pool not found (by name) */
     }
     else
     {
-      auto it = _pools.find(v.address_map.front().iov_base);
+      auto it = _pools.find(::base(v.address_map().front()));
       if ( it != _pools.end() )
       {
         /* already have a session, make a copy of the pointer */
-        _pools.emplace(v.address_map.front().iov_base, it->second);
+        _pools.emplace(::base(v.address_map().front()), it->second);
       }
       else
       {
         /* no session yet, create one */
         auto s = _pool_manager->pool_open_2(AK_INSTANCE v, flags);
         /* explicit conversion to shared_ptr fpr g++ 5 */
-        _pools.emplace(v.address_map.front().iov_base, std::shared_ptr<open_pool_t>(s.release()));
+        _pools.emplace(::base(v.address_map().front()), std::shared_ptr<open_pool_t>(s.release()));
       }
-      return to_pool_t(v.address_map.front().iov_base);
+      return to_pool_t(::base(v.address_map().front()));
     }
   }
   catch( const pool_error &e ) {

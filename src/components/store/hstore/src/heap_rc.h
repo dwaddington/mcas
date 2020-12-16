@@ -24,11 +24,13 @@
 #include "tracked_header.h"
 
 #include <boost/icl/interval_set.hpp>
+#include <common/byte_span.h>
 #include <common/exceptions.h> /* General_exception */
 #include <nupm/region_descriptor.h>
 
 #include <sys/uio.h> /* iovec */
 
+#include <experimental/string_view>
 #include <algorithm>
 #include <array>
 #include <cstddef> /* size_t, ptrdiff_t */
@@ -47,8 +49,10 @@ struct heap_rc_ephemeral;
 struct heap_rc
 {
 private:
-	::iovec _pool0_full; /* entire extent of pool 0 */
-	::iovec _pool0_heap; /* portion of pool 0 which can be used for the heap */
+	using byte_span = common::byte_span;
+	using string_view = std::experimental::string_view;
+	byte_span _pool0_full; /* entire extent of pool 0 */
+	byte_span _pool0_heap; /* portion of pool 0 which can be used for the heap */
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
@@ -58,29 +62,29 @@ private:
 public:
 	explicit heap_rc(
 		unsigned debug_level
-		, ::iovec pool0_full
-		, ::iovec pool0_heap
+		, byte_span pool0_full
+		, byte_span pool0_heap
 		, unsigned numa_node
-		, const std::string &id_
-		, const std::string &backing_file
+		, string_view id_
+		, string_view backing_file
 	);
 	explicit heap_rc(
 		unsigned debug_level
 		, const std::unique_ptr<dax_manager> &dax_manager
-		, const std::string &id_
-		, const std::string &backing_file
-		, const ::iovec *iov_addl_first_
-		, const ::iovec *iov_addl_last_
+		, string_view id_
+		, string_view backing_file
+		, const byte_span *iov_addl_first_
+		, const byte_span *iov_addl_last_
 	);
 	/* allocation_state_combined offered, but not used */
 	explicit heap_rc(
-		unsigned debug_level
+		const unsigned debug_level
 		, const std::unique_ptr<dax_manager> &dax_manager
-		, const std::string &id
-		, const std::string &backing_file
-		, impl::allocation_state_combined *
-		, const ::iovec *iov_addl_first_
-		, const ::iovec *iov_addl_last_
+		, const string_view id
+		, const string_view backing_file
+		, impl::allocation_state_combined const *
+		, const byte_span *iov_addl_first_
+		, const byte_span *iov_addl_last_
 	)
 		: heap_rc(debug_level, dax_manager, id, backing_file, iov_addl_first_, iov_addl_last_)
 	{
@@ -93,9 +97,7 @@ public:
 
     static constexpr std::uint64_t magic_value() { return 0xc74892d72eed493a; }
 
-	static ::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager, std::uint64_t uuid, unsigned numa_node);
-
-	static void *iov_limit(const ::iovec &r);
+	static byte_span open_region(const std::unique_ptr<dax_manager> &dax_manager, std::uint64_t uuid, unsigned numa_node);
 
 	auto grow(
 		const std::unique_ptr<dax_manager> & dax_manager

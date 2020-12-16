@@ -9,6 +9,7 @@ add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual 
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/flatbuffers/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)

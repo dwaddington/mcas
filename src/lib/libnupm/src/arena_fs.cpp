@@ -39,15 +39,14 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 
 namespace fs = std::experimental::filesystem;
 
-std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<::iovec> &map, int flags, ::off_t offset)
+std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<byte_span> &map, int flags, ::off_t offset)
 {
 	std::vector<common::memory_mapped> mapped_elements;
 	for ( const auto &e : map )
 	{
 		using namespace nupm;
 		mapped_elements.emplace_back(
-			e.iov_base
-			, e.iov_len
+			e
 			, PROT_READ | PROT_WRITE
 			, flags
 			, fd
@@ -59,8 +58,7 @@ std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<:
 			mapped_elements.pop_back();
 			flags &= ~MAP_SYNC;
 			mapped_elements.emplace_back(
-				e.iov_base
-				, e.iov_len
+				e
 				, PROT_READ | PROT_WRITE
 				, flags
 				, fd
@@ -68,32 +66,32 @@ std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<:
 			);
 		}
 
-		if ( ! mapped_elements.back().iov_base )
+		if ( ! ::data(mapped_elements.back()) )
 		{
-			auto er = int(mapped_elements.back().iov_len);
-			throw General_exception("%s: mmap failed for fsdax (request %p:0x%zu): %s", __func__, e.iov_base, e.iov_len, ::strerror(er));
+			auto er = int(::size(mapped_elements.back()));
+			throw General_exception("%s: mmap failed for fsdax (request %p:0x%zu): %s", __func__, ::base(e), ::size(e), ::strerror(er));
 		}
 
-		if ( ::madvise(e.iov_base, e.iov_len, MADV_DONTFORK) != 0 )
+		if ( ::madvise(::data(e), ::size(e), MADV_DONTFORK) != 0 )
 		{
 			auto er = errno;
-			throw General_exception("%s: madvise 'don't fork' failed for fsdax (%p %lu): %s", __func__, e.iov_base, e.iov_len, ::strerror(er));
+			throw General_exception("%s: madvise 'don't fork' failed for fsdax (%p %lu): %s", __func__, ::base(e), ::size(e), ::strerror(er));
 		}
 
-		offset += e.iov_len;
+		offset += ::size(e);
 	}
 
 	return mapped_elements;
 }
 
-std::pair<std::vector<::iovec>, std::size_t> arena_fs::get_mapping(const fs::path &path_map)
+auto arena_fs::get_mapping(const fs::path &path_map) -> std::pair<std::vector<byte_span>, std::size_t>
 {
 	/* A region must always be mapped to the same address, as MCAS
 	 * MCAS software uses absolute addresses. Current design is to
 	 * save this in a file extended attribute, ahtough it could be
 	 * saved in a specially-named file.
 	 */
-	std::vector<::iovec> m;
+	std::vector<byte_span> m;
 	std::ifstream f(path_map.c_str());
 	std::size_t covered = 0;
 	std::uint64_t addr;
@@ -102,17 +100,17 @@ std::pair<std::vector<::iovec>, std::size_t> arena_fs::get_mapping(const fs::pat
 	f >> addr >> size;
 	while ( f.good() )
 	{
-		m.push_back(::iovec{reinterpret_cast<void *>(addr), size});
+		m.push_back(common::make_byte_span(reinterpret_cast<void *>(addr), size));
 		covered += size;
 #if 0
-		PLOG("%s %s: %p, 0x%zx", __func__, path_map.c_str(), m.back().iov_base, m.back().iov_len);
+		PLOG("%s %s: %p, 0x%zx", __func__, path_map.c_str(), m.back().data(), m.back().size());
 #endif
 		f >> addr >> size;
 	}
 	return { m, covered };
 }
 
-std::vector<::iovec> arena_fs::get_mapping(const fs::path &path_map, const std::size_t expected_size)
+auto arena_fs::get_mapping(const fs::path &path_map, const std::size_t expected_size) -> std::vector<byte_span>
 {
 	auto r = get_mapping(path_map);
 	if ( r.second != expected_size )
@@ -141,12 +139,12 @@ void *arena_fs::region_create_inner(
 	common::fd_locked &&fd
 	, const string_view &id_
 	, gsl::not_null<registry_memory_mapped *> const mh_
-	, const std::vector<::iovec> &mapping_
+	, const std::vector<byte_span> &mapping_
 )
 try {
 	auto entered = mh_->enter(std::move(fd), id_, mapping_);
 	/* return the map key, or nullptr if already mapped */
-	return entered ? mapping_.front().iov_base : nullptr;
+	return entered ? ::base(mapping_.front()) : nullptr;
 }
 catch ( const std::runtime_error &e )
 {
@@ -226,12 +224,17 @@ auto arena_fs::region_create(
 
 		using namespace nupm;
 
-		auto v = region_create_inner(std::move(fd), id_, mh_, std::vector<::iovec>{{base_addr, size}});
+		auto v = region_create_inner(std::move(fd), id_, mh_, std::vector<byte_span>({common::make_byte_span(base_addr, size)}));
 		if ( v )
 		{
 			commit = true;
 		}
-		return region_descriptor(id_, path_data_local.string(), region_descriptor::address_map_t(1, ::iovec{v, size}));
+		return
+			region_descriptor(
+				id_
+				, path_data_local.string()
+				, region_descriptor::address_map_t(1, common::make_byte_span(v, size))
+			);
 	}
 	catch (const std::exception & e)
 	{
@@ -278,7 +281,7 @@ void arena_fs::region_resize(
 			f << std::showbase << std::hex << added_base_addr << " " << added_size << std::endl;
 		}
 /* End of section which could be moved inside space_registered::grow, if space_registered were specialized for fsdax */
-		sr_->_or.grow(std::vector<::iovec>(1, ::iovec{added_base_addr, added_size}));
+		sr_->_or.grow(std::vector<byte_span>(1, common::make_byte_span(added_base_addr, added_size)));
 	}
 	else if ( size_ < r.second )
 	{
@@ -292,14 +295,14 @@ void arena_fs::region_resize(
 		auto map_size_to_remove = removed_size;
 		while ( 0 != map_size_to_remove )
 		{
-			if ( map_size_to_remove < r.first.back().iov_len )
+			if ( map_size_to_remove < ::size(r.first.back()) )
 			{
-				r.first.back().iov_len -= map_size_to_remove;
+				r.first.back() = common::make_byte_span(::base(r.first.back()), ::size(r.first.back()) - map_size_to_remove);
 				map_size_to_remove = 0;
 			}
 			else
 			{
-				map_size_to_remove -= r.first.back().iov_len;
+				map_size_to_remove -= ::size(r.first.back());
 				r.first.pop_back();
 			}
 		}
@@ -308,7 +311,7 @@ void arena_fs::region_resize(
 			CPLOG(1, "%s: write %s", __func__, path_map_local.c_str());
 			for ( const auto &iov : r.first )
 			{
-				f << std::showbase << std::hex << iov.iov_base << " " << iov.iov_len << std::endl;
+				f << std::showbase << std::hex << ::base(iov) << " " << ::size(iov) << std::endl;
 			}
 		}
 

@@ -68,6 +68,7 @@
 #include <atomic>
 
 #include "memory.h"
+#include <common/pointer_cast.h>
 #include <common/utils.h>
 #include <semaphore.h>
 #include <sstream>
@@ -117,7 +118,7 @@ private:
       _allocator(allocator),
       _size(size),
       _mask(size - 1),
-      _buffer(static_cast<node_t *>(static_cast<void *>(new (buf_addr) aligned_node_t[size]))) {
+      _buffer(common::pointer_cast<node_t>(new (buf_addr) aligned_node_t[size])) {
     assert(_buffer);
 
     // make sure it's a power of 2
@@ -180,8 +181,9 @@ public:
          * which means that the call to a destructor has no effect and is not necessary.
          * Retain tne call because it cannot hurt, except for readability.
          */
-        static_cast<aligned_node_t *>(static_cast<void *>(&_buffer[i]))
-          ->~aligned_node_t(); /* manually call dtors */
+
+        /* manually call dtors */
+        common::pointer_cast<aligned_node_t>(&_buffer[i])->~aligned_node_t();
 
       _allocator->free(_buffer);
     }

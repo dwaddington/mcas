@@ -133,7 +133,7 @@ int Connection_handler::tick()
         ++_stats.recv_msg_count;
 
         if (option_DEBUG > 2)
-          PMAJOR("Shard State: %lu %p WAIT_MSG_RECV complete", _tick_count, static_cast<const void *>(this));
+          PMAJOR("Shard State: %lu %p WAIT_MSG_RECV complete", _tick_count, common::p_fmt(this));
       }
     else {
       ++_stats.wait_msg_recv_misses;
@@ -145,7 +145,7 @@ int Connection_handler::tick()
     static int handshakes = 0;
     handshakes++;
     if (option_DEBUG > 2)
-      PMAJOR("Shard State: %lu %p POST_HANDSHAKE (%d)", _tick_count, static_cast<const void *>(this), handshakes);
+      PMAJOR("Shard State: %lu %p POST_HANDSHAKE (%d)", _tick_count, common::p_fmt(this), handshakes);
 
     assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
     post_recv_buffer(allocate_recv());
@@ -188,7 +188,7 @@ int Connection_handler::tick()
 
       if (option_DEBUG > 2)
         PLOG("Shard State: %lu %p WAIT_HANDSHAKE complete (%d)",
-             _tick_count, static_cast<const void *>(this), resp_handshakes);
+             _tick_count, common::p_fmt(this), resp_handshakes);
 
       const auto iob = posted_recv();
       assert(iob);

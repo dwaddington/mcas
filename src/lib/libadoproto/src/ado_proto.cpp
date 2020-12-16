@@ -16,6 +16,7 @@
 #include <common/logging.h>
 #include <common/exceptions.h>
 #include <common/dump_utils.h>
+#include <common/pointer_cast.h>
 #include <common/time.h>
 #include <boost/numeric/conversion/cast.hpp>
 #include <cstring>
@@ -39,8 +40,8 @@ class Buffer_header
    */
   std::uint32_t _size;
   std::uint32_t _offset; // offset to the region used by flatbuffers
-  const uint8_t *buf_begin() const { return static_cast<const uint8_t *>(static_cast<const void *>(this)); }
-  uint8_t *buf_begin() { return static_cast<uint8_t *>(static_cast<void *>(this)); }
+  const uint8_t *buf_begin() const { return common::pointer_cast<const uint8_t>(this); }
+  uint8_t *buf_begin() { return common::pointer_cast<uint8_t>(this); }
 public:
   Buffer_header(std::uint32_t size_)
     : _size(size_)
@@ -219,7 +220,7 @@ void ADO_protocol_builder::send_memory_map(uint64_t memory_token,
 void ADO_protocol_builder::send_memory_map_named(unsigned region_id,
   string_view pool_name,
   std::size_t offset,
-  ::iovec iov)
+  byte_span iov)
 {
   auto buffer = get_buffer().release();
 
@@ -317,7 +318,7 @@ void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
   if( 1 < option_DEBUG) {
     PMAJOR("SENDING Work_request: key=(%p=%.*s) value=%p value_len=%lu"
            " invocation_len=%lu detached_value=(%p,%lu) (%.*s) new=%d",
-           static_cast<const void *>(key),
+           common::p_fmt(key),
            int(key_len),
            key,
            value,

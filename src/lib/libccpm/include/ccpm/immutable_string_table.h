@@ -1,6 +1,7 @@
 #ifndef __NUPM_CCPM_STRING_TABLE_H__
 #define __NUPM_CCPM_STRING_TABLE_H__
 
+#include <common/byte_span.h>
 #include <string>
 #include <iterator>
 #include <ccpm/immutable_allocator.h>
@@ -16,6 +17,7 @@ template <class CharT = char>
 class Immutable_string_table :
     private Immutable_allocator_base
 {
+  using byte_span = common::byte_span;
 public:
   struct String_record
   {
@@ -32,7 +34,7 @@ public:
   //   bool operator!=(iterator other) const {return !(*this == other);}
   //   reference operator*() const {return num;}
   // };
-                                        
+
 public:
 #if 0
   Immutable_string_table(void * buffer, size_t buffer_size)
@@ -42,7 +44,6 @@ public:
   Immutable_string_table(region_vector_t regions, bool force_init)
     : Immutable_allocator_base(regions, ccpm::accept_all, force_init) {
   }
-  
 
   const char * add_string(const std::basic_string<CharT>& str)
   {
@@ -57,7 +58,7 @@ public:
 
     /* final write length to indicate string is fully written */
     record->length = str.size();
-    pmem_flush(&record->length, sizeof(record->length));    
+    pmem_flush(&record->length, sizeof(record->length));
     return dst;
   }
 
@@ -84,7 +85,7 @@ public:
     return result;
   }
 
-  inline void expand(::iovec region) {
+  inline void expand(byte_span region) {
     Immutable_allocator_base::expand(region);
   }
    

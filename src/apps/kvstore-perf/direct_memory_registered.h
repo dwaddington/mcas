@@ -35,7 +35,7 @@ template <typename T> /* register_direct_memory/unregister_direct_memory is in b
 			, _t(transport_)
 			, _r(_t->register_direct_memory(base_, len_))
 		{
-			CPLOG(2, "%s %p (%p:0x%zx)", __func__, static_cast<const void *>(_r), base_, len_);
+			CPLOG(2, "%s %p (%p:0x%zx)", __func__, common::p_fmt(_r), base_, len_);
 		}
 
 		direct_memory_registered(const direct_memory_registered &) = delete;
@@ -52,7 +52,7 @@ template <typename T> /* register_direct_memory/unregister_direct_memory is in b
 		{
 			if ( _t )
 			{
-				CPLOG(2, "%s %p", __func__, static_cast<const void *>(_r));
+				CPLOG(2, "%s %p", __func__, common::p_fmt(_r));
 				_t->unregister_direct_memory(_r);
 			}
 		}

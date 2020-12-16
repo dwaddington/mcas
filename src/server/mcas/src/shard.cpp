@@ -204,7 +204,7 @@ void Shard::thread_entry(const std::string &backend,
     PLOG("%s: bad mask parameter", __FILE__);
   }
 
-  CPLOG(2, "CPU_MASK: SHARD thread %p configured with cpu mask: [%s]", static_cast<void *>(this),
+  CPLOG(2, "CPU_MASK: SHARD thread %p configured with cpu mask: [%s]", common::p_fmt(this),
         mask.string_form().c_str());
 
   try {
@@ -310,14 +310,14 @@ void Shard::service_cluster_signals()
   while (_cluster_signal_queue.recv_message(cmsg)) {
 
     if(debug_level() > 1)
-      PMAJOR("Shard::Cluster (%p) got message !! (sender=%s,type=%s,content=%s)", static_cast<void *>(this),
+      PMAJOR("Shard::Cluster (%p) got message !! (sender=%s,type=%s,content=%s)", common::p_fmt(this),
              cmsg->_sender.c_str(), cmsg->_type.c_str(), cmsg->_content.c_str());
 
     assert(cmsg);
 
     /* if we have ADOs then forward to them */
     for (auto &proxy : _ado_map) {
-      CPLOG(2, "Sending cluster event to ADO (%p)...", static_cast<void *>(proxy.second));
+      CPLOG(2, "Sending cluster event to ADO (%p)...", common::p_fmt(proxy.second));
 
       proxy.second->send_cluster_event(cmsg->_sender, cmsg->_type, cmsg->_content);
     }
@@ -476,7 +476,7 @@ void Shard::main_loop(common::profiler &pr_)
             CPLOG(1, "Shard: closed pool handle %lx for connection close request", pool_id);
           }
 
-          if (debug_level() > 1) PMAJOR("Shard: closing connection %p", static_cast<const void *>(handler));
+          if (debug_level() > 1) PMAJOR("Shard: closing connection %p", common::p_fmt(handler));
           pending_close.push_back(handler);
         } // TICK_RESPONSE_CLOSE
 
@@ -564,7 +564,7 @@ void Shard::main_loop(common::profiler &pr_)
       /* process closures */
       for (auto &h : pending_close) {
         _handlers.erase(std::remove(_handlers.begin(), _handlers.end(), h), _handlers.end());
-        CPLOG(1, "Deleting handler (%p)", static_cast<const void *>(h));
+        CPLOG(1, "Deleting handler (%p)", common::p_fmt(h));
 
         assert(h);
         delete h;
@@ -581,7 +581,7 @@ void Shard::main_loop(common::profiler &pr_)
 
   close_all_ado();
 
-  PLOG("Shard (%p) exited", static_cast<const void *>(this));
+  PLOG("Shard (%p) exited", common::p_fmt(this));
 }
 
 void Shard::process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg)
@@ -654,10 +654,13 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
           nupm::region_descriptor regions;
           status_t             hr;
           if ((hr = _i_kvstore->get_pool_regions(pool, regions)) == S_OK) {
-            for (auto &r : regions.address_map) {
-              CPLOG(1, "region: %p %lu MiB", r.iov_base, REDUCE_MB(r.iov_len));
+            for (auto &r : regions.address_map()) {
+              CPLOG(1, "region: %p %lu MiB", ::base(r), REDUCE_MB(::size(r)));
               /* pre-register memory region with RDMA */
+#if 0
               handler->ondemand_register(r.iov_base, r.iov_len);
+#endif
+              handler->ondemand_register(common::make_const_byte_span(r));
             }
           }
           else {
@@ -670,7 +673,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
           pool_desc_t desc = {pool_name, msg->pool_size(), msg->flags(),
                               msg->expected_object_count(), false,
                               reinterpret_cast<void*>(msg->base_addr())};
-          
+
           conditional_bootstrap_ado_process(_i_kvstore.get(), handler, pool, ado, desc);
         }
         static unsigned count2 = 0;
@@ -1026,7 +1029,7 @@ void Shard::respond2(Connection_handler *handler_,
 /////////////////////
 void Shard::io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  CPLOG(2, "PUT_ADVANCE: (%p) key=(%.*s) value_len=%zu request_id=%lu", static_cast<const void *>(this),
+  CPLOG(2, "PUT_ADVANCE: (%p) key=(%.*s) value_len=%zu request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
 
   /* open memory */
@@ -1107,7 +1110,7 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
 /////////////////////
 void Shard::io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", static_cast<const void *>(this),
+  CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
 
   /* open memory */
@@ -1172,7 +1175,7 @@ void Shard::io_response_get_locate(Connection_handler *handler, const protocol::
 void Shard::io_response_get_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   auto target = reinterpret_cast<const void *>(msg->addr);
-  CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", static_cast<const void *>(this),
+  CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
         target, msg->request_id());
 
   int status = S_OK;
@@ -1191,7 +1194,7 @@ void Shard::io_response_get_release(Connection_handler *handler, const protocol:
 /////////////////////
 void Shard::io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  CPLOG(2, "PUT_LOCATE: (%p) key=(%.*s) value_len=0x%zu request_id=%lu", static_cast<const void *>(this),
+  CPLOG(2, "PUT_LOCATE: (%p) key=(%.*s) value_len=0x%zu request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
 
   /* open memory */
@@ -1268,7 +1271,7 @@ void Shard::io_response_put_locate(Connection_handler *handler, const protocol::
 void Shard::io_response_put_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   auto target = reinterpret_cast<const void *>(msg->addr);
-  CPLOG(2, "PUT_RELEASE: (%p) addr=(%p) request_id=%lu", static_cast<const void *>(this),
+  CPLOG(2, "PUT_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
         target, msg->request_id());
   int status = S_OK;
   try {
@@ -1294,7 +1297,7 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
   if (debug_level() > 2) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
-    PMAJOR("PUT: (%p) key=(%.*s) value=(%.*s ...) len=(%zu)", static_cast<const void *>(this), int(msg->key_len()),
+    PMAJOR("PUT: (%p) key=(%.*s) value=(%.*s ...) len=(%zu)", common::p_fmt(this), int(msg->key_len()),
            msg->key(), (min(int(msg->get_value_len()), 20)), msg->value(), msg->get_value_len());
 #pragma GCC diagnostic pop
   }
@@ -1333,7 +1336,7 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
 void Shard::io_response_get(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   if (debug_level() > 2)
-    PMAJOR("GET: (%p) (request=%lu,buffer_size=%zu) key=(%.*s) ", static_cast<const void *>(this), msg->request_id(),
+    PMAJOR("GET: (%p) (request=%lu,buffer_size=%zu) key=(%.*s) ", common::p_fmt(this), msg->request_id(),
            msg->get_value_len(), int(msg->key_len()), msg->key());
 
   if (msg->is_scbe()) {
@@ -1537,14 +1540,15 @@ void Shard::process_message_IO_request(Connection_handler *handler, const protoc
 
 namespace
 {
-std::vector<::iovec> region_breaks(const std::vector<::iovec> regions_)
+  using byte_span = common::byte_span;
+auto region_breaks(const std::vector<byte_span> regions_) -> std::vector<byte_span>
 {
-  std::vector<::iovec> region_breaks;
+  std::vector<byte_span> region_breaks;
 
   std::size_t offset = 0;
   for (const auto &i : regions_) {
-    offset += i.iov_len;
-    region_breaks.push_back(::iovec{i.iov_base, offset});
+    offset += ::size(i);
+    region_breaks.push_back(common::make_byte_span(::base(i), offset));
   }
 
   return region_breaks;
@@ -1553,26 +1557,26 @@ std::vector<::iovec> region_breaks(const std::vector<::iovec> regions_)
 
 auto Shard::offset_to_sg_list(
                               range<std::uint64_t> t
-                              , const std::vector<::iovec> &region_breaks_
+                              , const std::vector<byte_span> &region_breaks_
                               ) -> sg_result
 {
   CPLOG(2, "region break count %zu", region_breaks_.size());
   for (const auto &e : region_breaks_) {
-    CPLOG(2, "region break %p len 0x%zx", e.iov_base, e.iov_len);
+    CPLOG(2, "region break %p len 0x%zx", ::base(e), ::size(e));
   }
-  auto it_begin = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.first, [](const uint64_t a, const iovec &b) {
-                                                                                            return a < reinterpret_cast<std::uint64_t>(b.iov_base);
+  auto it_begin = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.first, [](const uint64_t a, const byte_span &b) {
+                                                                                            return a < reinterpret_cast<std::uint64_t>(::data(b));
                                                                                           });
-  auto it_end   = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.second, [](const uint64_t a, const iovec &b) {
-                                                                                             return a < reinterpret_cast<std::uint64_t>(b.iov_base);
+  auto it_end   = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.second, [](const uint64_t a, const byte_span &b) {
+                                                                                             return a < reinterpret_cast<std::uint64_t>(::data(b));
                                                                                            });
 
   CPLOG(2, "it_begin %zu it_end %zu", it_begin - region_breaks_.begin(), it_end - region_breaks_.begin());
 
   /* beginning and ending offsets, within the beginning and ending regions,
    * respectively */
-  auto begin_off = t.first - (it_begin == region_breaks_.begin() ? 0 : (it_begin - 1)->iov_len);
-  auto end_off   = t.second - (it_end == region_breaks_.begin() ? 0 : (it_end - 1)->iov_len);
+  auto begin_off = t.first - (it_begin == region_breaks_.begin() ? 0 : ::size(*(it_begin - 1)));
+  auto end_off   = t.second - (it_end == region_breaks_.begin() ? 0 : ::size(*(it_end - 1)));
 
   std::vector<::iovec> transfer;
   auto                 mr_low  = std::numeric_limits<std::uint64_t>::max();
@@ -1589,12 +1593,12 @@ auto Shard::offset_to_sg_list(
   /* Entries before the last */
   while (it_begin != it_end) {
     /* range to fetch must fit within a single region, This one does not. */
-    assert(it_begin->iov_base);
+    assert(::data(*it_begin));
 
-    CPLOG(2, "loop iov_base %p iov_len 0x%zx begin_off %zu", it_begin->iov_base, it_begin->iov_len, begin_off);
+    CPLOG(2, "loop iov_base %p iov_len 0x%zx begin_off %zu", ::base(*it_begin), ::size(*it_begin), begin_off);
 
-    const auto m_low  = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + begin_off;
-    const auto m_high = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + it_begin->iov_len;
+    const auto m_low  = reinterpret_cast<std::uint64_t>(::data(*it_begin) + begin_off);
+    const auto m_high = reinterpret_cast<std::uint64_t>(::data_end(*it_begin));
     mr_low            = std::min(mr_low, m_low);
     mr_high           = std::max(mr_high, m_high);
 
@@ -1606,14 +1610,14 @@ auto Shard::offset_to_sg_list(
   }
 
   /* last entry */
-  assert(it_begin->iov_base);
+  assert(::base(*it_begin));
 
-  CPLOG(2, "final iov_base %p iov_len 0x%zx begin_off %zu", it_begin->iov_base, it_begin->iov_len, begin_off);
+  CPLOG(2, "final iov_base %p iov_len 0x%zx begin_off %zu", ::base(*it_begin), ::size(*it_begin), begin_off);
 
-  auto m_low = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + begin_off;
+  auto m_low = reinterpret_cast<std::uint64_t>(::data(*it_begin) + begin_off);
   /* end of last element, not to exceed the pools memory element */
-  auto excess_length = it_begin->iov_len < end_off ? end_off - it_begin->iov_len : 0;
-  auto m_high        = reinterpret_cast<std::uint64_t>(it_begin->iov_base) + end_off - excess_length;
+  auto excess_length = ::size(*it_begin) < end_off ? end_off - ::size(*it_begin) : 0;
+  auto m_high        = reinterpret_cast<std::uint64_t>(::data(*it_begin) + end_off - excess_length);
   mr_low             = std::min(mr_low, m_low);
   mr_high            = std::max(mr_high, m_high);
 
@@ -1630,14 +1634,14 @@ auto Shard::offset_to_sg_list(
 void Shard::io_response_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
-  CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", static_cast<const void *>(this), msg->get_offset(),
+  CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", common::p_fmt(this), msg->get_offset(),
         msg->get_size(), msg->request_id());
 
   nupm::region_descriptor regions;
   auto status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
-  
+
   if (status == S_OK) {
-    const auto rb = region_breaks(regions.address_map);
+    const auto rb = region_breaks(regions.address_map());
     auto sgr = offset_to_sg_list(t, rb);
     /* Register the entire range */
     std::uint64_t key = 0;
@@ -1659,7 +1663,7 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
     auto response = respond1(handler, iob, msg, status);
     if ( status == S_OK )
       {
-        response->copy_in_data(&*sgr.sg_list.begin(), sgr.sg_list.size() * sizeof *sgr.sg_list.begin());
+        response->copy_in_data(&sgr.sg_list.front(), sgr.sg_list.size() * sizeof *sgr.sg_list.begin());
         iob->set_length(response->msg_len());
         response->key = key;
         handler->post_send_buffer(iob, response, __func__);
@@ -1683,7 +1687,7 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
 void Shard::io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
-  CPLOG(2, "RELEASE: (%p) offset 0x%zx size %zu request_id=%lu", static_cast<const void *>(this), t.first,
+  CPLOG(2, "RELEASE: (%p) offset 0x%zx size %zu request_id=%lu", common::p_fmt(this), t.first,
         msg->get_size(), msg->request_id());
 
   int status = S_OK;
@@ -1691,7 +1695,7 @@ void Shard::io_response_release(Connection_handler *handler, const protocol::Mes
     release_space_shared(t);
   }
   catch (const Logic_exception &e) {
-    CPLOG(2, "%s: RELEASE: (%p) [0x%" PRIx64 "..0x%" PRIx64 ") error %s", __func__, static_cast<const void *>(this),
+    CPLOG(2, "%s: RELEASE: (%p) [0x%" PRIx64 "..0x%" PRIx64 ") error %s", __func__, common::p_fmt(this),
           t.first, t.second, e.cause());
     status = E_INVAL;
   }
@@ -1705,14 +1709,14 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
 {
   const char *tag = "RELEASE_WITH_FLUSH";
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
-  CPLOG(2, "%s: (%p) offset 0x%zx size %zu request_id=%lu", tag, static_cast<const void *>(this), t.first,
+  CPLOG(2, "%s: (%p) offset 0x%zx size %zu request_id=%lu", tag, common::p_fmt(this), t.first,
         msg->get_size(), msg->request_id());
 
   nupm::region_descriptor regions;
   auto status = _i_kvstore->get_pool_regions(msg->pool_id(), regions);
   
   if (status == S_OK) {
-    const auto rb = region_breaks(regions.address_map);
+    const auto rb = region_breaks(regions.address_map());
 
     auto sgr = offset_to_sg_list(t, rb);
     try {
@@ -1728,7 +1732,7 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
       release_space_shared(t);
     }
     catch (const Logic_exception &e) {
-      CPLOG(2, "%s: %s: (%p) [0x%" PRIx64 "..0x%" PRIx64 ") error %s", tag, __func__, static_cast<const void *>(this),
+      CPLOG(2, "%s: %s: (%p) [0x%" PRIx64 "..0x%" PRIx64 ") error %s", tag, __func__, common::p_fmt(this),
             t.first, t.second, e.cause());
       status = E_INVAL;
     }
@@ -1905,7 +1909,7 @@ void Shard::check_for_new_connections()
   static int connections = 1;
   while ((handler = get_new_connection()) != nullptr) {
     if (debug_level() > 1 || true) PMAJOR("Shard: processing new connection (%p) total %d",
-                                          static_cast<const void *>(handler), connections);
+                                          common::p_fmt(handler), connections);
     connections++;
     _handlers.push_back(handler);
   }
