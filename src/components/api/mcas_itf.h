@@ -127,22 +127,25 @@ public:
 
   using ado_flags_t = uint32_t;
 
-  static constexpr ado_flags_t ADO_FLAG_NONE = 0x0;
+  static constexpr ado_flags_t ADO_FLAG_NONE = 0;
   /*< operation is asynchronous */
-  static constexpr ado_flags_t ADO_FLAG_ASYNC = 0x1;
+  static constexpr ado_flags_t ADO_FLAG_ASYNC = (1 << 0);
   /*< create KV pair if needed */
-  static constexpr ado_flags_t ADO_FLAG_CREATE_ON_DEMAND = 0x2;
+  static constexpr ado_flags_t ADO_FLAG_CREATE_ON_DEMAND = (1 << 1);
   /*< create only - allocate key,value but don't call ADO */
-  static constexpr ado_flags_t ADO_FLAG_CREATE_ONLY = 0x4;
+  static constexpr ado_flags_t ADO_FLAG_CREATE_ONLY = (1 << 2);
   /*< do not overwrite value if it already exists */
-  static constexpr ado_flags_t ADO_FLAG_NO_OVERWRITE = 0x8;
+  static constexpr ado_flags_t ADO_FLAG_NO_OVERWRITE = (1 << 3);
   /*< create value but do not attach to key, unless key does not exist */
-  static constexpr ado_flags_t ADO_FLAG_DETACHED = 0x10;
+  static constexpr ado_flags_t ADO_FLAG_DETACHED = (1 << 4);
   /*< only take read lock */
-  static constexpr ado_flags_t ADO_FLAG_READ_ONLY = 0x20;
+  static constexpr ado_flags_t ADO_FLAG_READ_ONLY = (1 << 5);
   /*< zero any newly allocated value memory */
-  static constexpr ado_flags_t ADO_FLAG_ZERO_NEW_VALUE = 0x40;
-  
+  static constexpr ado_flags_t ADO_FLAG_ZERO_NEW_VALUE = (1 << 6);
+  /*< internal use only: on return provide IO response */
+  static constexpr ado_flags_t ADO_FLAG_INTERNAL_IO_RESPONSE = (1 << 7);
+  /*< internal use only: on return provide IO response with value buffer */
+  static constexpr ado_flags_t ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE = (1 << 8);
 
 public:
   /**

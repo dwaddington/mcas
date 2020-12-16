@@ -1,14 +1,14 @@
 /*
-   Copyright [2019,2020] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2019,2020] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 /*
@@ -56,11 +56,11 @@ enum class ADO_op {
   FREE_POOL_MEMORY = 7,
   SHUTDOWN = 8,
   POOL_DELETE = 9,
-};
+};  
 
-#define MDECL(X)  \
-  case ADO_op::X: \
-    return #X;
+#define MDECL(X)                                \
+  case ADO_op::X:                               \
+  return #X;
 
 inline std::string to_str(ADO_op op)
 {
@@ -75,8 +75,8 @@ inline std::string to_str(ADO_op op)
     MDECL(FREE_POOL_MEMORY);
     MDECL(SHUTDOWN);
     MDECL(POOL_DELETE);
-    default:
-      return "UNKNOWN";
+  default:
+    return "UNKNOWN";
   }
 }
 
@@ -87,7 +87,7 @@ inline std::string to_str(ADO_op op)
  *
  */
 class IADO_plugin : public component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xacb20ef2,0xe796,0x4619,0x845d,0x4e,0x8e,0x6b,0x5c,0x35,0xaa);
   // clang-format on
@@ -109,10 +109,10 @@ class IADO_plugin : public component::IBase {
 
     enum class alloc_type_t : std::uint32_t {
       POOL         = 0,
-      MALLOC       = 1,
-      INLINE       = 3,
-      POOL_TO_FREE = 4, /* buffer is pool memory which should be freed */
-    };
+        MALLOC       = 1,
+        INLINE       = 3,
+        POOL_TO_FREE = 4, /* buffer is pool memory which should be freed */
+        };
 
   public:
     response_buffer_t(const response_buffer_t &) = delete;
@@ -147,14 +147,14 @@ class IADO_plugin : public component::IBase {
       , _alloc_type(other._alloc_type)
     {
       switch (_alloc_type)
-      {
-      case alloc_type_t::INLINE:
-        addr = other.addr;
-        break;
-      default:
-        ptr = other.ptr;
-        break;
-      }
+        {
+        case alloc_type_t::INLINE:
+          addr = other.addr;
+          break;
+        default:
+          ptr = other.ptr;
+          break;
+        }
       other.ptr = nullptr; /* safety */
     }
 
@@ -164,14 +164,14 @@ class IADO_plugin : public component::IBase {
       layer_id = other.layer_id;
       _alloc_type = other._alloc_type;
       switch (_alloc_type)
-      {
-      case alloc_type_t::INLINE:
-        addr = other.addr;
-        break;
-      default:
-        ptr = other.ptr;
-        break;
-      }
+        {
+        case alloc_type_t::INLINE:
+          addr = other.addr;
+          break;
+        default:
+          ptr = other.ptr;
+          break;
+        }
       other.ptr = nullptr;
       return *this;
     }
@@ -210,7 +210,7 @@ class IADO_plugin : public component::IBase {
   private:
     using base = std::vector<response_buffer_t>;
     using base::push_back; /* If code uses this, change it to use emplace_back */
-   public:
+  public:
     using base::begin;
     using base::end;
     using base::emplace_back;
@@ -228,7 +228,7 @@ class IADO_plugin : public component::IBase {
     inline void append(void* ptr, size_t len) { push_back({ptr, len}); }
   };
 
- public:
+public:
   IADO_plugin() : _cb{} {}
 
   /**
@@ -362,20 +362,20 @@ class IADO_plugin : public component::IBase {
   /* Reference vector holds pointer to value memory held key-ptr,
      key-size, val-ptr, val-size for all pairs */
   class Reference_vector {
-   public:
+  public:
     Reference_vector(const Reference_vector& src)
-        : _count(src._count), _value_memory_array(src._value_memory_array), _value_memory_size(src._value_memory_size)
+      : _count(src._count), _value_memory_array(src._value_memory_array), _value_memory_size(src._value_memory_size)
     {
     }
 
     Reference_vector(const size_t count, kv_reference_t* value_memory_array, const size_t value_memory_size)
-        : _count(count), _value_memory_array(value_memory_array), _value_memory_size(value_memory_size)
+      : _count(count), _value_memory_array(value_memory_array), _value_memory_size(value_memory_size)
     {
     }
 
     Reference_vector(const size_t count, void* value_memory_array, const size_t value_memory_size)
-        : _count(count), _value_memory_array(static_cast<kv_reference_t*>(value_memory_array)),
-          _value_memory_size(value_memory_size)
+      : _count(count), _value_memory_array(static_cast<kv_reference_t*>(value_memory_array)),
+        _value_memory_size(value_memory_size)
     {
     }
 
@@ -393,7 +393,7 @@ class IADO_plugin : public component::IBase {
     inline size_t                count() const { return _count; }
     inline void*                 value_memory() const { return static_cast<void*>(_value_memory_array); }
 
-   private:
+  private:
     size_t          _count;
     kv_reference_t* _value_memory_array;
     size_t          _value_memory_size;
@@ -424,7 +424,7 @@ class IADO_plugin : public component::IBase {
                            void*&                      out_value_addr,
                            const char**                out_key_ptr,
                            component::IKVStore::key_t* out_key_handle)>
-        create_key;
+    create_key;
 
     /**
      * Open existing key-value pair. Implicitly take a lock (default releases at
@@ -450,7 +450,7 @@ class IADO_plugin : public component::IBase {
                            size_t&                     out_value_len,
                            const char**                out_key_ptr,
                            component::IKVStore::key_t* out_key_handle)>
-       open_key;
+    open_key;
 
     /**
      * Erase existing key-value pair from store and index
@@ -460,7 +460,7 @@ class IADO_plugin : public component::IBase {
      * @return : S_OK, E_INVAL or result from IKVStore::erase
      **/
     std::function<status_t(const std::string& key_name)>
-        erase_key;
+    erase_key;
 
     /**
      * Resize existing value (may perform memcpy)
@@ -477,7 +477,7 @@ class IADO_plugin : public component::IBase {
                            const std::string& key_name,
                            const size_t       new_value_size,
                            void*&             out_new_value_addr)>
-        resize_value;
+    resize_value;
 
     /**
      * Allocate pool memory. Memory is not attached to key.
@@ -491,7 +491,7 @@ class IADO_plugin : public component::IBase {
     std::function<status_t(const size_t size,
                            const size_t alignment_hint,
                            void*& out_new_addr)>
-        allocate_pool_memory;
+    allocate_pool_memory;
 
     /**
      * Free pool memory. Memory should not be referenced/attached.
@@ -502,7 +502,7 @@ class IADO_plugin : public component::IBase {
      * @return : S_OK, or result from IKVStore::free_pool_memory
      **/
     std::function<status_t(const size_t size, const void* addr)>
-        free_pool_memory;
+    free_pool_memory;
 
     /**
      * Get vector of all key-value references.  Optionally filter based on
@@ -519,7 +519,7 @@ class IADO_plugin : public component::IBase {
     std::function<status_t(const common::epoch_time_t t_begin,
                            const common::epoch_time_t t_end,
                            Reference_vector& out_vector)>
-        get_reference_vector;
+    get_reference_vector;
 
     /**
      * Scan for key (requires index configured)
@@ -539,7 +539,7 @@ class IADO_plugin : public component::IBase {
                            const IKVIndex::find_t find_type,
                            offset_t&              out_matched_position,
                            std::string&           out_matched_key)>
-        find_key;
+    find_key;
 
     /**
      * Get pool information, e.g., size, flags, expected_obj_count.
@@ -552,7 +552,7 @@ class IADO_plugin : public component::IBase {
      * @return : S_OK or E_FAIL
      */
     std::function<status_t(std::string& out_result)>
-        get_pool_info;
+    get_pool_info;
 
     /**
      * Iterate on pool key-value pairs
@@ -571,7 +571,7 @@ class IADO_plugin : public component::IBase {
                            const common::epoch_time_t             t_end,
                            component::IKVStore::pool_iterator_t&  iterator,
                            component::IKVStore::pool_reference_t& reference)>
-        iterate;
+    iterate;
 
     /**
      * Explicitly unlock a key-value pair
@@ -583,7 +583,7 @@ class IADO_plugin : public component::IBase {
      */
     std::function<status_t(const uint64_t work_id,
                            const component::IKVStore::key_t key_handle)>
-        unlock;
+    unlock;
 
 
     /**
@@ -592,11 +592,11 @@ class IADO_plugin : public component::IBase {
      * IADO_plugin::CONFIG_SHARD_DEC_REF)
      */
     std::function<status_t(const uint64_t option)>
-        configure;
+    configure;
   };
 
   /**------------------------------------------------------------------------------
-       Call back API wrappers
+     Call back API wrappers
      ------------------------------------------------------------------------------
   */
   inline status_t cb_create_key(const uint64_t              work_id,
@@ -628,7 +628,7 @@ class IADO_plugin : public component::IBase {
                               size_t&                     out_value_len,
                               const char**                out_key_ptr    = nullptr,
                               component::IKVStore::key_t* out_key_handle = nullptr)
-{
+  {
     return _cb.open_key(work_id, key_name, 0, out_value_addr, out_value_len, out_key_ptr, out_key_handle);
   }
 
@@ -710,7 +710,7 @@ class IADO_plugin : public component::IBase {
    */
   virtual status_t shutdown() = 0;
 
- protected:
+protected:
   IADO_plugin::Callback_table _cb; /*< callback functions */
 };
 
@@ -720,7 +720,7 @@ class IADO_plugin : public component::IBase {
  *
  */
 class IADO_proxy : public component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xbbbfa389,0x1665,0x4e5b,0xa1b1,0x3c,0xff,0x4a,0x5e,0xe2,0x63);
   // clang-format on
@@ -740,7 +740,7 @@ class IADO_proxy : public component::IBase {
   virtual status_t bootstrap_ado(bool opened_existing) = 0;
 
   /**
-   * Send operation to ADO
+   * Send operation to ADO. Op events will be acknowledged with a response.
    *
    * @return S_OK on success
    */
@@ -748,7 +748,7 @@ class IADO_proxy : public component::IBase {
 
 
   /**
-   * Send a clustering event to ADO
+   * Send a clustering event to ADO. ADO will not give any response back.
    *
    * @param sender Sender UUID
    * @param type Type/command
@@ -757,8 +757,8 @@ class IADO_proxy : public component::IBase {
    * @return S_OK on success
    */
   virtual status_t send_cluster_event(const std::string& sender,
-				      const std::string& type,
-				      const std::string& content) = 0;
+                                      const std::string& type,
+                                      const std::string& content) = 0;
 
   /**
    * Send a memory map request to ADO
@@ -942,8 +942,9 @@ class IADO_proxy : public component::IBase {
    *
    * @param status Status code
    *
+   * @return S_OK or E_FULL
    */
-  virtual void send_unlock_response(const status_t status) = 0;
+  virtual status_t send_unlock_response(const status_t status) = 0;
 
 
   /**
@@ -957,9 +958,11 @@ class IADO_proxy : public component::IBase {
   /**
    * @brief      Send configure response
    *
-   * @param[in]  status Status code
+   * @param[in]  status Status code      
+   *
+   * @return S_OK or E_FULL
    */
-  virtual void send_configure_response(const status_t status) =  0;
+  virtual status_t send_configure_response(const status_t status) = 0;
 
   /**
    * Send response to ADO for table operation
@@ -970,12 +973,13 @@ class IADO_proxy : public component::IBase {
    * @param key_ptr [out] Reference to key
    * @param key_handle [out] Key handle for unlocking explicitly
    *
+   * @return S_OK or E_FULL
    */
-  virtual void send_table_op_response(const status_t             status,
-                                      const void*                value_addr     = nullptr,
-                                      size_t                     value_len      = 0,
-                                      const char*                key_ptr        = nullptr,
-                                      component::IKVStore::key_t out_key_handle = nullptr) = 0;
+  virtual status_t send_table_op_response(const status_t             status,
+                                          const void*                value_addr     = nullptr,
+                                          size_t                     value_len      = 0,
+                                          const char*                key_ptr        = nullptr,
+                                          component::IKVStore::key_t out_key_handle = nullptr) = 0;
 
   /**
    * Send response to ADO for index operation
@@ -984,10 +988,11 @@ class IADO_proxy : public component::IBase {
    * @param matched_position Offset of the match
    * @param matched_key Key of the match
    *
+   * @return S_OK or E_FULL
    */
-  virtual void send_find_index_response(const status_t     status,
-                                        const offset_t     matched_position,
-                                        const std::string& matched_key) = 0;
+  virtual status_t send_find_index_response(const status_t     status,
+                                            const offset_t     matched_position,
+                                            const std::string& matched_key) = 0;
 
   /**
    * Send a vector of key-value pointers
@@ -995,8 +1000,9 @@ class IADO_proxy : public component::IBase {
    * @param status Status code
    * @param rv Reference vector
    *
+   * @return S_OK or E_FULL
    */
-  virtual void send_vector_response(const status_t status, const IADO_plugin::Reference_vector& rv) = 0;
+  virtual status_t send_vector_response(const status_t status, const IADO_plugin::Reference_vector& rv) = 0;
 
   /**
    * Send iteration response
@@ -1004,16 +1010,19 @@ class IADO_proxy : public component::IBase {
    * @param status Status code
    * @param iterator Iterator handle (updated)
    * @param reference Reference result
+   *
+   * @return S_OK or E_FULL
    */
-  virtual void send_iterate_response(const status_t                              status,
-                                     const component::IKVStore::pool_iterator_t  iterator,
-                                     const component::IKVStore::pool_reference_t reference) = 0;
+  virtual status_t send_iterate_response(const status_t                              status,
+                                         const component::IKVStore::pool_iterator_t  iterator,
+                                         const component::IKVStore::pool_reference_t reference) = 0;
 
   /**
    * Send a pool info response
    *
+   * @return S_OK or E_FULL
    */
-  virtual void send_pool_info_response(const status_t status, const std::string& info) = 0;
+  virtual status_t send_pool_info_response(const status_t status, const std::string& info) = 0;
 
   /**
    * Indicate whether ADO has shutdown
@@ -1120,7 +1129,7 @@ class IADO_proxy : public component::IBase {
  * processes.
  */
 class IADO_manager_proxy : public component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xaaafa389,0x1665,0x4e5b,0xa1b1,0x3c,0xff,0x4a,0x5e,0xe2,0x63);
   // clang-format on
@@ -1145,7 +1154,7 @@ class IADO_manager_proxy : public component::IBase {
    * destroy.
    */
   virtual IADO_proxy* create(const uint64_t              auth_id,
-			     const unsigned              debug_level,
+                             const unsigned              debug_level,
                              component::IKVStore*        itf,
                              component::IKVStore::pool_t pool_id,
                              const std::string&          pool_name,
@@ -1177,7 +1186,7 @@ class IADO_manager_proxy : public component::IBase {
 };
 
 class IADO_manager_proxy_factory : public component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xfacfa389,0x1665,0x4e5b,0xa1b1,0x3c,0xff,0x4a,0x5e,0xe2,0x63);
   // clang-format on
@@ -1186,13 +1195,13 @@ class IADO_manager_proxy_factory : public component::IBase {
 };
 
 class IADO_proxy_factory : public component::IBase {
- public:
+public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xfacbb389,0x1665,0x4e5b,0xa1b1,0x3c,0xff,0x4a,0x5e,0xe2,0x63);
   // clang-format on
 
   virtual IADO_proxy* create(const uint64_t              auth_id,
-			     const unsigned              debug_level,
+                             const unsigned              debug_level,
                              component::IKVStore*        itf,
                              component::IKVStore::pool_t pool_id,
                              const std::string&          pool_name,

@@ -74,7 +74,6 @@ using Shard_transport = Fabric_transport;
 class Shard : public Shard_transport, private common::log_source {
  private:
   static constexpr size_t TWO_STAGE_THRESHOLD = KiB(8); /* above this two stage protocol is used */
-
   static constexpr const char *const _cname = "Shard";
 
  private:
@@ -123,16 +122,16 @@ class Shard : public Shard_transport, private common::log_source {
     unsigned int flags;
     size_t       expected_obj_count;
     bool         opened_existing;
-    void *       base_addr;
+    void*        base_addr;
   };
 
   using pool_t              = component::IKVStore::pool_t;
   using buffer_t            = Shard_transport::buffer_t;
   using index_map_t         = std::unordered_map<pool_t, component::Itf_ref<component::IKVIndex>>;
-  using locked_value_map_t  = std::unordered_map<const void *, lock_info_t>;
+  using locked_value_map_t  = std::unordered_map<const void* , lock_info_t>;
   using spaces_shared_map_t = std::map<range<std::uint64_t>, space_lock_info_t>;
-  using rename_map_t        = std::unordered_map<const void *, rename_info_t>;
-  using task_list_t         = std::list<Shard_task *>;
+  using rename_map_t        = std::unordered_map<const void* , rename_info_t>;
+  using task_list_t         = std::list<Shard_task* >;
 
  public:
   using string_view = std::experimental::string_view;
@@ -153,10 +152,10 @@ class Shard : public Shard_transport, private common::log_source {
   inline void get_future() { return _thread.get(); }
   inline bool exiting() const { return _thread_exit; }
 
-  inline void signal_exit()
+  inline void signal_exit() /*< signal main loop to exit */
   {
     _thread_exit = true;
-  } /*< signal main loop to exit */
+  } 
 
   inline void send_cluster_event(const std::string &sender, const std::string &type, const std::string &content)
   {
@@ -193,6 +192,17 @@ class Shard : public Shard_transport, private common::log_source {
   void add_pending_rename(const pool_t pool_id, const void *target, const std::string &from, const std::string &to);
   void release_pending_rename(const void *target);
 
+  inline void add_target_keyname(const void *target, const std::string& skey) {
+    _target_keyname_map[target] = skey;
+  }
+
+  inline std::string release_target_keyname(const void *target) {
+    auto r = _target_keyname_map[target];
+    _target_keyname_map.erase(target);
+    return r;
+  }
+
+
   void initialize_components(const std::string &backend,
                              const std::string &index,
                              const std::string &dax_config,
@@ -204,9 +214,16 @@ class Shard : public Shard_transport, private common::log_source {
 
   void main_loop(common::profiler &);
 
+  /* message processing functions */
   void process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg);
-
   void process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg);
+  void process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
+  void process_ado_request(Connection_handler *handler, const protocol::Message_ado_request *msg);
+  void process_put_ado_request(Connection_handler *handler, const protocol::Message_put_ado_request *msg);
+  void process_messages_from_ado();
+  status_t process_configure(const protocol::Message_IO_request *msg);
+
+  /* response handling functions */
   void io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_put_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
@@ -220,31 +237,37 @@ class Shard : public Shard_transport, private common::log_source {
   void io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_release_with_flush(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
 
-  void process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
-  void process_ado_request(Connection_handler *handler, const protocol::Message_ado_request *msg);
-  void process_put_ado_request(Connection_handler *handler, const protocol::Message_put_ado_request *msg);
-
-  void process_messages_from_ado();
   void close_all_ado();
-
-  status_t process_configure(const protocol::Message_IO_request *msg);
 
   void process_tasks(unsigned &idle);
 
   void service_cluster_signals();
+  
+  void signal_ado(const char * tag,
+                  Connection_handler * handler,
+                  const uint64_t client_request_id,
+                  const component::IKVStore::pool_t pool,
+                  const std::string& key,
+                  const component::IKVStore::lock_type_t lock_type,
+                  const bool is_get_response = false);
 
-  static auto respond1(
-    const Connection_handler *           handler_,
-    buffer_t                           * iob_,
-    const protocol::Message_IO_request * msg_,
-    int                                  status_) -> protocol::Message_IO_response *;
-
-  static void respond2(Connection_handler * handler,
-    buffer_t                           * iob,
-    const protocol::Message_IO_request * msg,
-    int                                  status,
-    const char *                         func);
-
+  void signal_ado_async_nolock(const char * tag,
+                               Connection_handler * handler,
+                               const uint64_t client_request_id,
+                               const component::IKVStore::pool_t pool,
+                               const std::string& key);
+                        
+  static protocol::Message_IO_response * prepare_response(const Connection_handler *           handler_,
+                                                          buffer_t *                           iob_,
+                                                          uint64_t                             request_id,
+                                                          int                                  status_);
+  
+  static void respond(Connection_handler *                 handler,
+                      buffer_t *                           iob,
+                      const protocol::Message_IO_request * msg,
+                      int                                  status,
+                      const char *                         func);
+  
   component::IKVIndex *lookup_index(const pool_t pool_id)
   {
     if (_index_map) {
@@ -284,7 +307,15 @@ class Shard : public Shard_transport, private common::log_source {
     , const std::vector<::iovec> &region_breaks
   ) -> sg_result;
 
-  inline bool ado_enabled() const { return (_i_ado_mgr && _ado_plugins.size() > 0); }
+  inline bool ado_enabled() const { return (_i_ado_mgr && (_ado_plugins.size() > 0)); }
+
+  /* ADO signalling helpers */
+  inline bool ado_signal_enabled() const { return ado_enabled() && (_ado_signal_mask != Ado_signal::NONE); }
+  inline bool ado_signal_post_put() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT); }
+  inline bool ado_signal_post_put_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT_DIRECT); }
+  inline bool ado_signal_post_get() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_GET); }
+  inline bool ado_signal_post_get_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_GET_DIRECT); }  
+  inline bool ado_signal_post_erase() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_ERASE); }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }
 
@@ -330,7 +361,7 @@ class Shard : public Shard_transport, private common::log_source {
 
   class Work_request_allocator {
    private:
-    static constexpr size_t       NUM_ELEMENTS = WORK_REQUEST_ALLOCATOR_COUNT;
+    static constexpr size_t NUM_ELEMENTS = WORK_REQUEST_ALLOCATOR_COUNT;
     std::vector<work_request_t *> _free;
     /* "_all" apparently exists only to own the work_request_t elements */
     std::vector<std::unique_ptr<work_request_t>> _all;
@@ -364,7 +395,8 @@ class Shard : public Shard_transport, private common::log_source {
   } _wr_allocator;
 
   using ado_pool_map_t =
-      std::unordered_map<component::IKVStore::pool_t, std::pair<component::IADO_proxy *, Connection_handler *>>;
+      std::unordered_map<component::IKVStore::pool_t,
+                         std::pair<component::IADO_proxy *, Connection_handler *>>;
 
   using work_request_key_t = uint64_t;
 
@@ -390,6 +422,7 @@ class Shard : public Shard_transport, private common::log_source {
   std::vector<Connection_handler *>                 _handlers;
   locked_value_map_t                                _locked_values_shared;
   locked_value_map_t                                _locked_values_exclusive;
+  std::map<const void*, std::string>                _target_keyname_map;
   spaces_shared_map_t                               _spaces_shared;
   rename_map_t                                      _pending_renames;
   task_list_t                                       _tasks; /*< list of deferred tasks */
@@ -398,6 +431,7 @@ class Shard : public Shard_transport, private common::log_source {
   const std::string                                 _ado_path;
   std::vector<std::string>                          _ado_plugins;
   std::map<std::string, std::string>                _ado_params;
+  Ado_signal                                        _ado_signal_mask = Ado_signal::NONE;  
   Shard_security                                    _security;
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;

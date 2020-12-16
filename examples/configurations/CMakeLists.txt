@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 
-configure_file(example-mapstore-ado0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-mapstore-ado0.conf)
-configure_file(example-hstore-devdax-secure-0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-hstore-devdax-secure-0.conf)
-configure_file(example-mapstore-rust-ado.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-mapstore-rust-ado.conf)
-configure_file(example-hstore-rust-ado.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-hstore-rust-ado.conf)
-configure_file(example-mapstore-adotest0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-mapstore-adotest0.conf)
+file(GLOB files "*.conf.in")
+foreach(file ${files})
+  get_filename_component(BASEFILE ${file} NAME)
+  get_filename_component(TARGETFILE ${file} NAME_WE)
+  configure_file(${BASEFILE} ${TARGETFILE}.conf)
+endforeach()
 
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/
   DESTINATION conf

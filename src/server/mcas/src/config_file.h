@@ -60,11 +60,40 @@ static constexpr const char *cert_path = "cert_path";
 static constexpr const char *key_path = "key_path";
 static constexpr const char *security_mode = "security_mode";
 static constexpr const char *security_port = "security_port";
-
 }
 
 namespace mcas
 {
+/** 
+ * Type used to define ADO signal filters
+ */
+enum class Ado_signal : unsigned long
+  {
+   NONE            = (1UL << 0),
+   POST_ERASE      = (1UL << 1),
+   POST_PUT        = (1UL << 2),
+   POST_GET        = (1UL << 3),
+   POST_PUT_DIRECT = (1UL << 4),
+   POST_GET_DIRECT = (1UL << 5),
+  };
+
+inline bool operator& (const Ado_signal src, Ado_signal tgt) {
+  return (static_cast<unsigned long>(tgt) & static_cast<unsigned long>(src));
+}
+
+inline Ado_signal& operator|= (Ado_signal& tgt, const Ado_signal src) {
+  tgt = static_cast<Ado_signal>(static_cast<unsigned long>(tgt) | static_cast<unsigned long>(src));
+  return tgt;
+}
+
+static constexpr const char * Ado_signal_POST_ERASE = "post-erase";
+static constexpr const char * Ado_signal_POST_PUT = "post-put";
+static constexpr const char * Ado_signal_POST_GET = "post-get";
+static constexpr const char * Ado_signal_POST_PUT_DIRECT = "post-put-direct";
+static constexpr const char * Ado_signal_POST_GET_DIRECT = "post-get-direct";
+
+
+
 class Config_file : private common::log_source
 {
 public:
@@ -99,6 +128,8 @@ public:
   const boost::optional<std::string> &get_ado_path() const { return _ado_path; };
 
   std::vector<std::string> get_shard_ado_plugins(rapidjson::SizeType i) const;
+
+  Ado_signal get_shard_ado_signals(rapidjson::SizeType i) const;
 
   std::map<std::string, std::string> get_shard_ado_params(rapidjson::SizeType i) const;
 

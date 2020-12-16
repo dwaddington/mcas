@@ -43,7 +43,7 @@ using buffer_space_dedicated_ptr_t = ado_protocol_buffer::space_dedicated_ptr_t;
  *
  */
 
-class ADO_protocol_builder
+class ADO_protocol_builder : common::log_source
 {
 public:
   static constexpr size_t MAX_MESSAGE_SIZE  = MB(2); //4096;
@@ -54,9 +54,6 @@ public:
   static_assert(MAX_MESSAGE_SIZE > 64, "MAX_MESSAGE_SIZE too small");
 
   using string_view = std::experimental::string_view;
-
-private:
-  const unsigned option_DEBUG = 0;
 
 private:
   ADO_protocol_builder(const ADO_protocol_builder &) = delete;
@@ -82,12 +79,9 @@ private:
     return buffer_space_shared_ptr_t(p, channel_t(_channel));
   }
 
-  inline void send(void * buffer)
+  inline status_t send(void * buffer)
   {
-    while ( ::uipc_send(_channel, buffer) != S_OK )
-    {
-      cpu_relax();
-    }
+    return ::uipc_send(_channel, buffer);
   }
 
   inline status_t recv(channel_t ch, Buffer_header *& out_buffer) __attribute__((warn_unused_result))
@@ -117,7 +111,7 @@ public:
 
   status_t recv_bootstrap_response();
 
-  void send_bootstrap(const uint64_t auth_id,
+  status_t send_bootstrap(const uint64_t auth_id,
                       const std::string& pool_name,
                       const size_t pool_size,
                       const unsigned int pool_flags,
@@ -125,33 +119,33 @@ public:
                       const uint64_t expected_obj_count,
                       const bool open_existing);
 
-  void send_bootstrap_response();
+  status_t send_bootstrap_response();
 
-  void send_op_event(component::ADO_op event);
+  status_t send_op_event(component::ADO_op event);
 
-  void send_op_event_response(component::ADO_op event);
+  status_t send_op_event_response(component::ADO_op event);
 
-  void send_cluster_event(const std::string& sender,
+  status_t send_cluster_event(const std::string& sender,
 			  const std::string& type,
 			  const std::string& content);
 
-  void send_shutdown();
+  status_t send_shutdown();
 
-  void send_shutdown_to_shard();
+  status_t send_shutdown_to_shard();
 
   /* shard-side, must not block */
-  void send_memory_map(uint64_t token,
+  status_t send_memory_map(uint64_t token,
                        size_t size,
                        void * value_vaddr);
 
   /* shard-side, must not block */
-  void send_memory_map_named(unsigned region,
+  status_t send_memory_map_named(unsigned region,
                        string_view pool_name,
                        std::size_t offset,
                        ::iovec iov);
 
   /* shard-side, must not block */
-  void send_work_request(const uint64_t work_request_key,
+  status_t send_work_request(const uint64_t work_request_key,
                          const char * key,
                          const size_t key_len,
                          const void * value,
@@ -162,7 +156,7 @@ public:
                          const size_t invocation_data_len,
                          const bool new_root);
 
-  void send_work_response(status_t status,
+  status_t send_work_response(status_t status,
                           uint64_t work_key,
                           const component::IADO_plugin::response_buffer_vector_t& response_buffers);
 
@@ -174,44 +168,44 @@ public:
                                      component::IADO_plugin::response_buffer_vector_t& response_buffers);
 
   /* table operations */
-  void send_table_op_create(const uint64_t work_request_id,
+  status_t send_table_op_create(const uint64_t work_request_id,
                             const std::string& key,
                             const size_t value_len,
                             const std::uint64_t flags);
 
-  void send_table_op_open(const uint64_t work_request_id,
+  status_t send_table_op_open(const uint64_t work_request_id,
                           const std::string& key,
                           const size_t value_len,
                           const std::uint64_t flags);
 
-  void send_table_op_resize(const uint64_t work_request_id,
+  status_t send_table_op_resize(const uint64_t work_request_id,
                             const std::string& key,
                             const size_t new_value_len);
 
-  void send_table_op_erase(const std::string& key);
+  status_t send_table_op_erase(const std::string& key);
 
-  void send_table_op_allocate_pool_memory(const size_t size,
+  status_t send_table_op_allocate_pool_memory(const size_t size,
                                           const size_t alignment);
 
-  void send_table_op_free_pool_memory(const void * ptr,
+  status_t send_table_op_free_pool_memory(const void * ptr,
                                       const size_t size);
 
-  void send_find_index_request(const std::string& key_expression,
+  status_t send_find_index_request(const std::string& key_expression,
                                offset_t begin_position,
                                component::IKVIndex::find_t find_type);
 
-  void send_vector_response(const status_t status,
+  status_t send_vector_response(const status_t status,
                             const component::IADO_plugin::Reference_vector& rv);
 
-  void send_vector_request(const common::epoch_time_t t_begin,
+  status_t send_vector_request(const common::epoch_time_t t_begin,
                            const common::epoch_time_t t_end);
 
   void recv_vector_response(status_t& status,
                             component::IADO_plugin::Reference_vector& out_vector);
 
-  void send_pool_info_request();
+  status_t send_pool_info_request();
 
-  void send_pool_info_response(const status_t status,
+  status_t send_pool_info_response(const status_t status,
                                const std::string& info);
 
 
@@ -241,7 +235,7 @@ public:
                              offset_t& begin_pos,
                              int& find_type);
 
-  void send_table_op_response(const status_t status,
+  status_t send_table_op_response(const status_t status,
                               const void * value_addr = nullptr,
                               size_t value_len = 0,
                               const char * key_addr = nullptr,
@@ -257,11 +251,11 @@ public:
                                 offset_t& out_matched_position,
                                 std::string& out_matched_key);
 
-  void send_find_index_response(const status_t status,
+  status_t send_find_index_response(const status_t status,
                                 const offset_t matched_position,
                                 const std::string& matched_key);
 
-  void send_iterate_request(const common::epoch_time_t t_begin,
+  status_t send_iterate_request(const common::epoch_time_t t_begin,
                             const common::epoch_time_t t_end,
                             component::IKVStore::pool_iterator_t iterator);
 
@@ -274,11 +268,11 @@ public:
                             common::epoch_time_t& t_end,
                             component::IKVStore::pool_iterator_t& iterator);
 
-  void send_iterate_response(const status_t rc,
+  status_t send_iterate_response(const status_t rc,
                              component::IKVStore::pool_iterator_t iterator,
                              component::IKVStore::pool_reference_t reference);
 
-  void send_unlock_request(const uint64_t work_id,
+  status_t send_unlock_request(const uint64_t work_id,
                            const component::IKVStore::key_t key_handle);
 
   bool recv_unlock_response(status_t& status);
@@ -287,14 +281,14 @@ public:
                            uint64_t& work_id,
                            component::IKVStore::key_t& key_handle);
 
-  void send_unlock_response(const status_t status);
+  status_t send_unlock_response(const status_t status);
 
-  void send_configure_request(const uint64_t options);
+  status_t send_configure_request(const uint64_t options);
 
   bool recv_configure_request(const Buffer_header * buffer,
                               uint64_t& options);
 
-  void send_configure_response(const status_t status);
+  status_t send_configure_response(const status_t status);
 
   bool recv_configure_response(status_t& status);
 
@@ -311,12 +305,9 @@ public:
   }
 
   /* UIPC helpers */
-  inline void send_callback(void * buffer)
+  inline status_t send_callback(void * buffer)
   {
-    while ( ::uipc_send(_channel_callback, buffer) != S_OK )
-    {
-      cpu_relax();
-    }
+    return ::uipc_send(_channel_callback, buffer);
   }
 
   inline status_t recv(Buffer_header *& out_buffer) __attribute__((warn_unused_result)) { return recv(_channel, out_buffer); }
