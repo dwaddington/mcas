@@ -7,14 +7,6 @@ foreach(file ${files})
   configure_file(${BASEFILE} ${TARGETFILE}.conf)
 endforeach()
 
-# configure_file(example-mapstore-ado0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-mapstore-ado0.conf)
-# configure_file(example-hstore-devdax-secure-0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-hstore-devdax-secure-0.conf)
-# configure_file(example-mapstore-rust-ado.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-mapstore-rust-ado.conf)
-# configure_file(example-hstore-rust-ado.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-hstore-rust-ado.conf)
-# configure_file(example-mapstore-adotest0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-mapstore-adotest0.conf)
-# configure_file(example-hstore-pmem-ado0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-hstore-pmem-ado0.conf)
-# configure_file(example-hstore-devdax-ado0.conf.in ${CMAKE_CURRENT_BINARY_DIR}/example-hstore-devdax-ado0.conf)
-
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/
   DESTINATION conf
   FILES_MATCHING PATTERN "*.conf"

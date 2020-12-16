@@ -186,19 +186,19 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
               throw Logic_exception("initial send_memory_map_named failed");
           }
           else
-          {
-            /* uses MCAS kernel module */
-            /* generate a token for the mapping - TODO: remove exposed memory */
-            uint64_t token = reinterpret_cast<uint64_t>(r.iov_base);
+            {
+              /* uses MCAS kernel module */
+              /* generate a token for the mapping - TODO: remove exposed memory */
+              uint64_t token = reinterpret_cast<uint64_t>(r.iov_base);
 
-            nupm::revoke_memory(token); /* move any prior registration; TODO clean up when ADO goes */
+              nupm::revoke_memory(token); /* move any prior registration; TODO clean up when ADO goes */
 
-            if (nupm::expose_memory(token, r.iov_base, r.iov_len) != S_OK)
-              throw Logic_exception("nupm::expose_memory failed unexpectedly");
+              if (nupm::expose_memory(token, r.iov_base, r.iov_len) != S_OK)
+                throw Logic_exception("nupm::expose_memory failed unexpectedly");
 
-            if (ado->send_memory_map(token, r.iov_len, r.iov_base) != S_OK)
-              throw Logic_exception("initial send_memory_map failed");
-          }
+              if (ado->send_memory_map(token, r.iov_len, r.iov_base) != S_OK)
+                throw Logic_exception("initial send_memory_map failed");
+            }
         }
 
         CPLOG(2, "Shard_ado: exposed region: %p %lu", r.iov_base, r.iov_len);
@@ -791,7 +791,7 @@ void Shard::process_messages_from_ado()
 
           /* when this is a 'get' signal then we have to re-get the value 
              so we can send it back with the response.
-           */
+          */
           component::IKVStore::key_t key_handle;
           ::iovec value_out{nullptr, 0};
 
@@ -807,7 +807,7 @@ void Shard::process_messages_from_ado()
 
           memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);            
           auto desc = mr.desc();
-          auto response = respond1(handler, iob, request_record->request_id, S_OK);
+          auto response = prepare_response(handler, iob, request_record->request_id, S_OK);
 
           /* deal with the two-stage optimization */
           if (value_out.iov_len < TWO_STAGE_THRESHOLD) {
@@ -819,7 +819,7 @@ void Shard::process_messages_from_ado()
             handler->post_response(iob, response, __func__);
           }
           else {
-            handler->post_response2(iob, value_out, desc, response, __func__);
+            handler->post_response_with_value(iob, value_out, desc, response, __func__);
           }
         }
         /* handle ADO response that came from signal ADO request */
@@ -1060,27 +1060,27 @@ void Shard::process_messages_from_ado()
 
           /* provide memory PM and DRAM summary */
           if (debug_level() > 0)
-          {
-            uint64_t     expected_obj_count = 0;
-            size_t       pool_size          = 0;
-            unsigned int pool_flags         = 0;
+            {
+              uint64_t     expected_obj_count = 0;
+              size_t       pool_size          = 0;
+              unsigned int pool_flags         = 0;
 
-            assert(handler);
-            handler->pool_manager().get_pool_info(ado->pool_id(), expected_obj_count, pool_size, pool_flags);
+              assert(handler);
+              handler->pool_manager().get_pool_info(ado->pool_id(), expected_obj_count, pool_size, pool_flags);
 
-            std::vector<uint64_t> pu_attr;
-            if(_i_kvstore->get_attribute(ado->pool_id(),
-                                         IKVStore::Attribute::PERCENT_USED, pu_attr) == S_OK) {
-              PLOG("Shard_ado: port(%u) '#memory' pool (%s) memory %lu%% used (%luMiB/%luMiB)",
-                   _port,
-                   ado->pool_name().c_str(),
-                   pu_attr[0],
-                   REDUCE_MB(pu_attr[0] == 0 ? 0 : pu_attr[0] * pool_size / 100),
-                   REDUCE_MB(pool_size));
+              std::vector<uint64_t> pu_attr;
+              if(_i_kvstore->get_attribute(ado->pool_id(),
+                                           IKVStore::Attribute::PERCENT_USED, pu_attr) == S_OK) {
+                PLOG("Shard_ado: port(%u) '#memory' pool (%s) memory %lu%% used (%luMiB/%luMiB)",
+                     _port,
+                     ado->pool_name().c_str(),
+                     pu_attr[0],
+                     REDUCE_MB(pu_attr[0] == 0 ? 0 : pu_attr[0] * pool_size / 100),
+                     REDUCE_MB(pool_size));
+              }
+
+              PLOG("Shard_ado: port(%u) '#memory' %s", _port, common::get_DRAM_usage().c_str());
             }
-
-            PLOG("Shard_ado: port(%u) '#memory' %s", _port, common::get_DRAM_usage().c_str());
-          }
 
           void* out_addr = nullptr;
           rc             = _i_kvstore->allocate_pool_memory(ado->pool_id(), value_len, align_or_flags, out_addr);

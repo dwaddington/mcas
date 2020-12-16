@@ -778,7 +778,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
 
                 /* send message to ADO, but perform closure only
                    when a response is given back from the ADO.
-                   we can't block here though - the shard
+                   we can't block here because the shard
                    thread must keep going to avoid cross-client
                    degradation */
                 if (ado_itf->send_op_event(ADO_op::POOL_DELETE) != S_OK)
@@ -1003,7 +1003,7 @@ void Shard::release_pending_rename(const void *target)
 }
 
 /* like respond2, but omits the final post */
-protocol::Message_IO_response * Shard::respond1(const Connection_handler *handler_,
+protocol::Message_IO_response * Shard::prepare_response(const Connection_handler *handler_,
                                                 buffer_t *iob_,
                                                 uint64_t request_id,
                                                 int status_)
@@ -1016,13 +1016,13 @@ protocol::Message_IO_response * Shard::respond1(const Connection_handler *handle
   return response;
 }
 
-void Shard::respond2(Connection_handler *handler_,
+void Shard::respond(Connection_handler *handler_,
                      buffer_t *iob_,
                      const protocol::Message_IO_request *msg_,
                      int status_,
                      const char * func_)
 {
-  auto response = respond1(handler_, iob_, msg_->request_id(), status_);
+  auto response = prepare_response(handler_, iob_, msg_->request_id(), status_);
   handler_->post_response(iob_, response, func_);  // issue IO request response
 }
 
@@ -1057,7 +1057,7 @@ void Shard::io_response_get_locate(Connection_handler *handler,
   }
 
   if (status != S_OK) {
-    respond2(handler, iob, msg, status, __func__);
+    respond(handler, iob, msg, status, __func__);
     ++_stats.op_failed_request_count;
   }
   else {
@@ -1082,7 +1082,7 @@ void Shard::io_response_get_locate(Connection_handler *handler,
       status = E_FAIL;
     }
 
-    auto response  = respond1(handler, iob, msg->request_id(), status);
+    auto response  = prepare_response(handler, iob, msg->request_id(), status);
     response->addr = reinterpret_cast<std::uint64_t>(target);
     response->key  = key;
     response->set_data_len_without_data(target_len);
@@ -1127,7 +1127,7 @@ void Shard::io_response_get_release(Connection_handler *handler,
      */
   }
   else {
-    respond2(handler, iob, msg, status, __func__);
+    respond(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1148,7 +1148,7 @@ void Shard::io_response_put_advance(Connection_handler *handler,
   if (msg->flags() & IKVStore::FLAGS_DONT_STOMP) {
     PWRN("PUT_ADVANCE failed IKVStore::FLAGS_DONT_STOMP not viable");
     _stats.op_failed_request_count++;
-    respond2(handler, iob, msg, E_INVAL, __func__);
+    respond(handler, iob, msg, E_INVAL, __func__);
   }
   else {
     auto status = S_OK;
@@ -1177,7 +1177,7 @@ void Shard::io_response_put_advance(Connection_handler *handler,
     }
 
     if (status != S_OK) {
-      respond2(handler, iob, msg, status, __func__);
+      respond(handler, iob, msg, status, __func__);
       ++_stats.op_failed_request_count;
     }
     else {
@@ -1206,7 +1206,7 @@ void Shard::io_response_put_advance(Connection_handler *handler,
           status = E_FAIL;
         }
 
-      auto response  = respond1(handler, iob, msg->request_id(), status);
+      auto response  = prepare_response(handler, iob, msg->request_id(), status);
       response->addr = reinterpret_cast<std::uint64_t>(target);
       response->key  = key;
 
@@ -1236,7 +1236,7 @@ void Shard::io_response_put_locate(Connection_handler *handler,
   if (msg->flags() & IKVStore::FLAGS_DONT_STOMP) {
     PWRN("PUT_ADVANCE failed IKVStore::FLAGS_DONT_STOMP not viable");
     _stats.op_failed_request_count++;
-    respond2(handler, iob, msg, E_INVAL, __func__);
+    respond(handler, iob, msg, E_INVAL, __func__);
   }
   else {
     auto status = S_OK;
@@ -1262,7 +1262,7 @@ void Shard::io_response_put_locate(Connection_handler *handler,
     }
 
     if (status != S_OK) {
-      respond2(handler, iob, msg, status, __func__);
+      respond(handler, iob, msg, status, __func__);
       ++_stats.op_failed_request_count;
     }
     else {
@@ -1288,7 +1288,7 @@ void Shard::io_response_put_locate(Connection_handler *handler,
           status = E_FAIL;
         }
 
-      auto response  = respond1(handler, iob, msg->request_id(), status);
+      auto response  = prepare_response(handler, iob, msg->request_id(), status);
       response->addr = reinterpret_cast<std::uint64_t>(target);
       response->key  = key;
 
@@ -1334,7 +1334,7 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
      */
   }
   else {
-    respond2(handler, iob, msg, status, __func__);
+    respond(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1394,7 +1394,7 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
     ++_stats.op_put_count;
 
     if (!ado_signal_post_put())
-      respond2(handler, iob, msg, status, __func__);
+      respond(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1411,7 +1411,7 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
   if (msg->is_scbe()) {
     CPLOG(2, "GET: short-circuited backend");
     
-    respond2(handler, iob, msg, S_OK, __func__);
+    respond(handler, iob, msg, S_OK, __func__);
   }
   else {
     ::iovec value_out{nullptr, 0};
@@ -1427,7 +1427,7 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
 
     if ( ! is_locked(rc) || key_handle == component::IKVStore::KEY_NONE) { /* key not found */
       CPLOG(2, "Shard: locking value failed");
-      respond2(handler, iob, msg, rc, __func__);
+      respond(handler, iob, msg, rc, __func__);
       ++_stats.op_failed_request_count;
     }
     else {
@@ -1481,7 +1481,7 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
                      true /* special 'get' response */);
         }
         else {
-          auto response = respond1(handler, iob, msg->request_id(), S_OK);
+          auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
           response->copy_in_data(value_out.iov_base, value_out.iov_len);
           iob->set_length(response->msg_len());
 
@@ -1502,14 +1502,14 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
           _i_kvstore->unlock(msg->pool_id(), lk.release()); /* no flush needed ? */
           PWRN("Shard: client posted insufficient space for get operation.");
           ++_stats.op_failed_request_count;
-          respond2(handler, iob, msg, E_INSUFFICIENT_SPACE, __func__);
+          respond(handler, iob, msg, E_INSUFFICIENT_SPACE, __func__);
         }
         else {
           try {
             memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);
             
             auto desc = mr.desc();
-            auto response = respond1(handler, iob, msg->request_id(), S_OK);
+            auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
             
             response->set_data_len_without_data(value_out.iov_len);
             assert(response->get_status() == S_OK);
@@ -1536,17 +1536,17 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
                 */
               }
               else {
-                handler->post_response2(iob, value_out, desc, response, __func__);
+                handler->post_response_with_value(iob, value_out, desc, response, __func__);
               }
             }
             else {
               /* client should have used GET_LOCATE */
-              respond2(handler, iob, msg, component::IKVStore::E_TOO_LARGE, __func__);
+              respond(handler, iob, msg, component::IKVStore::E_TOO_LARGE, __func__);
             }
           }
           catch ( const std::exception &e ) {
             PLOG("%s failed: %s", __func__, e.what());
-            respond2(handler, iob, msg, E_FAIL, __func__);
+            respond(handler, iob, msg, E_FAIL, __func__);
           }
           _stats.op_get_twostage_count++;
         }
@@ -1590,7 +1590,7 @@ void Shard::io_response_erase(Connection_handler *handler, const protocol::Messa
 
   _stats.op_erase_count++;
 
-  respond2(handler, iob, msg, status, __func__);
+  respond(handler, iob, msg, status, __func__);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1599,7 +1599,7 @@ void Shard::io_response_erase(Connection_handler *handler, const protocol::Messa
 void Shard::io_response_configure(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   if (debug_level() > 1) PMAJOR("Shard: pool CONFIGURE (%s)", msg->cmd());
-  respond2(handler, iob, msg, process_configure(msg), __func__);
+  respond(handler, iob, msg, process_configure(msg), __func__);
 }
 
 void Shard::process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg)
@@ -1783,7 +1783,7 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
       }
 
     /* respond, with the scatter-gather list as "data" */
-    auto response = respond1(handler, iob, msg->request_id(), status);
+    auto response = prepare_response(handler, iob, msg->request_id(), status);
     if ( status == S_OK )
       {
         response->copy_in_data(&*sgr.sg_list.begin(), sgr.sg_list.size() * sizeof *sgr.sg_list.begin());
@@ -1793,14 +1793,14 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
       }
     else
       {
-        respond2(handler, iob, msg, status, __func__);
+        respond(handler, iob, msg, status, __func__);
       }
 
     /* update stats */
     ++_stats.op_get_direct_offset_count;
   }
   else {
-    respond2(handler, iob, msg, status, __func__);
+    respond(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1822,7 +1822,7 @@ void Shard::io_response_release(Connection_handler *handler, const protocol::Mes
           t.first, t.second, e.cause());
     status = E_INVAL;
   }
-  respond2(handler, iob, msg, status, __func__);
+  respond(handler, iob, msg, status, __func__);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1859,7 +1859,7 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
       status = E_INVAL;
     }
   }
-  respond2(handler, iob, msg, status, __func__);
+  respond(handler, iob, msg, status, __func__);
 }
 
 void Shard::process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr_)

@@ -326,7 +326,7 @@ public:
   }
 
   template <typename Msg>
-  void post_send_buffer2(gsl::not_null<buffer_t *> buffer,
+  void post_send_buffer_with_value(gsl::not_null<buffer_t *> buffer,
                          const ::iovec &           val_iov,
                          void *                    val_desc,
                          Msg *                     msg,
@@ -342,14 +342,14 @@ public:
    * @param iob IO buffer to post
    */
   template <typename Msg>
-  inline void post_response2(gsl::not_null<buffer_t *> iob,
+  inline void post_response_with_value(gsl::not_null<buffer_t *> iob,
                              const ::iovec &           val_iov,
                              void *                    val_desc,
                              Msg *                     msg,
                              const char *              func_name)
   {
     iob->set_completion(static_send_callback2, val_iov.iov_base);
-    post_send_buffer2(iob, val_iov, val_desc, msg, func_name);
+    post_send_buffer_with_value(iob, val_iov, val_desc, msg, func_name);
     /* don't wait for this, let it be picked up in the check_completions cycle
      */
 

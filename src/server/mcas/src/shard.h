@@ -152,10 +152,10 @@ class Shard : public Shard_transport, private common::log_source {
   inline void get_future() { return _thread.get(); }
   inline bool exiting() const { return _thread_exit; }
 
-  inline void signal_exit()
+  inline void signal_exit() /*< signal main loop to exit */
   {
     _thread_exit = true;
-  } /*< signal main loop to exit */
+  } 
 
   inline void send_cluster_event(const std::string &sender, const std::string &type, const std::string &content)
   {
@@ -214,9 +214,16 @@ class Shard : public Shard_transport, private common::log_source {
 
   void main_loop(common::profiler &);
 
+  /* message processing functions */
   void process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg);
-
   void process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg);
+  void process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
+  void process_ado_request(Connection_handler *handler, const protocol::Message_ado_request *msg);
+  void process_put_ado_request(Connection_handler *handler, const protocol::Message_put_ado_request *msg);
+  void process_messages_from_ado();
+  status_t process_configure(const protocol::Message_IO_request *msg);
+
+  /* response handling functions */
   void io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_put_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
@@ -230,43 +237,36 @@ class Shard : public Shard_transport, private common::log_source {
   void io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
   void io_response_release_with_flush(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
 
-  void process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
-  void process_ado_request(Connection_handler *handler, const protocol::Message_ado_request *msg);
-  void process_put_ado_request(Connection_handler *handler, const protocol::Message_put_ado_request *msg);
-
-  void process_messages_from_ado();
   void close_all_ado();
-
-  status_t process_configure(const protocol::Message_IO_request *msg);
 
   void process_tasks(unsigned &idle);
 
   void service_cluster_signals();
   
   void signal_ado(const char * tag,
-                  Connection_handler* handler,
+                  Connection_handler * handler,
                   const uint64_t client_request_id,
                   const component::IKVStore::pool_t pool,
                   const std::string& key,
                   const component::IKVStore::lock_type_t lock_type,
-                  const bool get_response = false);
+                  const bool is_get_response = false);
 
   void signal_ado_async_nolock(const char * tag,
-                               Connection_handler* handler,
+                               Connection_handler * handler,
                                const uint64_t client_request_id,
                                const component::IKVStore::pool_t pool,
                                const std::string& key);
                         
-  static auto respond1(const Connection_handler *           handler_,
-                       buffer_t                           * iob_,
-                       uint64_t                             request_id,
-                       int                                  status_) -> protocol::Message_IO_response *;
-
-  static void respond2(Connection_handler *                 handler,
-                       buffer_t                           * iob,
-                       const protocol::Message_IO_request * msg,
-                       int                                  status,
-                       const char *                         func);
+  static protocol::Message_IO_response * prepare_response(const Connection_handler *           handler_,
+                                                          buffer_t *                           iob_,
+                                                          uint64_t                             request_id,
+                                                          int                                  status_);
+  
+  static void respond(Connection_handler *                 handler,
+                      buffer_t *                           iob,
+                      const protocol::Message_IO_request * msg,
+                      int                                  status,
+                      const char *                         func);
   
   component::IKVIndex *lookup_index(const pool_t pool_id)
   {
@@ -309,7 +309,7 @@ class Shard : public Shard_transport, private common::log_source {
 
   inline bool ado_enabled() const { return (_i_ado_mgr && (_ado_plugins.size() > 0)); }
 
-  /* ADO signaling helpers */
+  /* ADO signalling helpers */
   inline bool ado_signal_enabled() const { return ado_enabled() && (_ado_signal_mask != Ado_signal::NONE); }
   inline bool ado_signal_post_put() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT); }
   inline bool ado_signal_post_put_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT_DIRECT); }
