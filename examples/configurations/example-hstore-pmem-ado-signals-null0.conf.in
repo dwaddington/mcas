@@ -8,7 +8,7 @@
             "default_backend" : "hstore",
             "dax_config" : [{ "path": "/mnt/pmem0", "addr": "0x9000000000" }],
             "ado_plugins" : ["libcomponent-adoplugin-passthru.so"],
-            "ado_signals" : ["post-put"],
+            "ado_signals" : ["post-put", "post-put-direct", "post-erase"],
             "ado_cores" : "2"
         }
     ],

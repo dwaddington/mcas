@@ -248,17 +248,18 @@ class Shard : public Shard_transport, private common::log_source {
                   const uint64_t client_request_id,
                   const component::IKVStore::pool_t pool,
                   const std::string& key,
-                  const component::IKVStore::lock_type_t lock_type);
+                  const component::IKVStore::lock_type_t lock_type,
+                  const bool get_response = false);
 
   void signal_ado_async_nolock(const char * tag,
                                Connection_handler* handler,
                                const uint64_t client_request_id,
                                const component::IKVStore::pool_t pool,
-                               const std::string& key);                        
+                               const std::string& key);
                         
   static auto respond1(const Connection_handler *           handler_,
                        buffer_t                           * iob_,
-                       const protocol::Message_IO_request * msg_,
+                       uint64_t                             request_id,
                        int                                  status_) -> protocol::Message_IO_response *;
 
   static void respond2(Connection_handler *                 handler,
@@ -312,6 +313,8 @@ class Shard : public Shard_transport, private common::log_source {
   inline bool ado_signal_enabled() const { return ado_enabled() && (_ado_signal_mask != Ado_signal::NONE); }
   inline bool ado_signal_post_put() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT); }
   inline bool ado_signal_post_put_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT_DIRECT); }
+  inline bool ado_signal_post_get() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_GET); }
+  inline bool ado_signal_post_get_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_GET_DIRECT); }  
   inline bool ado_signal_post_erase() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_ERASE); }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }
@@ -358,7 +361,7 @@ class Shard : public Shard_transport, private common::log_source {
 
   class Work_request_allocator {
    private:
-    static constexpr size_t       NUM_ELEMENTS = WORK_REQUEST_ALLOCATOR_COUNT;
+    static constexpr size_t NUM_ELEMENTS = WORK_REQUEST_ALLOCATOR_COUNT;
     std::vector<work_request_t *> _free;
     /* "_all" apparently exists only to own the work_request_t elements */
     std::vector<std::unique_ptr<work_request_t>> _all;

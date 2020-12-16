@@ -847,8 +847,12 @@ Ado_signal Config_file::get_shard_ado_signals(rapidjson::SizeType i) const
       /* interpret strings */
       if (filter == std::string(Ado_signal_POST_PUT))
         result |= mcas::Ado_signal::POST_PUT;
+      else if (filter == std::string(Ado_signal_POST_GET))
+        result |= mcas::Ado_signal::POST_GET;      
       else if(filter == std::string(Ado_signal_POST_PUT_DIRECT))
         result |= mcas::Ado_signal::POST_PUT_DIRECT;
+      else if(filter == std::string(Ado_signal_POST_GET_DIRECT))
+        result |= mcas::Ado_signal::POST_GET_DIRECT;      
       else if(filter == std::string(Ado_signal_POST_ERASE))
         result |= mcas::Ado_signal::POST_ERASE;
       

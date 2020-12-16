@@ -72,7 +72,9 @@ enum class Ado_signal : unsigned long
    NONE            = (1UL << 0),
    POST_ERASE      = (1UL << 1),
    POST_PUT        = (1UL << 2),
-   POST_PUT_DIRECT = (1UL << 3),
+   POST_GET        = (1UL << 3),
+   POST_PUT_DIRECT = (1UL << 4),
+   POST_GET_DIRECT = (1UL << 5),
   };
 
 inline bool operator& (const Ado_signal src, Ado_signal tgt) {
@@ -86,7 +88,9 @@ inline Ado_signal& operator|= (Ado_signal& tgt, const Ado_signal src) {
 
 static constexpr const char * Ado_signal_POST_ERASE = "post-erase";
 static constexpr const char * Ado_signal_POST_PUT = "post-put";
+static constexpr const char * Ado_signal_POST_GET = "post-get";
 static constexpr const char * Ado_signal_POST_PUT_DIRECT = "post-put-direct";
+static constexpr const char * Ado_signal_POST_GET_DIRECT = "post-get-direct";
 
 
 

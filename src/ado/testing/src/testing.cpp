@@ -714,7 +714,9 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-BaseAddr", baseAddr },
     { "ADO::Signal::post-erase", adoSignal },
     { "ADO::Signal::post-put", adoSignal },
-    { "ADO::Signal::post-put-direct", adoSignal },    
+    { "ADO::Signal::post-get", adoSignal },
+    { "ADO::Signal::post-put-direct", adoSignal },
+    { "ADO::Signal::post-get-direct", adoSignal },    
     { "BLAST ME!", other }, // used by ado-perf
     { "put", other }, // used by ado-perf
     { "erase", erase }, // used by ado-perf

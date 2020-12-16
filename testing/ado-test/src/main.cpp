@@ -650,25 +650,39 @@ TEST_F(ADO_test, PutSignal)
   std::vector<std::string> keys;
   for (unsigned i = 0; i < 10; i++) {
     auto key = common::random_string(8);
+    auto val = common::random_string(64);
     keys.push_back(key);
-    ASSERT_OK(mcas->put(pool, key, common::random_string(64)));
-  }
+    ASSERT_OK(mcas->put(pool, key, val));
 
+    std::string val2;
+    ASSERT_OK(mcas->get(pool, key, val2));
+    PLOG("val:(%s) val2:(%s)", val.c_str(), val2.c_str());
+    ASSERT_TRUE(val == val2);
+  }
+  
+  size_t len = MiB(8);
+  void * buffer = ::aligned_alloc(4096, len);
+  memset(buffer, 0xEF, len);
+  auto mr = mcas->register_direct_memory(buffer, len);
+  ASSERT_FALSE(mr == IMCAS::MEMORY_HANDLE_NONE);
+  
   /* put direct */
   {
-    size_t len = MiB(8);
-    void * buffer = ::aligned_alloc(4096, len);
-    memset(buffer, 0xEF, len);
-
-    auto mr = mcas->register_direct_memory(buffer, len);
-    ASSERT_FALSE(mr == IMCAS::MEMORY_HANDLE_NONE);
-
     ASSERT_OK(mcas->put_direct(pool, "BiGKey", buffer, len, mr));
     ASSERT_OK(mcas->put_direct(pool, "BiGKey-Copy", buffer, len, mr));
-
-    mcas->unregister_direct_memory(mr);
   }
 
+  /* get direct */
+  {
+    size_t glen = len;
+    ASSERT_OK(mcas->get_direct(pool, "BiGKey", buffer, glen, mr));
+    ASSERT_TRUE(len == glen);
+  }
+
+  mcas->unregister_direct_memory(mr);
+  ::free(buffer);
+  
+  /* erase */
   for(auto k: keys) {
     /* erase every other */
     ASSERT_OK(mcas->erase(pool, k));

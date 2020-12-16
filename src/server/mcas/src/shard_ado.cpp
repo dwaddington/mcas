@@ -336,7 +336,7 @@ void Shard::process_put_ado_request(Connection_handler* handler, const protocol:
   CPLOG(2, "Shard_ado: locked KV pair (value=%p, value_len=%lu)", value, value_len);
 
   /* register outstanding work */
-  auto wr = _wr_allocator.allocate();
+  work_request_t* wr = _wr_allocator.allocate();
   *wr     = {handler, msg->pool_id(), key_handle, key_ptr, msg->get_key_len(), locktype, msg->request_id(), msg->flags};
 
   auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
@@ -612,7 +612,8 @@ void Shard::signal_ado(const char * tag,
                        const uint64_t client_request_id,                             
                        const component::IKVStore::pool_t pool,
                        const std::string& key,
-                       const component::IKVStore::lock_type_t lock_type)
+                       const component::IKVStore::lock_type_t lock_type,
+                       const bool is_get_response)
 {
   using namespace component;
 
@@ -641,10 +642,14 @@ void Shard::signal_ado(const char * tag,
 
   /* create ADO signal work request */
   work_request_t* wr = _wr_allocator.allocate();
+
+  auto flags = IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE;
+  if (is_get_response)
+    flags = IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE;
   
   *wr = {handler, pool, key_handle, key_ptr,
          key_len, lock_type, client_request_id,
-         IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE /* flag to indicate signal */};
+         flags};
 
   auto wr_key = reinterpret_cast<work_request_key_t>(wr); /* pointer to uint64_t */
   _outstanding_work.insert(wr_key); /* save request by index on key-handle */
@@ -668,7 +673,6 @@ void Shard::signal_ado(const char * tag,
   /* when the work completes, the locks will be released.  The ADO 
      response is converted to an IO response */
 }
-
 
 
 void Shard::close_all_ado()
@@ -755,10 +759,11 @@ void Shard::process_messages_from_ado()
 
       /* handle erasing target */
       if (response_status == IADO_plugin::S_ERASE_TARGET) {
-        status_t s =
-          _i_kvstore->erase(request_record->pool, std::string(request_record->key_ptr, request_record->key_len));
+        status_t s = _i_kvstore->erase(request_record->pool,
+                                       std::string(request_record->key_ptr, request_record->key_len));
         if (s != S_OK)
           PWRN("Shard_ado: request to erase target failed unexpectedly (key=%s,rc=%d)", request_record->key_ptr, s);
+        
         response_status = s;
       }
 
@@ -780,8 +785,43 @@ void Shard::process_messages_from_ado()
         auto iob = handler->allocate_send();
         assert(iob);
         assert(iob->base());
-        
-        if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE) {
+
+        if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE) {
+
+          /* when this is a 'get' signal then we have to re-get the value 
+             so we can send it back with the response.
+           */
+          component::IKVStore::key_t key_handle;
+          ::iovec value_out{nullptr, 0};
+
+          std::string skey(request_record->key_ptr,request_record->key_len);          
+          status_t rc = _i_kvstore->lock(request_record->pool,
+                                         skey,
+                                         IKVStore::STORE_LOCK_READ,
+                                         value_out.iov_base,
+                                         value_out.iov_len,
+                                         key_handle);
+          if(rc != S_OK)
+            throw Logic_exception("unable to re-lock for 'get' signal response");
+
+          memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);            
+          auto desc = mr.desc();
+          auto response = respond1(handler, iob, request_record->request_id, S_OK);
+
+          /* deal with the two-stage optimization */
+          if (value_out.iov_len < TWO_STAGE_THRESHOLD) {
+            response->copy_in_data(value_out.iov_base, value_out.iov_len);
+            iob->set_length(response->msg_len());
+
+            _i_kvstore->unlock(request_record->pool, key_handle);
+            
+            handler->post_response(iob, response, __func__);
+          }
+          else {
+            handler->post_response2(iob, value_out, desc, response, __func__);
+          }
+        }
+        else if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE) {
 
           /* translate back to IO response */
           auto response_msg  = new (iob->base()) protocol::Message_IO_response(iob->length(),
