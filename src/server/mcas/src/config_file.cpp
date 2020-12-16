@@ -371,7 +371,7 @@ auto make_schema_shard()
           ( config::ado_signals
             , json::object
             ( json::member(schema::description, "Set of ADO signals.")
-              , json::member(schema::examples, json::array( json::array("post-put")))
+              , json::member(schema::examples, json::array( json::array("post-put","post-get","post-erase")))
               , json::member(schema::type, schema::array)
               , json::member
               ( schema::items
@@ -849,10 +849,6 @@ Ado_signal Config_file::get_shard_ado_signals(rapidjson::SizeType i) const
         result |= mcas::Ado_signal::POST_PUT;
       else if (filter == std::string(Ado_signal_POST_GET))
         result |= mcas::Ado_signal::POST_GET;      
-      else if(filter == std::string(Ado_signal_POST_PUT_DIRECT))
-        result |= mcas::Ado_signal::POST_PUT_DIRECT;
-      else if(filter == std::string(Ado_signal_POST_GET_DIRECT))
-        result |= mcas::Ado_signal::POST_GET_DIRECT;      
       else if(filter == std::string(Ado_signal_POST_ERASE))
         result |= mcas::Ado_signal::POST_ERASE;
       
