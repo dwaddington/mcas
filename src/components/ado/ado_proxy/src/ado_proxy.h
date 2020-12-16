@@ -47,7 +47,7 @@ public:
   unsigned debug_level() const { return _debug_level; }
   
   ADO_proxy(const uint64_t auth_id,
-	    const unsigned debug_level,
+            const unsigned debug_level,
             component::IKVStore * kvs,
             component::IKVStore::pool_t pool_id,
             const std::string &pool_name,
@@ -151,31 +151,31 @@ public:
                             component::IKVStore::key_t& key_handle) override;
 
   
-  void send_table_op_response(const status_t s,
-                              const void * value_addr = nullptr,
-                              size_t value_len = 0,
-                              const char * key_ptr = nullptr,
-                              component::IKVStore::key_t out_key_handle = nullptr) override;
+  status_t send_table_op_response(const status_t s,
+                                  const void * value_addr = nullptr,
+                                  size_t value_len = 0,
+                                  const char * key_ptr = nullptr,
+                                  component::IKVStore::key_t out_key_handle = nullptr) override;
 
-  void send_find_index_response(const status_t status,
-                                const offset_t matched_position,
-                                const std::string& matched_key) override;
+  status_t send_find_index_response(const status_t status,
+                                    const offset_t matched_position,
+                                    const std::string& matched_key) override;
 
-  void send_vector_response(const status_t status,
-                            const component::IADO_plugin::Reference_vector& rv) override;
+  status_t send_vector_response(const status_t status,
+                                const component::IADO_plugin::Reference_vector& rv) override;
 
-  void send_iterate_response(const status_t rc,
-                             const component::IKVStore::pool_iterator_t iterator,
-                             const component::IKVStore::pool_reference_t reference) override;
+  status_t send_iterate_response(const status_t rc,
+                                 const component::IKVStore::pool_iterator_t iterator,
+                                 const component::IKVStore::pool_reference_t reference) override;
 
-  void send_pool_info_response(const status_t status,
-                               const std::string& info) override;
+  status_t send_pool_info_response(const status_t status,
+                                   const std::string& info) override;
 
-  void send_unlock_response(const status_t status) override;
+  status_t send_unlock_response(const status_t status) override;
 
   bool check_configure_request(const void* buffer, uint64_t& options) override;
 
-  void send_configure_response(const status_t status) override;
+  status_t send_configure_response(const status_t status) override;
 
   bool has_exited() override;
 
@@ -275,8 +275,8 @@ public:
   {
     component::IADO_proxy *obj =
       static_cast<component::IADO_proxy *>(new ADO_proxy(auth_id,
-							 debug_level,
-							 kvs,
+                                                         debug_level,
+                                                         kvs,
                                                          pool_id,
                                                          pool_name,
                                                          pool_size,

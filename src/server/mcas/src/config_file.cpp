@@ -64,6 +64,7 @@ static constexpr const char *ado_core_count = "ado_core_count";
 static constexpr const char *ado_plugins = "ado_plugins";
 static constexpr const char *ado_params = "ado_params";
 static constexpr const char *ado_path = "ado_path";
+static constexpr const char *ado_signals = "ado_signals";
 static constexpr const char *security = "security";
 static constexpr const char *cluster = "cluster";
 static constexpr const char *core = "core";
@@ -367,6 +368,18 @@ auto make_schema_shard()
               )
             )
           , json::member
+          ( config::ado_signals
+            , json::object
+            ( json::member(schema::description, "Set of ADO signals.")
+              , json::member(schema::examples, json::array( json::array("post-put")))
+              , json::member(schema::type, schema::array)
+              , json::member
+              ( schema::items
+                , schema::string
+                )
+              )
+            )
+          , json::member
           ( config::ado_params
             , json::object
             ( json::member(schema::description, "Key/value pairs passed to ADO. The values must be strings")
@@ -608,6 +621,7 @@ rapidjson::Document validate(unsigned debug_level_, rapidjson::Document &&doc)
         validator.GetInvalidDocumentPointer().StringifyUriFragment(sb);
         why += std::string("Invalid document: ") + sb.GetString() + "\n";
       }
+      PERR("JSON parse error: %s", why.c_str());
       throw std::domain_error(error_report("JSON config failed validation", why, doc));
     }
   return std::move(doc);
@@ -658,17 +672,20 @@ rapidjson::Document filename_to_doc(unsigned debug_level_, const std::string &fi
 }
 }
 
-void mcas::throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset)
+namespace mcas
+{
+
+void throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size_t offset)
 {
   throw ParseException(code, msg, offset);
 }
 
-mcas::Config_file::Config_file(unsigned debug_level_, const std::string& config_spec)
+Config_file::Config_file(unsigned debug_level_, const std::string& config_spec)
   : Config_file(debug_level_, (config_spec[0] == '{' ? string_to_doc : filename_to_doc)(debug_level_, config_spec))
 {
 }
 
-mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document&& doc)
+Config_file::Config_file(unsigned debug_level_, rapidjson::Document&& doc)
   : common::log_source(debug_level_),
   _doc(std::move(doc)),
   _shards(init_shards(_doc)),
@@ -715,27 +732,27 @@ mcas::Config_file::Config_file(unsigned debug_level_, rapidjson::Document&& doc)
   }
 }
 
-std::string mcas::Config_file::get_ado_cores() const
+std::string Config_file::get_ado_cores() const
 {
   if (_resources.IsNull() || !_resources.HasMember(config::ado_cores)) return "";
   return std::string(_resources[config::ado_cores].GetString());
 }
 
-int mcas::Config_file::get_ado_manager_core() const
+int Config_file::get_ado_manager_core() const
 {
   if (_resources.IsNull()) return -1;
   if (!_resources.HasMember(config::ado_manager_core)) return -1;
   return _resources[config::ado_manager_core].GetInt();
 }
 
-auto mcas::Config_file::get_shard(rapidjson::SizeType i) const
+auto Config_file::get_shard(rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
   assert(_shards[i].IsObject());
   return _shards[i].GetObject();
 }
 
-std::string mcas::Config_file::get_shard_ado_cores(rapidjson::SizeType i) const
+std::string Config_file::get_shard_ado_cores(rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s: out of bounds", __func__);
   assert(_shards[i].IsObject());
@@ -744,7 +761,7 @@ std::string mcas::Config_file::get_shard_ado_cores(rapidjson::SizeType i) const
   return std::string(shard[config::ado_cores].GetString());
 }
 
-float mcas::Config_file::get_shard_ado_core_number(rapidjson::SizeType i) const
+float Config_file::get_shard_ado_core_number(rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s: out of bounds", __func__);
   assert(_shards[i].IsObject());
@@ -754,7 +771,7 @@ float mcas::Config_file::get_shard_ado_core_number(rapidjson::SizeType i) const
   return shard[config::ado_core_count].GetFloat();
 }
 
-unsigned int mcas::Config_file::get_shard_core(rapidjson::SizeType i) const
+unsigned int Config_file::get_shard_core(rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
   assert(_shards[i].IsObject());
@@ -762,7 +779,7 @@ unsigned int mcas::Config_file::get_shard_core(rapidjson::SizeType i) const
   return shard[config::core].GetUint();
 }
 
-unsigned int mcas::Config_file::get_shard_port(rapidjson::SizeType i) const
+unsigned int Config_file::get_shard_port(rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
   assert(_shards[i].IsObject());
@@ -771,7 +788,7 @@ unsigned int mcas::Config_file::get_shard_port(rapidjson::SizeType i) const
   return m == shard.MemberEnd() ? 0 : m->value.GetUint();
 }
 
-unsigned int mcas::Config_file::get_shard_security_port(rapidjson::SizeType i) const
+unsigned int Config_file::get_shard_security_port(rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
   assert(_shards[i].IsObject());
@@ -780,7 +797,7 @@ unsigned int mcas::Config_file::get_shard_security_port(rapidjson::SizeType i) c
   return m == shard.MemberEnd() ? 0 : m->value.GetUint();
 }
 
-boost::optional<std::string> mcas::Config_file::get_shard_optional(std::string field, rapidjson::SizeType i) const
+boost::optional<std::string> Config_file::get_shard_optional(std::string field, rapidjson::SizeType i) const
 {
   if (field.empty()) throw Config_exception("%s invalid field", __func__);
   auto shard = get_shard(i);
@@ -791,14 +808,14 @@ boost::optional<std::string> mcas::Config_file::get_shard_optional(std::string f
   return m == shard.MemberEnd() ? boost::optional<std::string>() : std::string(m->value.GetString());
 }
 
-std::string mcas::Config_file::get_shard_required(std::string field, rapidjson::SizeType i) const
+std::string Config_file::get_shard_required(std::string field, rapidjson::SizeType i) const
 {
   if (field.empty()) throw Config_exception("%s invalid field", __func__);
   auto shard = get_shard(i);
   return shard.HasMember(field.c_str()) ? std::string(shard[field.c_str()].GetString()) : std::string();
 }
 
-std::vector<std::string> mcas::Config_file::get_shard_ado_plugins(rapidjson::SizeType i) const
+std::vector<std::string> Config_file::get_shard_ado_plugins(rapidjson::SizeType i) const
 {
   auto result = std::vector<std::string>();
   if (i > shard_count()) throw Config_exception("%s shard out of bounds", __func__);
@@ -814,7 +831,38 @@ std::vector<std::string> mcas::Config_file::get_shard_ado_plugins(rapidjson::Siz
   return result;
 }
 
-std::map<std::string, std::string> mcas::Config_file::get_shard_ado_params(rapidjson::SizeType i) const
+Ado_signal Config_file::get_shard_ado_signals(rapidjson::SizeType i) const
+{
+  Ado_signal result = Ado_signal::NONE;
+  if (i > shard_count()) throw Config_exception("%s shard out of bounds", __func__);
+
+  auto shard = get_shard(i);
+  if (shard.HasMember(config::ado_signals)) {
+    if (!shard[config::ado_signals].IsArray()) throw Config_exception("%s should be an array", config::ado_signals);
+    auto array = shard[config::ado_signals].GetArray();
+    for (auto itr = array.Begin(); itr != array.End(); ++itr) {
+
+      auto filter = itr->GetString();
+
+      /* interpret strings */
+      if (filter == std::string(Ado_signal_POST_PUT))
+        result |= mcas::Ado_signal::POST_PUT;
+      else if (filter == std::string(Ado_signal_POST_GET))
+        result |= mcas::Ado_signal::POST_GET;      
+      else if(filter == std::string(Ado_signal_POST_PUT_DIRECT))
+        result |= mcas::Ado_signal::POST_PUT_DIRECT;
+      else if(filter == std::string(Ado_signal_POST_GET_DIRECT))
+        result |= mcas::Ado_signal::POST_GET_DIRECT;      
+      else if(filter == std::string(Ado_signal_POST_ERASE))
+        result |= mcas::Ado_signal::POST_ERASE;
+      
+    }
+  }
+  return result;
+}
+
+
+std::map<std::string, std::string> Config_file::get_shard_ado_params(rapidjson::SizeType i) const
 {
   std::map<std::string, std::string> result;
   if (i > shard_count()) throw Config_exception("%s shard out of bounds", __func__);
@@ -830,7 +878,7 @@ std::map<std::string, std::string> mcas::Config_file::get_shard_ado_params(rapid
   return result;
 }
 
-auto mcas::Config_file::get_shard_object(std::string name, rapidjson::SizeType i) const
+auto Config_file::get_shard_object(std::string name, rapidjson::SizeType i) const
 {
   if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
   if (name.empty()) throw Config_exception("%s invalid name", __func__);
@@ -840,7 +888,7 @@ auto mcas::Config_file::get_shard_object(std::string name, rapidjson::SizeType i
   return shard[name.c_str()].GetObject();
 }
 
-boost::optional<rapidjson::Document> mcas::Config_file::get_shard_dax_config_raw(rapidjson::SizeType i)
+boost::optional<rapidjson::Document> Config_file::get_shard_dax_config_raw(rapidjson::SizeType i)
 {
   if (i > shard_count()) throw Config_exception("%s out of bounds", __func__);
 
@@ -856,44 +904,44 @@ boost::optional<rapidjson::Document> mcas::Config_file::get_shard_dax_config_raw
   return d;
 }
 
-std::string mcas::Config_file::security_get_cert_path() const
+std::string Config_file::security_get_cert_path() const
 {
   return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::cert_path].GetString());
 }
 
-std::string mcas::Config_file::security_get_key_path() const
+std::string Config_file::security_get_key_path() const
 {
   return (!_doc.HasMember(config::security)) ? std::string() : std::string(_security[config::key_path].GetString());
 }
 
-std::string mcas::Config_file::cluster_group() const
+std::string Config_file::cluster_group() const
 {
   if (!_cluster.IsObject()) return std::string();
   return (_cluster.HasMember(config::group)) ? std::string(_cluster[config::group].GetString()) : std::string();
 }
 
-std::string mcas::Config_file::cluster_local_name() const
+std::string Config_file::cluster_local_name() const
 {
   if (!_cluster.IsObject()) return std::string();
   return (_cluster.HasMember(config::name)) ? std::string(_cluster[config::name].GetString()) : std::string();
 }
 
-std::string mcas::Config_file::cluster_ip_addr() const
+std::string Config_file::cluster_ip_addr() const
 {
   if (!_cluster.IsObject()) return std::string();
   return (_cluster.HasMember(config::addr)) ? std::string(_cluster[config::addr].GetString()) : std::string();
 }
 
-unsigned int mcas::Config_file::cluster_net_port() const
+unsigned int Config_file::cluster_net_port() const
 {
   if (!_cluster.IsObject()) return -1U;
   return (_cluster.HasMember(config::port)) ? _cluster[config::port].GetUint() : DEFAULT_CLUSTER_PORT;
 }
 
-unsigned int mcas::Config_file::debug_level() const
+unsigned int Config_file::debug_level() const
 {
-  return std::max(
-                  common::log_source::debug_level()
-                  , _doc.HasMember(config::debug_level) ? _doc[config::debug_level].GetUint() : 0U
-                  );
+  return std::max(common::log_source::debug_level(),
+                  _doc.HasMember(config::debug_level) ? _doc[config::debug_level].GetUint() : 0U);
 }
+
+} // namespace mcas

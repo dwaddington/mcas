@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2019] [IBM Corporation]
+  Copyright [2017-2020] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -73,14 +73,15 @@ const uint8_t * ADO_protocol_builder::buffer_header_to_message(Buffer_header *bh
   return bh->to_message();
 }
 
-ADO_protocol_builder::ADO_protocol_builder(unsigned option_DEBUG_, const std::string& channel_prefix,
+ADO_protocol_builder::ADO_protocol_builder(unsigned debug_level_,
+                                           const std::string& channel_prefix,
                                            Role role)
-  : option_DEBUG(option_DEBUG_)
-  , _channel_prefix(channel_prefix)
-  , _channel()
-  , _channel_callback()
-  , _b_mutex()
-  , _buffer()
+  : common::log_source(debug_level_),
+  _channel_prefix(channel_prefix),
+  _channel(),
+  _channel_callback(),
+  _b_mutex(),
+  _buffer()
 {
   /* connect UIPC channels */
   if(role == Role::CONNECT) {
@@ -112,13 +113,13 @@ void ADO_protocol_builder::create_uipc_channels()
   _channel_callback.create(_channel_prefix + "-cb", MAX_MESSAGE_SIZE, QUEUE_SIZE);
 }
 
-void ADO_protocol_builder::send_bootstrap(const uint64_t auth_id,
-                                          const std::string& pool_name,
-                                          const size_t pool_size,
-                                          const unsigned int pool_flags,
-                                          const unsigned int memory_type,
-                                          const uint64_t expected_obj_count,
-                                          const bool open_existing)
+status_t ADO_protocol_builder::send_bootstrap(const uint64_t auth_id,
+                                              const std::string& pool_name,
+                                              const size_t pool_size,
+                                              const unsigned int pool_flags,
+                                              const unsigned int memory_type,
+                                              const uint64_t expected_obj_count,
+                                              const bool open_existing)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Bootstrap_request(MAX_MESSAGE_SIZE,
@@ -129,15 +130,16 @@ void ADO_protocol_builder::send_bootstrap(const uint64_t auth_id,
                                             memory_type,
                                             expected_obj_count,
                                             open_existing);
-  send(buffer);
-  PLOG("%s", "ADO_protocol_builder: sent bootstrap");
+  auto result = send(buffer);
+  CPLOG(3, "ADO_protocol_builder: sent bootstrap (%d)", result);
+  return result;
 }
 
-void ADO_protocol_builder::send_bootstrap_response()
+status_t ADO_protocol_builder::send_bootstrap_response()
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::HELLO);
-  send(buffer);
+  return send(buffer);
 }
 
 /// --- op event
@@ -154,57 +156,57 @@ bool ADO_protocol_builder::recv_op_event_response(const Buffer_header * buffer,
   return false;
 }
 
-void ADO_protocol_builder::send_op_event_response(component::ADO_op event)
+status_t ADO_protocol_builder::send_op_event_response(component::ADO_op event)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Op_event_response(event);
-  /* it OK to send the response back on the callback queue.
+  /* its OK to send the response back on the callback queue.
      currently only work request completions are passed on the
      main queue for semantic reasons but we may be
      able to unify
   */
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_op_event(component::ADO_op op)
+status_t ADO_protocol_builder::send_op_event(component::ADO_op op)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Op_event(op);
-  send(buffer);
+  return send(buffer);
 }
 
-void ADO_protocol_builder::send_cluster_event(const std::string& sender,
-					      const std::string& type,
-					      const std::string& content)
+status_t ADO_protocol_builder::send_cluster_event(const std::string& sender,
+                                                  const std::string& type,
+                                                  const std::string& content)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Cluster_event(MAX_MESSAGE_SIZE,
-					sender,
-					type,
-					content);
-  send(buffer);
+                                        sender,
+                                        type,
+                                        content);
+  return send(buffer);
 }
 
 
 
-void ADO_protocol_builder::send_shutdown()
+status_t ADO_protocol_builder::send_shutdown()
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::SHUTDOWN);
-  send(buffer);
+  return send(buffer);
 }
 
-void ADO_protocol_builder::send_shutdown_to_shard()
+status_t ADO_protocol_builder::send_shutdown_to_shard()
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::SHUTDOWN);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 
-void ADO_protocol_builder::send_memory_map(uint64_t memory_token,
-                                           size_t memory_size,
-                                           void * shard_address)
+status_t ADO_protocol_builder::send_memory_map(uint64_t memory_token,
+                                               size_t memory_size,
+                                               void * shard_address)
 {
   auto buffer = get_buffer().release();
 
@@ -213,25 +215,25 @@ void ADO_protocol_builder::send_memory_map(uint64_t memory_token,
                           memory_size,
                           shard_address);
 
-  send(buffer);
-  PLOG("%s", "ADO_protocol_builder::send_memory_map OK");
+  auto result = send(buffer);
+  CPLOG(3, "ADO_protocol_builder::send_memory_map (%d)", result);
+  return result;
 }
 
-void ADO_protocol_builder::send_memory_map_named(unsigned region_id,
-  string_view pool_name,
-  std::size_t offset,
-  byte_span iov)
+status_t ADO_protocol_builder::send_memory_map_named(unsigned region_id,
+                                                     string_view pool_name,
+                                                     std::size_t offset,
+                                                     byte_span iov)
 {
   auto buffer = get_buffer().release();
 
   new (buffer) Map_memory_named(MAX_MESSAGE_SIZE,
-                          region_id,
-                          pool_name,
-                          offset,
-                          iov);
+                                region_id,
+                                pool_name,
+                                offset,
+                                iov);
 
-  send(buffer);
-  PLOG("ADO_protocol_builder::%s OK", __func__);
+  return send(buffer);
 }
 
 bool ADO_protocol_builder::recv_index_op_request(const Buffer_header * buffer,
@@ -253,28 +255,28 @@ bool ADO_protocol_builder::recv_index_op_request(const Buffer_header * buffer,
 
 // --- find index
 
-void ADO_protocol_builder::send_find_index_request(const std::string& key_expression,
-                                                   offset_t begin_position,
-                                                   component::IKVIndex::find_t find_type)
+status_t ADO_protocol_builder::send_find_index_request(const std::string& key_expression,
+                                                       offset_t begin_position,
+                                                       component::IKVIndex::find_t find_type)
 {
   auto buffer = get_buffer().release();
   new (buffer) Index_request(MAX_MESSAGE_SIZE,
                              begin_position,
                              find_type,
                              key_expression);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_find_index_response(const status_t status,
-                                                    const offset_t matched_position,
-                                                    const std::string& matched_key)
+status_t ADO_protocol_builder::send_find_index_response(const status_t status,
+                                                        const offset_t matched_position,
+                                                        const std::string& matched_key)
 {
   auto buffer = get_buffer().release();
   new (buffer) Index_response(MAX_MESSAGE_SIZE,
                               matched_position,
                               status,
                               matched_key);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 void ADO_protocol_builder::recv_find_index_response(status_t& status,
@@ -299,23 +301,23 @@ void ADO_protocol_builder::recv_find_index_response(status_t& status,
 }
 
 
-void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
-                                             const char * key,
-                                             const size_t key_len,
-                                             const void * value,
-                                             const size_t value_len,
-                                             const void * detached_value,
-                                             const size_t detached_value_len,
-                                             const void * invocation_data,
-                                             const size_t invocation_data_len,
-                                             const bool new_root)
+status_t ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
+                                                 const char * key,
+                                                 const size_t key_len,
+                                                 const void * value,
+                                                 const size_t value_len,
+                                                 const void * detached_value,
+                                                 const size_t detached_value_len,
+                                                 const void * invocation_data,
+                                                 const size_t invocation_data_len,
+                                                 const bool new_root)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__,__LINE__);
 
   assert(detached_value ? detached_value_len > 0 : true);
 
-  if( 1 < option_DEBUG) {
+  if( 1 < debug_level()) {
     PMAJOR("SENDING Work_request: key=(%p=%.*s) value=%p value_len=%lu"
            " invocation_len=%lu detached_value=(%p,%lu) (%.*s) new=%d",
            common::p_fmt(key),
@@ -343,12 +345,12 @@ void ADO_protocol_builder::send_work_request(const uint64_t work_request_key,
                             invocation_data_len,
                             new_root);
 
-  send(buffer);
+  return send(buffer);
 }
 
-void ADO_protocol_builder::send_work_response(status_t status,
-                                              uint64_t work_key,
-                                              const IADO_plugin::response_buffer_vector_t& response_buffers)
+status_t ADO_protocol_builder::send_work_response(status_t status,
+                                                  uint64_t work_key,
+                                                  const IADO_plugin::response_buffer_vector_t& response_buffers)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -358,7 +360,7 @@ void ADO_protocol_builder::send_work_response(status_t status,
                              status,
                              response_buffers);
 
-  send(buffer);
+  return send(buffer);
 }
 
 bool ADO_protocol_builder::
@@ -408,10 +410,10 @@ status_t ADO_protocol_builder::recv_bootstrap_response()
   return st;
 }
 
-void ADO_protocol_builder::send_table_op_create(const uint64_t work_request_id,
-                                                const std::string& keystr,
-                                                const size_t value_len,
-                                                const std::uint64_t flags)
+status_t ADO_protocol_builder::send_table_op_create(const uint64_t work_request_id,
+                                                    const std::string& keystr,
+                                                    const size_t value_len,
+                                                    const std::uint64_t flags)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -423,13 +425,13 @@ void ADO_protocol_builder::send_table_op_create(const uint64_t work_request_id,
                              0, /* addr */
                              flags, /* align or flags */
                              component::ADO_op::CREATE);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_table_op_open(const uint64_t work_request_id,
-                                              const std::string& keystr,
-                                              const size_t value_len,
-                                              const std::uint64_t flags)
+status_t ADO_protocol_builder::send_table_op_open(const uint64_t work_request_id,
+                                                  const std::string& keystr,
+                                                  const size_t value_len,
+                                                  const std::uint64_t flags)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -441,12 +443,12 @@ void ADO_protocol_builder::send_table_op_open(const uint64_t work_request_id,
                              0,
                              flags,
                              component::ADO_op::OPEN);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_table_op_resize(const uint64_t work_request_id,
-                                                const std::string& keystr,
-                                                const size_t new_value_len)
+status_t ADO_protocol_builder::send_table_op_resize(const uint64_t work_request_id,
+                                                    const std::string& keystr,
+                                                    const size_t new_value_len)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -458,10 +460,10 @@ void ADO_protocol_builder::send_table_op_resize(const uint64_t work_request_id,
                              0,
                              0,
                              component::ADO_op::VALUE_RESIZE);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_table_op_erase(const std::string& keystr)
+status_t ADO_protocol_builder::send_table_op_erase(const std::string& keystr)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -473,11 +475,11 @@ void ADO_protocol_builder::send_table_op_erase(const std::string& keystr)
                              0,
                              0,
                              component::ADO_op::ERASE);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_table_op_allocate_pool_memory(const size_t size,
-                                                              const size_t alignment)
+status_t ADO_protocol_builder::send_table_op_allocate_pool_memory(const size_t size,
+                                                                  const size_t alignment)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -488,11 +490,11 @@ void ADO_protocol_builder::send_table_op_allocate_pool_memory(const size_t size,
                              0,
                              alignment,
                              component::ADO_op::ALLOCATE_POOL_MEMORY);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_table_op_free_pool_memory(const void * ptr,
-                                                          const size_t size)
+status_t ADO_protocol_builder::send_table_op_free_pool_memory(const void * ptr,
+                                                              const size_t size)
 {
   auto buffer = get_buffer().release();
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -503,18 +505,18 @@ void ADO_protocol_builder::send_table_op_free_pool_memory(const void * ptr,
                              reinterpret_cast<uint64_t>(ptr),
                              0,
                              component::ADO_op::FREE_POOL_MEMORY);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 
 
 /// --- pool info
-void ADO_protocol_builder::send_pool_info_response(const status_t status,
-                                                   const std::string& info)
+status_t ADO_protocol_builder::send_pool_info_response(const status_t status,
+                                                       const std::string& info)
 {
   auto buffer = get_buffer().release();
   new (buffer) Pool_info_response(MAX_MESSAGE_SIZE, status, info);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 bool ADO_protocol_builder::recv_pool_info_request(const Buffer_header * buffer)
@@ -528,11 +530,11 @@ bool ADO_protocol_builder::recv_pool_info_request(const Buffer_header * buffer)
 }
 
 
-void ADO_protocol_builder::send_pool_info_request()
+status_t ADO_protocol_builder::send_pool_info_request()
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::POOL_INFO_REQUEST);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 void ADO_protocol_builder::recv_pool_info_response(status_t& status, std::string& out_response)
@@ -554,11 +556,11 @@ void ADO_protocol_builder::recv_pool_info_response(status_t& status, std::string
 }
 
 
-void ADO_protocol_builder::send_table_op_response(const status_t status,
-                                                  const void * value_addr,
-                                                  size_t value_len,
-                                                  const char * key_addr,
-                                                  component::IKVStore::key_t key_handle)
+status_t ADO_protocol_builder::send_table_op_response(const status_t status,
+                                                      const void * value_addr,
+                                                      size_t value_len,
+                                                      const char * key_addr,
+                                                      component::IKVStore::key_t key_handle)
 {
   auto buffer = get_buffer().release(); //::uipc_alloc_message(_channel);
   if(!buffer) throw General_exception("%s:%u out of buffers", __FILE__, __LINE__);
@@ -570,7 +572,7 @@ void ADO_protocol_builder::send_table_op_response(const status_t status,
                               reinterpret_cast<uint64_t>(key_addr),
                               reinterpret_cast<uint64_t>(key_handle));
 
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 void ADO_protocol_builder::recv_table_op_response(status_t& status,
@@ -643,20 +645,20 @@ bool ADO_protocol_builder::recv_table_op_request(const Buffer_header * buffer,
 
 /// --- vector
 
-void ADO_protocol_builder::send_vector_request(const common::epoch_time_t t_begin,
-                                               const common::epoch_time_t t_end)
+status_t ADO_protocol_builder::send_vector_request(const common::epoch_time_t t_begin,
+                                                   const common::epoch_time_t t_end)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Vector_request(t_begin, t_end);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
-void ADO_protocol_builder::send_vector_response(const status_t status,
-                                                const IADO_plugin::Reference_vector& rv)
+status_t ADO_protocol_builder::send_vector_response(const status_t status,
+                                                    const IADO_plugin::Reference_vector& rv)
 {
   auto buffer = get_buffer().release();
   new (buffer) Vector_response(status, rv);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 void ADO_protocol_builder::recv_vector_response(status_t& status,
@@ -694,16 +696,16 @@ bool ADO_protocol_builder::recv_vector_request(const Buffer_header * buffer,
 
 /// --- vector
 
-void ADO_protocol_builder::send_iterate_request(const common::epoch_time_t t_begin,
-                                                const common::epoch_time_t t_end,
-                                                component::IKVStore::pool_iterator_t iterator)
+status_t ADO_protocol_builder::send_iterate_request(const common::epoch_time_t t_begin,
+                                                    const common::epoch_time_t t_end,
+                                                    component::IKVStore::pool_iterator_t iterator)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Iterate_request(t_begin,
                                           t_end,
                                           iterator);
 
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 void ADO_protocol_builder::recv_iterate_response(status_t& status,
@@ -744,24 +746,24 @@ bool ADO_protocol_builder::recv_iterate_request(const Buffer_header * buffer,
   return false;
 }
 
-void ADO_protocol_builder::send_iterate_response(const status_t rc,
-                                                 component::IKVStore::pool_iterator_t iterator,
-                                                 component::IKVStore::pool_reference_t reference)
+status_t ADO_protocol_builder::send_iterate_response(const status_t rc,
+                                                     component::IKVStore::pool_iterator_t iterator,
+                                                     component::IKVStore::pool_reference_t reference)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Iterate_response(rc, iterator, reference);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 
 /// --unlock
-void ADO_protocol_builder::send_unlock_request(const uint64_t work_id,
-                                               const component::IKVStore::key_t key_handle)
+status_t ADO_protocol_builder::send_unlock_request(const uint64_t work_id,
+                                                   const component::IKVStore::key_t key_handle)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Unlock_request(work_id, key_handle);
 
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 bool ADO_protocol_builder::recv_unlock_response(status_t& status)
@@ -796,39 +798,38 @@ bool ADO_protocol_builder::recv_unlock_request(const Buffer_header * buffer,
   return false;
 }
 
-void ADO_protocol_builder::send_unlock_response(const status_t status)
+status_t ADO_protocol_builder::send_unlock_response(const status_t status)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::UNLOCK_RESPONSE, status);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 
-void ADO_protocol_builder::send_configure_request(const uint64_t options)
+status_t ADO_protocol_builder::send_configure_request(const uint64_t options)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Configure_request(options);
-
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 bool ADO_protocol_builder::recv_configure_request(const Buffer_header * buffer,
                                                   uint64_t& options)
 {
   if(mcas::ipc::Message::is_valid(buffer) &&
-       mcas::ipc::Message::type(buffer) == MSG_TYPE::CONFIGURE_REQUEST) {
-      auto * req = reinterpret_cast<const Configure_request*>(buffer);
-      options = req->options;
-      return true;
-    }
-    return false;
+     mcas::ipc::Message::type(buffer) == MSG_TYPE::CONFIGURE_REQUEST) {
+    auto * req = reinterpret_cast<const Configure_request*>(buffer);
+    options = req->options;
+    return true;
+  }
+  return false;
 }
 
-void ADO_protocol_builder::send_configure_response(const status_t status)
+status_t ADO_protocol_builder::send_configure_response(const status_t status)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::CONFIGURE_RESPONSE, status);
-  send_callback(buffer);
+  return send_callback(buffer);
 }
 
 bool ADO_protocol_builder::recv_configure_response(status_t& status)
@@ -845,5 +846,4 @@ bool ADO_protocol_builder::recv_configure_response(status_t& status)
     return chirp->type == chirp_t::CONFIGURE_RESPONSE;
   }
   return false;
-
 }

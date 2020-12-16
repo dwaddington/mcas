@@ -503,8 +503,21 @@ namespace
     return S_OK;
   }
 
+  status_t adoSignal(
+    IADO_plugin * // ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & args_
+    , const string_view key_
+    , value_space_t & values_
+    , response_buffer_vector_t & //response_buffers_
+  )
+  {
+    std::string s(args_[0].begin(),args_[0].end());
+    PNOTICE("(%s) \tkey(%.*s) \tvalue at %p \t(%lu)",
+            s.c_str(), boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
+    return S_OK;
+  }
 
-  
   status_t basicAdoResponse(
     IADO_plugin * // ap_
     , uint64_t // work_key_
@@ -660,10 +673,12 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
 {
   (void)new_root; // unused
 
-  ASSERT_TRUE(values[0].ptr != nullptr, "ADO_testing_plugin:%s: bad parameter", __func__);
-  ASSERT_TRUE(values[0].len != 0, "ADO_testing_plugin:%s: value_len is 0", __func__);
-  ASSERT_TRUE(key_addr != nullptr, "ADO_testing_plugin:%s: bad parameter", __func__);
-  ASSERT_TRUE(key_len != 0, "ADO_testing_plugin:%s: bad parameter", __func__);
+  if(values[0].ptr)    
+    ASSERT_TRUE(values[0].len != 0, "ADO_testing_plugin:%s: value_len is 0", __func__);
+
+  
+  ASSERT_TRUE(key_addr != nullptr, "ADO_testing_plugin:%s: bad key parameter", __func__);
+  ASSERT_TRUE(key_len != 0, "ADO_testing_plugin:%s: bad key parameter", __func__);
 
   const string_view key(key_addr, key_len);
   const string_view cmd(static_cast<const char *>(in_work_request), in_work_request_len);
@@ -696,6 +711,11 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-BasicAdoResponse", basicAdoResponse },
     { "RUN!TEST-RepeatInvokeAdo", repeatInvokeAdo },
     { "RUN!TEST-BaseAddr", baseAddr },
+    { "ADO::Signal::post-erase", adoSignal },
+    { "ADO::Signal::post-put", adoSignal },
+    { "ADO::Signal::post-get", adoSignal },
+    { "ADO::Signal::post-put-direct", adoSignal },
+    { "ADO::Signal::post-get-direct", adoSignal },    
     { "BLAST ME!", other }, // used by ado-perf
     { "put", other }, // used by ado-perf
     { "erase", erase }, // used by ado-perf

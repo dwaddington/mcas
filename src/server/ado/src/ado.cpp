@@ -619,18 +619,18 @@ int main(int argc, char* argv[])
               component::IADO_plugin::response_buffer_vector_t response_buffers;
               auto * wr = reinterpret_cast<Work_request*>(buffer);
 
-              if(debug_level > 1)
+              if(debug_level > 1) 
                 PLOG("ADO process: RECEIVED Work_request: key=(%p:%.*s) value=%p "
                      "value_len=%lu invocation_len=%lu detached_value=%p (%.*s) len=%lu new=%d",
-                     common::p_fmt(wr->get_key()),
-                     int(wr->get_key_len()),
-                     wr->get_key(),
-                     wr->get_value_addr(),
+                     shard_to_local(wr->get_key()),
+                     boost::numeric_cast<int>(wr->get_key_len()),
+                     shard_to_local<char>(wr->get_key()),
+                     shard_to_local(wr->get_value_addr()),
                      wr->value_len,
                      wr->invocation_data_len,
-                     wr->get_detached_value_addr(),
+                     shard_to_local(wr->get_detached_value_addr()),
                      int(wr->detached_value_len),
-                     static_cast<char *>(wr->get_detached_value_addr()),
+                     shard_to_local<char>(wr->get_detached_value_addr()),
                      wr->detached_value_len,
                      wr->new_root);
 

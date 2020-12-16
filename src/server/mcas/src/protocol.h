@@ -629,8 +629,7 @@ class Message_IO_response : public Message_numbered_response {
   auto edata() const { return common::pointer_cast<const locate_element>(this + 1); }
   auto data() const { return common::pointer_cast<const data_t>(this + 1); }
 
-  Message_IO_response(size_t               // buffer_size
-                      ,
+  Message_IO_response(size_t /* buffer_size */,
                       uint64_t auth_id,
                       uint64_t request_id_)
       : Message_numbered_response(auth_id, (sizeof *this), id, OP_INVALID, request_id_),

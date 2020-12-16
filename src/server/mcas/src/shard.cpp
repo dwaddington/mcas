@@ -85,8 +85,9 @@ public:
 struct locked_key
 {
   common::moveable_ptr<component::IKVStore> _store;
-  IKVStore::pool_t _pool;
-  component::IKVStore::key_t _lock_handle;
+  IKVStore::pool_t                          _pool;
+  component::IKVStore::key_t                _lock_handle;
+  
   locked_key(component::IKVStore *store_, IKVStore::pool_t pool_, component::IKVStore::key_t lh_)
     : _store(store_)
     , _pool(pool_)
@@ -96,10 +97,9 @@ struct locked_key
   locked_key &operator=(const locked_key &) = delete;
   ~locked_key()
   {
-    if ( _store )
-      {
-        _store->unlock(_pool, _lock_handle);
-      }
+    if ( _store ) {
+      _store->unlock(_pool, _lock_handle);
+    }
   }
   component::IKVStore::key_t release()
   {
@@ -153,6 +153,7 @@ Shard::Shard(const Config_file &config_file,
     _handlers{},
     _locked_values_shared{},
     _locked_values_exclusive{},
+    _target_keyname_map{},
     _spaces_shared{},
     _pending_renames{},
     _tasks{},
@@ -161,6 +162,7 @@ Shard::Shard(const Config_file &config_file,
     _ado_path(config_file.get_ado_path() ? *config_file.get_ado_path() : ""),
     _ado_plugins(config_file.get_shard_ado_plugins(shard_index)),
     _ado_params(config_file.get_shard_ado_params(shard_index)),
+    _ado_signal_mask(config_file.get_shard_ado_signals(shard_index)),        
     _security(config_file.security_get_cert_path(),
               config_file.security_get_key_path(),
               config_file.get_shard_optional(config::security_mode, shard_index),
@@ -319,7 +321,8 @@ void Shard::service_cluster_signals()
     for (auto &proxy : _ado_map) {
       CPLOG(2, "Sending cluster event to ADO (%p)...", common::p_fmt(proxy.second));
 
-      proxy.second->send_cluster_event(cmsg->_sender, cmsg->_type, cmsg->_content);
+      if (proxy.second->send_cluster_event(cmsg->_sender, cmsg->_type, cmsg->_content) != S_OK)
+        throw General_exception("send_cluster_event to ADO failed");
     }
 
     delete cmsg;
@@ -778,10 +781,11 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
 
                 /* send message to ADO, but perform closure only
                    when a response is given back from the ADO.
-                   we can't block here though - the shard
+                   we can't block here because the shard
                    thread must keep going to avoid cross-client
                    degradation */
-                ado_itf->send_op_event(ADO_op::POOL_DELETE);
+                if (ado_itf->send_op_event(ADO_op::POOL_DELETE) != S_OK)
+                  throw General_exception("send_op_event to ADO failed");
               }
               else {
                 /* close and delete pool */
@@ -986,7 +990,8 @@ void Shard::release_pending_rename(const void *target)
     if (_i_kvstore->swap_keys(info.pool, info.from, info.to) != S_OK)
       throw Logic_exception("%s swap_keys failed", __func__);
 
-    if (_i_kvstore->erase(info.pool, info.from) != S_OK) throw Logic_exception("%s erase failed", __func__);
+    if (_i_kvstore->erase(info.pool, info.from) != S_OK)
+      throw Logic_exception("%s erase failed", __func__);
 
     _pending_renames.erase(target);
 
@@ -1001,33 +1006,140 @@ void Shard::release_pending_rename(const void *target)
 }
 
 /* like respond2, but omits the final post */
-auto Shard::respond1(const Connection_handler *handler_,
-                     buffer_t *iob_,
-                     const protocol::Message_IO_request *msg_,
-                     int status_) -> protocol::Message_IO_response *
+protocol::Message_IO_response * Shard::prepare_response(const Connection_handler *handler_,
+                                                buffer_t *iob_,
+                                                uint64_t request_id,
+                                                int status_)
 {
   auto response =
-    new (iob_->base()) protocol::Message_IO_response(iob_->length(), handler_->auth_id(), msg_->request_id());
+    new (iob_->base()) protocol::Message_IO_response(iob_->length(), handler_->auth_id(), request_id);
   response->set_status(status_);
 
   iob_->set_length(response->base_message_size());
   return response;
 }
 
-void Shard::respond2(Connection_handler *handler_,
+void Shard::respond(Connection_handler *handler_,
                      buffer_t *iob_,
                      const protocol::Message_IO_request *msg_,
                      int status_,
                      const char * func_)
 {
-  auto response = respond1(handler_, iob_, msg_, status_);
+  auto response = prepare_response(handler_, iob_, msg_->request_id(), status_);
   handler_->post_response(iob_, response, func_);  // issue IO request response
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//   GET LOCATE    //
+/////////////////////
+void Shard::io_response_get_locate(Connection_handler *handler,
+                                   const protocol::Message_IO_request *msg,
+                                   buffer_t *iob)
+{
+  CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", common::p_fmt(this),
+        static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
+
+  /* open memory */
+  assert(msg->pool_id() > 0);
+
+  auto status = S_OK;
+
+  std::string k = msg->skey();
+
+  /* lock value */
+  component::IKVStore::key_t key_handle;
+  void *                     target     = nullptr;
+  size_t                     target_len = 0;
+  status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, target, target_len, key_handle);
+
+  if ( ! is_locked(rc) ) { status = E_FAIL; }
+
+  if (key_handle == component::IKVStore::KEY_NONE) {
+    PWRN("%s failed to lock value returned KEY_NONE", __func__);
+    status = E_FAIL;
+  }
+
+  if (status != S_OK) {
+    respond(handler, iob, msg, status, __func__);
+    ++_stats.op_failed_request_count;
+  }
+  else {
+    locked_key lk(_i_kvstore.get(), msg->pool_id(), key_handle);
+
+    assert(target);
+    auto pool_id = msg->pool_id();
+
+    std::uint64_t key = 0;
+    try  {
+      memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
+      key = mr.key();
+      /* register clean and deregister tasks for value */
+      add_locked_value_shared(pool_id, lk.release(), target, target_len, std::move(mr));
+
+      /* record key for signaling */
+      if (ado_signal_post_get_direct())
+        add_target_keyname(target, k);
+    }
+    catch ( const std::exception &e ) {
+      PWRN("%s failed: %s", __func__, e.what());
+      status = E_FAIL;
+    }
+
+    auto response  = prepare_response(handler, iob, msg->request_id(), status);
+    response->addr = reinterpret_cast<std::uint64_t>(target);
+    response->key  = key;
+    response->set_data_len_without_data(target_len);
+
+    handler->post_send_buffer(iob, response, __func__);
+
+    /* update stats */
+    _stats.op_get_direct_count++;
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//   GET RELEASE   //
+/////////////////////
+void Shard::io_response_get_release(Connection_handler *handler,
+                                    const protocol::Message_IO_request *msg,
+                                    buffer_t *iob)
+{
+  auto target = reinterpret_cast<const void *>(msg->addr);
+  CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
+        target, msg->request_id());
+
+  int status = S_OK;
+  try {
+    release_locked_value_shared(target);
+  }
+  catch (const Logic_exception &) {
+    status = E_INVAL;
+  }
+  ++_stats.op_get_count;
+
+  if (ado_signal_post_get_direct()) {
+    auto skey = release_target_keyname(target); /* recover key and remove entry from map */
+    signal_ado("post-get-direct",
+               handler,
+               msg->request_id(),
+               msg->pool_id(),
+               skey,
+               IKVStore::lock_type_t::STORE_LOCK_READ);
+    /* note: client will be signalled on return of this ADO call,
+       therefore if the ADO operation stalls, the client will be stalled too.
+     */
+  }
+  else {
+    respond(handler, iob, msg, status, __func__);
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////
 //   PUT ADVANCE   //
 /////////////////////
-void Shard::io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_advance(Connection_handler *handler,
+                                    const protocol::Message_IO_request *msg,
+                                    buffer_t *iob)
 {
   CPLOG(2, "PUT_ADVANCE: (%p) key=(%.*s) value_len=%zu request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1039,7 +1151,7 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
   if (msg->flags() & IKVStore::FLAGS_DONT_STOMP) {
     PWRN("PUT_ADVANCE failed IKVStore::FLAGS_DONT_STOMP not viable");
     _stats.op_failed_request_count++;
-    respond2(handler, iob, msg, E_INVAL, __func__);
+    respond(handler, iob, msg, E_INVAL, __func__);
   }
   else {
     auto status = S_OK;
@@ -1068,7 +1180,7 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
     }
 
     if (status != S_OK) {
-      respond2(handler, iob, msg, status, __func__);
+      respond(handler, iob, msg, status, __func__);
       ++_stats.op_failed_request_count;
     }
     else {
@@ -1086,6 +1198,10 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
           /* register clean and rename tasks for value */
           add_locked_value_exclusive(pool_id, lk.release(), target, target_len, std::move(mr));
           add_pending_rename(pool_id, target, k, actual_key);
+
+          /* record key for signaling */
+          if (ado_signal_post_put_direct())
+            add_target_keyname(target, k);
         }
       catch ( const std::exception &e )
         {
@@ -1093,7 +1209,7 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
           status = E_FAIL;
         }
 
-      auto response  = respond1(handler, iob, msg, status);
+      auto response  = prepare_response(handler, iob, msg->request_id(), status);
       response->addr = reinterpret_cast<std::uint64_t>(target);
       response->key  = key;
 
@@ -1106,93 +1222,11 @@ void Shard::io_response_put_advance(Connection_handler *handler, const protocol:
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//   GET LOCATE    //
+//   PUT LOCATE    //
 /////////////////////
-void Shard::io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
-{
-  CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", common::p_fmt(this),
-        static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
-
-  /* open memory */
-  assert(msg->pool_id() > 0);
-
-  auto status = S_OK;
-
-  std::string k = msg->skey();
-
-  /* lock value */
-  component::IKVStore::key_t key_handle;
-  void *                     target     = nullptr;
-  size_t                     target_len = 0;
-  status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, target, target_len, key_handle);
-
-  if ( ! is_locked(rc) ) { status = E_FAIL; }
-
-  if (key_handle == component::IKVStore::KEY_NONE) {
-    PWRN("%s failed to lock value returned KEY_NONE", __func__);
-    status = E_FAIL;
-  }
-
-  if (status != S_OK) {
-    respond2(handler, iob, msg, status, __func__);
-    ++_stats.op_failed_request_count;
-  }
-  else {
-    locked_key lk(_i_kvstore.get(), msg->pool_id(), key_handle);
-
-    assert(target);
-    auto pool_id = msg->pool_id();
-
-    std::uint64_t key = 0;
-    try
-      {
-        memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
-        key = mr.key();
-        /* register clean and deregister tasks for value */
-        add_locked_value_shared(pool_id, lk.release(), target, target_len, std::move(mr));
-      }
-    catch ( const std::exception &e )
-      {
-        PLOG("%s failed: %s", __func__, e.what());
-        status = E_FAIL;
-      }
-
-    auto response  = respond1(handler, iob, msg, status);
-    response->addr = reinterpret_cast<std::uint64_t>(target);
-    response->key  = key;
-    response->set_data_len_without_data(target_len);
-
-    handler->post_send_buffer(iob, response, __func__);
-
-    /* update stats */
-    _stats.op_get_direct_count++;
-  }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-//   GET RELEASE   //
-/////////////////////
-void Shard::io_response_get_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
-{
-  auto target = reinterpret_cast<const void *>(msg->addr);
-  CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
-        target, msg->request_id());
-
-  int status = S_OK;
-  try {
-    release_locked_value_shared(target);
-  }
-  catch (const Logic_exception &) {
-    status = E_INVAL;
-  }
-  ++_stats.op_get_count;
-  respond2(handler, iob, msg, status, __func__);
-}
-
-/////////////////////////////////////////////////////////////////////////////
-//   PUT LOCATE   //
-/////////////////////
-void Shard::io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
+void Shard::io_response_put_locate(Connection_handler *handler,
+                                   const protocol::Message_IO_request *msg,
+                                   buffer_t *iob)
 {
   CPLOG(2, "PUT_LOCATE: (%p) key=(%.*s) value_len=0x%zu request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
@@ -1204,7 +1238,7 @@ void Shard::io_response_put_locate(Connection_handler *handler, const protocol::
   if (msg->flags() & IKVStore::FLAGS_DONT_STOMP) {
     PWRN("PUT_ADVANCE failed IKVStore::FLAGS_DONT_STOMP not viable");
     _stats.op_failed_request_count++;
-    respond2(handler, iob, msg, E_INVAL, __func__);
+    respond(handler, iob, msg, E_INVAL, __func__);
   }
   else {
     auto status = S_OK;
@@ -1230,7 +1264,7 @@ void Shard::io_response_put_locate(Connection_handler *handler, const protocol::
     }
 
     if (status != S_OK) {
-      respond2(handler, iob, msg, status, __func__);
+      respond(handler, iob, msg, status, __func__);
       ++_stats.op_failed_request_count;
     }
     else {
@@ -1246,6 +1280,9 @@ void Shard::io_response_put_locate(Connection_handler *handler, const protocol::
           /* register clean and rename tasks for value */
           add_locked_value_exclusive(pool_id, lk.release(), target, target_len, std::move(mr));
           add_pending_rename(pool_id, target, k, actual_key);
+
+          if (ado_signal_enabled())
+            add_target_keyname(target, actual_key);
         }
       catch ( const std::exception &e )
         {
@@ -1253,7 +1290,7 @@ void Shard::io_response_put_locate(Connection_handler *handler, const protocol::
           status = E_FAIL;
         }
 
-      auto response  = respond1(handler, iob, msg, status);
+      auto response  = prepare_response(handler, iob, msg->request_id(), status);
       response->addr = reinterpret_cast<std::uint64_t>(target);
       response->key  = key;
 
@@ -1273,7 +1310,9 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
   auto target = reinterpret_cast<const void *>(msg->addr);
   CPLOG(2, "PUT_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
         target, msg->request_id());
+
   int status = S_OK;
+  
   try {
     release_locked_value_exclusive(target);
     release_pending_rename(target);
@@ -1281,8 +1320,24 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
   catch (const Logic_exception &) {
     status = E_INVAL;
   }
+
   ++_stats.op_put_count;
-  respond2(handler, iob, msg, status, __func__);
+
+  if (ado_signal_post_put_direct()) {
+    auto skey = release_target_keyname(target); /* recover key and remove entry from map */
+    signal_ado("post-put-direct",
+               handler,
+               msg->request_id(),
+               msg->pool_id(),
+               skey,
+               IKVStore::lock_type_t::STORE_LOCK_READ);
+    /* note: client will be signalled on return of this ADO call,
+       therefore if the ADO operation stalls, the client will be stalled too.
+     */
+  }
+  else {
+    respond(handler, iob, msg, status, __func__);
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1304,13 +1359,13 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
   {
     int status = S_OK;
     if (UNLIKELY(msg->is_scbe())) {
-      // short-circuit backend
+      // short-circuit backend - testing only
       CPLOG(2, "PUT: short-circuited backend");
     }
     else {
-      const std::string k = msg->skey();
+      const std::string key = msg->skey();
 
-      status = _i_kvstore->put(msg->pool_id(), k, msg->value(), msg->get_value_len(), msg->flags());
+      status = _i_kvstore->put(msg->pool_id(), key, msg->value(), msg->get_value_len(), msg->flags());
 
       if (debug_level() > 2) {
         if (status == E_ALREADY_EXISTS) {
@@ -1322,11 +1377,26 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
         }
       }
 
-      add_index_key(msg->pool_id(), k);
+      add_index_key(msg->pool_id(), key);
+
+      /* optional ado signaling of put event */
+      if (ado_signal_post_put()) {
+        signal_ado("post-put",
+                   handler,
+                   msg->request_id(),
+                   msg->pool_id(),
+                   key,
+                   IKVStore::lock_type_t::STORE_LOCK_READ);
+        /* note: client will be signalled on return of this ADO call,
+           therefore if the ADO operation stalls, the client will be stalled too.
+        */
+      }
     }
     /* update stats */
     ++_stats.op_put_count;
-    respond2(handler, iob, msg, status, __func__);
+
+    if (!ado_signal_post_put())
+      respond(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1336,44 +1406,45 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
 void Shard::io_response_get(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   if (debug_level() > 2)
-    PMAJOR("GET: (%p) (request=%lu,buffer_size=%zu) key=(%.*s) ", common::p_fmt(this), msg->request_id(),
+    PMAJOR("GET: (%p) (request=%lu,buffer_size=%zu) key=(%.*s) ",
+           common::p_fmt(this), msg->request_id(),
            msg->get_value_len(), int(msg->key_len()), msg->key());
 
   if (msg->is_scbe()) {
     CPLOG(2, "GET: short-circuited backend");
-    {
-      respond2(handler, iob, msg, S_OK, __func__);
-    }
+
+    respond(handler, iob, msg, S_OK, __func__);
   }
   else {
     ::iovec value_out{nullptr, 0};
     std::string k             = msg->skey();
 
     component::IKVStore::key_t key_handle;
-    status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, value_out.iov_base, value_out.iov_len, key_handle);
+    status_t rc = _i_kvstore->lock(msg->pool_id(),
+                                   k,
+                                   IKVStore::STORE_LOCK_READ,
+                                   value_out.iov_base,
+                                   value_out.iov_len,
+                                   key_handle);
 
     if ( ! is_locked(rc) || key_handle == component::IKVStore::KEY_NONE) { /* key not found */
       CPLOG(2, "Shard: locking value failed");
-
-      {
-        respond2(handler, iob, msg, rc, __func__);
-      }
+      respond(handler, iob, msg, rc, __func__);
       ++_stats.op_failed_request_count;
     }
     else {
       locked_key lk(_i_kvstore.get(), msg->pool_id(), key_handle);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-      CPLOG(2, "Shard: locked OK: value_out=%p (%.*s ...) value_out_len=%lu", value_out.iov_base, int(min(value_out.iov_len, 20)),
+
+      CPLOG(2, "Shard: locked OK: value_out=%p (%.*s ...) value_out_len=%lu", value_out.iov_base,
+            boost::numeric_cast<int>(min(boost::numeric_cast<int>(value_out.iov_len), 20)),
             static_cast<char *>(value_out.iov_base), value_out.iov_len);
-#pragma GCC diagnostic pop
 
       assert(value_out.iov_len);
       assert(value_out.iov_base);
 
       /*
        * The value is returned in one of three places:
-       *   (1) ! direcT *and* below TWO_STAGE_THRESHOLD     : adjoining the
+       *   (1) ! direct *and* below TWO_STAGE_THRESHOLD     : adjoining the
        * message On completion the single buffer_t will be resturned as with any
        * response (2) ! direct *and* would fit in a receive buffer : two buffers
        * in one packet (what is a packet?) On completion of the single post: (a)
@@ -1389,19 +1460,35 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
        * about the value of TWO_STAGE_THRESHOLD?
        */
       bool is_direct = msg->is_direct();
+      
       /* optimize based on size */
       if (!is_direct && (value_out.iov_len < TWO_STAGE_THRESHOLD)) {
+
         /* value can fit in message buffer, let's copy instead of
            performing two-part DMA */
         CPLOG(2, "Shard: performing memcpy for small get");
 
-        {
-          auto response = respond1(handler, iob, msg, S_OK);
+        if(ado_signal_post_get()) {
+
+          /* actually, this will override the memcpy optimization and
+             do a dual buffer send. */
+          _i_kvstore->unlock(msg->pool_id(), lk.release(), IKVStore::UNLOCK_FLAGS_FLUSH);
+
+          signal_ado("post-get",
+                     handler,
+                     msg->request_id(),
+                     msg->pool_id(),
+                     k,
+                     IKVStore::lock_type_t::STORE_LOCK_READ,
+                     true /* special 'get' response */);
+        }
+        else {
+          auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
           response->copy_in_data(value_out.iov_base, value_out.iov_len);
           iob->set_length(response->msg_len());
 
           _i_kvstore->unlock(msg->pool_id(), lk.release(), IKVStore::UNLOCK_FLAGS_FLUSH);
-
+          
           handler->post_response(iob, response, __func__);
         }
 
@@ -1411,45 +1498,58 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
         CPLOG(2, "Shard: get using two stage get response (value_out_len=%lu)", value_out.iov_len);
 
         size_t client_side_value_len = msg->get_value_len();
+        
         /* check if client has allocated sufficient space */
         if (client_side_value_len < value_out.iov_len) {
           _i_kvstore->unlock(msg->pool_id(), lk.release()); /* no flush needed ? */
-          PWRN("Shard: responding with Client posted insufficient space.");
+          PWRN("Shard: client posted insufficient space for get operation.");
           ++_stats.op_failed_request_count;
-          respond2(handler, iob, msg, E_INSUFFICIENT_SPACE, __func__);
+          respond(handler, iob, msg, E_INSUFFICIENT_SPACE, __func__);
         }
         else {
-          try
-            {
-              memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);
-              // auto mr = make_memory_registered(debug_level(), handler, target,
-              // target_len, 0, 0);
-              auto desc = mr.desc();
+          try {
+            memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);
+            
+            auto desc = mr.desc();
+            auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
+            
+            response->set_data_len_without_data(value_out.iov_len);
+            assert(response->get_status() == S_OK);
+            
+            /* register clean up task for value */
+            add_locked_value_shared(msg->pool_id(), lk.release(), value_out.iov_base, value_out.iov_len, std::move(mr));
+            
+            if (!is_direct && (value_out.iov_len <= (handler->IO_buffer_size() - response->base_message_size()))) {
+              CPLOG(2, "posting response header and value together");
+              
+              /* post both buffers together in same response packet */
+              if(ado_signal_post_get()) {
 
-              auto response = respond1(handler, iob, msg, S_OK);
+                signal_ado("post-get",
+                           handler,
+                           msg->request_id(),
+                           msg->pool_id(),
+                           k,
+                           IKVStore::lock_type_t::STORE_LOCK_READ,
+                           true);
 
-              response->set_data_len_without_data(value_out.iov_len);
-
-              assert(response->get_status() == S_OK);
-              /* register clean up task for value */
-              add_locked_value_shared(msg->pool_id(), lk.release(), value_out.iov_base, value_out.iov_len, std::move(mr));
-
-              if (!is_direct && (value_out.iov_len <= (handler->IO_buffer_size() - response->base_message_size()))) {
-                CPLOG(2, "posting response header and value together");
-
-                /* post both buffers together in same response packet */
-                handler->post_response2(iob, value_out, desc, response, __func__);
+                /* note: client will be signalled on return of this ADO call,
+                   therefore if the ADO operation stalls, the client will be stalled too.
+                */
               }
               else {
-                /* client should have used GET_LOCATE */
-                respond2(handler, iob, msg, component::IKVStore::E_TOO_LARGE, __func__);
+                handler->post_response_with_value(iob, value_out, desc, response, __func__);
               }
             }
-          catch ( const std::exception &e )
-            {
-              PLOG("%s failed: %s", __func__, e.what());
-              respond2(handler, iob, msg, E_FAIL, __func__);
+            else {
+              /* client should have used GET_LOCATE */
+              respond(handler, iob, msg, component::IKVStore::E_TOO_LARGE, __func__);
             }
+          }
+          catch ( const std::exception &e ) {
+            PLOG("%s failed: %s", __func__, e.what());
+            respond(handler, iob, msg, E_FAIL, __func__);
+          }
           _stats.op_get_twostage_count++;
         }
       }
@@ -1462,17 +1562,37 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
 /////////////////////
 void Shard::io_response_erase(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-  std::string k = msg->skey();
+  std::string key = msg->skey();
 
-  auto status = _i_kvstore->erase(msg->pool_id(), k);
+  status_t status;
+  
+  if (ado_signal_post_erase()) {
 
-  if (status == S_OK)
-    remove_index_key(msg->pool_id(), k);
-  else
+    /* actually it may not have been erased by the time the
+       notification goes through.  We're just sending an
+       asynchronous notification of erase to the ADO.
+       if we want a pre-erase with guarantees we'll have to
+       support a "deferred" erase (similar to unlock).
+    */
+    signal_ado_async_nolock("post-erase", 
+                            handler,
+                            msg->request_id(),
+                            msg->pool_id(),
+                            key);
+  }  
+
+  status = _i_kvstore->erase(msg->pool_id(), key);
+
+  if (status == S_OK) {
+    remove_index_key(msg->pool_id(), key);
+  }
+  else {
     _stats.op_failed_request_count++;
+  }
 
   _stats.op_erase_count++;
-  respond2(handler, iob, msg, status, __func__);
+
+  respond(handler, iob, msg, status, __func__);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1481,7 +1601,7 @@ void Shard::io_response_erase(Connection_handler *handler, const protocol::Messa
 void Shard::io_response_configure(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
   if (debug_level() > 1) PMAJOR("Shard: pool CONFIGURE (%s)", msg->cmd());
-  respond2(handler, iob, msg, process_configure(msg), __func__);
+  respond(handler, iob, msg, process_configure(msg), __func__);
 }
 
 void Shard::process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg)
@@ -1555,21 +1675,27 @@ auto region_breaks(const std::vector<byte_span> regions_) -> std::vector<byte_sp
 }
 }  // namespace
 
-auto Shard::offset_to_sg_list(
-                              range<std::uint64_t> t
-                              , const std::vector<byte_span> &region_breaks_
-                              ) -> sg_result
+auto Shard::offset_to_sg_list(range<std::uint64_t> t,
+                              const std::vector<byte_span> &region_breaks_) -> sg_result
 {
   CPLOG(2, "region break count %zu", region_breaks_.size());
   for (const auto &e : region_breaks_) {
     CPLOG(2, "region break %p len 0x%zx", ::base(e), ::size(e));
   }
-  auto it_begin = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.first, [](const uint64_t a, const byte_span &b) {
-                                                                                            return a < reinterpret_cast<std::uint64_t>(::data(b));
-                                                                                          });
-  auto it_end   = std::upper_bound(region_breaks_.begin(), region_breaks_.end(), t.second, [](const uint64_t a, const byte_span &b) {
-                                                                                             return a < reinterpret_cast<std::uint64_t>(::data(b));
-                                                                                           });
+
+  auto it_begin = std::upper_bound(region_breaks_.begin(),
+                                   region_breaks_.end(),
+                                   t.first,
+                                   [](const uint64_t a, const byte_span &b) {
+                                     return a < reinterpret_cast<std::uint64_t>(::data(b));
+                                   });
+
+  auto it_end   = std::upper_bound(region_breaks_.begin(),
+                                   region_breaks_.end(),
+                                   t.second,
+                                   [](const uint64_t a, const byte_span &b) {
+                                     return a < reinterpret_cast<std::uint64_t>(::data(b));
+                                   });
 
   CPLOG(2, "it_begin %zu it_end %zu", it_begin - region_breaks_.begin(), it_end - region_breaks_.begin());
 
@@ -1660,7 +1786,7 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
       }
 
     /* respond, with the scatter-gather list as "data" */
-    auto response = respond1(handler, iob, msg, status);
+    auto response = prepare_response(handler, iob, msg->request_id(), status);
     if ( status == S_OK )
       {
         response->copy_in_data(&sgr.sg_list.front(), sgr.sg_list.size() * sizeof *sgr.sg_list.begin());
@@ -1670,14 +1796,14 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
       }
     else
       {
-        respond2(handler, iob, msg, status, __func__);
+        respond(handler, iob, msg, status, __func__);
       }
 
     /* update stats */
     ++_stats.op_get_direct_offset_count;
   }
   else {
-    respond2(handler, iob, msg, status, __func__);
+    respond(handler, iob, msg, status, __func__);
   }
 }
 
@@ -1699,7 +1825,7 @@ void Shard::io_response_release(Connection_handler *handler, const protocol::Mes
           t.first, t.second, e.cause());
     status = E_INVAL;
   }
-  respond2(handler, iob, msg, status, __func__);
+  respond(handler, iob, msg, status, __func__);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1723,10 +1849,9 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
       for ( const auto &e : sgr.sg_list )
         {
           auto s = _i_kvstore->flush_pool_memory(msg->pool_id(), reinterpret_cast<const void *>(e.addr), e.len);
-          if ( status == S_OK )
-            {
-              status = s;
-            }
+          if ( status == S_OK ) {
+            status = s;
+          }
         }
 
       release_space_shared(t);
@@ -1737,7 +1862,7 @@ void Shard::io_response_release_with_flush(Connection_handler *handler, const pr
       status = E_INVAL;
     }
   }
-  respond2(handler, iob, msg, status, __func__);
+  respond(handler, iob, msg, status, __func__);
 }
 
 void Shard::process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr_)
@@ -1970,7 +2095,7 @@ status_t Shard::process_configure(const protocol::Message_IO_request *msg)
                                      [p](const std::string &key)
                                      {
                                        p->second->insert(key);
-                                     return 0;
+                                       return 0;
                                      })) != S_OK) {
         
         /* alternative when map_keys method optimization is not supported on main engine */
