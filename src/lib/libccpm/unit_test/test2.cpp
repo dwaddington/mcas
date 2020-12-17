@@ -146,7 +146,7 @@ TEST_F(Libccpm_test, ccpm_cca)
   {
     ccpm::region_vector_t rv_bad(
       ccpm::region_vector_t::value_type(
-        common::make_byte_span(static_cast<gsl::byte *>(pr)+8, size)
+        common::make_byte_span(static_cast<common::byte *>(pr)+8, size)
       )
     );
     try

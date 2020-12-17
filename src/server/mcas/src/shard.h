@@ -28,9 +28,9 @@
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/spsc_bounded_queue.h>
+#include <common/string_view.h>
 
 #include <csignal> /* sig_atomic_t */
-#include <experimental/string_view>
 #include <list>
 #include <memory>
 #include <string>

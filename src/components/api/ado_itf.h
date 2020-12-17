@@ -27,11 +27,11 @@
 #include <common/byte_span.h>
 #include <common/errors.h>
 #include <common/pointer_cast.h>
+#include <common/string_view.h>
 #include <common/types.h>
 #include <common/time.h>
 #include <component/base.h>
 
-#include <experimental/string_view>
 #include <functional>
 #include <map>
 #include <string>
@@ -99,7 +99,7 @@ public:
   */
   static constexpr int S_ERASE_TARGET = S_USER0;
 
-  using byte_string_view = std::experimental::basic_string_view<gsl::byte>;
+  using byte_string_view = std::experimental::basic_string_view<common::byte>;
 
   /* Used to define the set of buffers to return to client. The first
      buffer in the vector will be copied into the return message and

@@ -22,7 +22,7 @@
 #include <nupm/region_descriptor.h>
 #include <common/byte_span.h>
 #include <common/pointer_cast.h>
-#include <experimental/string_view>
+#include <common/string_view.h>
 #include <memory>
 #include <sstream>
 #include <stdexcept>

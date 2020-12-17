@@ -31,7 +31,7 @@ namespace common
   struct memory_mapped : public moveable_struct<::iovec, iovec_moveable_traits>
   {
     using byte_span = common::byte_span;
-    using byte = gsl::byte;
+    using byte = common::byte;
   private:
     byte *iov_end() const { return ::data_end(*this); }
   public:
@@ -58,7 +58,7 @@ namespace common
 namespace
 {
   inline auto base(const common::memory_mapped &m) { return m.iov_base; }
-  inline auto data(const common::memory_mapped &m) { return static_cast<gsl::byte *>(::base(m)); }
+  inline auto data(const common::memory_mapped &m) { return static_cast<common::byte *>(::base(m)); }
   inline auto size(const common::memory_mapped &m) { return m.iov_len; }
   inline auto data_end(const common::memory_mapped &m) { return ::data(m) + ::size(m); }
   inline void *end(const common::memory_mapped &m) { return data_end(m); }

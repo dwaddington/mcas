@@ -11,8 +11,8 @@
    limitations under the License.
 */
 
-#ifndef _MCAS_COMMON_IOVEC_
-#define _MCAS_COMMON_IOVEC_
+#ifndef _MCAS_COMMON_BYTE_SPAN_
+#define _MCAS_COMMON_BYTE_SPAN_
 
 #include <common/pointer_cast.h>
 #include <cstddef>
@@ -25,8 +25,10 @@
 
 namespace common
 {
+	using byte = gsl::byte; /* can be std::byte in C++17 */
+	template <typename T> using span = gsl::span<T>; /* can be std::span in C++17 */
 	/* span of a const area. No equivalent in ::iovec, so always use span */
-	using const_byte_span = gsl::span<const gsl::byte>;
+	using const_byte_span = span<const byte>;
 	inline const_byte_span make_const_byte_span(const void *base, std::size_t len)
     {
       return const_byte_span(static_cast<const_byte_span::pointer>(base), len);
@@ -41,9 +43,9 @@ namespace
     /* Length of area in bytes, for use in byte-based address calculations and comparisons */
 	inline std::size_t size(const common::const_byte_span &r) { return r.size(); }
 	/* Start of area as byte *, for use in byte-based address calculations and comparisons */
-	inline const gsl::byte *data(const common::const_byte_span &r) { return r.data(); }
+	inline const common::byte *data(const common::const_byte_span &r) { return r.data(); }
 	/* End of area as byte *, for use in byte-based address calculations and comparisons */
-	inline const gsl::byte *data_end(const common::const_byte_span &r) { return r.data() + r.size(); }
+	inline const common::byte *data_end(const common::const_byte_span &r) { return r.data() + r.size(); }
 	/* End of are as a void *, for use with %p format */
 	inline const void *end(const common::const_byte_span &r) { return ::data_end(r); }
 }
@@ -53,8 +55,8 @@ namespace
 	/* Same accessors as above, for ::iovec */
 	inline void *base(const ::iovec &r) { return r.iov_base; }
 	inline std::size_t size(const ::iovec &r) { return r.iov_len; }
-	inline gsl::byte *data(const ::iovec &r) { return static_cast<gsl::byte *>(::base(r)); }
-	inline gsl::byte *data_end(const ::iovec &r) { return ::data(r) + ::size(r); }
+	inline common::byte *data(const ::iovec &r) { return static_cast<common::byte *>(::base(r)); }
+	inline common::byte *data_end(const ::iovec &r) { return ::data(r) + ::size(r); }
 	inline void *end(const ::iovec &r) { return ::data_end(r); }
 }
 
@@ -77,7 +79,7 @@ namespace common
 #include <common/pointer_cast.h>
 namespace common
 {
-	using byte_span = gsl::span<gsl::byte>;
+	using byte_span = span<byte>;
 }
 
 namespace
@@ -85,8 +87,8 @@ namespace
 	/* Same accessors as above, for non-const byte span */
 	inline void *base(const common::byte_span &r) { return r.data(); }
 	inline std::size_t size(const common::byte_span &r) { return r.size(); }
-	inline gsl::byte *data(const common::byte_span &r) { return r.data(); }
-	inline gsl::byte *data_end(const common::byte_span &r) { return ::data(r) + ::size(r); }
+	inline common::byte *data(const common::byte_span &r) { return r.data(); }
+	inline common::byte *data_end(const common::byte_span &r) { return ::data(r) + ::size(r); }
 	inline void *end(const common::byte_span &r) { return ::data_end(r); }
 }
 

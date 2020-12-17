@@ -26,11 +26,11 @@
 #include <boost/icl/interval_set.hpp>
 #include <common/byte_span.h>
 #include <common/exceptions.h> /* General_exception */
+#include <common/string_view.h>
 #include <nupm/region_descriptor.h>
 
 #include <sys/uio.h> /* iovec */
 
-#include <experimental/string_view>
 #include <algorithm>
 #include <array>
 #include <cstddef> /* size_t, ptrdiff_t */

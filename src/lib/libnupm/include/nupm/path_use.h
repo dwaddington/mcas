@@ -21,7 +21,7 @@
 #define _NUPM_PATH_USE_H_
 
 #include <common/logging.h>
-#include <experimental/string_view>
+#include <common/string_view.h>
 #include <string>
 
 namespace nupm

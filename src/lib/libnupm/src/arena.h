@@ -16,10 +16,10 @@
 
 #include <nupm/region_descriptor.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <gsl/pointers> /* not_null */
 #include <sys/uio.h> /* ::iovec */
 
-#include <experimental/string_view>
 #include <cstddef>
 #include <vector>
 

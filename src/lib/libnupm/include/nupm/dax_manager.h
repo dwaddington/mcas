@@ -31,8 +31,8 @@
 #include <common/logging.h>
 #include <common/memory_mapped.h>
 #include <common/moveable_ptr.h>
+#include <common/string_view.h>
 #include <experimental/filesystem>
-#include <experimental/string_view>
 #include <boost/icl/interval_set.hpp>
 #include <map>
 #include <mutex>
@@ -68,7 +68,7 @@ struct registry_memory_mapped
 struct dax_manager : protected common::log_source, private registry_memory_mapped {
  private:
   static constexpr const char *_cname = "dax_manager";
-  using byte = gsl::byte;
+  using byte = common::byte;
 
  public:
   using arena_id_t = unsigned;

@@ -24,6 +24,7 @@
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/pointer_cast.h>
+#include <common/string_view.h>
 #include <common/utils.h>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -368,8 +369,8 @@ class Message_numbered_request : public Message {
   uint64_t _pool_id;
  protected:
   template <typename T>
-    using basic_string_view = std::experimental::basic_string_view<T>;
-  using byte = gsl::byte;
+    using basic_string_view = common::basic_string_view<T>;
+  using byte = common::byte;
 
  public:
   Message_numbered_request(uint64_t    auth_id_,

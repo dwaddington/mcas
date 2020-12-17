@@ -127,7 +127,7 @@ std::pair<std::vector<common::byte_span>, std::size_t> get_mapping(const fs::pat
 	f >> addr >> size;
 	while ( f.good() )
 	{
-		m.push_back(common::make_byte_span(reinterpret_cast<gsl::byte *>(addr), size));
+		m.push_back(common::make_byte_span(reinterpret_cast<common::byte *>(addr), size));
 		covered += size;
 #if 0
 		PLOG("%s %s: %p, 0x%zx", __func__, path_map.c_str(), common::p_fmt(m.back().data()), m.back().size());

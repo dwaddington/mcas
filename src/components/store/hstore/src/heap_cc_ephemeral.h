@@ -23,11 +23,11 @@
 
 #include <ccpm/interfaces.h> /* ownership_callback, (IHeap_expandable, region_vector_t) */
 #include <common/byte_span.h>
+#include <common/string_view.h>
 #include <nupm/region_descriptor.h>
 
 #include <sys/uio.h> /* iovec */
 
-#include <experimental/string_view>
 #include <algorithm> /* min, swap */
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <memory> /* unique_ptr */

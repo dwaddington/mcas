@@ -18,10 +18,10 @@
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
 #include <boost/optional.hpp>
+#include <common/byte_span.h>
 #include <common/pointer_cast.h>
-#include <gsl/gsl_byte> /* std::byte in c++20 */
+#include <common/string_view.h>
 
-#include <experimental/string_view> /* std::string_view in c++20 */
 #include <cstdint> /* uint16_t */
 #include <memory>
 
@@ -80,7 +80,7 @@ public:
   using key_t           = IKVStore::key_t;
   using Attribute       = IKVStore::Attribute;
   using Addr            = IKVStore::Addr;
-  using byte            = gsl::byte;
+  using byte            = common::byte;
   
   template <typename T>
     using basic_string_view = std::experimental::basic_string_view<T>;

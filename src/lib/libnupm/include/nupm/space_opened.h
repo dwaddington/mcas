@@ -25,11 +25,11 @@
 #include <common/logging.h> /* log_source */
 #include <common/memory_mapped.h>
 #include <common/moveable_ptr.h>
+#include <common/string_view.h>
 #include <common/types.h> /* addr_t */
 #include <gsl/pointers>
 #include <cassert>
 #include <cstddef>
-#include <experimental/string_view>
 #include <string>
 #include <vector>
 
@@ -45,7 +45,7 @@ private:
   std::vector<common::memory_mapped> _iovm;
 
   std::vector<common::memory_mapped> address_coverage_check(std::vector<common::memory_mapped> &&iovm);
-  using byte = gsl::byte;
+  using byte = common::byte;
   using byte_span = common::byte_span;
 public:
 #if 0

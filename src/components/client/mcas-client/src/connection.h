@@ -27,6 +27,7 @@
 #include <common/exceptions.h>
 #include <common/utils.h>
 #include <common/byte_buffer.h>
+#include <common/string_view.h>
 #include <gsl/gsl_byte>
 #include <gsl/pointers>
 #include <sys/mman.h>
@@ -37,7 +38,6 @@
 #include <gnutls/crypto.h>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <experimental/string_view>
 #include <map>
 #include <set>
 #include <tuple>
@@ -93,8 +93,8 @@ public:
 
   using memory_region_t = typename Transport::memory_region_t;
   template <typename T>
-    using basic_string_view = std::experimental::basic_string_view<T>;
-  using byte = gsl::byte;
+    using basic_string_view = common::basic_string_view<T>;
+  using byte = common::byte;
 
   /**
    * Constructor

@@ -21,7 +21,7 @@
 #define _NUPM_REGION_DESCRIPTOR_
 
 #include <common/byte_span.h>
-#include <experimental/string_view>
+#include <common/string_view.h>
 #include <string>
 #include <vector>
 

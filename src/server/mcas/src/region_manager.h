@@ -16,8 +16,8 @@
 #include <api/fabric_itf.h>
 #include <common/byte_span.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <common/utils.h>
-#include <experimental/string_view>
 
 #include <set>
 

@@ -59,7 +59,7 @@ inline bool accept_all(const void *) { return true; }
 struct region_vector_t : public std::vector<common::byte_span>
 {
   explicit region_vector_t(void * ptr_, std::size_t size_)
-    : region_vector_t(common::make_byte_span(static_cast<gsl::byte *>(ptr_), size_))
+    : region_vector_t(common::make_byte_span(static_cast<common::byte *>(ptr_), size_))
   {}
   explicit region_vector_t(const value_type &v) {
     push_back(v);

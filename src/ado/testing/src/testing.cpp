@@ -18,10 +18,10 @@
 #include <common/cycles.h>
 #include <common/byte_span.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <common/utils.h>
 #include <libpmem.h>
 #include <boost/numeric/conversion/cast.hpp>
-#include <experimental/string_view>
 #include <algorithm> /* copy, fill, find */
 #include <cstring> /* strncmp, strcpy, memset */
 #include <map>
@@ -100,7 +100,7 @@ namespace
 
     status_t rc = S_OK;
 
-    std::fill(::data(value), ::data_end(value), gsl::byte(0xe));
+    std::fill(::data(value), ::data_end(value), common::byte(0xe));
     PLOG("value=%p value_len=%zu", ::base(value), ::size(value));
     ASSERT_TRUE(::size(value) == 4096, "ADO_testing_plugin: value bad length");
 

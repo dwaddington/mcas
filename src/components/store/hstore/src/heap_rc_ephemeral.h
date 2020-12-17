@@ -23,10 +23,10 @@
 
 #include <boost/icl/interval_set.hpp>
 #include <common/byte_span.h>
+#include <common/string_view.h>
 #include <nupm/rc_alloc_lb.h> /* Rca_LB */
 #include <nupm/region_descriptor.h>
 
-#include <experimental/string_view>
 #include <algorithm> /* mini, swap */
 #include <cstddef> /* size_t */
 #include <string>

@@ -31,9 +31,9 @@
 #include <common/byte_span.h>
 #include <common/exceptions.h> /* General_exception */
 #include <common/logging.h> /* log_source */
+#include <common/string_view.h>
 #include <nupm/region_descriptor.h>
 
-#include <experimental/string_view>
 #include <algorithm>
 #include <array>
 #include <cstddef> /* size_t, ptrdiff_t */

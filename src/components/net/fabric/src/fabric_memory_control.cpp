@@ -318,7 +318,7 @@ fid_mr * Fabric_memory_control::make_fid_mr_reg_ptr(
     CHECK_FI_ERR(::fi_mr_reg(&*_domain, ::data(buf), ::size(buf), access, offset, key, flags, &f, context));
     if ( _paging_test )
     {
-      auto rc = ::madvise(const_cast<gsl::byte *>(::data(buf)), ::size(buf), MADV_DONTNEED);
+      auto rc = ::madvise(const_cast<common::byte *>(::data(buf)), ::size(buf), MADV_DONTNEED);
       PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", ::base(buf), ::size(buf), rc ? " refused" : " accepted");
     }
   }
