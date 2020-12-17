@@ -89,10 +89,6 @@ inline Ado_signal& operator|= (Ado_signal& tgt, const Ado_signal src) {
 static constexpr const char * Ado_signal_POST_ERASE = "post-erase";
 static constexpr const char * Ado_signal_POST_PUT = "post-put";
 static constexpr const char * Ado_signal_POST_GET = "post-get";
-static constexpr const char * Ado_signal_POST_PUT_DIRECT = "post-put-direct";
-static constexpr const char * Ado_signal_POST_GET_DIRECT = "post-get-direct";
-
-
 
 class Config_file : private common::log_source
 {

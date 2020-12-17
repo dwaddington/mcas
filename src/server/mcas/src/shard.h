@@ -312,9 +312,7 @@ class Shard : public Shard_transport, private common::log_source {
   /* ADO signalling helpers */
   inline bool ado_signal_enabled() const { return ado_enabled() && (_ado_signal_mask != Ado_signal::NONE); }
   inline bool ado_signal_post_put() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT); }
-  inline bool ado_signal_post_put_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_PUT_DIRECT); }
   inline bool ado_signal_post_get() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_GET); }
-  inline bool ado_signal_post_get_direct() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_GET_DIRECT); }  
   inline bool ado_signal_post_erase() const { return ado_enabled() && (_ado_signal_mask & Ado_signal::POST_ERASE); }
 
   inline auto get_ado_interface(pool_t pool_id) { return _ado_pool_map.get_proxy(pool_id); }
