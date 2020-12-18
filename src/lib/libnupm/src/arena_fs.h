@@ -20,7 +20,11 @@
 #include <common/fd_locked.h>
 #include <common/logging.h>
 
+#if __cplusplus < 201703
 #include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 #include <string>
 
 namespace common
@@ -35,7 +39,11 @@ struct arena_fs
 private:
 	using byte_span = common::byte_span;
 	constexpr static const char *_cname = "arena_fs";
+#if __cplusplus < 201703
 	using path = std::experimental::filesystem::path;
+#else
+	using path = std::filesystem::path;
+#endif
 	path _dir;
 
 	void *region_create_inner(

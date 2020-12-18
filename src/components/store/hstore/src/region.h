@@ -39,7 +39,7 @@ template <
   private:
     static constexpr std::uint64_t magic_value = Heap::magic_value(); // 0xc74892d72eed493a;
     using byte_span = common::byte_span;
-    using string_view = std::experimental::string_view;
+    using string_view = common::string_view;
   public:
     using heap_type = Heap;
     using persist_data_type = PersistData;

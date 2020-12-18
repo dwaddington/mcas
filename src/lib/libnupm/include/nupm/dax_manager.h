@@ -32,8 +32,12 @@
 #include <common/memory_mapped.h>
 #include <common/moveable_ptr.h>
 #include <common/string_view.h>
-#include <experimental/filesystem>
 #include <boost/icl/interval_set.hpp>
+#if __cplusplus < 201703
+#include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 #include <map>
 #include <mutex>
 #include <string>
@@ -53,7 +57,7 @@ class DM_region_header;
 struct registry_memory_mapped
 {
   using byte_span = common::byte_span;
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
   virtual ~registry_memory_mapped() {}
   virtual bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) = 0;
   virtual void remove(const string_view &id) = 0;
@@ -72,7 +76,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
 
  public:
   using arena_id_t = unsigned;
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
   static const bool have_odp;
   static const int effective_map_locked;
 
@@ -188,8 +192,13 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   /* callback for arena_dax to register mapped memory */
   bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) override;
   void remove(const string_view & id) override;
+#if __cplusplus < 201703
   using path = std::experimental::filesystem::path;
   using directory_entry = std::experimental::filesystem::directory_entry;
+#else
+  using path = std::filesystem::path;
+  using directory_entry = std::filesystem::directory_entry;
+#endif
   void data_map_remove(const directory_entry &e, const std::string &origin);
   void map_register(const directory_entry &e, const std::string &origin);
   void files_scan(const path &p, const std::string &origin, void (dax_manager::*action)(const directory_entry &, const std::string &));

@@ -20,15 +20,21 @@ struct timer
 {
 	using clock_t = std::chrono::steady_clock;
 	using duration_t = typename clock_t::duration;
+#if __cplusplus < 201703L
+	using fn_t = std::function<void(duration_t) noexcept>;
+#else
+	/* std::function not updated to include a noexcept argument */
+	using fn_t = std::function<void(duration_t)>;
+#endif
 private:
-	std::function<void(duration_t) noexcept> _f;
+	fn_t _f;
 	clock_t::time_point _start;
 public:
 #pragma GCC diagnostic push
 #if defined __GNUC__ && 6 < __GNUC__ && __cplusplus < 201703L
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
-	timer(std::function<void(duration_t) noexcept> f_)
+	timer(fn_t f_)
 		: _f(f_)
 		, _start(clock_t::now())
 	{}

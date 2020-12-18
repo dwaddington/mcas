@@ -36,7 +36,7 @@ struct heap_rc_ephemeral
 {
 private:
 	using byte_span = common::byte_span;
-	using string_view = std::experimental::string_view;
+	using string_view = common::string_view;
 	nupm::Rca_LB _heap;
 	nupm::region_descriptor _managed_regions;
 	std::size_t _allocated;

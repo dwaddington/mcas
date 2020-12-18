@@ -137,7 +137,7 @@ class Shard : public Shard_transport, private common::log_source {
   using task_list_t         = std::list<Shard_task* >;
 
  public:
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 
   Shard(const Config_file & config_file,
         unsigned            shard_index,

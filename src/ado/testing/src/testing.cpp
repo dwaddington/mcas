@@ -27,7 +27,7 @@
 #include <map>
 #include <string>
 
-using std::experimental::string_view;
+using common::string_view;
 
 status_t ADO_testing_plugin::register_mapped_memory(void *shard_vaddr, void *local_vaddr, size_t len)
 {

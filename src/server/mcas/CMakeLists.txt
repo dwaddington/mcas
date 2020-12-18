@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 include(../../../mk/common.cmake)
 
-set(CMAKE_CXX_STANDARD 14)
-
 # use this to disable optimizations, e.g. for debugging or profiling
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 

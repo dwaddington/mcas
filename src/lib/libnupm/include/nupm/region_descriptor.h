@@ -31,7 +31,7 @@ namespace nupm
 	{
 		using byte_span = common::byte_span;
 		using address_map_t = std::vector<byte_span>;
-		using string_view = std::experimental::string_view;
+		using string_view = common::string_view;
 	private:
 		std::string _id;
 		std::string _data_file;

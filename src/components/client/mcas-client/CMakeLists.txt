@@ -6,8 +6,6 @@ execute_process( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTUR
 
 project(component-mcasclient CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 include (../../../../mk/clang-dev-tools.cmake)
 
 add_subdirectory(./unit_test)

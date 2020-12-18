@@ -46,7 +46,7 @@ struct heap_cc_ephemeral
 {
 private:
 	using byte_span = common::byte_span;
-	using string_view = std::experimental::string_view;
+	using string_view = common::string_view;
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
 	nupm::region_descriptor _managed_regions;
 	std::size_t _capacity;

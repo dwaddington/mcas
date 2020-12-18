@@ -55,7 +55,7 @@ public:
 
   static_assert(MAX_MESSAGE_SIZE > 64, "MAX_MESSAGE_SIZE too small");
 
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 
 private:
   ADO_protocol_builder(const ADO_protocol_builder &) = delete;

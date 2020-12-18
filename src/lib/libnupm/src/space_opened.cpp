@@ -24,7 +24,11 @@
 #include <sys/stat.h> /* stat, open */
 #include <sys/types.h> /* open */
 #include <boost/icl/split_interval_map.hpp>
+#if __cplusplus < 201703
 #include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 #include <cinttypes>
 #include <iterator>
 #include <numeric> /* accumulate */
@@ -45,7 +49,11 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #define MAP_SHARED_VALIDATE 0x03
 #endif
 
+#if __cplusplus < 201703
 namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::vector<common::memory_mapped> &&iovm_)
 {

@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project (mcas-module-test CXX)
 
-set (CMAKE_CXX_STANDARD 14)
-
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)

@@ -50,7 +50,7 @@ struct heap_rc
 {
 private:
 	using byte_span = common::byte_span;
-	using string_view = std::experimental::string_view;
+	using string_view = common::string_view;
 	byte_span _pool0_full; /* entire extent of pool 0 */
 	byte_span _pool0_heap; /* portion of pool 0 which can be used for the heap */
 	unsigned _numa_node;

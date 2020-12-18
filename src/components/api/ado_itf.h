@@ -766,7 +766,7 @@ public:
   // clang-format on
 
   using work_id_t = uint64_t; /*< work handle/identifier */
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
   using byte_span = common::byte_span;
 
   /* ADO-to-SHARD (and vice versa) protocol */

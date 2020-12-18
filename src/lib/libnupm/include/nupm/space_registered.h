@@ -34,7 +34,7 @@ struct dax_manager;
 struct space_registered
 {
   using byte_span = common::byte_span;
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 private:
   path_use _pu;
 public:

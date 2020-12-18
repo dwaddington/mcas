@@ -22,7 +22,11 @@
 #include <boost/scope_exit.hpp>
 #include <sys/mman.h> /* ::mmap */
 #include <sys/stat.h> /* ::open */
+#if __cplusplus < 201703
 #include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 #include <cinttypes>
 #include <fstream>
 #include <mutex>
@@ -37,7 +41,11 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #define MAP_SYNC 0x80000
 #endif
 
+#if __cplusplus < 201703
 namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<byte_span> &map, int flags, ::off_t offset)
 {
@@ -84,7 +92,7 @@ std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<b
 	return mapped_elements;
 }
 
-auto arena_fs::get_mapping(const fs::path &path_map) -> std::pair<std::vector<byte_span>, std::size_t>
+auto arena_fs::get_mapping(const path &path_map) -> std::pair<std::vector<byte_span>, std::size_t>
 {
 	/* A region must always be mapped to the same address, as MCAS
 	 * MCAS software uses absolute addresses. Current design is to
@@ -110,7 +118,7 @@ auto arena_fs::get_mapping(const fs::path &path_map) -> std::pair<std::vector<by
 	return { m, covered };
 }
 
-auto arena_fs::get_mapping(const fs::path &path_map, const std::size_t expected_size) -> std::vector<byte_span>
+auto arena_fs::get_mapping(const path &path_map, const std::size_t expected_size) -> std::vector<byte_span>
 {
 	auto r = get_mapping(path_map);
 	if ( r.second != expected_size )
@@ -122,7 +130,7 @@ auto arena_fs::get_mapping(const fs::path &path_map, const std::size_t expected_
 	return r.first;
 }
 
-arena_fs::arena_fs(const common::log_source &ls_, std::experimental::filesystem::path dir_)
+arena_fs::arena_fs(const common::log_source &ls_, path dir_)
   : arena(ls_)
   , _dir(dir_)
 {
@@ -212,7 +220,7 @@ auto arena_fs::region_create(
 			f << std::showbase << std::hex << base_addr << " " << size << std::endl;
 		}
 
-		fs::path map_path_local = path_map(id_);
+		path map_path_local = path_map(id_);
 
 		BOOST_SCOPE_EXIT(&commit, &map_path_local) {
 			if ( ! commit )
@@ -330,7 +338,6 @@ void arena_fs::region_resize(
 
 void arena_fs::region_erase(const string_view &id_, gsl::not_null<registry_memory_mapped *> mh_)
 {
-	namespace fs = std::experimental::filesystem;
 	auto path_data_local = path_data(id_);
 	CPLOG(1, "%s remove %s", __func__, path_data_local.c_str());
 	fs::remove(path_data(id_));

@@ -20,13 +20,23 @@
 #include <gsl/span>
 #include <sys/uio.h>
 
-/* For minimal difference with older code; implement span as as iovec */
-#define MCAS_SPAN_USES_IOVEC 1
+#ifndef MCAS_SPAN_USES_GSL
+/* For minimal difference with older code; implement span as iovec (not gsl::span) */
+#define MCAS_SPAN_USES_GSL 0
+#endif
+#ifndef MCAS_BYTE_USES_STD
+/* For compilcation with C++14, use gsl::byte, not C++17 std::byte */
+#define MCAS_BYTE_USES_STD 0
+#endif
 
 namespace common
 {
+#if MCAS_BYTE_USES_STD
+	using byte = std::byte;
+#else
 	using byte = gsl::byte; /* can be std::byte in C++17 */
-	template <typename T> using span = gsl::span<T>; /* can be std::span in C++17 */
+#endif
+	template <typename T> using span = gsl::span<T>; /* can be std::span in C++20 */
 	/* span of a const area. No equivalent in ::iovec, so always use span */
 	using const_byte_span = span<const byte>;
 	inline const_byte_span make_const_byte_span(const void *base, std::size_t len)
@@ -65,17 +75,7 @@ namespace common
 	inline constexpr ::iovec make_iovec(void *base, std::size_t len) { return ::iovec{base, len}; }
 }
 
-#if MCAS_SPAN_USES_IOVEC
-
-namespace common
-{
-	using byte_span = ::iovec;
-	/* Construct an iovec in syntax compatible with span (no braces) */
-	inline byte_span make_byte_span(void *base, std::size_t len) { return byte_span{base, len}; }
-}
-
-#else
-
+#if MCAS_SPAN_USES_GSL
 #include <common/pointer_cast.h>
 namespace common
 {
@@ -96,6 +96,13 @@ namespace common
 {
 	/* Construct a byte_span in syntax compatible with iovec (function, not constructor) */
 	inline byte_span make_byte_span(void *base, std::size_t len) { return byte_span(common::pointer_cast<byte_span::value_type>(base), len); }
+}
+#else /* ! MCAS_SPAN_USES_GSL */
+namespace common
+{
+	using byte_span = ::iovec;
+	/* Construct an iovec in syntax compatible with span (no braces) */
+	inline byte_span make_byte_span(void *base, std::size_t len) { return byte_span{base, len}; }
 }
 #endif
 

@@ -23,9 +23,8 @@
 #define __STRUCTURED_COMPONENT_H__
 
 #include <api/ado_itf.h>
-#include <experimental/string_view>
+#include <common/string_view.h>
 #include <common/byte_span.h>
-#include <gsl/gsl_byte>
 #include <cpp_list_proto_generated.h>
 #include <ccpm/interfaces.h>
 
@@ -34,8 +33,8 @@ class ADO_structured_plugin : public component::IADO_plugin
 private:
   static constexpr bool option_DEBUG = true;
   using byte_span = common::byte_span;
-  using string_view = std::experimental::string_view;
-  using byte_string_view = std::experimental::basic_string_view<gsl::byte>;
+  using string_view = common::string_view;
+  using byte_string_view = common::basic_string_view<common::byte>;
 
 public:
   /** 

@@ -28,7 +28,11 @@
 #include <fcntl.h>
 #include <sys/mman.h> /* MAP_LOCKED */
 #include <boost/icl/split_interval_map.hpp>
+#if __cplusplus < 201703
 #include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 #include <cinttypes>
 #include <fstream>
 #include <mutex>
@@ -38,7 +42,11 @@
 
 #define DEBUG_PREFIX "dax_manager: "
 
+#if __cplusplus < 201703
 namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace
 {

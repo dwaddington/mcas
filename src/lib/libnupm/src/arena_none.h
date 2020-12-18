@@ -16,7 +16,11 @@
 
 #include "arena.h"
 
+#if __cplusplus < 201703
 #include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 
 /* An unsupported arena */
 struct arena_none
@@ -24,7 +28,11 @@ struct arena_none
 {
 private:
 	constexpr static const char *_cname = "arena_none";
+#if __cplusplus < 201703
 	using path = std::experimental::filesystem::path;
+#else
+	using path = std::filesystem::path;
+#endif
 	path _dir;
 public:
 	arena_none(const common::log_source &ls, path dir_) : arena(ls), _dir{dir_} {}

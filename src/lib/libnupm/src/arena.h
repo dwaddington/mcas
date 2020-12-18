@@ -35,7 +35,7 @@ struct arena
   using region_descriptor = nupm::region_descriptor;
   using registry_memory_mapped = nupm::registry_memory_mapped;
   using space_registered = nupm::space_registered;
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 
   arena(const common::log_source &ls) : common::log_source(ls) {}
   virtual ~arena() {}

@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(example-cpp-basic CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)

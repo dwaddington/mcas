@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-index-rbtree CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 add_definitions(-DCONFIG_DEBUG)
 
 include(../../../../mk/clang-dev-tools.cmake)

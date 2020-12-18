@@ -28,7 +28,6 @@
 #include <common/utils.h>
 #include <common/byte_buffer.h>
 #include <common/string_view.h>
-#include <gsl/gsl_byte>
 #include <gsl/pointers>
 #include <sys/mman.h>
 #include <sys/uio.h>

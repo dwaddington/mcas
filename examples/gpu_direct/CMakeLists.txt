@@ -4,7 +4,6 @@ project(gpu-direct-demo LANGUAGES CXX)
 
 find_package(CUDA REQUIRED)
 
-set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_COMPILER ${CUDA_TOOLKIT_ROOT_DIR}/bin/nvcc)
 
 # -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_70,code=compute_70
