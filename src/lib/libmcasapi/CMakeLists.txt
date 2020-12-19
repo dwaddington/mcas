@@ -9,21 +9,11 @@ add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
 include(../../../mk/clang-dev-tools.cmake)
 
-# find_library(LIB_JEMALLOC libjemalloc.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
-#find_library(LIB_NDCTL libndctl.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
-
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
-# include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
-# include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
 include_directories("../common/include")
-# include_directories(${CMAKE_SOURCE_DIR}/src/lib/cityhash/cityhash/src)
- include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
+include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
 
-# link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
-# link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
-
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
 add_definitions(-DCONFIG_DEBUG)
