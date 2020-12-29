@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
-set(CMAKE_CXX_STANDARD 14) # throw exception specificationi, used in tbb, disallowed as of C++17 
+# throw exception specification, used in tbb, disallowed as of C++17
+set(CMAKE_CXX_STANDARD 14)
 
 if(BOOTSTRAP_DEPS)
   add_subdirectory(flatbuffers)

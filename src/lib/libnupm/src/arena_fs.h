@@ -16,15 +16,12 @@
 
 #include "arena.h"
 
+#include "filesystem.h"
+
 #include <common/byte_span.h>
 #include <common/fd_locked.h>
 #include <common/logging.h>
 
-#if __cplusplus < 201703
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 #include <string>
 
 namespace common
@@ -39,10 +36,10 @@ struct arena_fs
 private:
 	using byte_span = common::byte_span;
 	constexpr static const char *_cname = "arena_fs";
-#if __cplusplus < 201703
-	using path = std::experimental::filesystem::path;
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 	using path = std::filesystem::path;
+#else
+	using path = std::experimental::filesystem::path;
 #endif
 	path _dir;
 

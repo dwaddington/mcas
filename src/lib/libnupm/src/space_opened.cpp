@@ -14,6 +14,7 @@
 #include "space_opened.h"
 #include "dax_manager.h"
 #include "arena_fs.h"
+#include "filesystem.h"
 #include "nd_utils.h" /* get_dax_device_size */
 
 #include <common/memory_mapped.h>
@@ -24,11 +25,6 @@
 #include <sys/stat.h> /* stat, open */
 #include <sys/types.h> /* open */
 #include <boost/icl/split_interval_map.hpp>
-#if __cplusplus < 201703
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 #include <cinttypes>
 #include <iterator>
 #include <numeric> /* accumulate */
@@ -49,10 +45,10 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #define MAP_SHARED_VALIDATE 0x03
 #endif
 
-#if __cplusplus < 201703
-namespace fs = std::experimental::filesystem;
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
 #endif
 
 std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::vector<common::memory_mapped> &&iovm_)

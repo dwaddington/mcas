@@ -132,7 +132,7 @@ class IFabric_op_completer {
                                                         std::size_t   len,
                                                         void *        error_data,
                                                         void *        param)
-#if 2017030L <= __cplusplus
+#if 201703L <= __cplusplus
 	noexcept
 #endif
     ;
@@ -142,10 +142,10 @@ class IFabric_op_completer {
                                                                   std::size_t   len,
                                                                   void *        error_data,
                                                                   void *        param)
-#if 2017030L <= __cplusplus
+#if 201703L <= __cplusplus
 	noexcept
 #endif
-	  ;
+	;
 
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error

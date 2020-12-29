@@ -25,7 +25,7 @@ file(GLOB SOURCES src/*.c*)
 add_library(threadipc SHARED ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} common numa)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(DIRECTORY "src/" DESTINATION "include/threadipc" FILES_MATCHING PATTERN "./include/threadipc/*")

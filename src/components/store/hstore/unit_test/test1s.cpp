@@ -845,7 +845,7 @@ TEST_F(KVStore_test, LockMany)
   unsigned ct = 0;
   for ( const auto &kv : kvm )
   {
-#if __cplusplus < 201703
+#if __cplusplus < 201703L
     static constexpr auto KEY_NONE = +IKVStore::KEY_NONE;
 #else
     static constexpr auto KEY_NONE = IKVStore::KEY_NONE;

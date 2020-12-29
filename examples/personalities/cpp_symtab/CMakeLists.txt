@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(personality-cpp-symtab CXX)
 
+include(${CMAKE_SOURCE_DIR}/mk/avoid_boost_type_to_string_bug.cmake)
+
 find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
 
 if (NOT FLATC)

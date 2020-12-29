@@ -4,6 +4,8 @@ project(component-adoplugin-testing CXX)
 
 enable_language(CXX C ASM)
 
+include(${CMAKE_SOURCE_DIR}/mk/avoid_boost_type_to_string_bug.cmake)
+
 add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wformat=2 -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
 
 file(GLOB SOURCES src/*.cpp)

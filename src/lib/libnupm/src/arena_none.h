@@ -16,11 +16,7 @@
 
 #include "arena.h"
 
-#if __cplusplus < 201703
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
+#include "filesystem.h"
 
 /* An unsupported arena */
 struct arena_none
@@ -28,10 +24,10 @@ struct arena_none
 {
 private:
 	constexpr static const char *_cname = "arena_none";
-#if __cplusplus < 201703
-	using path = std::experimental::filesystem::path;
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 	using path = std::filesystem::path;
+#else
+	using path = std::experimental::filesystem::path;
 #endif
 	path _dir;
 public:

@@ -18,6 +18,7 @@
 #include "arena_fs.h"
 #include "arena_none.h"
 #include "dax_data.h" /* DM_region_header */
+#include "filesystem.h"
 #include "nd_utils.h"
 
 #include <common/exceptions.h>
@@ -28,11 +29,6 @@
 #include <fcntl.h>
 #include <sys/mman.h> /* MAP_LOCKED */
 #include <boost/icl/split_interval_map.hpp>
-#if __cplusplus < 201703
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 #include <cinttypes>
 #include <fstream>
 #include <mutex>
@@ -42,10 +38,10 @@
 
 #define DEBUG_PREFIX "dax_manager: "
 
-#if __cplusplus < 201703
-namespace fs = std::experimental::filesystem;
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
 #endif
 
 namespace
@@ -160,10 +156,10 @@ std::vector<common::byte_span> get_mapping(const fs::path &path_map, const std::
 void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std::string &)
 {
 	if (
-#if __cplusplus < 201703
-		fs::is_regular_file(e.status())
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 		e.is_regular_file()
+#else
+		fs::is_regular_file(e.status())
 #endif
 	)
 	{
@@ -181,10 +177,10 @@ void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std:
 		}
 	}
 	else if (
-#if __cplusplus < 201703
-		fs::is_directory(e.status())
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 		e.is_directory()
+#else
+		fs::is_directory(e.status())
 #endif
 	)
 	{
@@ -201,10 +197,10 @@ void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std:
 void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::string &origin)
 {
 	if (
-#if __cplusplus < 201703
-		fs::is_regular_file(e.status())
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 		e.is_regular_file()
+#else
+		fs::is_regular_file(e.status())
 #endif
 	)
 	{
@@ -250,10 +246,10 @@ void nupm::dax_manager::files_scan(const path &p, const std::string &origin, voi
 		for ( auto e : ir )
 		{
 			if (
-#if __cplusplus < 201703
-				fs::is_directory(e.status())
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 				e.is_directory()
+#else
+				fs::is_directory(e.status())
 #endif
 			)
 			{

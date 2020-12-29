@@ -13,6 +13,8 @@
 
 #include "arena_fs.h"
 
+#include "filesystem.h"
+
 #include <nupm/dax_manager.h>
 #include <common/fd_open.h>
 #include <common/memory_mapped.h>
@@ -22,11 +24,6 @@
 #include <boost/scope_exit.hpp>
 #include <sys/mman.h> /* ::mmap */
 #include <sys/stat.h> /* ::open */
-#if __cplusplus < 201703
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 #include <cinttypes>
 #include <fstream>
 #include <mutex>
@@ -41,10 +38,10 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #define MAP_SYNC 0x80000
 #endif
 
-#if __cplusplus < 201703
-namespace fs = std::experimental::filesystem;
-#else
+#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
 namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
 #endif
 
 std::vector<common::memory_mapped> arena_fs::fd_mmap(int fd, const std::vector<byte_span> &map, int flags, ::off_t offset)
