@@ -38,7 +38,7 @@
 
 #define DEBUG_PREFIX "dax_manager: "
 
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 namespace fs = std::filesystem;
 #else
 namespace fs = std::experimental::filesystem;
@@ -156,7 +156,7 @@ std::vector<common::byte_span> get_mapping(const fs::path &path_map, const std::
 void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std::string &)
 {
 	if (
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 		e.is_regular_file()
 #else
 		fs::is_regular_file(e.status())
@@ -177,7 +177,7 @@ void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std:
 		}
 	}
 	else if (
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 		e.is_directory()
 #else
 		fs::is_directory(e.status())
@@ -197,7 +197,7 @@ void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std:
 void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::string &origin)
 {
 	if (
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 		e.is_regular_file()
 #else
 		fs::is_regular_file(e.status())
@@ -246,7 +246,7 @@ void nupm::dax_manager::files_scan(const path &p, const std::string &origin, voi
 		for ( auto e : ir )
 		{
 			if (
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 				e.is_directory()
 #else
 				fs::is_directory(e.status())

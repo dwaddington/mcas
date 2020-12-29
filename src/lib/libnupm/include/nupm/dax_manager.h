@@ -33,17 +33,15 @@
 #include <common/moveable_ptr.h>
 #include <common/string_view.h>
 #include <boost/icl/interval_set.hpp>
-#define _NUPM_DAX_MANAGER_FILESYSTEM_STD_ 0
-#if defined __has_include
-  #if __has_include (<filesystem>)
-  #include <filesystem>
-  #undef _NUPM_DAX_MANAGER_FILESYSTEM_STD_
-  #define _NUPM_DAX_MANAGER_FILESYSTEM_STD_ 1
-  #else
-  #include <experimental/filesystem>
+#if ! defined _NUPM_FILESYSTEM_STD_ && defined __has_include
+  #if __has_include (<filesystem>) && __cplusplus >= 201703L
+    #include <filesystem>
+    #define _NUPM_FILESYSTEM_STD_ 1
   #endif
-#else
-#include <experimental/filesystem>
+#endif
+#if ! defined _NUPM_FILESYSTEM_STD_
+  #include <experimental/filesystem>
+  #define _NUPM_FILESYSTEM_STD_ 0
 #endif
 #include <map>
 #include <mutex>
@@ -199,7 +197,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   /* callback for arena_dax to register mapped memory */
   bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) override;
   void remove(const string_view & id) override;
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
   using path = std::filesystem::path;
   using directory_entry = std::filesystem::directory_entry;
 #else

@@ -38,7 +38,7 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #define MAP_SYNC 0x80000
 #endif
 
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 namespace fs = std::filesystem;
 #else
 namespace fs = std::experimental::filesystem;

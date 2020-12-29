@@ -11,19 +11,13 @@
    limitations under the License.
 */
 
-#ifndef _NUPM_DAX_MANAGER_FILESYSTEM_STD_
-
-#define _NUPM_DAX_MANAGER_FILESYSTEM_STD_ 0
-#if defined __has_include
-  #if __has_include (<filesystem>)
-  #include <filesystem>
-  #undef _NUPM_DAX_MANAGER_FILESYSTEM_STD_
-  #define _NUPM_DAX_MANAGER_FILESYSTEM_STD_ 1
-  #else
-  #include <experimental/filesystem>
+#if ! defined _NUPM_FILESYSTEM_STD_ && defined __has_include
+  #if __has_include (<filesystem>) && __cplusplus >= 201703L
+    #include <filesystem>
+    #define _NUPM_FILESYSTEM_STD_ 1
   #endif
-#else
-#include <experimental/filesystem>
 #endif
-
+#if ! defined _NUPM_FILESYSTEM_STD_
+  #include <experimental/filesystem>
+  #define _NUPM_FILESYSTEM_STD_ 0
 #endif

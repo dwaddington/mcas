@@ -36,7 +36,7 @@ struct arena_fs
 private:
 	using byte_span = common::byte_span;
 	constexpr static const char *_cname = "arena_fs";
-#if _NUPM_DAX_MANAGER_FILESYSTEM_STD_
+#if _NUPM_FILESYSTEM_STD_
 	using path = std::filesystem::path;
 #else
 	using path = std::experimental::filesystem::path;
