@@ -1077,7 +1077,7 @@ void Shard::io_response_get_locate(Connection_handler *handler,
       add_locked_value_shared(pool_id, lk.release(), target, target_len, std::move(mr));
 
       /* record key for signaling */
-      if (ado_signal_post_get_direct())
+      if (ado_signal_post_get())
         add_target_keyname(target, k);
     }
     catch ( const std::exception &e ) {
@@ -1117,9 +1117,9 @@ void Shard::io_response_get_release(Connection_handler *handler,
   }
   ++_stats.op_get_count;
 
-  if (ado_signal_post_get_direct()) {
+  if (ado_signal_post_get()) {
     auto skey = release_target_keyname(target); /* recover key and remove entry from map */
-    signal_ado("post-get-direct",
+    signal_ado("post-get",
                handler,
                msg->request_id(),
                msg->pool_id(),
@@ -1200,7 +1200,7 @@ void Shard::io_response_put_advance(Connection_handler *handler,
           add_pending_rename(pool_id, target, k, actual_key);
 
           /* record key for signaling */
-          if (ado_signal_post_put_direct())
+          if (ado_signal_post_put())
             add_target_keyname(target, k);
         }
       catch ( const std::exception &e )
@@ -1273,23 +1273,21 @@ void Shard::io_response_put_locate(Connection_handler *handler,
       auto pool_id = msg->pool_id();
 
       std::uint64_t key = 0;
-      try
-        {
-          memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
-          key = mr.key();
-          /* register clean and rename tasks for value */
-          add_locked_value_exclusive(pool_id, lk.release(), target, target_len, std::move(mr));
-          add_pending_rename(pool_id, target, k, actual_key);
-
-          if (ado_signal_enabled())
-            add_target_keyname(target, actual_key);
-        }
-      catch ( const std::exception &e )
-        {
-          PLOG("%s failed: %s", __func__, e.what());
-          status = E_FAIL;
-        }
-
+      try  {
+        memory_registered<Connection_base> mr(debug_level(), handler, target, target_len, 0, 0);
+        key = mr.key();
+        /* register clean and rename tasks for value */
+        add_locked_value_exclusive(pool_id, lk.release(), target, target_len, std::move(mr));
+        add_pending_rename(pool_id, target, k, actual_key);
+        
+        if (ado_signal_post_put())
+          add_target_keyname(target, actual_key);
+      }
+      catch ( const std::exception &e ) {
+        PLOG("%s failed: %s", __func__, e.what());
+        status = E_FAIL;
+      }
+      
       auto response  = prepare_response(handler, iob, msg->request_id(), status);
       response->addr = reinterpret_cast<std::uint64_t>(target);
       response->key  = key;
@@ -1323,9 +1321,9 @@ void Shard::io_response_put_release(Connection_handler *handler, const protocol:
 
   ++_stats.op_put_count;
 
-  if (ado_signal_post_put_direct()) {
+  if (ado_signal_post_put()) {
     auto skey = release_target_keyname(target); /* recover key and remove entry from map */
-    signal_ado("post-put-direct",
+    signal_ado("post-put",
                handler,
                msg->request_id(),
                msg->pool_id(),

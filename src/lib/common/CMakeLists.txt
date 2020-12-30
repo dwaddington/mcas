@@ -14,9 +14,11 @@ configure_file(include/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/include/config.h)
 
 execute_process( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE )
 
-set(CMAKE_INCLUDE_CURRENT_DIR true)
 include_directories(./include)
 include_directories(../GSL/include)
+
+set(CMAKE_INCLUDE_CURRENT_DIR true)
+set(CMAKE_INSTALL_RPATH "/usr/lib64")
 
 if( ${ARCHITECTURE} STREQUAL "x86_64" )
   add_compile_options(-msse4.2)
@@ -28,7 +30,7 @@ file(GLOB SOURCES src/*.c*)
 
 add_library(common SHARED ${SOURCES})
 target_compile_options(common PUBLIC "-fPIC")
-target_link_libraries(common gcov)
+target_link_libraries(common gcov numa)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(DIRECTORY "include/common" DESTINATION include FILES_MATCHING PATTERN "*.h*")
