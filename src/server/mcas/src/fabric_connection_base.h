@@ -125,7 +125,7 @@ class Fabric_connection_base : protected common::log_source {
   {
     --_send_buffer_posted_count;
     posted_count_log();
-    CPLOG(2, "Completed send (%p) freeing buffer", static_cast<const void *>(iob));
+    CPLOG(2, "Completed send (%p) freeing buffer", common::p_fmt(iob));
     free_buffer(iob);
   }
 
@@ -139,7 +139,7 @@ class Fabric_connection_base : protected common::log_source {
     --_recv_buffer_posted_count;
     posted_count_log();
     _completed_recv_buffers.push_front(iob);
-    CPLOG(2, "Completed recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
+    CPLOG(2, "Completed recv (%p) (complete %zu)", common::p_fmt(iob), _completed_recv_buffers.size());
   }
 
   static void completion_callback(void *   context,
@@ -184,7 +184,7 @@ class Fabric_connection_base : protected common::log_source {
     transport()->post_recv(buffer->iov, buffer->iov + 1, buffer->desc, buffer);
     ++_recv_buffer_posted_count;
     posted_count_log();
-    CPLOG(2, "Posted recv (%p) (complete %zu)", static_cast<const void *>(buffer), _completed_recv_buffers.size());
+    CPLOG(2, "Posted recv (%p) (complete %zu)", common::p_fmt(buffer), _completed_recv_buffers.size());
   }
 
   void post_send_buffer(gsl::not_null<buffer_t *> buffer)
@@ -194,19 +194,19 @@ class Fabric_connection_base : protected common::log_source {
     /* if packet is small enough use inject */
     if (iov->iov_len <= transport()->max_inject_size()) {
       CPLOG(2, "Fabric_connection_base: posting send with inject (iob %p %p,len=%lu)",
-             static_cast<const void *>(buffer), iov->iov_base, iov->iov_len);
+             common::p_fmt(buffer), iov->iov_base, iov->iov_len);
 
       transport()->inject_send(iov->iov_base, iov->iov_len);
-      CPLOG(2, "%s: buffer %p", __func__, static_cast<const void *>(buffer));
+      CPLOG(2, "%s: buffer %p", __func__, common::p_fmt(buffer));
       free_buffer(buffer); /* buffer is immediately complete fi_inject */
     }
     else {
-      CPLOG(2, "Fabric_connection_base: posting send (%p, %p)", static_cast<const void *>(buffer), iov->iov_base);
+      CPLOG(2, "Fabric_connection_base: posting send (%p, %p)", common::p_fmt(buffer), iov->iov_base);
 
       transport()->post_send(iov, iov + 1, buffer->desc, buffer);
       ++_send_buffer_posted_count;
       posted_count_log();
-      CPLOG(0, "%s buffer (%p)", __func__, static_cast<const void *>(buffer));
+      CPLOG(0, "%s buffer (%p)", __func__, common::p_fmt(buffer));
     }
   }
 
@@ -217,7 +217,7 @@ class Fabric_connection_base : protected common::log_source {
 
     ++_send_buffer_posted_count;
     posted_count_log();
-    CPLOG(0, "Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", static_cast<const void *>(buffer),
+    CPLOG(0, "Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", common::p_fmt(buffer),
          int(val_iov.iov_len), static_cast<char *>(val_iov.iov_base), val_iov.iov_len, val_iov.iov_base);
 
     transport()->post_send(buffer->iov, buffer->iov + 2, buffer->desc, buffer);
@@ -229,7 +229,7 @@ class Fabric_connection_base : protected common::log_source {
 
     auto iob = _completed_recv_buffers.back();
     _completed_recv_buffers.pop_back();
-    CPLOG(2, "Presented recv (%p) (complete %zu)", static_cast<const void *>(iob), _completed_recv_buffers.size());
+    CPLOG(2, "Presented recv (%p) (complete %zu)", common::p_fmt(iob), _completed_recv_buffers.size());
     return iob;
   }
 

@@ -14,11 +14,11 @@
 #ifndef __CCPM_INTERFACES_H__
 #define __CCPM_INTERFACES_H__
 
+#include <common/byte_span.h>
 #include <common/types.h>
 #include <cstddef>
 #include <functional>
 #include <vector>
-#include <sys/uio.h> /* iovec */
 
 namespace ccpm
 {
@@ -56,12 +56,12 @@ inline bool accept_all(const void *) { return true; }
  * Allocators can expand to more than one coarse-grained region of
  * memory.
  */
-struct region_vector_t : public std::vector<::iovec>
+struct region_vector_t : public std::vector<common::byte_span>
 {
-  explicit region_vector_t(void * ptr_, std::size_t size_) {
-    push_back({ptr_, size_});
-  }
-  explicit region_vector_t(const ::iovec &v) {
+  explicit region_vector_t(void * ptr_, std::size_t size_)
+    : region_vector_t(common::make_byte_span(static_cast<common::byte *>(ptr_), size_))
+  {}
+  explicit region_vector_t(const value_type &v) {
     push_back(v);
   }
   region_vector_t() {
@@ -73,7 +73,6 @@ enum class Type_id : int64_t
     None        = 0,
     Fixed_array = 0xF0,
   };
-    
 
 /**
  * Heap allocator (variable sized allocations)

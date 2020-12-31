@@ -26,7 +26,7 @@ private:
 	using syndrome = std::vector<void *>;
 	struct less
 	{
-		bool operator()(const syndrome &a, const syndrome &b);
+		bool operator() (const syndrome &a, const syndrome &b) const;
 	};
 	using syndrome_map = std::map<syndrome, std::uint64_t, less>;
 	static syndrome_map seen;

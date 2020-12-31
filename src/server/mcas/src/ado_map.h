@@ -97,8 +97,8 @@ class Ado_pool_map
   void add(const component::IKVStore::pool_t pool, component::IADO_proxy *ado, Connection_handler *handler)
   {
     if (1 < _debug_level)
-      PLOG("Ado_pool_map: adding mapping (%lx->%p,%p)", pool, static_cast<const void *>(ado),
-           static_cast<const void *>(handler));
+      PLOG("Ado_pool_map: adding mapping (%lx->%p,%p)", pool, common::p_fmt(ado),
+           common::p_fmt(handler));
 
     auto entry = find(pool);
     if (entry == end())

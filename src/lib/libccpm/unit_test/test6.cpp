@@ -163,7 +163,13 @@ TEST_F(Log_test, CCVectorOfPointer)
 
 	common::profiler pr("test6-vp-cpu-" + store_map::impl->name + ".profile");
 	{
-		ccpm::cca mr(ccpm::region_vector_t(heap_area, heap_size));
+		ccpm::cca mr(
+          ccpm::region_vector_t(
+            ccpm::region_vector_t::value_type(
+              common::make_byte_span(heap_area, heap_size)
+            )
+          )
+        );
 		auto ccv = new (vector_area) cc_vector(mr);
 
 		for ( int i = 0; i != 1000000; ++i )

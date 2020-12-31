@@ -25,6 +25,7 @@
 #include "fabric_runtime_error.h"
 #include "fabric_util.h" /* make_fi_infodup */
 
+#include <common/byte_span.h>
 #include <common/logging.h> /* PLOG */
 #include <common/pointer_cast.h>
 #include <sys/uio.h> /* iovec */
@@ -44,18 +45,21 @@ using guard = std::unique_lock<std::mutex>;
 
 namespace
 {
+#if 0
   void *iov_end(const ::iovec &v)
   {
     return static_cast<char *>(v.iov_base) + v.iov_len;
   }
+#endif
   /* True if range of a is a superset of range of b */
-  bool covers(const ::iovec &a, const ::iovec &b)
+  using byte_span = common::byte_span;
+  bool covers(const byte_span a, const byte_span b)
   {
-    return a.iov_base <= b.iov_base && iov_end(b) <= iov_end(a);
+    return ::base(a) <= ::base(b) && ::end(b) <= ::end(a);
   }
-  std::ostream &operator<<(std::ostream &o, const ::iovec &v)
+  std::ostream &operator<<(std::ostream &o, const byte_span v)
   {
-    return o << "[" << v.iov_base << ".." << iov_end(v) << ")";
+    return o << "[" << ::base(v) << ".." << ::end(v) << ")";
   }
 
   long ru_flt()
@@ -109,12 +113,14 @@ Fabric_memory_control::~Fabric_memory_control()
 
 struct mr_and_address
 {
-  mr_and_address(::fid_mr *mr_, const void *addr_, std::size_t size_)
+  using byte_span = common::byte_span;
+  using const_byte_span = common::const_byte_span;
+  mr_and_address(::fid_mr *mr_, const_byte_span contig_)
     : mr(fid_ptr(mr_))
-    , v{const_cast<void *>(addr_), size_}
+    , v(common::make_byte_span(const_cast<void *>(::base(contig_)), ::size(contig_)))
   {}
   std::shared_ptr<::fid_mr> mr;
-  ::iovec v;
+  byte_span v;
 };
 
 namespace
@@ -142,17 +148,15 @@ namespace
   }
 }
 
-auto Fabric_memory_control::register_memory(const void * addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_) -> component::IFabric_connection::memory_region_t
+auto Fabric_memory_control::register_memory(const_byte_span contig_, std::uint64_t key_, std::uint64_t flags_) -> component::IFabric_connection::memory_region_t
 {
   auto mra =
     std::make_unique<mr_and_address>(
-      make_fid_mr_reg_ptr(addr_,
-                          size_,
+      make_fid_mr_reg_ptr(contig_,
                           std::uint64_t(FI_SEND|FI_RECV|FI_READ|FI_WRITE|FI_REMOTE_READ|FI_REMOTE_WRITE),
                           key_,
                           flags_)
-      , addr_
-      , size_
+      , contig_
     );
 
   assert(mra->mr);
@@ -160,7 +164,7 @@ auto Fabric_memory_control::register_memory(const void * addr_, std::size_t size
   /* operations which access local memory will need the "mr." Record it here. */
   guard g{_m};
 
-  auto it = _mr_addr_to_mra.emplace(addr_, std::move(mra));
+  auto it = _mr_addr_to_mra.emplace(::base(contig_), std::move(mra));
 
   /*
    * Operations which access remote memory will need the memory key.
@@ -181,8 +185,8 @@ void Fabric_memory_control::deregister_memory(const memory_region_t mr_)
 
   guard g{_m};
 
-  auto lb = _mr_addr_to_mra.lower_bound(mra->v.iov_base);
-  auto ub = _mr_addr_to_mra.upper_bound(mra->v.iov_base);
+  auto lb = _mr_addr_to_mra.lower_bound(::data(mra->v));
+  auto ub = _mr_addr_to_mra.upper_bound(::data(mra->v));
 
   map_addr_to_mra::size_type scan_count = 0;
   auto it =
@@ -237,7 +241,7 @@ std::vector<void *> Fabric_memory_control::populated_desc(const std::vector<::io
 }
 
 /* find a registered memory region which covers the iovec range */
-::fid_mr *Fabric_memory_control::covering_mr(const ::iovec &v)
+::fid_mr *Fabric_memory_control::covering_mr(const byte_span v)
 {
   /* _mr_addr_to_mr is sorted by starting address.
    * Find the last acceptable starting address, and iterate
@@ -247,7 +251,7 @@ std::vector<void *> Fabric_memory_control::populated_desc(const std::vector<::io
 
   guard g{_m};
 
-  auto ub = _mr_addr_to_mra.upper_bound(v.iov_base);
+  auto ub = _mr_addr_to_mra.upper_bound(::data(v));
 
   auto it =
     std::find_if(
@@ -277,7 +281,7 @@ std::vector<void *> Fabric_memory_control::populated_desc(const ::iovec *first, 
     first
     , last
     , std::back_inserter(desc)
-    , [this] (const ::iovec &v) { return ::fi_mr_desc(covering_mr(v)); }
+    , [this] (const ::iovec &v) { return ::fi_mr_desc(covering_mr(common::make_byte_span(v.iov_base, v.iov_len))); }
   );
 
   return desc;
@@ -291,8 +295,7 @@ std::vector<void *> Fabric_memory_control::populated_desc(const ::iovec *first, 
  * "requested" is not the same as "required."
  */
 fid_mr * Fabric_memory_control::make_fid_mr_reg_ptr(
-  const void *buf
-  , size_t len
+  const_byte_span buf
   , uint64_t access
   , uint64_t key
   , uint64_t flags
@@ -312,17 +315,20 @@ fid_mr * Fabric_memory_control::make_fid_mr_reg_ptr(
      * against the entire memory space of the DAX device.
      */
     /* Note: this was once observed to return "Bad address" when the (GPU) memory seemed properly aligned. */
-    CHECK_FI_ERR(::fi_mr_reg(&*_domain, buf, len, access, offset, key, flags, &f, context));
+    CHECK_FI_ERR(::fi_mr_reg(&*_domain, ::data(buf), ::size(buf), access, offset, key, flags, &f, context));
     if ( _paging_test )
     {
-      auto rc = ::madvise(const_cast<void *>(buf), len, MADV_DONTNEED);
-      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", buf, len, rc ? " refused" : " accepted");
+      auto rc = ::madvise(const_cast<common::byte *>(::data(buf)), ::size(buf), MADV_DONTNEED);
+      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", ::base(buf), ::size(buf), rc ? " refused" : " accepted");
     }
   }
   catch ( const fabric_runtime_error &e )
   {
     std::ostringstream s;
-    s << std::showbase << std::hex << " in " << __func__ << " calling ::fi_mr_reg(domain " << &*_domain << " buf " << buf << ", len " << len << ", access " << access << ", offset " << offset << ", key " << key << ", flags " << flags << ", fid_mr " << &f << ", context " << static_cast<void *>(context) << ")";
+    s << std::showbase << std::hex << " in " << __func__ << " calling ::fi_mr_reg(domain "
+      << &*_domain << " buf " << ::base(buf) << ", len " << ::size(buf) << ", access " << access
+      << ", offset " << offset << ", key " << key << ", flags " << flags << ", fid_mr " << &f
+      << ", context " << common::p_fmt(context) << ")";
     throw e.add(s.str());
   }
   FABRIC_TRACE_FID(f);

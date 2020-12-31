@@ -2,13 +2,15 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(ado-proto CXX)
 
-set (CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
+
 add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
 
 # use this to disable optimizations, e.g. for debugging or profiling
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/flatbuffers/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)

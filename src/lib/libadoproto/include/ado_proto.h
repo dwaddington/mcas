@@ -17,14 +17,15 @@
 #include "ado_proto_buffer.h"
 #include "channel_wrap.h"
 #include "uipc.h"
+#include <common/byte_span.h>
 #include <common/errors.h>
 #include <common/exceptions.h>
+#include <common/string_view.h>
 #include <common/types.h>
 #include <common/utils.h>
 #include <api/kvindex_itf.h>
 #include <api/ado_itf.h>
 #include <unistd.h>
-#include <experimental/string_view>
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -45,6 +46,7 @@ using buffer_space_dedicated_ptr_t = ado_protocol_buffer::space_dedicated_ptr_t;
 
 class ADO_protocol_builder : common::log_source
 {
+  using byte_span = common::byte_span;
 public:
   static constexpr size_t MAX_MESSAGE_SIZE  = MB(2); //4096;
   static constexpr size_t QUEUE_SIZE        = 32;
@@ -53,7 +55,7 @@ public:
 
   static_assert(MAX_MESSAGE_SIZE > 64, "MAX_MESSAGE_SIZE too small");
 
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 
 private:
   ADO_protocol_builder(const ADO_protocol_builder &) = delete;
@@ -142,7 +144,7 @@ public:
   status_t send_memory_map_named(unsigned region,
                        string_view pool_name,
                        std::size_t offset,
-                       ::iovec iov);
+                       byte_span iov);
 
   /* shard-side, must not block */
   status_t send_work_request(const uint64_t work_request_key,

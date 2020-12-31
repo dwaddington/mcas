@@ -22,6 +22,8 @@
 #include "persistent.h"
 
 #include <ccpm/interfaces.h> /* ownership_callback, (IHeap_expandable, region_vector_t) */
+#include <common/byte_span.h>
+#include <common/string_view.h>
 #include <nupm/region_descriptor.h>
 
 #include <sys/uio.h> /* iovec */
@@ -43,6 +45,8 @@ struct heap_cc_ephemeral
   : private common::log_source
 {
 private:
+	using byte_span = common::byte_span;
+	using string_view = common::string_view;
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
 	nupm::region_descriptor _managed_regions;
 	std::size_t _capacity;
@@ -68,10 +72,10 @@ private:
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, std::unique_ptr<ccpm::IHeap_expandable> p
-		, const std::string &id
-		, const std::string &backing_file
-		, const std::vector<::iovec> &rv_full
-		, const ::iovec &pool0_heap
+		, string_view id
+		, string_view backing_file
+		, const std::vector<byte_span> &rv_full
+		, const byte_span &pool0_heap
 	);
 	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
 	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n)
@@ -82,12 +86,12 @@ private:
 	}
 
 	template <bool B>
-		void write_hist(const ::iovec & pool_) const
+		void write_hist(const byte_span & pool_) const
 		{
 			static bool suppress = false;
 			if ( ! suppress )
 			{
-				hop_hash_log<B>::write(LOG_LOCATION, "pool ", pool_.iov_base);
+				hop_hash_log<B>::write(LOG_LOCATION, "pool ", ::base(pool_));
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
 				for ( unsigned i = log_min_alignment; i != limit; ++i )
@@ -113,10 +117,10 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, const std::string &id
-		, const std::string &backing_file
-		, const std::vector<::iovec> &rv_full
-		, const ::iovec &pool0_heap_
+		, string_view id
+		, string_view backing_file
+		, const std::vector<byte_span> &rv_full
+		, const byte_span &pool0_heap_
 	);
 	explicit heap_cc_ephemeral(
 		unsigned debug_level
@@ -124,16 +128,16 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, const std::string &id
-		, const std::string &backing_file
-		, const std::vector<::iovec> &rv_full
-		, const ::iovec &pool0_heap
+		, string_view id
+		, string_view backing_file
+		, const std::vector<byte_span> &rv_full
+		, const byte_span &pool0_heap
 		, ccpm::ownership_callback_t f
 	);
 	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
 	heap_cc_ephemeral(const heap_cc_ephemeral &) = delete;
 	heap_cc_ephemeral& operator=(const heap_cc_ephemeral &) = delete;
-	void add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, unsigned numa_node);
+	void add_managed_region(const byte_span &r_full, const byte_span &r_heap, unsigned numa_node);
 };
 
 #endif

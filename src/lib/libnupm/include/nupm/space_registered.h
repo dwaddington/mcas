@@ -22,11 +22,10 @@
 
 #include "space_opened.h"
 #include "path_use.h"
+#include <common/byte_span.h>
 #include <common/logging.h>
-#include <experimental/string_view>
 #include <string>
 #include <vector>
-#include <sys/uio.h>
 
 namespace nupm
 {
@@ -34,7 +33,8 @@ struct dax_manager;
 
 struct space_registered
 {
-  using string_view = std::experimental::string_view;
+  using byte_span = common::byte_span;
+  using string_view = common::string_view;
 private:
   path_use _pu;
 public:
@@ -52,7 +52,7 @@ public:
     , dax_manager * dm
     , common::fd_locked &&fd
     , const string_view &name
-    , const std::vector<::iovec> &mapping
+    , const std::vector<byte_span> &mapping
   );
 
   space_registered(const space_registered &) = delete;

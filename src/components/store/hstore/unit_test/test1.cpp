@@ -16,6 +16,7 @@
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
+#include <common/byte_span.h>
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* MiB, GiB */
 #include <nupm/region_descriptor.h>
@@ -875,17 +876,17 @@ TEST_F(KVStore_test, GetRegions)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    EXPECT_EQ(1, v.address_map.size());
-    if ( 1 == v.address_map.size() )
+    EXPECT_EQ(1, v.address_map().size());
+    if ( 1 == v.address_map().size() )
     {
-      PMAJOR("Pool region at %p len %zu", v.address_map.front().iov_base, v.address_map.front().iov_len);
-      auto iov_base = reinterpret_cast<std::uintptr_t>(v.address_map.front().iov_base);
+      PMAJOR("Pool region at %p len %zu", ::base(v.address_map().front()), ::size(v.address_map().front()));
+      auto iov_base = reinterpret_cast<std::uintptr_t>(::base(v.address_map().front()));
       /* region no longer needs to be well-aligned, but heap_cc still aligns to a
        * page boundary.
        */
       EXPECT_EQ(iov_base & 0xfff, 0);
-      EXPECT_GT(v.address_map.front().iov_len, many_count_target * 64U * 3U * 2U);
-      EXPECT_LT(v.address_map.front().iov_len, GiB(512));
+      EXPECT_GT(::size(v.address_map().front()), many_count_target * 64U * 3U * 2U);
+      EXPECT_LT(::size(v.address_map().front()), GiB(512));
     }
   }
 }
@@ -904,7 +905,7 @@ TEST_F(KVStore_test, LockMany)
   unsigned ct = 0;
   for ( auto &kv : kvv )
   {
-#if __cplusplus < 201703
+#if __cplusplus < 201703L
     static constexpr auto KEY_NONE = +IKVStore::KEY_NONE;
 #else
     static constexpr auto KEY_NONE = IKVStore::KEY_NONE;
@@ -1522,9 +1523,9 @@ TEST_F(KVStore_test, KeySwap)
 
   ASSERT_OK(_kvstore->swap_keys(pool, left_key, right_key));
 
-  iovec new_left{}; /* ERROR: uninitialized in map_store test */
+  ::iovec new_left{}; /* ERROR: uninitialized in map_store test */
   _kvstore->get(pool, left_key, new_left.iov_base, new_left.iov_len);
-  iovec new_right{}; /* ERROR: uninitialized in map_store test */
+  ::iovec new_right{}; /* ERROR: uninitialized in map_store test */
   _kvstore->get(pool, right_key, new_right.iov_base, new_right.iov_len);
 
   PLOG("left: %.*s", int(new_left.iov_len), static_cast<const char *>(new_left.iov_base));

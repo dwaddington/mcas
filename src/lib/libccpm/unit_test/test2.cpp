@@ -47,7 +47,11 @@ TEST_F(Libccpm_test, ccpm_cca_scenario_A)
   auto pr = aligned_alloc(4096,size);
   ASSERT_NE(nullptr, pr);
 
-  ccpm::region_vector_t rv{pr, size};
+  ccpm::region_vector_t rv(
+    ccpm::region_vector_t::value_type(
+      common::make_byte_span(pr, size)
+    )
+  );
   {
     ccpm::cca ccheap(rv);
 
@@ -73,7 +77,6 @@ TEST_F(Libccpm_test, ccpm_cca_scenario_A)
     EXPECT_NE(nullptr, p);
     p = nullptr;
 
-    
     PLOG("allocations OK");
   }
 }
@@ -84,7 +87,11 @@ TEST_F(Libccpm_test, ccpm_cca)
   auto pr = aligned_alloc(4096,size);
   ASSERT_NE(nullptr, pr);
   const void *ph = static_cast<const char *>(pr) + size;
-  ccpm::region_vector_t rv{pr, size};
+  ccpm::region_vector_t rv(
+    ccpm::region_vector_t::value_type(
+      common::make_byte_span(pr, size)
+    )
+  );
   {
   int r = S_OK;
   ccpm::cca bt(rv);
@@ -137,7 +144,11 @@ TEST_F(Libccpm_test, ccpm_cca)
     ccpm::cca bt(rv, [] (const void *) -> bool { return true; } );
   }
   {
-    ccpm::region_vector_t rv_bad{static_cast<char *>(pr)+8, size};
+    ccpm::region_vector_t rv_bad(
+      ccpm::region_vector_t::value_type(
+        common::make_byte_span(static_cast<common::byte *>(pr)+8, size)
+      )
+    );
     try
     {
       ccpm::cca bt(rv_bad, [] (const void *) -> bool { return true; } );
@@ -146,7 +157,7 @@ TEST_F(Libccpm_test, ccpm_cca)
     catch ( const std::domain_error &e )
     {
       std::cerr << "Expected falure: " << e.what() << "\n";
-    }  
+    }
   }
 }
 

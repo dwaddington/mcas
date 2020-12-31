@@ -232,7 +232,7 @@ class Fabric_transport : protected common::log_source {
     //   aligned");
 
     auto buffer = new buffer_external(debug_level(), _transport, region, region_len);
-    CPLOG(0, "register_direct_memory (%p, %lu, mr=%p)", region, region_len, static_cast<const void *>(buffer->region()));
+    CPLOG(0, "register_direct_memory (%p, %lu, mr=%p)", region, region_len, common::p_fmt(buffer->region()));
     return buffer;
   }
 

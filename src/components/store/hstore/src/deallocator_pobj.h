@@ -101,7 +101,7 @@ template <typename T, typename Persister>
 				auto ptr = static_cast<char *>(pmemobj_direct(oid));
 				hop_hash_log::write(LOG_LOCATION
 					, "[", ptr
-					, "..", static_cast<void *>(ptr + s * sizeof(T))
+					, "..", common::p_fmt(ptr + s * sizeof(T))
 					, ")"
 				);
 			}
@@ -126,7 +126,7 @@ template <typename T, typename Persister>
 #if HSTORE_TRACE_PERSIST
 			hop_hash_log::write(LOG_LOCATION, what, " ["
 				, ptr, ".."
-				, static_cast<const void *>(static_cast<const char*>(ptr)+len)
+				, common::p_fmt(static_cast<const char*>(ptr)+len)
 				, ")"
 			);
 #endif

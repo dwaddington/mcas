@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(personality-tabulator-ccpm CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+include(${CMAKE_SOURCE_DIR}/mk/avoid_boost_type_to_string_bug.cmake)
 
 find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
 
@@ -13,9 +13,8 @@ endif()
 set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated/tabulator_generated.h)
 
 set(PLUGIN_SOURCES ${GENERATED} src/tabulator_plugin.cpp)
-set(CLIENT_SOURCES ${GENERATED} )  
+set(CLIENT_SOURCES ${GENERATED} )
 
-  
 set(TEST_SOURCES ./src/tabulator_test.cpp)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
@@ -35,7 +34,7 @@ link_directories(${CMAKE_BINARY_DIR}/src/lib/flatbuffers/)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 
 add_custom_command(
-  OUTPUT ${GENERATED}  
+  OUTPUT ${GENERATED}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/tabulator.fbs
   COMMAND ${FLATC} --python --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/src/tabulator.fbs
   COMMAND touch ${GENERATED}

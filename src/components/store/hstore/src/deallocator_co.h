@@ -98,7 +98,7 @@ template <typename T, typename Persister>
 				auto p = static_cast<char *>(pmemobj_direct(ptr));
 				hop_hash_log<HSTORE_TRACE_PALLOC>::write(LOG_LOCATION
 					, "[", p
-					, "..", static_cast<void *>(p + sz_ * sizeof(T))
+					, "..", common::p_fmt(p + sz_ * sizeof(T))
 					, ")"
 				);
 			}

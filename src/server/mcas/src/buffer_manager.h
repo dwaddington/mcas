@@ -105,8 +105,8 @@ public:
       , magic(0xC0FFEE)
     {
       assert(length_);
-      CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, static_cast<void *>(this),
-            static_cast<void *>(transport()), static_cast<void *>(region()));
+      CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, common::p_fmt(this),
+            common::p_fmt(transport()), common::p_fmt(region()));
     }
 
     void *get_desc() const { return _region.desc(); }
@@ -116,8 +116,8 @@ public:
   protected:
     ~buffer_base()
     {
-      CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, static_cast<void *>(this),
-            static_cast<void *>(transport()), static_cast<void *>(region()));
+      CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, common::p_fmt(this),
+            common::p_fmt(transport()), common::p_fmt(region()));
     }
 
   public:
@@ -199,7 +199,7 @@ public:
       _buffers.emplace_back(std::make_unique<buffer_internal>(debug_level_, _transport, len));
       _free.push_back(_buffers.back().get());
     }
-    PLOG("%s %p allocated %lu buffers", __func__, static_cast<void *>(this), buffer_count);
+    PLOG("%s %p allocated %lu buffers", __func__, common::p_fmt(this), buffer_count);
   }
 #pragma GCC diagnostic pop
 
@@ -216,7 +216,7 @@ public:
     if (UNLIKELY(_free.empty())) throw Program_exception("Buffer_manager: no shard buffers remaining");
     auto iob = _free.back();
     _free.pop_back();
-    CPLOG(3, "%s::%s %p (%lu free)", _cname, __func__, static_cast<const void *>(iob), _free.size());
+    CPLOG(3, "%s::%s %p (%lu free)", _cname, __func__, common::p_fmt(iob), _free.size());
     assert(iob);
     iob->reset_length();
     iob->set_completion(completion_);
@@ -227,7 +227,7 @@ public:
   {
     assert(iob);
 
-    CPLOG(3, "%s::%s %p (%lu free)", _cname, __func__, static_cast<const void *>(iob), _free.size());
+    CPLOG(3, "%s::%s %p (%lu free)", _cname, __func__, common::p_fmt(iob), _free.size());
     iob->reset_length();
     iob->set_completion(nullptr);
     _free.push_back(iob);

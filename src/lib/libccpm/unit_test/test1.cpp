@@ -132,10 +132,10 @@ TEST_F(Libccpm_test, ccpm_immutable_allocator)
 
   size_t region_size = 0x400;
   region_vector_t regions;
-  regions.push_back(::iovec{aligned_alloc(8,region_size), region_size});
-  ASSERT_NE(nullptr, regions.back().iov_base);
-  regions.push_back(::iovec{aligned_alloc(8,region_size), region_size});
-  ASSERT_NE(nullptr, regions.back().iov_base);
+  regions.push_back(region_vector_t::value_type(common::make_byte_span(aligned_alloc(8,region_size), region_size)));
+  ASSERT_NE(nullptr, ::base(regions.back()));
+  regions.push_back(region_vector_t::value_type(common::make_byte_span(aligned_alloc(8,region_size), region_size)));
+  ASSERT_NE(nullptr, ::base(regions.back()));
   ASSERT_TRUE(regions.size() == 2);
 
   Immutable_allocator_base allocator(regions, nullptr, true);
@@ -155,7 +155,7 @@ TEST_F(Libccpm_test, ccpm_immutable_allocator)
     PLOG("ran out of memory - OK - time to add more memmory!");
     auto r = aligned_alloc(8,region_size);
     ASSERT_NE(nullptr, r);
-    allocator.expand(::iovec{r, region_size});
+    allocator.expand(region_vector_t::value_type(common::make_byte_span(r, region_size)));
   }
 
   PLOG("allocate: %p,0x%lx", ptr = allocator.allocate(inc), inc);

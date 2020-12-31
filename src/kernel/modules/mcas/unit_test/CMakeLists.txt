@@ -2,7 +2,8 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project (mcas-module-test CXX)
 
-set (CMAKE_CXX_STANDARD 14)
+# Drop to 14 to avoid boost bug (surfaced by g++ 7.1 std=c++1z, fixed in boost 1.66) icl/type_traits/type_to_string.hpp partial specialization
+set(CMAKE_CXX_STANDARD 14)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)

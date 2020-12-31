@@ -20,6 +20,6 @@
 #define PREFIX_STATIC "HSTORE %s %s:%d "
 #define LOCATION_STATIC __func__, __FILE__, __LINE__
 #define PREFIX PREFIX_STATIC "%p "
-#define LOCATION LOCATION_STATIC, static_cast<const void *>(this)
+#define LOCATION LOCATION_STATIC, common::p_fmt(this)
 
 #endif

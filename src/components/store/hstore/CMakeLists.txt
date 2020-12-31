@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-hstore CXX)
 
-set (CMAKE_CXX_STANDARD 14)
+include(${CMAKE_SOURCE_DIR}/mk/avoid_boost_type_to_string_bug.cmake)
 
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 

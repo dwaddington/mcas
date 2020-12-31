@@ -16,6 +16,7 @@
 #define __NUPM_DAX_DATA_H__
 
 #include <libpmem.h>
+#include <common/pointer_cast.h>
 #include <common/types.h>
 #include <common/utils.h>
 #include <boost/icl/split_interval_map.hpp>
@@ -163,7 +164,7 @@ class DM_region_header {
     PINF(
         " magic [0x%8x]\n version [%u]\n device_size [%lu]\n region_count [%u]",
         _magic, _version, _device_size, _region_count);
-    PINF(" base [%p]", static_cast<void *>(this));
+    PINF(" base [%p]", common::p_fmt(this));
 
     for (uint16_t r = 0; r < _region_count; r++) {
       auto reg = region_table_base()[r];
@@ -317,11 +318,11 @@ class DM_region_header {
 
   inline unsigned char *arena_base()
   {
-    return static_cast<unsigned char *>(static_cast<void *>(this)) + grain_size();
+    return common::pointer_cast<unsigned char>(this) + grain_size();
   }
 
-  inline DM_region *region_table_base() { return static_cast<DM_region *>(static_cast<void *>(this + 1)); }
-  inline const DM_region *region_table_base() const { return static_cast<const DM_region *>(static_cast<const void *>(this + 1)); }
+  inline DM_region *region_table_base() { return common::pointer_cast<DM_region>(this + 1); }
+  inline const DM_region *region_table_base() const { return common::pointer_cast<const DM_region>(this + 1); }
 
   inline DM_region *region(size_t idx)
   {

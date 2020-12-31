@@ -23,13 +23,14 @@
 #include <api/fabric_itf.h>
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
+#include <common/byte_span.h>
 #include <common/cpu.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/spsc_bounded_queue.h>
+#include <common/string_view.h>
 
 #include <csignal> /* sig_atomic_t */
-#include <experimental/string_view>
 #include <list>
 #include <memory>
 #include <string>
@@ -75,6 +76,8 @@ class Shard : public Shard_transport, private common::log_source {
  private:
   static constexpr size_t TWO_STAGE_THRESHOLD = KiB(8); /* above this two stage protocol is used */
   static constexpr const char *const _cname = "Shard";
+
+  using byte_span = common::byte_span;
 
  private:
   struct rename_info_t {
@@ -134,7 +137,7 @@ class Shard : public Shard_transport, private common::log_source {
   using task_list_t         = std::list<Shard_task* >;
 
  public:
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 
   Shard(const Config_file & config_file,
         unsigned            shard_index,
@@ -304,7 +307,7 @@ class Shard : public Shard_transport, private common::log_source {
 
   auto offset_to_sg_list(
     range<std::uint64_t> t
-    , const std::vector<::iovec> &region_breaks
+    , const std::vector<byte_span> &region_breaks
   ) -> sg_result;
 
   inline bool ado_enabled() const { return (_i_ado_mgr && (_ado_plugins.size() > 0)); }

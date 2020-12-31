@@ -106,7 +106,7 @@ class Memory_region : public core::AVL_node<Memory_region> {
     //        _free ? "yes" : "no", common::chksum32((void*)_addr, _size));
     // }
     // else {
-    PLOG("node [%p]: addr=0x%lx size=%ld free=%s", static_cast<const void *>(this), _addr, _size,
+    PLOG("node [%p]: addr=0x%lx size=%ld free=%s", common::p_fmt(this), _addr, _size,
          _free ? "yes" : "no");
   }
 
@@ -398,7 +398,7 @@ class AVL_range_allocator {
       root = reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(
           (reinterpret_cast<addr_t>(slab.get_first_element())));
 
-      if (option_DEBUG) PLOG("reconstructed root pointer: %p", static_cast<const void *>(root));
+      if (option_DEBUG) PLOG("reconstructed root pointer: %p", common::p_fmt(root));
     }
     else {
       /* create root pointer on slab */

@@ -5,6 +5,7 @@ project (ado-prox-test CXX)
 add_definitions(-DCONFIG_DEBUG)
 
 include_directories(../../../../lib/common/include)
+include_directories(../../../../lib/GSL/include)
 include_directories(../../../../lib/libadoproto/include)
 include_directories(../../../../components/)
 include_directories(../../../)

@@ -278,7 +278,7 @@ public:
 
   status_t map_keys(std::function<int(const std::string &key)> function);
 
-  status_t get_pool_regions(std::vector<::iovec> &out_regions);
+  status_t get_pool_regions(nupm::region_descriptor::address_map_t &out_regions);
 
   status_t grow_pool(const size_t increment_size, size_t &reconfigured_size);
 
@@ -824,12 +824,12 @@ status_t Pool_handle::resize_value(const std::string &key,
   return s;
 }
 
-status_t Pool_handle::get_pool_regions(std::vector<::iovec> &out_regions) {
+status_t Pool_handle::get_pool_regions(nupm::region_descriptor::address_map_t &out_regions) {
   if (_regions.empty()) {
     return E_INVAL;
   }
   for (auto region : _regions)
-    out_regions.push_back(region);
+    out_regions.push_back(nupm::region_descriptor::address_map_t::value_type(common::make_byte_span(region.iov_base, region.iov_len)));
   return S_OK;
 }
 
@@ -992,7 +992,7 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
     session = new Pool_session{handle};
     _pools[handle->_name] = handle;
 
-    CPLOG(1, PREFIX "adding new session (%p)", static_cast<const void *>(session));
+    CPLOG(1, PREFIX "adding new session (%p)", common::p_fmt(session));
 
     _pool_sessions.insert(session); /* create a session too */
   }
@@ -1020,7 +1020,7 @@ IKVStore::pool_t Map_store::open_pool(const std::string &name,
   if (ph == nullptr) return component::IKVStore::POOL_ERROR;
 
   auto new_session = new Pool_session(ph);
-  CPLOG(1, PREFIX "opened pool(%p)", static_cast<const void *>(new_session));
+  CPLOG(1, PREFIX "opened pool(%p)", common::p_fmt(new_session));
   _pool_sessions.insert(new_session);
 
   return reinterpret_cast<IKVStore::pool_t>(new_session);
@@ -1038,7 +1038,7 @@ status_t Map_store::close_pool(const pool_t pid) {
   delete session;
   _pool_sessions.erase(session);
   CPLOG(1, PREFIX "closed pool (%lx)", pid);
-  CPLOG(1, PREFIX "erased session %p", static_cast<const void *>(session));
+  CPLOG(1, PREFIX "erased session %p", common::p_fmt(session));
 
   return S_OK;
 }
@@ -1066,7 +1066,7 @@ status_t Map_store::delete_pool(const std::string &poolname) {
       PWRN(
            PREFIX "delete_pool (%s) pool delete failed because pool still "
            "open (%p)",
-           poolname.c_str(), static_cast<void *>(s));
+           poolname.c_str(), common::p_fmt(s));
       return E_ALREADY_OPEN;
     }
   }
@@ -1254,9 +1254,10 @@ status_t Map_store::get_pool_regions(const pool_t pool,
                                      nupm::region_descriptor &out_regions) {
   auto session = get_session(pool);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
-  out_regions.id.clear();
-  out_regions.data_file.clear();
-  return session->pool->get_pool_regions(out_regions.address_map);
+  nupm::region_descriptor::address_map_t addr_map;
+  auto status = session->pool->get_pool_regions(addr_map);
+  out_regions = std::move(nupm::region_descriptor(addr_map));
+  return status;
 }
 status_t Map_store::grow_pool(const pool_t pool, const size_t increment_size,
                               size_t &reconfigured_size) {

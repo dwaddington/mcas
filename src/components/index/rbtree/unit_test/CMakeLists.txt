@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(ramrbtree-tests CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 include_directories(../../../../lib/common/include/)
 include_directories(../../../)
 

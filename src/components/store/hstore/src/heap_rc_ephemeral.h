@@ -22,10 +22,10 @@
 #include "hop_hash_log.h"
 
 #include <boost/icl/interval_set.hpp>
+#include <common/byte_span.h>
+#include <common/string_view.h>
 #include <nupm/rc_alloc_lb.h> /* Rca_LB */
 #include <nupm/region_descriptor.h>
-
-#include <sys/uio.h> /* iovec */
 
 #include <algorithm> /* mini, swap */
 #include <cstddef> /* size_t */
@@ -35,6 +35,8 @@ struct heap_rc_ephemeral
 	: private common::log_source
 {
 private:
+	using byte_span = common::byte_span;
+	using string_view = common::string_view;
 	nupm::Rca_LB _heap;
 	nupm::region_descriptor _managed_regions;
 	std::size_t _allocated;
@@ -55,21 +57,21 @@ private:
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
-	void add_managed_region(const ::iovec &r);
+	void add_managed_region(const byte_span &r);
 public:
-	explicit heap_rc_ephemeral(unsigned debug_level, const std::string & id, const std::string & backing_file);
+	explicit heap_rc_ephemeral(unsigned debug_level, string_view id, string_view backing_file);
 
-	void add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, unsigned numa_node);
+	void add_managed_region(const byte_span &r_full, const byte_span &r_heap, unsigned numa_node);
 	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
 	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n) { using std::swap; swap(n, _managed_regions); return n; }
 
 	template <bool B>
-		void write_hist(const ::iovec & pool_) const
+		void write_hist(const byte_span & pool_) const
 		{
 			static bool suppress = false;
 			if ( ! suppress )
 			{
-				hop_hash_log<B>::write(LOG_LOCATION, "pool ", pool_.iov_base);
+				hop_hash_log<B>::write(LOG_LOCATION, "pool ", ::base(pool_));
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
 				for ( unsigned i = log_min_alignment; i != limit; ++i )

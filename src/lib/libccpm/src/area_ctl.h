@@ -20,6 +20,8 @@
 
 #include "atomic_word.h"
 #include "element_state.h"
+#include <common/byte_span.h>
+#include <common/pointer_cast.h>
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -137,6 +139,7 @@ namespace ccpm
 		 * cover an area) */
 		using index_t = unsigned;
 		using level_ix_t = std::uint8_t;
+		using byte_span = common::byte_span;
 #if 1
 		static constexpr index_t ct_atomic_words = 1;
 #define USE_PADDING 56
@@ -149,8 +152,8 @@ namespace ccpm
 #endif
 		static constexpr std::size_t min_alloc_size = 8;
 
-    void set_root(const iovec& iov);
-    iovec get_root() const;
+    void set_root(const byte_span & iov);
+    byte_span get_root() const;
 
 	private:
 		static constexpr index_t alloc_states_per_word = ccpm::alloc_states_per_word;
@@ -178,7 +181,7 @@ namespace ccpm
 		std::uint64_t _magic;
 
     /* space for the root pointer */
-    iovec _root; 
+    byte_span _root;
 
 #if USE_PADDING
 		char _padding[USE_PADDING];
@@ -299,12 +302,12 @@ namespace ccpm
 		/* locate start of elements */
 		char *area_byte()
 		{
-			return static_cast<char *>(static_cast<void *>(this - this->_level));
+			return common::pointer_cast<char>(this - this->_level);
 		}
 
 		const char *area_byte() const
 		{
-			return static_cast<const char *>(static_cast<const void *>(this - this->_level));
+			return common::pointer_cast<const char>(this - this->_level);
 		}
 
 		char *element_byte(index_t ix)

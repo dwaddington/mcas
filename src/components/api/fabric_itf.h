@@ -15,6 +15,7 @@
 #define __API_FABRIC_ITF__
 
 #include <component/base.h> /* component::IBase, DECLARE_COMPONENT_UUID, DECLARE_INTERFACE_UUID */
+#include <common/byte_span.h>
 
 #include <chrono>
 #include <cstddef> /* size_t */
@@ -131,20 +132,20 @@ class IFabric_op_completer {
                                                         std::size_t   len,
                                                         void *        error_data,
                                                         void *        param)
-#if 2017030L <= __cplusplus
+#if 201703L <= __cplusplus
 	noexcept
 #endif
-	  ;
+    ;
   using complete_param_tentative_ptr_noexcept = cb_acceptance (*)(void *context,
                                                                   ::status_t,
                                                                   std::uint64_t completion_flags,
                                                                   std::size_t   len,
                                                                   void *        error_data,
                                                                   void *        param)
-#if 2017030L <= __cplusplus
+#if 201703L <= __cplusplus
 	noexcept
 #endif
-	  ;
+	;
 
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
@@ -328,6 +329,8 @@ class IFabric_communicator : public IFabric_op_completer {
 struct IFabric_memory_region;
 
 class IFabric_connection {
+protected:
+  using const_byte_span = common::const_byte_span;
  public:
   virtual ~IFabric_connection() {}
 
@@ -354,6 +357,10 @@ class IFabric_connection {
    */
   virtual memory_region_t register_memory(const void *  contig_addr,
                                           std::size_t   size,
+                                          std::uint64_t key,
+                                          std::uint64_t flags)
+   { return register_memory(common::make_const_byte_span(contig_addr, size), key, flags); }
+  virtual memory_region_t register_memory(const_byte_span contig_,
                                           std::uint64_t key,
                                           std::uint64_t flags) = 0;
 

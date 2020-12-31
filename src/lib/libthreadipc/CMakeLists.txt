@@ -4,8 +4,6 @@ project(threadipc CXX C)
 
 add_subdirectory(unit_test)
 
-set(CMAKE_CXX_STANDARD 14)
-
 add_compile_options(-g -pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
 
 #add_compile_options("$<$<CONFIG:Debug>:-O0>")

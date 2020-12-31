@@ -47,9 +47,9 @@ TEST_F(IADO_manager_proxy_test, Instantiate) {
 
   nupm::revoke_memory(token);
   size_t size = g_size;
-  auto rv = ddm.create_region("1234", 0, size).address_map;
+  auto rv = ddm.create_region("1234", 0, size).address_map();
   ASSERT_TRUE(rv.size() !=  0);
-  char *pop = static_cast<char *>(rv[0].iov_base);
+  char *pop = static_cast<char *>(::base(rv[0]));
   memset(pop, 0, size);
   PLOG("touched memory.");
   strcpy(pop, "Hello!");

@@ -118,7 +118,7 @@ TEST_F(Libnupm_test, AVLRange)
     core::AVL_range_allocator avl(BASE, ARENA_SIZE);
 
     for(auto a : log) {
-      avl.alloc_at((addr_t)a.iov_base, a.iov_len);
+      avl.alloc_at((addr_t)a.data(), a.size());
     }
     avl.dump_info(&after);
   }
@@ -518,9 +518,9 @@ TEST_F(Libnupm_test, DevdaxManager)
   ddm.debug_dump(0); /* region id 0 */
 
   PLOG("Opening existing region..");
-  auto iovs = ddm.open_region(uuid, 0).address_map;
+  auto iovs = ddm.open_region(uuid, 0).address_map();
   if (iovs.size() == 1) {
-    PLOG("Opened existing region %p OK", iovs.front().iov_base);
+    PLOG("Opened existing region %p OK", ::base(iovs.front()));
     ddm.debug_dump(0);
     PLOG("Now erasing it...");
     ddm.erase_region(uuid, 0);
@@ -528,12 +528,12 @@ TEST_F(Libnupm_test, DevdaxManager)
   }
 
   size_t size = MB(256);
-  auto p_iov = ddm.create_region(uuid, 0, size).address_map;
+  auto p_iov = ddm.create_region(uuid, 0, size).address_map();
   void * p = nullptr;
-  if (p_iov.size())
+  if ( p_iov.size() )
   {
-    PLOG("created region %p ", p_iov[0].iov_base);
-    p = p_iov[0].iov_base;
+    PLOG("created region %p ", ::base(p_iov[0]));
+    p = ::base(p_iov[0]);
   }
   ASSERT_TRUE(p);
   memset(p, 0, 4096);
@@ -544,11 +544,11 @@ TEST_F(Libnupm_test, DevdaxManager)
   ddm.debug_dump(0);
 
   PLOG("Re-create...");
-  auto q_iov = ddm.create_region(uuid, 0, size).address_map;
+  auto q_iov = ddm.create_region(uuid, 0, size).address_map();
   void * q = nullptr;
   if (q_iov.size())
   {
-    q = q_iov[0].iov_base;
+    q = ::base(q_iov[0]);
   }
   ASSERT_TRUE(q == p);
 

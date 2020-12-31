@@ -19,7 +19,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <ostream>
-#include <sys/uio.h> /* iovec */
 
 /* scan the chains of free pointers, starting with the least acceptable length
  * (min_run_length_) and ending at the greatest possible length (alloc_states_per_word)
@@ -119,18 +118,18 @@ ccpm::area_top::~area_top()
 }
 
 /* Initial area_ctl */
-ccpm::area_top::area_top(const ::iovec &iov_, const unsigned trace_level_, std::ostream &o_)
-	: area_top(area_ctl::commission(iov_.iov_base, iov_.iov_len), trace_level_, o_)
+ccpm::area_top::area_top(const byte_span &iov_, const unsigned trace_level_, std::ostream &o_)
+	: area_top(area_ctl::commission(::base(iov_), ::size(iov_)), trace_level_, o_)
 {}
 
 /* Restored area_ctl */
 ccpm::area_top::area_top(
-	const ::iovec &iov_
+	const byte_span &iov_
 	, const ownership_callback_t &resolver_
 	, const unsigned trace_level_
 	, std::ostream &o_
 )
-	: area_top(&area_ctl::root(iov_.iov_base)->restore(resolver_), trace_level_, o_)
+	: area_top(&area_ctl::root(::base(iov_))->restore(resolver_), trace_level_, o_)
 {
 }
 
@@ -308,7 +307,7 @@ bool ccpm::area_top::allocate_recovery_1()
 {
 	if ( _o && trace_fine() )
 	{
-		*_o << __func__ << " for " << static_cast<const void *>(this) << ", ctl at " << static_cast<const void *>(_ctl) << "\n";
+		*_o << __func__ << " for " << common::p_fmt(this) << ", ctl at " << common::p_fmt(_ctl) << "\n";
 	}
 	auto ct =
 		_all_restored
@@ -524,7 +523,7 @@ RETRY:
 
 			if ( ptr_ == nullptr && trace_fine() )
 			{
-				PLOG("ctl %p no cached element available", static_cast<void *>(_ctl));
+				PLOG("ctl %p no cached element available", common::p_fmt(_ctl));
 			}
 
 			while ( ptr_ == nullptr
@@ -548,7 +547,7 @@ RETRY:
 				);
 				if ( ptr_ == nullptr && trace_fine() )
 				{
-					PLOG("ctl %p rechain/subdivision failed to make cached element available", static_cast<void *>(_ctl));
+					PLOG("ctl %p rechain/subdivision failed to make cached element available", common::p_fmt(_ctl));
 				}
 			}
 		}
@@ -615,12 +614,12 @@ bool ccpm::area_top::contains(const void *p) const
 	return _ctl && _ctl->contains(p);
 }
 
-void ccpm::area_top::set_root(const iovec& iov)
+void ccpm::area_top::set_root(const byte_span& iov)
 {
   _ctl->set_root(iov);
 }
 
-iovec ccpm::area_top::get_root() const
+auto ccpm::area_top::get_root() const -> byte_span
 {
   return _ctl->get_root();
 }

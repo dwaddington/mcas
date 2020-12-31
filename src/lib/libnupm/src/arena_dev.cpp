@@ -37,12 +37,12 @@ void arena_dev::debug_dump() const
 
 auto arena_dev::region_get(const string_view &id_) -> region_descriptor
 {
-  ::iovec iov;
-  iov.iov_base = _hdr->get_region(make_uuid(id_), &iov.iov_len);
-  std::vector<::iovec> v;
-  if ( iov.iov_base != nullptr )
+  std::size_t len = 0;
+  auto base = _hdr->get_region(make_uuid(id_), &len);
+  region_descriptor::address_map_t v;
+  if ( base != nullptr )
   {
-    v.push_back(iov);
+    v.push_back(common::make_byte_span(base, len));
   }
   return region_descriptor(v);
 }
@@ -56,7 +56,13 @@ auto arena_dev::region_create(const string_view &id_, gsl::not_null<registry_mem
 
   return
     region_descriptor(
-      region_descriptor::address_map_t(1, ::iovec{_hdr->allocate_region(make_uuid(id_), size_in_grains), size_in_grains * _hdr->grain_size()})
+      region_descriptor::address_map_t(
+        1
+        , common::make_byte_span(
+            _hdr->allocate_region(make_uuid(id_), size_in_grains)
+            , size_in_grains * _hdr->grain_size()
+          )
+      )
     ); /* allocates n grains */
 }
 

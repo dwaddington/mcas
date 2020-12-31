@@ -43,6 +43,7 @@ public:
 class Fabric_memory_control
   : public component::IFabric_connection
 {
+  using byte_span = common::byte_span;
   Fabric &_fabric;
   std::shared_ptr<::fi_info> _domain_info;
   std::shared_ptr<::fid_domain> _domain;
@@ -61,14 +62,13 @@ class Fabric_memory_control
    * @throw fabric_runtime_error : std::runtime_error : ::fi_mr_reg fail
    */
   ::fid_mr *make_fid_mr_reg_ptr(
-    const void *buf
-    , std::size_t len
+    const_byte_span buf
     , std::uint64_t access
     , std::uint64_t key
     , std::uint64_t flags
   ) const;
 
-  ::fid_mr *covering_mr(const ::iovec &v);
+  ::fid_mr *covering_mr(byte_span v);
 
 public:
   /*
@@ -97,7 +97,7 @@ public:
    * @throw std::logic_error - inconsistent memory address tables
    * @throw fabric_runtime_error : std::runtime_error : ::fi_mr_reg fail
    */
-  memory_region_t register_memory(const void * contig_addr, std::size_t size, std::uint64_t key, std::uint64_t flags) override;
+  memory_region_t register_memory(const_byte_span contig_addr, std::uint64_t key, std::uint64_t flags) override;
   /**
    * @throw std::range_error - address not registered
    * @throw std::logic_error - inconsistent memory address tables

@@ -23,6 +23,8 @@
 #include <common/dump_utils.h>
 #include <common/exceptions.h>
 #include <common/logging.h>
+#include <common/pointer_cast.h>
+#include <common/string_view.h>
 #include <common/utils.h>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -253,10 +255,10 @@ struct Message_pool_request : public Message {
  private:
   using data_t = char; /* most trailing data is typed uint8_t, this is typed charr */
   auto data() const {
-    return static_cast<const data_t*>(static_cast<const void*>(this + 1));
+    return common::pointer_cast<const data_t>(this + 1);
   }
   auto data() {
-    return static_cast<data_t*>(static_cast<void*>(this + 1));
+    return common::pointer_cast<data_t>(this + 1);
   }
 
   Message_pool_request(size_t             buffer_size,
@@ -352,8 +354,8 @@ struct Message_pool_response : public Message {
  private:
   using data_t = uint8_t; /* some trailing data is typed uint8_t, some is typed
                              charu. This used to be char */
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
  public:
   Message_pool_response(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID), pool_id() {}
 
@@ -367,8 +369,8 @@ class Message_numbered_request : public Message {
   uint64_t _pool_id;
  protected:
   template <typename T>
-    using basic_string_view = std::experimental::basic_string_view<T>;
-  using byte = gsl::byte;
+    using basic_string_view = common::basic_string_view<T>;
+  using byte = common::byte;
 
  public:
   Message_numbered_request(uint64_t    auth_id_,
@@ -406,9 +408,9 @@ struct Message_IO_request : public Message_numbered_request {
   using data_t                             = uint8_t; /* some trailing data is typed uint8_t, some is typed
                                                          charu. This used to be char */
  private:
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto cdata() const { return common::pointer_cast<const char>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
   Message_IO_request(size_t      buffer_size,
@@ -621,12 +623,12 @@ class Message_IO_response : public Message_numbered_response {
  private:
   using data_t = uint8_t; /* some trailing data is typed uint8_t, some is typed
                              charu. This used to be char */
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
-  auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
-  auto edata() const { return static_cast<const locate_element*>(static_cast<const void*>(this + 1)); }
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
+  auto cdata() const { return common::pointer_cast<const char>(this + 1); }
+  auto edata() const { return common::pointer_cast<const locate_element>(this + 1); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
 
   Message_IO_response(size_t /* buffer_size */,
                       uint64_t auth_id,
@@ -684,9 +686,9 @@ struct Message_INFO_request : public Message {
  private:
   using data_t = uint8_t; /* some trailing data is typed uint8_t, some is typed
                              charu. This used to be char */
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto cdata() const { return common::pointer_cast<const char>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
   Message_INFO_request(uint64_t auth_id, component::IKVStore::Attribute type_, std::uint64_t pool_id_)
@@ -752,9 +754,9 @@ struct Message_INFO_response : public Message {
 
  private:
   using data_t = uint8_t;
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto cdata() const { return common::pointer_cast<const char>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
   Message_INFO_response(uint64_t authid_, offset_t offset_) : Message(authid_, (sizeof *this), id, OP_INVALID), _v{}, _offset(offset_) {}
   void set_value(size_t buffer_size, const void* value, size_t len)
@@ -836,8 +838,8 @@ struct Message_handshake_reply : public Message {
 
  private:
   using data_t = uint8_t;
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
   Message_handshake_reply(size_t         buffer_size,
@@ -903,9 +905,9 @@ struct Message_ado_request : public Message_numbered_request {
 
  private:
   using data_t = uint8_t;
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto cdata() const { return common::pointer_cast<const char>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
   Message_ado_request(size_t             buffer_size,
@@ -956,9 +958,9 @@ struct Message_put_ado_request : public Message_numbered_request {
 
  private:
   using data_t = byte;
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto cdata() const { return static_cast<const char*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto cdata() const { return common::pointer_cast<const char>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
   Message_put_ado_request(size_t             buffer_size,
@@ -1008,7 +1010,7 @@ struct Message_put_ado_request : public Message_numbered_request {
   const void* request() const { return static_cast<const void*>(&data()[key_len + 1]); }
   const void* value() const
   {
-    return static_cast<const void*>(static_cast<const byte*>(request()) + invocation_data_len);
+    return static_cast<const byte*>(request()) + invocation_data_len;
   }
   size_t request_len() const { return this->invocation_data_len; }
   size_t value_len() const { return this->_val_len; }
@@ -1028,8 +1030,8 @@ struct Message_ado_response : public Message_numbered_response {
   using data_t = uint8_t;
 
  private:
-  auto data() const { return static_cast<const data_t*>(static_cast<const void*>(this + 1)); }
-  auto data() { return static_cast<data_t*>(static_cast<void*>(this + 1)); }
+  auto data() const { return common::pointer_cast<const data_t>(this + 1); }
+  auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
   static constexpr auto        id          = MSG_TYPE::ADO_RESPONSE;
@@ -1058,7 +1060,7 @@ struct Message_ado_response : public Message_numbered_response {
     if (msg_len() + buffer_len > max_buffer_size) throw API_exception("Message_ado_response out of space");
 
     uint32_t* data_frame =
-        static_cast<uint32_t*>(static_cast<void*>(&data()[response_len])); /* next position in data field */
+        common::pointer_cast<uint32_t>(static_cast<void*>(&data()[response_len])); /* next position in data field */
 #ifdef RESPONSE_DATA_DEBUG
     if (buffer_len > 0) {
       PLOG("Shard_ado: converting ADO-IPC response to NPC: %lu", buffer_len);
