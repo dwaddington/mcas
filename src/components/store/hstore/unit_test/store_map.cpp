@@ -25,7 +25,7 @@ namespace
 {
   static auto store_env = ::getenv("STORE");
   /* example of a STORE_LOCATION string:
-   *   [{"path", "/mnt/pmem1", "addr", 618475290624}]
+   *   [{"path": "/mnt/pmem1", "addr": 618475290624}]
    */
   static auto store_loc = ::getenv("STORE_LOCATION");
 }

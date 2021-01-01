@@ -102,7 +102,7 @@ namespace ccpm
 
 	/*
 	 * Location of non-persisted items for a single "region" managed bu the crash-consistent allocator.
-	 * Persisted items are keps in an area_ctl, which is in perstnt memory.
+	 * Persisted items are keps in an area_ctl, which is in persistent memory.
 	 */
 	struct area_top
 	{
@@ -117,8 +117,9 @@ namespace ccpm
 		using level_hints_vec = std::vector<level_hints>;
 		level_hints_vec _level;
 		unsigned _ct_allocation;
+		byte_span _region; /* for get_region only */
 
-		area_top(area_ctl *ctl, unsigned trace_level, std::ostream &o);
+		area_top(area_ctl *ctl, unsigned trace_level, byte_span iov, std::ostream &o);
 		area_top(const area_top &) = delete;
 		area_top &operator=(const area_top &) = delete;
 
@@ -138,13 +139,13 @@ namespace ccpm
 	public:
 		/* Initial area_ctl */
 		explicit area_top(
-			const byte_span & iov
+			byte_span iov
 			, unsigned trace_level
 			, std::ostream &o
 		);
 		/* Restored area_ctl */
 		explicit area_top(
-			const byte_span & iov
+			byte_span iov
 			, const ownership_callback_t &resolver
 			, unsigned trace_level
 			, std::ostream &o
@@ -155,6 +156,8 @@ namespace ccpm
 
 		/* Free byte count. Required by users */
 		std::size_t bytes_free() const;
+
+		byte_span get_region() const { return _region; }
 
 		void allocate(
 			void * & ptr, std::size_t bytes
@@ -177,7 +180,7 @@ namespace ccpm
 
     void set_root(const byte_span & iov);
     byte_span get_root() const;
-    
+
 		/*
 		 * called by area_ctl to add area_ctl a, at level level_ix, with a longest
 		 * free run (consecutive free elements) of free_run, to _level, which is the

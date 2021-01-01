@@ -48,12 +48,6 @@ namespace impl
 	struct allocation_state_extend;
 }
 
-namespace ccpm
-{
-	class IHeap_expandable;
-	struct region_vector_t;
-}
-
 struct heap_cc_ephemeral;
 
 struct heap_cc

@@ -140,6 +140,10 @@ class KVStore_test
       "test-" + store_map::impl->name + store_map::numa_zone()
       + "-" + std::to_string(i) + ".pool";
   }
+  static std::string debug_level()
+  {
+    return std::getenv("DEBUG") ? std::getenv("DEBUG") : "0";
+  }
   static poolv_t pool;
   static std::size_t string_length_and_overhead(std::size_t length)
   {
@@ -181,6 +185,7 @@ KVStore_test::kvv_t KVStore_test::kvv_long_long;
 bool KVStore_test::short_short_put = false;
 bool KVStore_test::short_long_put = false;
 bool KVStore_test::long_long_put = false;
+unsigned debug = unsigned(std::getenv("DEBUG") ? std::stoul(std::getenv("DEBUG")) : 400U);
 
 std::size_t KVStore_test::multi_count_actual = 0;
 std::size_t KVStore_test::estimated_object_count =
@@ -212,6 +217,7 @@ TEST_F(KVStore_test, Instantiate)
       0
       , {
           { +component::IKVStore_factory::k_dax_config, store_map::location }
+          , { +component::IKVStore_factory::k_debug, debug_level() }
         }
     );
 }
@@ -271,7 +277,7 @@ TEST_F(KVStore_test, CreatePools)
   {
     double af = std::stod(getenv("POOL_ALLOCATE_FACTOR"));
     pool_alloc = std::size_t(double(pool_alloc) * af);
-    std::cerr << "pool allocatin extimate: " << pool_alloc << "\n";
+    std::cerr << "pool allocation estimate: " << pool_alloc << "\n";
   }
   ASSERT_TRUE(_kvstore);
   timer t(

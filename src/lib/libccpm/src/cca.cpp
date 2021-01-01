@@ -213,6 +213,16 @@ auto ccpm::cca::remaining(
 	return _top.empty() ? E_FAIL : S_OK;
 }
 
+auto ccpm::cca::get_regions() const -> region_vector_t
+{
+	region_vector_t rv;
+	for ( const auto & t : _top )
+	{
+		rv.emplace_back(t->get_region());
+	}
+	return rv;
+}
+
 void ccpm::cca::set_root(
   byte_span root
 )
