@@ -1660,6 +1660,11 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
 {
   API_LOCK();
 
+  if (debug_level() > 1) {
+    auto key_len = key.length();
+    PINF("get: %.*s (key_len=%lu)", int(key_len), key.c_str(), key_len);
+  }
+
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
   assert(iobs);
@@ -1708,6 +1713,11 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
   {
     API_LOCK();
 
+    if (debug_level() > 1) {
+      auto key_len = key.length();
+      PINF("get: %.*s (key_len=%lu)", int(key_len), key.c_str(), key_len);
+    }
+
     const auto iobs = make_iob_ptr_send();
     const auto iobr = make_iob_ptr_recv();
     assert(iobs);
@@ -1736,7 +1746,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
 
       if (response_msg->get_status() != S_OK) return response_msg->get_status();
 
-      CPLOG(1, "%s: message value (%.*s)", __func__, int(response_msg->data_length()), response_msg->data());
+      CPLOG(1, "%s: message value (%.*s) size=%lu", __func__, int(response_msg->data_length()), response_msg->data(), response_msg->data_length());
 
       if (response_msg->is_set_twostage_bit()) {
         /* two-stage get */

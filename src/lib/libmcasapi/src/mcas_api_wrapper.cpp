@@ -1,5 +1,6 @@
 #include <unistd.h>
 
+#include <common/logging.h>
 #include <api/components.h>
 #include <api/mcas_itf.h>
 
@@ -19,6 +20,9 @@ extern "C" mcas_session_t mcas_open_session_ex(const char * server_addr,
   auto comp = load_component("libcomponent-mcasclient.so", mcas_client_factory);
   auto factory = static_cast<IMCAS_factory *>(comp->query_interface(IMCAS_factory::iid()));
   assert(factory);
+
+  PLOG("%s : server_addr(%s), net_device(%s), debug_level(%u), patience(%u)",
+       __func__, server_addr, net_device, debug_level, patience);
 
   /* create instance of MCAS client session */
   mcas_session_t mcas = factory->mcas_create(debug_level /* debug level, 0=off */,
