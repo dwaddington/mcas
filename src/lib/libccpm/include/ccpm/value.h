@@ -35,7 +35,7 @@ protected:
       throw Constructor_exception("Structured_value_base requires 64-bit alignment");
 
     assert(_root);
-    PLOG("Structured_value_base: _root=%p", static_cast<void *>(_root));
+    PLOG("Structured_value_base: _root=%p", common::p_fmt(_root));
     if(force_init || !check_integrity() || _root->size != size) {
       PINF("Structured_value_base: rebuilding (base=%p,size=%lu)", base, size);
       /* rebuild */

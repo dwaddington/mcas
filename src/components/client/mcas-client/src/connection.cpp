@@ -156,8 +156,8 @@ protected:
   {
     CPLOG(2, "%s iobs %p iobr %p"
           , __func__
-          , static_cast<const void *>(&*iobs)
-          , static_cast<const void *>(&*iobr)
+          , common::p_fmt(&*iobs)
+          , common::p_fmt(&*iobr)
           );
   }
 
@@ -251,9 +251,9 @@ public:
   {
     CPLOG(2, "%s: iobrd %p iobs2 %p iobr2 %p"
           , __func__
-          , static_cast<const void *>(&*_iobrd)
-          , static_cast<const void *>(&*iobs)
-          , static_cast<const void *>(&*iobr)
+          , common::p_fmt(&*_iobrd)
+          , common::p_fmt(&*iobs)
+          , common::p_fmt(&*iobr)
           );
     /* reply have been received, with credentials for the DMA */
 
@@ -261,7 +261,7 @@ public:
           "%s::%s post_read %p local (addr %p.%zx desc %p) <- (_addr 0x%zx, key 0x%zx)"
           , _cname
           , __func__
-          , static_cast<const void *>(&*_iobrd)
+          , common::p_fmt(&*_iobrd)
           , _v[0].iov_base, _v[0].iov_len
           , _desc[0]
           , _addr, key_
@@ -279,7 +279,7 @@ public:
         return E_BUSY;
       }
       /* What to do when DMA completes */
-      CPLOG(2, "%s dma complete %p", __func__, static_cast<const void *>(&*_iobrd));
+      CPLOG(2, "%s dma complete %p", __func__, common::p_fmt(&*_iobrd));
       _iobrd.reset(nullptr);
       /* DMA is complete. Issue GET_RELEASE */
 
@@ -362,9 +362,9 @@ public:
   {
     CPLOG(2, "%s: iobrd %p iobs2 %p iobr2 %p"
           , __func__
-          , static_cast<const void *>(&*_iobrd)
-          , static_cast<const void *>(&*_iobs2)
-          , static_cast<const void *>(&*_iobr2)
+          , common::p_fmt(&*_iobrd)
+          , common::p_fmt(&*_iobs2)
+          , common::p_fmt(&*_iobr2)
           );
   }
   DELETE_COPY(async_buffer_set_put_locate);
@@ -398,7 +398,7 @@ public:
       CPLOG(2,
             "%s post_write %p local (addr %p.%zx desc %p) -> (_addr 0x%zx, key 0x%zx)"
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             , _v[0].iov_base, _v[0].iov_len
             , _desc[0]
             , _addr, key
@@ -412,7 +412,7 @@ public:
         return E_BUSY;
       }
       /* What to do when DMA completes */
-      CPLOG(2, "%s dma complete %p", __func__, static_cast<const void *>(&*_iobrd));
+      CPLOG(2, "%s dma complete %p", __func__, common::p_fmt(&*_iobrd));
       _iobrd.reset(nullptr);
       /* DMA is complete. Issue PUT_RELEASE */
 
@@ -534,8 +534,8 @@ public:
   {
     CPLOG(2, "%s iobs2 %p iobr2 %p"
           , __func__
-          , static_cast<const void *>(&*_iobs2)
-          , static_cast<const void *>(&*_iobr2)
+          , common::p_fmt(&*_iobs2)
+          , common::p_fmt(&*_iobr2)
           );
   }
   DELETE_COPY(async_buffer_set_get_direct_offset);
@@ -566,8 +566,8 @@ public:
               , _cname
               , __func__
               , response->element_count()
-              , static_cast<const void *>(cursor)
-              , static_cast<const void *>(cursor + response->element_count())
+              , common::p_fmt(cursor)
+              , common::p_fmt(cursor + response->element_count())
               );
 
         _length = 0;
@@ -600,7 +600,7 @@ public:
       _iobrd = c->make_iob_ptr_read();
       CPLOG(2, "%s iobrd %p"
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             );
 
       /* reply have been received, with credentials for the DMA */
@@ -610,7 +610,7 @@ public:
             "%s::%s post_read %p local (addr %p.%zx desc %p) <- (_addr 0x%zx, key 0x%zx)"
             , _cname
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             , _v[0].iov_base, _v[0].iov_len
             , _desc[0]
             , _addr_cursor->addr, _key
@@ -630,7 +630,7 @@ public:
       CPLOG(2, "%s::%s dma read complete %p"
             , _cname
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             );
 
       _iobrd.reset(nullptr);
@@ -719,8 +719,8 @@ public:
   {
     CPLOG(2, "%s iobs2 %p iobr2 %p"
           , __func__
-          , static_cast<const void *>(&*_iobs2)
-          , static_cast<const void *>(&*_iobr2)
+          , common::p_fmt(&*_iobs2)
+          , common::p_fmt(&*_iobr2)
           );
   }
   DELETE_COPY(async_buffer_set_put_direct_offset);
@@ -751,8 +751,8 @@ public:
               , _cname
               , __func__
               , response->element_count()
-              , static_cast<const void *>(cursor)
-              , static_cast<const void *>(cursor + response->element_count())
+              , common::p_fmt(cursor)
+              , common::p_fmt(cursor + response->element_count())
               );
         _length = 0;
         for (const auto &e : _addr_list) {
@@ -787,7 +787,7 @@ public:
       _iobrd = c->make_iob_ptr_write();
       CPLOG(2, "%s iobrd %p"
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             );
 
       /* reply received, with credentials for the DMA */
@@ -797,7 +797,7 @@ public:
             "%s::%s post_write %p local (addr %p.%zx desc %p) -> (_addr 0x%zx, key 0x%zx)"
             , _cname
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             , _v[0].iov_base, _v[0].iov_len
             , _desc[0]
             , _addr_cursor->addr
@@ -820,7 +820,7 @@ public:
             , "%s::%s dma write complete %p"
             , _cname
             , __func__
-            , static_cast<const void *>(&*_iobrd)
+            , common::p_fmt(&*_iobrd)
             );
 
       _iobrd.reset(nullptr);
@@ -898,24 +898,24 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
 
 Connection_handler::~Connection_handler()
 {
-  PLOG("%s: (%p)", __func__, static_cast<const void *>(this));
+  PLOG("%s: (%p)", __func__, common::p_fmt(this));
 }
 
 void Connection_handler::send_complete(void *param, buffer_t *iob)
 {
-  PLOG("%s param %p iob %p", __func__, param, static_cast<const void *>(iob));
+  PLOG("%s param %p iob %p", __func__, param, common::p_fmt(iob));
 }
 void Connection_handler::recv_complete(void *param, buffer_t *iob)
 {
-  PLOG("%s param %p iob %p", __func__, param, static_cast<const void *>(iob));
+  PLOG("%s param %p iob %p", __func__, param, common::p_fmt(iob));
 }
 void Connection_handler::write_complete(void *param, buffer_t *iob)
 {
-  PLOG("%s param %p iob %p", __func__, param, static_cast<const void *>(iob));
+  PLOG("%s param %p iob %p", __func__, param, common::p_fmt(iob));
 }
 void Connection_handler::read_complete(void *param, buffer_t *iob)
 {
-  PLOG("%s param %p iob %p", __func__, param, static_cast<const void *>(iob));
+  PLOG("%s param %p iob %p", __func__, param, common::p_fmt(iob));
 }
 
 Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
@@ -2509,7 +2509,7 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
       // }
 
       set_state(STOPPED);
-      PLOG("Connection_handler::%s: connection %p shutdown.", __func__, static_cast<const void *>(this));
+      PLOG("Connection_handler::%s: connection %p shutdown.", __func__, common::p_fmt(this));
       return 0;
     }
     case STOPPED: {

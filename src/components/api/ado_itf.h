@@ -24,12 +24,14 @@
 
 #include <api/kvindex_itf.h>
 #include <api/kvstore_itf.h>
+#include <common/byte_span.h>
 #include <common/errors.h>
+#include <common/pointer_cast.h>
+#include <common/string_view.h>
 #include <common/types.h>
 #include <common/time.h>
 #include <component/base.h>
 
-#include <experimental/string_view>
 #include <functional>
 #include <map>
 #include <string>
@@ -96,6 +98,8 @@ public:
      deleted after do_work calls
   */
   static constexpr int S_ERASE_TARGET = S_USER0;
+
+  using byte_string_view = std::experimental::basic_string_view<common::byte>;
 
   /* Used to define the set of buffers to return to client. The first
      buffer in the vector will be copied into the return message and
@@ -299,7 +303,43 @@ public:
                            const void*                 in_work_request,
                            const size_t                in_work_request_len,
                            const bool                  new_root,
-                           response_buffer_vector_t&   response_buffers) = 0;
+                           response_buffer_vector_t&   response_buffers)
+   {
+     return do_work(
+       work_id
+       , byte_string_view(common::pointer_cast<const byte_string_view::value_type>(key), key_len)
+       , values
+       , byte_string_view(static_cast<byte_string_view::const_pointer>(in_work_request), in_work_request_len)
+       , new_root
+       , response_buffers
+     );
+   }
+
+  /**
+   * Alternate version of do_work, with key and work_request parameters passed as views
+   * with the goal of more colosely tying each pointer with its associated length.
+   *
+   * This do_work cannot replace the earliers version, as doing so would break esisting
+   * ADO implementations. An implementation must override one of the two versions of do_work.
+   */
+  virtual status_t do_work(const uint64_t              work_id,
+                           byte_string_view            key,
+                           IADO_plugin::value_space_t& values,
+                           byte_string_view            in_work_request,
+                           const bool                  new_root,
+                           response_buffer_vector_t&   response_buffers)
+   {
+     return do_work(
+       work_id
+       , common::pointer_cast<const char>(key.data())
+       , key.size()
+       , values
+       , in_work_request.data()
+       , in_work_request.size()
+       , new_root
+       , response_buffers
+     );
+   }
 
   /**
    * Upcall initial launch event
@@ -726,7 +766,8 @@ public:
   // clang-format on
 
   using work_id_t = uint64_t; /*< work handle/identifier */
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
+  using byte_span = common::byte_span;
 
   /* ADO-to-SHARD (and vice versa) protocol */
 
@@ -784,7 +825,7 @@ public:
    *
    * @return S_OK on success
    */
-  virtual status_t send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, ::iovec iov) = 0;
+  virtual status_t send_memory_map_named(unsigned region_id, string_view pool_name, std::size_t offset, byte_span iov) = 0;
 
   /**
    * Send a work request to the ADO

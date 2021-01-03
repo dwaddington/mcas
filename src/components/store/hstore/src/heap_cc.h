@@ -28,11 +28,11 @@
 
 #include <boost/icl/interval_set.hpp>
 #include <ccpm/interfaces.h>
+#include <common/byte_span.h>
 #include <common/exceptions.h> /* General_exception */
 #include <common/logging.h> /* log_source */
+#include <common/string_view.h>
 #include <nupm/region_descriptor.h>
-
-#include <sys/uio.h> /* iovec */
 
 #include <algorithm>
 #include <array>
@@ -58,9 +58,11 @@ struct heap_cc_ephemeral;
 
 struct heap_cc
 {
+	using byte_span = common::byte_span;
+	using string_view = common::string_view;
 private:
-	::iovec _pool0_full; /* entire extent of pool 0 */
-	::iovec _pool0_heap; /* portion of pool 0 which can be used for the heap */
+	byte_span _pool0_full; /* entire extent of pool 0 */
+	byte_span _pool0_heap; /* portion of pool 0 which can be used for the heap */
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
@@ -73,20 +75,20 @@ public:
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
-		, ::iovec pool0_full
-		, ::iovec pool0_heap
+		, byte_span pool0_full
+		, byte_span pool0_heap
 		, unsigned numa_node
-		, const std::string & id_
-		, const std::string & backing_file_
+		, string_view id_
+		, string_view backing_file_
 	);
 
 	explicit heap_cc(
 		unsigned debug_level
 		, const std::unique_ptr<dax_manager> &dax_manager
-		, const std::string &id
-		, const std::string &backing_file
-		, const ::iovec *iov_addl_first_
-		, const ::iovec *iov_addl_last_
+		, string_view id
+		, string_view backing_file
+		, const byte_span *iov_addl_first_
+		, const byte_span *iov_addl_last_
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -99,7 +101,7 @@ public:
 	~heap_cc();
 
 	static constexpr std::uint64_t magic_value() { return 0x7c84297de2de94a3; }
-	static void *iov_limit(const ::iovec &r);
+	static void *iov_limit(const byte_span &r);
 
 	auto grow(
 		const std::unique_ptr<dax_manager> & dax_manager_

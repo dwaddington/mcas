@@ -110,7 +110,7 @@ class RWLock_guard {
   ~RWLock_guard() noexcept(false) {
     if (_lock.unlock() != 0)
     {
-      PLOG("%s: failed to release lock %p", __func__, static_cast<const void *>(this));
+      PLOG("%s: failed to release lock %p", __func__, common::p_fmt(this));
 #ifdef DEBUG_LOCKING
       abort();
 #endif

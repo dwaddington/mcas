@@ -61,8 +61,7 @@ public:
    * @throw std::logic_error - inconsistent memory address tables
    */
   memory_region_t register_memory(
-    const void * contig_addr
-    , std::size_t size
+    const_byte_span contig
     , std::uint64_t key
     , std::uint64_t flags
   ) override;

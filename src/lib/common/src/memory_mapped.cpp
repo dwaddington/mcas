@@ -17,6 +17,7 @@
 
 #include <common/memory_mapped.h>
 
+#include <common/byte_span.h>
 #include <common/logging.h>
 #include <sys/mman.h>
 #include <cerrno>
@@ -24,17 +25,18 @@
 
 namespace
 {
-	/* not-present value must be compile-time evaluable.
-     * MMAP_FAILED is not; use nullptr instead
-     */
-    static ::iovec translate_mmap_result(::iovec iov_)
-    {
-      return iov_.iov_base == MAP_FAILED ? ::iovec{nullptr, std::size_t(errno)} : iov_;
-    }
+  /* not-present value must be compile-time evaluable.
+  * MMAP_FAILED is not; use nullptr instead
+  */
+  static ::iovec translate_mmap_result(common::byte_span iov_)
+  {
+    return ::base(iov_) == MAP_FAILED ? common::make_iovec(nullptr, std::size_t(errno)) : common::make_iovec(::base(iov_), ::size(iov_));
+  }
 }
 
 constexpr ::iovec common::iovec_moveable_traits::none;
 
+#if 0
 common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd) noexcept
   : memory_mapped(vaddr, size, prot, flags, fd, 0)
 {
@@ -42,28 +44,44 @@ common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, in
 
 common::memory_mapped::memory_mapped(void *vaddr, std::size_t size, int prot, int flags, int fd, off_t offset) noexcept
   : memory_mapped(
-    ::iovec{
-      ::mmap(vaddr, size, prot, flags, fd, offset)
-      , size
-    }
+      make_byte_span(
+        ::mmap(vaddr, size, prot, flags, fd, offset)
+        , size
+      )
+  )
+{
+}
+#endif
+
+common::memory_mapped::memory_mapped(const byte_span area, int prot, int flags, int fd) noexcept
+  : memory_mapped(area, prot, flags, fd, 0)
+{
+}
+
+common::memory_mapped::memory_mapped(const byte_span area, int prot, int flags, int fd, off_t offset) noexcept
+  : memory_mapped(
+      make_byte_span(
+        ::mmap(::base(area), ::size(area), prot, flags, fd, offset)
+        , ::size(area)
+      )
   )
 {
 }
 
-common::memory_mapped::memory_mapped(::iovec iov_) noexcept
+common::memory_mapped::memory_mapped(byte_span iov_) noexcept
   : moveable_struct<::iovec, iovec_moveable_traits>(translate_mmap_result(iov_))
 {
 }
 
 int common::memory_mapped::shrink_by(std::size_t size_)
 {
-  auto discard_base = iov_end() - size_;
+  void *discard_base = iov_end() - size_;
   auto rc = ::munmap(discard_base, size_);
   int e = errno;
-  PLOG("%s: from %p,:0x%zx, %i = munmap(%p, %zu)", __func__, iov_base, iov_len, rc, static_cast<const void *>(discard_base), size_);
+  PLOG("%s: from %p,:0x%zx, %i = munmap(%p, %zu)", __func__, ::base(*this), ::size(*this), rc, discard_base, size_);
   if ( rc != 0 )
   {
-    PLOG("%s: munmap(%p, %zu) failed: %s", __func__, static_cast<const void *>(discard_base), size_, ::strerror(e));
+    PLOG("%s: munmap(%p, %zu) failed: %s", __func__, discard_base, size_, ::strerror(e));
     errno = e;
   }
   return rc;
@@ -71,12 +89,12 @@ int common::memory_mapped::shrink_by(std::size_t size_)
 
 common::memory_mapped::~memory_mapped()
 {
-  if ( iov_base != nullptr )
+  if ( ::base(*this) != nullptr )
   {
-    if ( ::munmap(iov_base, iov_len) != 0 )
+    if ( ::munmap(::base(*this), ::size(*this)) != 0 )
     {
       auto e = errno;
-      PLOG("%s: munmap(%p, %zu) failed: %s", __func__, iov_base, iov_len, ::strerror(e));
+      PLOG("%s: munmap(%p, %zu) failed: %s", __func__, ::base(*this), ::size(*this), ::strerror(e));
     }
   }
 }

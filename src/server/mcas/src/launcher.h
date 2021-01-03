@@ -71,7 +71,7 @@ class Shard_launcher {
     }
   }
 
-  ~Shard_launcher() { PLOG("%s::%s (%p)", _cname, __func__, static_cast<const void *>(this)); }
+  ~Shard_launcher() { PLOG("%s::%s (%p)", _cname, __func__, common::p_fmt(this)); }
 
   bool threads_running()
   {
@@ -98,11 +98,11 @@ class Shard_launcher {
       }
       catch ( const Exception &e )
       {
-        PLOG("%s::%s: shard (%p): Exception %s",  _cname, __func__, static_cast<const void *>(this), e.cause());
+        PLOG("%s::%s: shard (%p): Exception %s",  _cname, __func__, common::p_fmt(this), e.cause());
       }
       catch ( const std::exception &e )
       {
-        PLOG("%s::%s: shard (%p) std::exception %s",  _cname, __func__, static_cast<const void *>(this), e.what());
+        PLOG("%s::%s: shard (%p) std::exception %s",  _cname, __func__, common::p_fmt(this), e.what());
       }
     }
   }

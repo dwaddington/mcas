@@ -98,11 +98,11 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       CPLOG(1, PREFIX "id %s: creating region length 0x%zx", LOCATION, path_.str().c_str(), size);
       auto v = _dax_manager->create_region(path_.str(), _numa_node, size);
       /* Guess that nullptr indicate a failure */
-      if ( v.address_map.empty() )
+      if ( v.address_map().empty() )
       {
         throw pool_error("create_region fail: " + path_.str(), pool_ec::region_fail);
       }
-      CPLOG(1, PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), v.address_map.front().iov_base, v.address_map.front().iov_len);
+      CPLOG(1, PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), ::base(v.address_map().front()), ::size(v.address_map().front()));
       return v;
     }
     catch ( const General_exception &e )
@@ -136,16 +136,16 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     try
     {
       open_pool_handle h(
-        new (rac_.address_map.front().iov_base)
+        new (::base(rac_.address_map().front()))
         region_type(
           AK_REF this->debug_level()
           /* Note: Consider moving dax_uuid_hash computation to the callee */
-          , CityHash64(&*rac_.id.begin(), rac_.id.size())
-          , rac_.address_map.front().iov_len
+          , CityHash64(rac_.id().data(), rac_.id().size())
+          , ::size(rac_.address_map().front())
           , expected_obj_count_
           , _numa_node
-          , rac_.id // backing file
-          , rac_.data_file // backing file
+          , rac_.id() // backing file
+          , rac_.data_file() // backing file
         )
       );
       return std::make_unique<session<open_pool_handle, allocator_t, table_t, lock_type_t>>(AK_REF std::move(h), construction_mode::create);
@@ -171,7 +171,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   {
     auto iovs = _dax_manager->open_region(path_.str(), _numa_node);
 
-    if ( iovs.address_map.empty() )
+    if ( iovs.address_map().empty() )
     {
       throw pool_error("in Devdax_manger::open_region faili: " + path_.str(), pool_ec::region_fail);
     }
@@ -191,23 +191,23 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       throw pool_error("unsupported flags " + std::to_string(flags_), pool_ec::pool_unsupported_mode);
     }
 
-    auto iov_first = ra_.address_map.begin();
-    const auto iov_last = ra_.address_map.end();
+    auto iov_first = ra_.address_map().begin();
+    const auto iov_last = ra_.address_map().end();
     assert(iov_first != iov_last);
     ++iov_first;
     open_pool_handle
       h(
-        new (ra_.address_map.front().iov_base)
+        new (::base(ra_.address_map().front()))
           region_type(
             this->debug_level()
             , _dax_manager
-            , ra_.id
-            , ra_.data_file
+            , ra_.id()
+            , ra_.data_file()
             , &*iov_first, &*iov_last
           )
       );
 #if 0
-    PLOG(PREFIX "in open_2 region at %p", LOCATION, ra_.address_map.front().iov_base);
+    PLOG(PREFIX "in open_2 region at %p", LOCATION, ra_.address_map().front().iov_base);
 #endif
     /* open_pool_handle is a managed region * */
     auto s =

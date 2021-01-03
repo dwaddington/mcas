@@ -23,15 +23,15 @@ tracked_header::tracked_header(unsigned debug_level_, tracked_header *prev_, tra
 	, _size(size_)
 	, _align(align_)
 {
-	const char *p = static_cast<const char *>(static_cast<const void *>(this));
+	const char *p = common::pointer_cast<const char>(this);
 	if ( 3 < debug_level_ )
 	{
 		PLOG("%s: begin %p this %p data %p end %p (size 0x%zx align 0x%zx)"
 			, __func__
-			, static_cast<const void *>(p+sizeof(*this)-_align)
-			, static_cast<const void *>(p)
-			, static_cast<const void *>(p + sizeof(*this))
-			, static_cast<const void *>(p +sizeof(*this) -_align+_size)
+			, common::p_fmt(p+sizeof(*this)-_align)
+			, common::p_fmt(p)
+			, common::p_fmt(p + sizeof(*this))
+			, common::p_fmt(p +sizeof(*this) -_align+_size)
 			, _size
 			, _align
 		);
@@ -53,9 +53,9 @@ void tracked_header::recover(unsigned debug_level_, heap_rc_ephemeral *eph_, uns
 		PLOG(
 			"%s: TH anchor %p prev %p next %p"
 			, __func__
-			, static_cast<const void *>(h)
-			, static_cast<const void *>(h->_prev)
-			, static_cast<const void *>(h->_next)
+			, common::p_fmt(h)
+			, common::p_fmt(h->_prev)
+			, common::p_fmt(h->_next)
 		);
 	}
 
@@ -68,9 +68,9 @@ void tracked_header::recover(unsigned debug_level_, heap_rc_ephemeral *eph_, uns
 			PLOG(
 				"%s: TH %p prev %p next %p size %zu align %zu"
 				, __func__
-				, static_cast<const void *>(e)
-				, static_cast<const void *>(e->_prev)
-				, static_cast<const void *>(e->_next)
+				, common::p_fmt(e)
+				, common::p_fmt(e->_prev)
+				, common::p_fmt(e->_next)
 				, e->_size
 				, e->_align
 			);

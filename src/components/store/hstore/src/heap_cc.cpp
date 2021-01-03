@@ -20,6 +20,7 @@
 #include "dax_manager.h"
 #include "heap_cc_ephemeral.h"
 #include <ccpm/cca.h>
+#include <common/pointer_cast.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>
 #include <cassert>
@@ -39,23 +40,24 @@ namespace
 
 namespace
 {
-	::iovec open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
+	using byte_span = common::byte_span;
+	byte_span open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_)
 	{
 		auto file_and_iov = dax_manager_->open_region(std::to_string(uuid_), numa_node_);
-		if ( file_and_iov.address_map.size() != 1 )
+		if ( file_and_iov.address_map().size() != 1 )
 		{
 			throw std::range_error("failed to re-open region " + std::to_string(uuid_));
 		}
-		return file_and_iov.address_map.front();
+		return file_and_iov.address_map().front();
 	}
 
 	const ccpm::region_vector_t add_regions_full(
 		ccpm::region_vector_t &&rv_
-		, const ::iovec pool0_heap_
+		, const byte_span pool0_heap_
 		, const std::unique_ptr<dax_manager> &dax_manager_
 		, unsigned numa_node_
-		, const ::iovec *iov_addl_first_
-		, const ::iovec *iov_addl_last_
+		, const byte_span *iov_addl_first_
+		, const byte_span *iov_addl_last_
 		, std::uint64_t *first_, std::uint64_t *last_
 	)
 	{
@@ -66,18 +68,18 @@ namespace
 			if ( it == first_ )
 			{
 				(void) pool0_heap_;
-				VALGRIND_MAKE_MEM_DEFINED(pool0_heap_.iov_base, pool0_heap_.iov_len);
-				VALGRIND_CREATE_MEMPOOL(pool0_heap_.iov_base, 0, true);
+				VALGRIND_MAKE_MEM_DEFINED(::base(pool0_heap_), ::size(pool0_heap_));
+				VALGRIND_CREATE_MEMPOOL(::base(pool0_heap_), 0, true);
 				for ( auto a = iov_addl_first_; a != iov_addl_last_; ++a )
 				{
-					VALGRIND_MAKE_MEM_DEFINED(a->iov_base, a->iov_len);
-					VALGRIND_CREATE_MEMPOOL(a->iov_base, 0, true);
+					VALGRIND_MAKE_MEM_DEFINED(::base(*a), ::size(*a));
+					VALGRIND_CREATE_MEMPOOL(::base(*a), 0, true);
 				}
 			}
 			else
 			{
-				VALGRIND_MAKE_MEM_DEFINED(r.iov_base, r.iov_len);
-				VALGRIND_CREATE_MEMPOOL(r.iov_base, 0, true);
+				VALGRIND_MAKE_MEM_DEFINED(::base(r), ::size(r));
+				VALGRIND_CREATE_MEMPOOL(::base(r), 0, true);
 			}
 			v.push_back(r);
 		}
@@ -91,16 +93,16 @@ namespace
  * which manifest as incorrect key and data values as seen on the ADO side.
  */
 heap_cc::heap_cc(
-	unsigned debug_level_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, ::iovec pool0_full_
-	, ::iovec pool0_heap_
-	, unsigned numa_node_
-	, const std::string & id_
-	, const std::string & backing_file_
+	const unsigned debug_level_
+	, impl::allocation_state_emplace *const ase_
+	, impl::allocation_state_pin *const aspd_
+	, impl::allocation_state_pin *const aspk_
+	, impl::allocation_state_extend *const asx_
+	, const byte_span pool0_full_
+	, const byte_span pool0_heap_
+	, const unsigned numa_node_
+	, const string_view id_
+	, const string_view backing_file_
 
 )
 	: _pool0_full(pool0_full_)
@@ -117,7 +119,7 @@ heap_cc::heap_cc(
 			, asx_
 			, id_
 			, backing_file_
-			, std::vector<::iovec>(1, _pool0_full) // ccpm::region_vector_t(_pool0_full.iov_base, _pool0_heap.iov_len)
+			, std::vector<byte_span>(1, _pool0_full) // ccpm::region_vector_t(::base(_pool0_full), ::size(_pool0_heap))
 			, pool0_heap_
 		)
 	)
@@ -125,27 +127,27 @@ heap_cc::heap_cc(
 	/* cursor now locates the best-aligned region */
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
-		, " pool ", _pool0_heap.iov_base, " .. ", iov_limit(_pool0_heap)
-		, " size ", _pool0_heap.iov_len
+		, " pool ", ::base(_pool0_heap), " .. ", ::end(_pool0_heap)
+		, " size ", ::size(_pool0_heap)
 		, " new"
 	);
-	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, false);
+	VALGRIND_CREATE_MEMPOOL(::base(_pool0_heap), 0, false);
 }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
 heap_cc::heap_cc(
-	unsigned debug_level_
+	const unsigned debug_level_
 	, const std::unique_ptr<dax_manager> &dax_manager_
-	, const std::string & id_
-	, const std::string &backing_file_
-	, const ::iovec *iov_addl_first_
-	, const ::iovec *iov_addl_last_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
+	, const string_view id_
+	, const string_view backing_file_
+	, const byte_span *iov_addl_first_
+	, const byte_span *iov_addl_last_
+	, impl::allocation_state_emplace *const ase_
+	, impl::allocation_state_pin *const aspd_
+	, impl::allocation_state_pin *const aspk_
+	, impl::allocation_state_extend *const asx_
 )
 	: _pool0_full(this->_pool0_full)
 	, _pool0_heap(this->_pool0_heap)
@@ -163,7 +165,7 @@ heap_cc::heap_cc(
 			, backing_file_
 			, add_regions_full(
 				ccpm::region_vector_t(
-					_pool0_full.iov_base, _pool0_full.iov_len
+					::data(_pool0_full), ::size(_pool0_full)
 				)
 				, _pool0_heap
 				, dax_manager_
@@ -186,12 +188,12 @@ heap_cc::heap_cc(
 {
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
-		, " pool ", _pool0_heap.iov_base, " .. ", iov_limit(_pool0_heap)
-		, " size ", _pool0_heap.iov_len
+		, " pool ", ::base(_pool0_heap), " .. ", ::end(_pool0_heap)
+		, " size ", ::size(_pool0_heap)
 		, " reconstituting"
 	);
-	VALGRIND_MAKE_MEM_DEFINED(_pool0_heap.iov_base, _pool0_heap.iov_len);
-	VALGRIND_CREATE_MEMPOOL(_pool0_heap.iov_base, 0, true);
+	VALGRIND_MAKE_MEM_DEFINED(::base(_pool0_heap), ::size(_pool0_heap));
+	VALGRIND_CREATE_MEMPOOL(::base(_pool0_heap), 0, true);
 }
 #pragma GCC diagnostic pop
 
@@ -205,23 +207,18 @@ auto heap_cc::regions() const -> nupm::region_descriptor
 	return _eph->get_managed_regions();
 }
 
-void *heap_cc::iov_limit(const ::iovec &r)
-{
-	return static_cast<char *>(r.iov_base) + r.iov_len;
-}
-
 namespace
 {
-	std::size_t region_size(const std::vector<::iovec> &v)
+	std::size_t region_size(const std::vector<byte_span> &v)
 	{
 		return
 			std::accumulate(
 				v.begin()
 				, v.end()
 				, std::size_t(0)
-				, [] (std::size_t s, const ::iovec &iov) -> std::size_t
+				, [] (std::size_t s, const byte_span &iov) -> std::size_t
 					{
-						return s + iov.iov_len;
+						return s + ::size(iov);
 					}
 			);
 	}
@@ -245,11 +242,11 @@ auto heap_cc::grow(
 		auto grown = false;
 		{
 			const auto old_regions = regions();
-			const auto &old_region_list = old_regions.address_map;
+			const auto &old_region_list = old_regions.address_map();
 			const auto old_list_size = old_region_list.size();
 			const auto old_size = region_size(old_region_list);
-			_eph->set_managed_regions(dax_manager_->resize_region(old_regions.id,  _numa_node, old_size + increment_));
-			const auto new_region_list = regions().address_map;
+			_eph->set_managed_regions(dax_manager_->resize_region(old_regions.id(),  _numa_node, old_size + increment_));
+			const auto new_region_list = regions().address_map();
 			const auto new_size = region_size(new_region_list);
 			const auto new_list_size = new_region_list.size();
 
@@ -261,8 +258,8 @@ auto heap_cc::grow(
 					_eph->add_managed_region(r, r, _numa_node);
 					hop_hash_log<trace_heap_summary>::write(
 						LOG_LOCATION
-						, " pool ", r.iov_base, " .. ", iov_limit(r)
-						, " size ", r.iov_len
+						, " pool ", ::base(r), " .. ", ::end(r)
+						, " size ", ::size(r)
 						, " grow"
 					);
 				}
@@ -283,7 +280,7 @@ auto heap_cc::grow(
 						/* Note: crash between here and "Slot persist done" may cause dax_manager_
 						 * to leak the region.
 						 */
-						std::vector<::iovec> rv = dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size).address_map;
+						std::vector<byte_span> rv = dax_manager_->create_region(std::to_string(uuid_next), _numa_node, size).address_map();
 						{
 							auto &slot = _more_region_uuids[_more_region_uuids_size];
 							slot = uuid_next;
@@ -299,8 +296,8 @@ auto heap_cc::grow(
 							_eph->add_managed_region(r, r, _numa_node);
 							hop_hash_log<trace_heap_summary>::write(
 								LOG_LOCATION
-								, " pool ", r.iov_base, " .. ", iov_limit(r)
-								, " size ", r.iov_len
+								, " pool ", ::base(r), " .. ", ::end(r)
+								, " size ", ::size(r)
 								, " grow"
 							);
 						}
@@ -328,9 +325,9 @@ auto heap_cc::grow(
 
 void heap_cc::quiesce()
 {
-	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", _pool0_heap.iov_len, " allocated ", _eph->_allocated);
-	VALGRIND_DESTROY_MEMPOOL(_pool0_heap.iov_base);
-	VALGRIND_MAKE_MEM_UNDEFINED(_pool0_heap.iov_base, _pool0_heap.iov_len);
+	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap), " allocated ", _eph->_allocated);
+	VALGRIND_DESTROY_MEMPOOL(::base(_pool0_heap));
+	VALGRIND_MAKE_MEM_UNDEFINED(::base(_pool0_heap), ::size(_pool0_heap));
 	_eph->write_hist<trace_heap_summary>(_pool0_heap);
 	_eph.reset(nullptr);
 }
@@ -376,9 +373,9 @@ void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align
 		 */
 		perishable::tick();
 
-		VALGRIND_MEMPOOL_ALLOC(_pool0_heap.iov_base, p_, sz);
+		VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p_, sz);
 		/* size grows twice: once for aligment, and possibly once more in allocation */
-		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz_, "->", sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p_, " size ", sz_, "->", sz);
 		_eph->_allocated += sz;
 		_eph->_hist_alloc.enter(sz);
 	}
@@ -392,9 +389,9 @@ void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align
 
 void heap_cc::free(persistent_t<void *> *p_, std::size_t sz_)
 {
-	VALGRIND_MEMPOOL_FREE(_pool0_heap.iov_base, p_);
+	VALGRIND_MEMPOOL_FREE(::base(_pool0_heap), p_);
 	auto sz = _eph->free(p_, sz_);
-	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", _pool0_heap.iov_base, " addr ", p_, " size ", sz_, "->", sz);
+	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p_, " size ", sz_, "->", sz);
 }
 
 unsigned heap_cc::percent_used() const

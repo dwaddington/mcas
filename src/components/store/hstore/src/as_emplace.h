@@ -73,7 +73,7 @@ namespace impl
 				assert( ! _armed );
 				if ( _pmask )
 				{
-					hop_hash_log<true>::write(LOG_LOCATION, "non-null initial _pmask ", static_cast<const void *>(_pmask));
+					hop_hash_log<true>::write(LOG_LOCATION, "non-null initial _pmask ", common::p_fmt(_pmask));
 				}
 				if ( _index )
 				{
@@ -105,7 +105,7 @@ namespace impl
 					, Persister p_
 				)
 				{
-					hop_hash_log<false>::write(LOG_LOCATION, _armed ? "armed" : "not armed", static_cast<const void *>(ptr_));
+					hop_hash_log<false>::write(LOG_LOCATION, _armed ? "armed" : "not armed", common::p_fmt(ptr_));
 					if ( _armed )
 					{
 						/* Possible that a deallocate is being redone.
@@ -133,7 +133,7 @@ namespace impl
 					, Persister p_
 			)
 			{
-				hop_hash_log<false>::write(LOG_LOCATION, _armed ? "armed" : "not armed", static_cast<void *>(pmask_));
+				hop_hash_log<false>::write(LOG_LOCATION, _armed ? "armed" : "not armed", common::p_fmt(pmask_));
 				_pmask = pmask_;
 				_mask = mask_;
 				p_.persist(this, sizeof *this);

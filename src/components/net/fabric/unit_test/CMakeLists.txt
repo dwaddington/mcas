@@ -5,6 +5,7 @@ project(fabric-tests CXX)
 
 include_directories(../../../../components)
 include_directories(../../../../lib/common/include/)
+include_directories(../../../../lib/GSL/include/)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # libfabric
 
 add_executable(fabric-test1 test1.cpp

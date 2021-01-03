@@ -2,14 +2,13 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-adomgrproxy CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 add_subdirectory(unit_test)
 
 add_definitions(-DCONFIG_DEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libthreadipc/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # TBB
 

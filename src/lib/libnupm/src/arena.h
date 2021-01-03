@@ -16,10 +16,10 @@
 
 #include <nupm/region_descriptor.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <gsl/pointers> /* not_null */
 #include <sys/uio.h> /* ::iovec */
 
-#include <experimental/string_view>
 #include <cstddef>
 #include <vector>
 
@@ -35,7 +35,7 @@ struct arena
   using region_descriptor = nupm::region_descriptor;
   using registry_memory_mapped = nupm::registry_memory_mapped;
   using space_registered = nupm::space_registered;
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 
   arena(const common::log_source &ls) : common::log_source(ls) {}
   virtual ~arena() {}

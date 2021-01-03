@@ -7,6 +7,8 @@ option(BUILD_RUST "enabled Rust-based dependencies" ON)
 option(BUILD_KERNEL_SUPPORT "build kernel module dependencies" OFF)
 option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples (requires PMDK to be installed)" OFF)
 option(CODE_COVERAGE "enable gcc code coverage" OFF)
+option(SPAN_USES_GSL "span data uses gsl::span, not iovec" OFF)
+option(BYTE_USES_STD "byte data uses std::byte, not gsl::byte" OFF)
 
 set(DM_REGION_LOG_GRAIN_SIZE 25 CACHE STRING "log base 2 of the device_manager allocation granularity")
 
@@ -27,6 +29,13 @@ endif()
 #add_compile_options(-shared-libgcc) # for exception support when using gcc (not g++) to link
 add_compile_options(-g)
 add_definitions(-DTBB_USE_THREADING_TOOLS -DEASTL_STD_ITERATOR_CATEGORY_ENABLED)
+
+if(SPAN_USES_GSL)
+ add_compile_options(-DMCAS_SPAN_USES_GSL=1)
+endif()
+if(BYTE_USES_STD)
+ add_compile_options(-DMCAS_BYTE_USES_STD=1)
+endif()
 
 set(ENV{MCAS_HOME} ${CMAKE_CURRENT_SOURCE_DIR})
 

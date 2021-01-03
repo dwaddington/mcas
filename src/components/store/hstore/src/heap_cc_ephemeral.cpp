@@ -34,27 +34,29 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
 	, std::unique_ptr<ccpm::IHeap_expandable> p
-	, const std::string & id_
-	, const std::string & backing_file_
-	, const std::vector<::iovec> &rv_full_
-	, const ::iovec &pool0_heap_
+	, string_view id_
+	, string_view backing_file_
+	, const std::vector<byte_span> &rv_full_
+	, const byte_span &pool0_heap_
 )
 	: common::log_source(debug_level_)
 	, _heap(std::move(p))
 	, _managed_regions(id_, backing_file_, rv_full_)
 	, _capacity(
-		pool0_heap_.iov_len
+		::size(pool0_heap_)
 		+
-		std::accumulate(
+		::size(
+			std::accumulate(
 /* Note: rv_full_ must contain at least the first element, representing pool 0 */
-			rv_full_.begin() + 1
-			, rv_full_.end()
-			, ::iovec{nullptr, 0}
-			, [] (const auto &a, const auto &b) -> ::iovec
-				{
-					return {nullptr, a.iov_len + b.iov_len};
-				}
-		).iov_len
+				rv_full_.begin() + 1
+				, rv_full_.end()
+				, byte_span{}
+				, [] (const auto &a, const auto &b) -> byte_span
+					{
+						return {nullptr, ::size(a) + ::size(b)};
+					}
+			)
+		)
 	)
 	, _allocated(
 		[this] ()
@@ -75,9 +77,9 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 
   for ( const auto &r : rv_full_ )
   {
-    CPLOG(2, "%s : %p.%zx", __func__, r.iov_base, r.iov_len);
+    CPLOG(2, "%s : %p.%zx", __func__, ::base(r), ::size(r));
   }
-  CPLOG(2, "%s : pool0_heap: %p.%zx", __func__, pool0_heap_.iov_base, pool0_heap_.iov_len);
+  CPLOG(2, "%s : pool0_heap: %p.%zx", __func__, ::base(pool0_heap_), ::size(pool0_heap_));
 }
 
 heap_cc_ephemeral::heap_cc_ephemeral(
@@ -86,10 +88,10 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
-	, const std::string & id_
-	, const std::string & backing_file_
-	, const std::vector<::iovec> &rv_full_
-	, const ::iovec &pool0_heap_
+	, string_view id_
+	, string_view backing_file_
+	, const std::vector<byte_span> &rv_full_
+	, const byte_span &pool0_heap_
 )
 	: heap_cc_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(ccpm::region_vector_t(pool0_heap_)), id_, backing_file_, rv_full_, pool0_heap_)
 {}
@@ -100,25 +102,25 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
-	, const std::string & id_
-	, const std::string & backing_file_
-	, const std::vector<::iovec> &rv_full_
-	, const ::iovec &pool0_heap_
+	, string_view id_
+	, string_view backing_file_
+	, const std::vector<byte_span> &rv_full_
+	, const byte_span &pool0_heap_
 	, ccpm::ownership_callback_t f
 )
 	: heap_cc_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(ccpm::region_vector_t(pool0_heap_), f), id_, backing_file_, rv_full_, pool0_heap_)
 {}
 
 void heap_cc_ephemeral::add_managed_region(
-	const ::iovec &r_full
-	, const ::iovec &r_heap
+	const byte_span &r_full
+	, const byte_span &r_heap
 	, const unsigned // numa_node
 )
 {
 	_heap->add_regions(ccpm::region_vector_t(r_heap));
-	CPLOG(2, "%s : %p.%zx", __func__, r_heap.iov_base, r_heap.iov_len);
-	_managed_regions.address_map.push_back(r_full);
-	_capacity += r_heap.iov_len;
+	CPLOG(2, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
+	_managed_regions.address_map_push_back(r_full);
+	_capacity += ::size(r_heap);
 }
 
 std::size_t heap_cc_ephemeral::free(persistent_t<void *> *p_, std::size_t sz_)

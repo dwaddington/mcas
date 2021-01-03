@@ -16,6 +16,7 @@
 #include <api/interfaces.h>
 #include <common/logging.h>
 #include <common/dump_utils.h>
+#include <common/pointer_cast.h>
 #include <common/type_name.h>
 #include <sstream>
 #include <string>
@@ -55,8 +56,7 @@ ADO_structured_plugin::process_putvar_command(const structured_ADO_protocol::Put
 
 status_t ADO_structured_plugin::process_invoke_command(const structured_ADO_protocol::Invoke * command,
                                                        const ccpm::region_vector_t& regions,
-                                                       void*& out_work_response,
-                                                       size_t& out_work_response_len)
+                                                       byte_span & out_work_response)
 {
   PLOG("invoke command");
 
@@ -87,39 +87,35 @@ status_t ADO_structured_plugin::process_invoke_command(const structured_ADO_prot
 
 
 status_t ADO_structured_plugin::do_work(const uint64_t work_request_id,
-                                        const char * key,
-                                        size_t key_len,
+                                        byte_string_view key,
                                         IADO_plugin::value_space_t& values,
-                                        const void *in_work_request, /* don't use iovec because of non-const */
-                                        const size_t in_work_request_len,
+                                        byte_string_view in_work_request,
                                         bool new_root,
                                         response_buffer_vector_t& response_buffers)
 {
   using namespace flatbuffers;
   using namespace structured_ADO_protocol;
 
-  auto value = values[0].ptr;
-  auto value_len = values[0].len;
+  auto value = common::make_byte_span(values[0].ptr, values[0].len);
 
-  PLOG("invoke: value=%p value_len=%lu", value, value_len);
+  PLOG("invoke: value=%p value_len=%lu", ::base(value), ::size(value));
 
-  Verifier verifier(static_cast<const uint8_t*>(in_work_request), in_work_request_len);
+  Verifier verifier(common::pointer_cast<const uint8_t>(in_work_request.data()), in_work_request.size());
   if(!VerifyMessageBuffer(verifier)) {
     PMAJOR("unknown command");
   }
 
-  auto msg = GetMessage(in_work_request);
+  auto msg = GetMessage(common::pointer_cast<char>(in_work_request.data()));
 
   auto putvar_command = msg->command_as_PutVariable();
   if(putvar_command)
-    return process_putvar_command(putvar_command, ccpm::region_vector_t{value, value_len});
+    return process_putvar_command(putvar_command, ccpm::region_vector_t(value));
 
   auto invoke_command = msg->command_as_Invoke();
   if(invoke_command)
     return process_invoke_command(invoke_command,
-                                  ccpm::region_vector_t{value, value_len},
-                                  value,
-                                  value_len);
+                                  ccpm::region_vector_t(value),
+                                  value);
 
   PERR("unhandled command");
   return E_FAIL;

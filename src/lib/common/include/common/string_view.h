@@ -11,34 +11,29 @@
    limitations under the License.
 */
 
+#ifndef _MCAS_COMMON_STRING_VIEW_
+#define _MCAS_COMMON_STRING_VIEW_
 
-/*
- * Authors:
- *
- */
+#define MCAS_STRING_VIEW_USES_EXPERIMENTAL 1
 
-#include <nupm/space_registered.h>
+#if MCAS_STRING_VIEW_USES_EXPERIMENTAL
 
-nupm::space_registered::space_registered(
-  const common::log_source &ls_
-  , dax_manager * dm_
-  , common::fd_locked &&fd_
-  , const string_view &name_
-  , addr_t base_addr_
-)
-  : _pu(ls_, name_)
- , _or(ls_, dm_, std::move(fd_), base_addr_)
+#include <experimental/string_view>
+namespace common
 {
+	template<typename T> using basic_string_view = std::experimental::basic_string_view<T>;
+	using string_view = std::experimental::string_view;
 }
 
-nupm::space_registered::space_registered(
-  const common::log_source &ls_
-  , dax_manager * dm_
-  , common::fd_locked &&fd_
-  , const string_view &name_
-  , const std::vector<byte_span> &mapping_
-)
-  : _pu(ls_, name_)
-  , _or(ls_, dm_, std::move(fd_), mapping_)
+#else
+
+#include <string_view>
+namespace common
 {
+	template<typename T> using basic_string_view = std::basic_string_view<T>;
+	using string_view = std::string_view;
 }
+
+#endif
+
+#endif

@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-adoplugin-passthru CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 enable_language(CXX C ASM)
 
 add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wformat=2 -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
@@ -19,6 +17,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES})
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include/)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/src)
 

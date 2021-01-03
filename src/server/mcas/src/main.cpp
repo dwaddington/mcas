@@ -50,10 +50,10 @@ void global_signal_handler(int signal)
   switch (signal)
   {
   case SIGINT:
-    ;
 #if 201703L <= __cplusplus
     [[fallthrough]]
 #endif
+    ;
   case SIGTERM:
     signals::sigint = 1;
     break;

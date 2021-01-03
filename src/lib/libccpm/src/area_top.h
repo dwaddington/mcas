@@ -17,12 +17,11 @@
 #include "atomic_word.h"
 #include "list_item.h"
 #include <ccpm/interfaces.h>
+#include <common/byte_span.h>
 #include <array>
 #include <cstddef>
 #include <ios> // ios_base::fmtflags, ostream
 #include <vector>
-
-struct iovec;
 
 namespace ccpm
 {
@@ -109,6 +108,7 @@ namespace ccpm
 	{
 	private:
 		using level_ix_t = std::uint8_t;
+		using byte_span = common::byte_span;
 		area_ctl *_ctl;
 		std::size_t _bytes_free;
 		bool _all_restored;
@@ -138,13 +138,13 @@ namespace ccpm
 	public:
 		/* Initial area_ctl */
 		explicit area_top(
-			const ::iovec &iov
+			const byte_span & iov
 			, unsigned trace_level
 			, std::ostream &o
 		);
 		/* Restored area_ctl */
 		explicit area_top(
-			const ::iovec &iov
+			const byte_span & iov
 			, const ownership_callback_t &resolver
 			, unsigned trace_level
 			, std::ostream &o
@@ -175,8 +175,8 @@ namespace ccpm
 
     level_ix_t height() const { return level_ix_t(_level.size()); }
 
-    void set_root(const iovec& iov);
-    iovec get_root() const;
+    void set_root(const byte_span & iov);
+    byte_span get_root() const;
     
 		/*
 		 * called by area_ctl to add area_ctl a, at level level_ix, with a longest

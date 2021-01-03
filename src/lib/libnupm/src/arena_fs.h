@@ -16,10 +16,12 @@
 
 #include "arena.h"
 
-#include <common/logging.h>
-#include <common/fd_locked.h>
+#include "filesystem.h"
 
-#include <experimental/filesystem>
+#include <common/byte_span.h>
+#include <common/fd_locked.h>
+#include <common/logging.h>
+
 #include <string>
 
 namespace common
@@ -32,15 +34,20 @@ struct arena_fs
 	: arena
 {
 private:
+	using byte_span = common::byte_span;
 	constexpr static const char *_cname = "arena_fs";
+#if _NUPM_FILESYSTEM_STD_
+	using path = std::filesystem::path;
+#else
 	using path = std::experimental::filesystem::path;
+#endif
 	path _dir;
 
 	void *region_create_inner(
 		common::fd_locked &&fd
 		, const string_view &id_
 		, gsl::not_null<registry_memory_mapped *> mh
-		, const std::vector<::iovec> &mapping
+		, const std::vector<byte_span> &mapping
 	);
 	path path_data(const string_view &id) const
 	{
@@ -52,7 +59,7 @@ private:
 		using namespace std::string_literals;
 		return _dir / ( std::string(id) + ".map"s );
 	}
-	static std::vector<::iovec> get_mapping(const path &path_map, const std::size_t expected_size);
+	static std::vector<byte_span> get_mapping(const path &path_map, const std::size_t expected_size);
 public:
 	arena_fs(const common::log_source &ls, path dir);
 	region_descriptor region_get(const string_view &id) override;
@@ -62,8 +69,8 @@ public:
 	std::size_t get_max_available() override;
     bool is_file_backed() const override { return true; }
 	void debug_dump() const override;
-	static std::pair<std::vector<::iovec>, std::size_t> get_mapping(const path &path_map);
-	static std::vector<common::memory_mapped> fd_mmap(int fd, const std::vector<::iovec> &map, int flags, ::off_t size);
+	static std::pair<std::vector<byte_span>, std::size_t> get_mapping(const path &path_map);
+	static std::vector<common::memory_mapped> fd_mmap(int fd, const std::vector<byte_span> &map, int flags, ::off_t size);
 };
 
 #endif

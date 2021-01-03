@@ -264,7 +264,7 @@ int Experiment::initialize_store(unsigned core)
 
   if (_verbose)
     {
-      PINF("[%u] component address: %p", core, static_cast<const void *>(&comp));
+      PINF("[%u] component address: %p", core, common::p_fmt(&comp));
     }
 
   if (!comp)
@@ -305,7 +305,7 @@ int Experiment::initialize_store(unsigned core)
 
       _store.reset(fact->create(debug_level(), mc));
 
-      PMAJOR("mcas component instance: %p", static_cast<const void *>(_store.get()));
+      PMAJOR("mcas component instance: %p", common::p_fmt(_store.get()));
     }
     else if ( component_is( "hstore" ) || component_is("dummystore") ) {
       auto device = core_to_device(core);

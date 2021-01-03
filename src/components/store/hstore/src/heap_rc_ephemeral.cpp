@@ -20,8 +20,8 @@ constexpr unsigned heap_rc_ephemeral::hist_report_upper_bound;
 
 heap_rc_ephemeral::heap_rc_ephemeral(
 	unsigned debug_level_
-	, const std::string & id_
-	, const std::string & backing_file_
+	, const string_view id_
+	, const string_view backing_file_
 )
 	: common::log_source(debug_level_)
 	, _heap()
@@ -34,12 +34,12 @@ heap_rc_ephemeral::heap_rc_ephemeral(
 	, _hist_free()
 {}
 
-void heap_rc_ephemeral::add_managed_region(const ::iovec &r_full, const ::iovec &r_heap, const unsigned numa_node)
+void heap_rc_ephemeral::add_managed_region(const byte_span &r_full, const byte_span &r_heap, const unsigned numa_node)
 {
-	_heap.add_managed_region(r_heap.iov_base, r_heap.iov_len, int(numa_node));
-	CPLOG(2, "%s : %p.%zx", __func__, r_heap.iov_base, r_heap.iov_len);
-	_managed_regions.address_map.push_back(r_full);
-	_capacity += r_heap.iov_len;
+	_heap.add_managed_region(::base(r_heap), ::size(r_heap), int(numa_node));
+	CPLOG(2, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
+	_managed_regions.address_map_push_back(r_full);
+	_capacity += ::size(r_heap);
 }
 
 void heap_rc_ephemeral::inject_allocation(void *p_, std::size_t sz_, unsigned numa_node_)

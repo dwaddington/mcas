@@ -2,10 +2,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project (ado)
 
-set(CMAKE_CXX_STANDARD 14)
-
 add_definitions(-DCONFIG_DEBUG)
-
 
 #set(PROFILER "profiler")
 #add_compile_options("-DPROFILE")

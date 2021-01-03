@@ -91,7 +91,7 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   
   /* new_root == true indicates this is a "fresh" key and therefore needs initializing */
   if(new_root) {
-    ccaptr = new ccpm::cca(ccpm::region_vector_t(value, value_len));
+    ccaptr = new ccpm::cca(ccpm::region_vector_t(common::make_byte_span(value, value_len)));
     ccv = new (ccaptr->allocate_root(sizeof(cc_vector))) cc_vector(*ccaptr);
     /* initialize vector */
     ccv->container->push_back(-1.0);
@@ -101,8 +101,8 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
     ccv->commit();
   }
   else {
-    ccaptr = new ccpm::cca(ccpm::region_vector_t(value, value_len), ccpm::accept_all);
-    ccv = reinterpret_cast<cc_vector*>(ccaptr->get_root().iov_base);
+    ccaptr = new ccpm::cca(ccpm::region_vector_t(common::make_byte_span(value, value_len)), ccpm::accept_all);
+    ccv = reinterpret_cast<cc_vector*>(::base(ccaptr->get_root()));
   }
 
   auto& min = (double&) ccv->container->at(0);

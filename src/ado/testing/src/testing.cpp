@@ -16,19 +16,18 @@
 #include <api/interfaces.h>
 #include <ccpm/immutable_allocator.h>
 #include <common/cycles.h>
+#include <common/byte_span.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <common/utils.h>
-#include <gsl/gsl_byte>
-#include <gsl/span>
 #include <libpmem.h>
 #include <boost/numeric/conversion/cast.hpp>
-#include <experimental/string_view>
 #include <algorithm> /* copy, fill, find */
 #include <cstring> /* strncmp, strcpy, memset */
 #include <map>
 #include <string>
 
-using std::experimental::string_view;
+using common::string_view;
 
 status_t ADO_testing_plugin::register_mapped_memory(void *shard_vaddr, void *local_vaddr, size_t len)
 {
@@ -93,7 +92,7 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    const gsl::span<gsl::byte> value(static_cast<gsl::byte *>(values_[0].ptr), values_[0].len);
+    const auto value(common::make_byte_span(values_[0].ptr, values_[0].len));
 
     PLOG("ADO_testing_plugin: running (key=%.*s)", int(key_.size()), key_.begin());
     PLOG("ADO_testing_plugin: cmd=(%.*s)", int(args_[0].size()), args_[0].begin());
@@ -101,9 +100,9 @@ namespace
 
     status_t rc = S_OK;
 
-    std::fill(value.begin(), value.end(), gsl::byte(0xe));
-    PLOG("value=%p value_len=%zu", static_cast<void *>(&*value.begin()), value.size());
-    ASSERT_TRUE(value.size() == 4096, "ADO_testing_plugin: value bad length");
+    std::fill(::data(value), ::data_end(value), common::byte(0xe));
+    PLOG("value=%p value_len=%zu", ::base(value), ::size(value));
+    ASSERT_TRUE(::size(value) == 4096, "ADO_testing_plugin: value bad length");
 
     /* resize value */
     void *new_addr = nullptr;
@@ -112,12 +111,12 @@ namespace
     PLOG("value after resize=%p", new_addr);
 
     /* check old content is still there */
-    void *tmp = malloc(value.size());
+    void *tmp = malloc(::size(value));
     if ( tmp == nullptr )
     {
       throw std::bad_alloc();
     }
-    std::memset(tmp, 0xe, value.size());
+    std::memset(tmp, 0xe, ::size(value));
     /* no actual check of tmp vs new_addr?? */
     /* tmp never freed?? */
 
@@ -192,8 +191,8 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    const gsl::span<gsl::byte> value(static_cast<gsl::byte *>(values_[0].ptr), values_[0].len);
-    string_view val(static_cast<const char *>(static_cast<const void *>(&*value.begin())), value.size());
+    const auto value(common::make_byte_span(values_[0].ptr, values_[0].len));
+    string_view val(static_cast<const char *>(::base(value)), ::size(value));
     PLOG("ADO_testing_plugin: (key=%.*s,value=%.*s)", int(key_.size()), key_.begin(), int(val.size()), val.begin());
 
     PLOG("ADO_testing_plugin: (request=%.*s)", int(args_[0].size()), args_[0].begin());
@@ -299,10 +298,10 @@ namespace
   )
   {
     ASSERT_TRUE(values_[1].ptr != nullptr, "BasicDetachedMemory::invalid detached ptr");
-    const gsl::span<gsl::byte> detached_value(static_cast<gsl::byte *>(values_[1].ptr), values_[1].len);
+    const common::byte_span detached_value(common::make_byte_span(values_[1].ptr, values_[1].len));
 
     /* free detached memory */
-    status_t rc = ap_->cb_free_pool_memory(detached_value.size(), &*detached_value.begin());
+    status_t rc = ap_->cb_free_pool_memory(::size(detached_value), ::base(detached_value));
     ASSERT_TRUE(rc == S_OK, "BasicDetachedMemory::free_pool_memory failed");
     return rc;
   }
@@ -374,7 +373,7 @@ namespace
   {
     IADO_plugin::Reference_vector v;
     status_t rc = ap_->cb_get_reference_vector(0, 0, v);
-    PMAJOR("rc (count=%lu, val=%p, val_len=%lu", v.count(), static_cast<const void *>(v.ref_array()),
+    PMAJOR("rc (count=%lu, val=%p, val_len=%lu", v.count(), common::p_fmt(v.ref_array()),
            v.value_memory_size());
 
     ASSERT_TRUE(rc == S_OK, "get_reference_vector failed rc %d", rc);
@@ -551,7 +550,7 @@ namespace
   {
     IADO_plugin::Reference_vector v;
     status_t rc = ap_->cb_get_reference_vector(0, 0, v);
-    PMAJOR("rc (count=%lu, val=%p, val_len=%lu", v.count(), static_cast<const void *>(v.ref_array()),
+    PMAJOR("rc (count=%lu, val=%p, val_len=%lu", v.count(), common::p_fmt(v.ref_array()),
            v.value_memory_size());
 
     ASSERT_TRUE(rc == S_OK, "get_reference_vector failed");
@@ -598,7 +597,7 @@ namespace
       rc = ap_->cb_get_reference_vector(now, 0, v);
 
       PMAJOR("by-time rc (count=%lu, val=%p, val_len=%lu", v.count(),
-             static_cast<const void *>(v.ref_array()), v.value_memory_size());
+             common::p_fmt(v.ref_array()), v.value_memory_size());
 
       ASSERT_TRUE(v.count() == 2, "bad vector count GetReferenceVectorByTime");
 
@@ -636,8 +635,8 @@ namespace
   )
   {
 #if 0
-    const gsl::span<gsl::byte> value(static_cast<gsl::byte *>(values_[0].ptr), values_[0].len);
-    pmem_memset(&*value.begin(), 0x1, value.size(), 0);
+    const common::byte_span value(common::make_byte_span(values_[0].ptr, values_[0].len);
+    pmem_memset(::data(value), 0x1, ::size(value), 0);
 #else
     (void)values_;
 #endif

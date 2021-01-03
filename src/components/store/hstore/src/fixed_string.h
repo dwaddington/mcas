@@ -15,6 +15,7 @@
 #ifndef MCAS_HSTORE_FIXED_STRING_H
 #define MCAS_HSTORE_FIXED_STRING_H
 
+#include <common/pointer_cast.h>
 #include <algorithm> /* fill_n, copy */
 #include <cassert>
 #include <cstddef> /* size_t */
@@ -86,12 +87,12 @@ template <typename T>
 				/* fill for alignment, returning address of first aligned byte */
 				const auto c0 =
 					std::fill_n(
-						static_cast<char *>(static_cast<void *>(this+1))
+						common::pointer_cast<char>(this+1)
 						, front_pad()
 						, 0
 				);
 				/* first aligned element starts at first aligned byte */
-				const auto e0 = static_cast<T *>(static_cast<void *>(c0));
+				const auto e0 = common::pointer_cast<T>(c0);
 				std::fill_n(
 					std::copy(first_, last_, e0)
 					, pad_
@@ -181,8 +182,8 @@ template <typename T>
 
 		T *data()
 		{
-			auto c0 = static_cast<char *>(static_cast<void *>(this)) + data_offset();
-			auto e0 = static_cast<T *>(static_cast<void *>(c0));
+			auto c0 = common::pointer_cast<char>(this) + data_offset();
+			auto e0 = common::pointer_cast<T>(c0);
 			return e0;
 		}
 

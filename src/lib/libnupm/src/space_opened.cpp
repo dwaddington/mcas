@@ -14,6 +14,7 @@
 #include "space_opened.h"
 #include "dax_manager.h"
 #include "arena_fs.h"
+#include "filesystem.h"
 #include "nd_utils.h" /* get_dax_device_size */
 
 #include <common/memory_mapped.h>
@@ -24,7 +25,6 @@
 #include <sys/stat.h> /* stat, open */
 #include <sys/types.h> /* open */
 #include <boost/icl/split_interval_map.hpp>
-#include <experimental/filesystem>
 #include <cinttypes>
 #include <iterator>
 #include <numeric> /* accumulate */
@@ -45,21 +45,23 @@ static constexpr int MAP_HUGE = MAP_LOG_GRAIN << MAP_HUGE_SHIFT;
 #define MAP_SHARED_VALIDATE 0x03
 #endif
 
+#if _NUPM_FILESYSTEM_STD_
+namespace fs = std::filesystem;
+#else
 namespace fs = std::experimental::filesystem;
+#endif
 
 std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::vector<common::memory_mapped> &&iovm_)
 {
-	using AC = boost::icl::interval_set<char *>;
+	using AC = boost::icl::interval_set<byte *>;
 	AC this_coverage;
 	for ( const auto &e : iovm_ )
 	{
-		auto c = static_cast<char *>(e.iov_base);
-		auto i = boost::icl::interval<char *>::right_open(c, c+e.iov_len);
+		auto i = boost::icl::interval<byte *>::right_open(::data(e), ::data_end(e));
 		if ( intersects(_dm->_address_coverage, i) )
 		{
-			const void *end = c+e.iov_len;
 			std::ostringstream o;
-			o << "range " << e.iov_base << ".." << end << " overlaps existing mapped storage";
+			o << "range " << ::base(e) << ".." << ::end(e) << " overlaps existing mapped storage";
 			PLOG("%s: %s", __func__, o.str().c_str());
 			throw std::runtime_error(o.str().c_str());
 		}
@@ -88,8 +90,7 @@ nupm::range_use::~range_use()
 	{
 		for ( const auto &e : _iovm )
 		{
-			auto c = static_cast<char *>(e.iov_base);
-			auto i = boost::icl::interval<char *>::right_open(c, c+e.iov_len);
+			auto i = boost::icl::interval<byte *>::right_open(::data(e), ::data_end(e));
 			_dm->_address_coverage.erase(i);
 			_dm->_address_fs_available.insert(i);
 		}
@@ -107,10 +108,9 @@ void nupm::range_use::shrink(std::size_t size_)
 	while ( size_ != 0 )
 	{
 		auto &e = _iovm.back();
-		if ( size_ < e.iov_len )
+		if ( size_ < ::size(e) )
 		{
-			auto end = static_cast<char *>(e.iov_base) + e.iov_len;
-			auto i = boost::icl::interval<char *>::right_open(end - size_, end);
+			auto i = boost::icl::interval<byte *>::right_open(::data_end(e) - size_, ::data_end(e));
 			_dm->_address_coverage.erase(i);
 			_dm->_address_fs_available.insert(i);
 			_iovm.back().shrink_by(size_);
@@ -118,11 +118,10 @@ void nupm::range_use::shrink(std::size_t size_)
 		}
 		else
 		{
-			auto c = static_cast<char *>(e.iov_base);
-			auto i = boost::icl::interval<char *>::right_open(c, c+e.iov_len);
+			auto i = boost::icl::interval<byte *>::right_open(::data(e), ::data_end(e));
 			_dm->_address_coverage.erase(i);
 			_dm->_address_fs_available.insert(i);
-			size_ -= e.iov_len;
+			size_ -= ::size(e);
 			_iovm.pop_back();
 		}
 	}
@@ -134,7 +133,7 @@ void nupm::range_use::shrink(std::size_t size_)
 		std::accumulate(
 			_iovm.begin(), _iovm.end()
 			, ::off_t(0)
-			, [] (off_t a_, const common::memory_mapped & m_) { return a_ + m_.iov_len; }
+			, [] (off_t a_, const common::memory_mapped & m_) { return a_ + ::size(m_); }
 		);
 }
 
@@ -170,47 +169,45 @@ std::vector<common::memory_mapped> nupm::space_opened::map_dev(int fd, const add
 
   /* mmap it in */
   common::memory_mapped iovm(
-    base_ptr
-    , len /* length = 0 means whole device (contrary to man 3 mmap??) */
+    common::make_byte_span(base_ptr, len) /* length = 0 means whole device (contrary to man 3 mmap??) */
     , PROT_READ | PROT_WRITE
     , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE | dax_manager::effective_map_locked
     , fd
   );
-  CPLOG(1, "%s: %p = mmap(%p, 0x%zx, %s", __func__, iovm.iov_base, base_ptr, iovm.iov_len, dax_manager::effective_map_locked ? "MAP_SYNC|locked" : "MAP_SYNC|not locked");
+  CPLOG(1, "%s: %p = mmap(%p, 0x%zx, %s", __func__, ::base(iovm), base_ptr, ::size(iovm), dax_manager::effective_map_locked ? "MAP_SYNC|locked" : "MAP_SYNC|not locked");
 
   if ( ! iovm ) {
     iovm =
       common::memory_mapped(
-        base_ptr
-        , len /* length = 0 means whole device (contrary to man 3 mmap??) */
+        common::make_byte_span(base_ptr, len) /* length = 0 means whole device (contrary to man 3 mmap??) */
         , PROT_READ | PROT_WRITE
         , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_HUGE | dax_manager::effective_map_locked
         , fd
       );
 
-    CPLOG(1, "%s: %p = mmap(%p, 0x%zx, %s", __func__, iovm.iov_base, base_ptr, iovm.iov_len, dax_manager::effective_map_locked ? "locked" : "not locked");
+    CPLOG(1, "%s: %p = mmap(%p, 0x%zx, %s", __func__, ::base(iovm), base_ptr, ::size(iovm), dax_manager::effective_map_locked ? "locked" : "not locked");
   }
 
   if ( ! iovm ) {
     throw General_exception("mmap failed on fd %i (request %p): %s", fd, base_ptr, ::strerror(errno));
   }
-  if (iovm.iov_base != base_ptr) {
-    throw General_exception("mmap failed on fd %i (request %p, got %p)", fd, base_ptr, iovm.iov_base);
+  if (::base(iovm) != base_ptr) {
+    throw General_exception("mmap failed on fd %i (request %p, got %p)", fd, base_ptr, ::base(iovm));
   }
 
   /* ERROR: throw after resource acquired */
-  if ( madvise(iovm.iov_base, iovm.iov_len, MADV_DONTFORK) != 0 )
+  if ( madvise(::base(iovm), ::size(iovm), MADV_DONTFORK) != 0 )
   {
     auto e = errno;
     throw General_exception("%s: madvise 'don't fork' failed unexpectedly (%p %lu) : %s",
-        iovm.iov_base, iovm.iov_len, ::strerror(e));
+        ::base(iovm), ::size(iovm), ::strerror(e));
   }
   std::vector<common::memory_mapped> v;
   v.push_back(std::move(iovm));
   return v;
 }
 
-std::vector<common::memory_mapped> nupm::space_opened::map_fs(int fd, const std::vector<::iovec> &mapping, ::off_t offset_)
+std::vector<common::memory_mapped> nupm::space_opened::map_fs(int fd, const std::vector<byte_span> &mapping, ::off_t offset_)
 {
   return arena_fs::fd_mmap(fd, mapping, MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE, offset_);
 }
@@ -240,7 +237,7 @@ nupm::space_opened::space_opened(
   const common::log_source & ls_
   , dax_manager * dm_
   , common::fd_locked &&fd_
-  , const std::vector<::iovec> &mapping
+  , const std::vector<byte_span> &mapping
 )
 try
   : common::log_source(ls_)
@@ -255,7 +252,7 @@ catch ( std::exception &e )
 	throw;
 }
 
-void nupm::space_opened::grow(std::vector<::iovec> && mapping)
+void nupm::space_opened::grow(std::vector<byte_span> && mapping)
 try
 {
   _range.grow(map_fs(_fd_locked.fd(), mapping, _range.size()));

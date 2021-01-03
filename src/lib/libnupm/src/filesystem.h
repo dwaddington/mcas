@@ -11,34 +11,13 @@
    limitations under the License.
 */
 
-
-/*
- * Authors:
- *
- */
-
-#include <nupm/space_registered.h>
-
-nupm::space_registered::space_registered(
-  const common::log_source &ls_
-  , dax_manager * dm_
-  , common::fd_locked &&fd_
-  , const string_view &name_
-  , addr_t base_addr_
-)
-  : _pu(ls_, name_)
- , _or(ls_, dm_, std::move(fd_), base_addr_)
-{
-}
-
-nupm::space_registered::space_registered(
-  const common::log_source &ls_
-  , dax_manager * dm_
-  , common::fd_locked &&fd_
-  , const string_view &name_
-  , const std::vector<byte_span> &mapping_
-)
-  : _pu(ls_, name_)
-  , _or(ls_, dm_, std::move(fd_), mapping_)
-{
-}
+#if ! defined _NUPM_FILESYSTEM_STD_ && defined __has_include
+  #if __has_include (<filesystem>) && __cplusplus >= 201703L
+    #include <filesystem>
+    #define _NUPM_FILESYSTEM_STD_ 1
+  #endif
+#endif
+#if ! defined _NUPM_FILESYSTEM_STD_
+  #include <experimental/filesystem>
+  #define _NUPM_FILESYSTEM_STD_ 0
+#endif

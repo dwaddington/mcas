@@ -20,7 +20,7 @@
 #include <execinfo.h>
 
 #include <cstddef> /* uint64_t */
-#include <exception> /* uncaught_excpetion */
+#include <exception> /* uncaught_excpetion(s) */
 
 
 bool perishable::_enabled = false;
@@ -29,7 +29,13 @@ std::uint64_t perishable::_time_to_live = 0;
 
 void perishable::check()
 {
-	if ( std::uncaught_exception() )
+	if (
+#if __cplusplus < 201703L
+		std::uncaught_exception()
+#else
+		0 != std::uncaught_exceptions()
+#endif
+	)
 	{
 		PWRN(PREFIX_STATIC "TTL 0 during exception", LOCATION_STATIC);
 	}
@@ -47,7 +53,7 @@ auto perishable::make_syndrome() -> syndrome
 	return sy;
 }
 
-bool perishable::less::operator()(const syndrome &a, const syndrome &b)
+bool perishable::less::operator()(const syndrome &a, const syndrome &b) const
 {
 	if ( a.size() < b.size() ) return true;
 	if ( b.size() < a.size() ) return false;

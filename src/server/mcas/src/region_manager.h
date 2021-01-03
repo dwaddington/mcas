@@ -14,9 +14,10 @@
 #define __mcas_REGION_MANAGER_H__
 
 #include <api/fabric_itf.h>
+#include <common/byte_span.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <common/utils.h>
-#include <gsl/pointers>
 
 #include <set>
 
@@ -27,6 +28,7 @@
 namespace mcas
 {
 class Region_manager : private common::log_source {
+  using const_byte_span = common::const_byte_span;
  public:
   Region_manager(unsigned debug_level_, gsl::not_null<Connection *> conn) : common::log_source(debug_level_), _conn(conn), _reg{}
   {
@@ -50,6 +52,13 @@ class Region_manager : private common::log_source {
     /* transport will now take care of repeat registrations */
     auto it = _reg.emplace(debug_level(), _conn, target, target_len, 0, 0);
     CPLOG(2, "%s registered %p 0x%zx (total %zu)", __func__, target, target_len, _reg.size());
+    return it->mr();
+  }
+  memory_region_t ondemand_register(const_byte_span target)
+  {
+    /* transport will now take care of repeat registrations */
+    auto it = _reg.emplace(debug_level(), _conn, target, 0, 0);
+    CPLOG(2, "%s registered %p 0x%zx (total %zu)", __func__, ::base(target), ::size(target), _reg.size());
     return it->mr();
   }
 

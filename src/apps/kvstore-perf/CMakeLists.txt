@@ -4,8 +4,6 @@ execute_process( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTUR
 
 project (kvstore-perf)
 
-set(CMAKE_CXX_STANDARD 14)
-
 add_subdirectory(unit_test)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)

@@ -17,6 +17,6 @@
 #include <common/logging.h>
 
 #define PREFIX "CCA %s %s:%d %p "
-#define LOCATION __func__, __FILE__, __LINE__, static_cast<const void *>(this)
+#define LOCATION __func__, __FILE__, __LINE__, common::p_fmt(this)
 
 #endif

@@ -21,7 +21,7 @@
 #define _NUPM_PATH_USE_H_
 
 #include <common/logging.h>
-#include <experimental/string_view>
+#include <common/string_view.h>
 #include <string>
 
 namespace nupm
@@ -29,7 +29,7 @@ namespace nupm
 struct path_use
   : public common::log_source
 {
-  using string_view = std::experimental::string_view;
+  using string_view = common::string_view;
 private:
   /* Would include a common::moveable_ptr<dax_manager>, except that the
    * registry is static, potentially covering multiple dax_manager instances.

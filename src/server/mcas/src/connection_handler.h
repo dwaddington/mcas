@@ -157,7 +157,7 @@ private:
   {
     assert(iob->value_adjunct);
     if (0 < option_DEBUG) {
-      PLOG("Completed send2 (value_adjunct %p)", static_cast<const void *>(iob->value_adjunct));
+      PLOG("Completed send2 (value_adjunct %p)", common::p_fmt(iob->value_adjunct));
     }
     _deferred_unlock.push(iob->value_adjunct);
     send_callback(iob);

@@ -2,8 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-adoplugin-rustexample CXX)
 
-set(CMAKE_CXX_STANDARD 14)
-
 find_program(CARGO cargo)
 
 file(GLOB SOURCES src/*.cpp)
@@ -25,6 +23,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/debug/
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include/)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/src)
 

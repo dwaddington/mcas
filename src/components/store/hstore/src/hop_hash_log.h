@@ -15,12 +15,13 @@
 #ifndef MCAS_HSTORE_HOP_HASH_LOG_H
 #define MCAS_HSTORE_HOP_HASH_LOG_H
 
+#include <common/logging.h>
 #include <iosfwd>
 #include <string>
 #include <sstream>
 
 #define LOG_LOCATION_STATIC __FILE__, ":", __LINE__, " ", __func__, "() "
-#define LOG_LOCATION LOG_LOCATION_STATIC, "this(", static_cast<const void *>(this), ") "
+#define LOG_LOCATION LOG_LOCATION_STATIC, "this(", common::p_fmt(this), ") "
 
 namespace hop_hash_log_impl
 {
