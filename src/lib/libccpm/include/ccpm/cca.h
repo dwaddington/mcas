@@ -94,6 +94,8 @@ namespace ccpm
 			std::size_t & out_size_
 		) const override;
 
+		region_vector_t get_regions() const override;
+
     void set_root(
       byte_span
     );

@@ -117,10 +117,20 @@ void heap_cc_ephemeral::add_managed_region(
 	, const unsigned // numa_node
 )
 {
+	CPLOG(0, "%s before IHeap::add_regions size %zu", __func__, _heap->get_regions().size());
+	for ( const auto &r : _heap->get_regions() )
+	{
+		CPLOG(0, "%s IHeap regions: %p.%zx", __func__, ::base(r), ::size(r));
+	}
 	_heap->add_regions(ccpm::region_vector_t(r_heap));
-	CPLOG(2, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
+	CPLOG(0, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
 	_managed_regions.address_map_push_back(r_full);
 	_capacity += ::size(r_heap);
+	CPLOG(0, "%s after IHeap::add_regions size %zu", __func__, _heap->get_regions().size());
+	for ( const auto &r : _heap->get_regions() )
+	{
+		CPLOG(0, "%s IHeap regions: %p.%zx", __func__, ::base(r), ::size(r));
+	}
 }
 
 std::size_t heap_cc_ephemeral::free(persistent_t<void *> *p_, std::size_t sz_)

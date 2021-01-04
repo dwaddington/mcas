@@ -420,7 +420,7 @@ namespace ccpm
 		void set_deallocated(void *p, std::size_t bytes);
 		auto restore(const ownership_callback_t &resolver_) -> area_ctl &;
 		level_ix_t level() const;
-    
+
 		index_t el_max_free_run() const
 		{
 			index_t m = 0;
@@ -430,7 +430,7 @@ namespace ccpm
 			}
 			return m;
 		}
-    
+
 		doubt &get_doubt()
 		{
 			return _dt;

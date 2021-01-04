@@ -65,7 +65,7 @@ namespace
 
     using PrettyWriter = rapidjson::PrettyWriter<rapidjson::StringBuffer>;
 
-	auto make_schema_string()
+	std::string make_schema_string()
 	{
 		namespace c_json = common::json;
 		namespace schema = c_json::schema;

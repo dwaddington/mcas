@@ -165,6 +165,14 @@ public:
    * @return S_OK or E_NOT_IMPL
    **/
   virtual status_t remaining(std::size_t& out_size) const = 0;
+
+  /* Return a vector of all regions
+   *
+   * @return vector containing the initial regions and all subsequently added
+   * regions, if the implementation keeps track of regions. Otherwise, an
+   * empty region_vector_t.
+   **/
+  virtual region_vector_t get_regions() const = 0;
 };
 
 /**
