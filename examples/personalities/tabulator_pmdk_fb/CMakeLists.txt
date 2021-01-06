@@ -24,6 +24,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
+include_directories(${CMAKE_INSTALL_PREFIX}/include)
 
 #link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # flatbuffers
 # don't use install directory

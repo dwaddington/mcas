@@ -74,6 +74,7 @@ bool ccpm::area_top::includes(const void *addr) const
 ccpm::area_top::area_top(
 	area_ctl *top_ctl_
 	, const unsigned trace_level_
+	, const byte_span region_
 	, std::ostream &o_
 )
 	: _ctl(top_ctl_)
@@ -86,6 +87,7 @@ ccpm::area_top::area_top(
 	, _o(&o_)
 	, _level(_ctl->level()+1)
 	, _ct_allocation(0)
+	, _region(region_)
 {
 	/* TODO: add _ctl to appropriate free_ctl chain */
 }
@@ -118,18 +120,18 @@ ccpm::area_top::~area_top()
 }
 
 /* Initial area_ctl */
-ccpm::area_top::area_top(const byte_span &iov_, const unsigned trace_level_, std::ostream &o_)
-	: area_top(area_ctl::commission(::base(iov_), ::size(iov_)), trace_level_, o_)
+ccpm::area_top::area_top(const byte_span iov_, const unsigned trace_level_, std::ostream &o_)
+	: area_top(area_ctl::commission(::base(iov_), ::size(iov_)), trace_level_, iov_, o_)
 {}
 
 /* Restored area_ctl */
 ccpm::area_top::area_top(
-	const byte_span &iov_
+	const byte_span iov_
 	, const ownership_callback_t &resolver_
 	, const unsigned trace_level_
 	, std::ostream &o_
 )
-	: area_top(&area_ctl::root(::base(iov_))->restore(resolver_), trace_level_, o_)
+	: area_top(&area_ctl::root(::base(iov_))->restore(resolver_), trace_level_, iov_, o_)
 {
 }
 

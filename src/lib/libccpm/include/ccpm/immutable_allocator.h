@@ -55,8 +55,6 @@ public:
   }
 #pragma GCC diagnostic pop
 
-  
-
   Immutable_allocator_base(Immutable_allocator_base& src) : _root(src._root)
   {
     assert(_root);
@@ -166,6 +164,12 @@ public:
   {
     out_size = std::size_t(_root->slab_end - reinterpret_cast<byte*>(_root->next_free.load()));
     return S_OK;
+  }
+
+  region_vector_t get_regions() const override
+  {
+    /* Immutable_allocator_base does not report regions (no requirement to do so) */
+    return region_vector_t();
   }
 
   bool rebuilt() const { return _rebuilt; }

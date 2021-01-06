@@ -1,5 +1,7 @@
 # Tabulator Example
 
+Before using this example, PMDK must be installed (see https://github.com/pmem/pmdk/).
+
 This example demonstrates the use of PMDK/fsdax in the ADO plugin.  It keeps
 min, max, mean for ongoing puts of a numerical value.  The client is based
 on Python and flatbuffers is used for the protocol.
