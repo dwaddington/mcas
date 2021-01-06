@@ -338,6 +338,7 @@ status_t Pool_handle::put(const std::string &key,
                           const void *value,
                           const size_t value_len,
                           unsigned int flags) {
+
   if (!value || !value_len || value_len > _nsize) {
     PWRN("Map_store: invalid parameters (value=%p, value_len=%lu)", value,
          value_len);
@@ -379,13 +380,12 @@ status_t Pool_handle::put(const std::string &key,
       auto p_to_free = p._ptr;
       auto len_to_free = p._length;
 
-      p._ptr = _lb.alloc(value_len > 8 ? value_len : 8,
-                         NUMA_ZONE, choose_alignment(value_len));
+      p._ptr = _lb.alloc(value_len, NUMA_ZONE, choose_alignment(value_len));
 
       memcpy(p._ptr, value, value_len);
 
       /* update entry */
-      i->second._length = value_len > 8 ? value_len : 8;
+      i->second._length = value_len;
       i->second._ptr = p._ptr;
 
       /* release old memory*/
@@ -400,17 +400,15 @@ status_t Pool_handle::put(const std::string &key,
     _map[k]._value_lock->unlock();
   }
   else { /* key does not already exist */
-    auto round_up_len = value_len > 8 ? value_len : 8;
-    auto buffer = _lb.alloc(round_up_len,
+    auto buffer = _lb.alloc(value_len,
                             NUMA_ZONE,
-                            choose_alignment(round_up_len));
+                            choose_alignment(value_len));
 
     memcpy(buffer, value, value_len);
     common::RWLock * p = new (aal.allocate(1, DEFAULT_ALIGNMENT)) common::RWLock();
 
-    //    auto ts = rdtsc();
-    //    _map.emplace(k, Value_type{buffer, round_up_len, p, ts});
-    _map.emplace(k, Value_type{buffer, round_up_len, p});
+    /* create map entry */
+    _map.emplace(k, Value_type{buffer, value_len, p});
   }
 
   return S_OK;
@@ -435,12 +433,11 @@ status_t Pool_handle::get(const std::string &key,
      or change free_memory ? */
   //  out_value = _lb.alloc(out_value_len, NUMA_ZONE, choose_alignment(out_value_len));
   out_value = malloc(out_value_len);
-  if ( out_value == nullptr )
-    {
-      return IKVStore::E_TOO_LARGE;
-    }
-  memcpy(out_value, i->second._ptr, i->second._length);
 
+  if ( out_value == nullptr )  {
+    return IKVStore::E_TOO_LARGE;
+  }
+  memcpy(out_value, i->second._ptr, i->second._length);  
   return S_OK;
 }
 
@@ -570,10 +567,7 @@ status_t Pool_handle::lock(const std::string &key,
 
   CPLOG(1, PREFIX "lock looking for key:(%s)", key.c_str());
 
-  if(out_value_len != 0 && out_value_len < 8)
-    out_value_len = 8; /* minimum object size */
-
-  if (i == _map.end()) {
+  if (i == _map.end()) { /* create value */
 
     write_touch();
 
@@ -867,9 +861,6 @@ status_t Pool_handle::allocate_pool_memory(const size_t size,
     PWRN("Map_store: invalid allocate_pool_memory request");
     return E_INVAL;
   }
-
-  // size_t ssize = size < 8UL ? 8UL : size;
-  // ssize = round_up_page(ssize);
 
   try {
     /* we can't fully support alignment choice */
