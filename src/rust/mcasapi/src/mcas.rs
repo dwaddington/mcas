@@ -6,7 +6,7 @@
 #[allow(unused_variables)]
 use crate::mcasapi_wrapper::*;
 
-use std::ffi::{CString,CStr};
+use std::ffi::{CString};
 use std::os::raw::{c_char, c_void};
 
 // USE THIS FOR DEBUG BREAK

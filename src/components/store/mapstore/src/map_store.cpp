@@ -338,6 +338,8 @@ status_t Pool_handle::put(const std::string &key,
                           const void *value,
                           const size_t value_len,
                           unsigned int flags) {
+
+  PNOTICE("value_len=%lu", value_len);
   if (!value || !value_len || value_len > _nsize) {
     PWRN("Map_store: invalid parameters (value=%p, value_len=%lu)", value,
          value_len);
