@@ -5,9 +5,11 @@
 
 #include "boost/date_time/posix_time/posix_time.hpp"
 
+#include <fstream>
 #include <unistd.h> /* HOST_NAME_MAX, gethostname */
 #include <csignal>
 
+static std::string _log_file;
 std::mutex ExperimentThroughput::_iops_lock;
 unsigned long ExperimentThroughput::_iops;
 bool ExperimentThroughput::_stop= false;
@@ -54,6 +56,7 @@ ExperimentThroughput::ExperimentThroughput(const ProgramOptions &options)
   , _rnd{}
   , _k0_rnd(33, 126)
 {
+  _log_file = *options.log_file;
 }
 
 void ExperimentThroughput::handler(int)
@@ -311,5 +314,9 @@ void ExperimentThroughput::cleanup_custom(unsigned core)
 
 void ExperimentThroughput::summarize()
 {
+  if(_log_file.empty() == false) {
+    std::ofstream ofs(_log_file);
+    ofs << "total IOPS: " << _iops << "\n";
+  }
   PMAJOR("total IOPS: %lu", _iops);
 }

@@ -88,6 +88,7 @@ ProgramOptions::ProgramOptions(const boost::program_options::variables_map &vm_)
     , device_name(vm_.count("device_name") ? vm_["device_name"].as<std::string>() : boost::optional<std::string>())
     , src_addr(vm_.count("src_addr") ? vm_["src_addr"].as<std::string>() : boost::optional<std::string>())
     , pci_addr(vm_.count("pci_addr") ? vm_["pci_addr"].as<std::string>() : boost::optional<std::string>())
+    , log_file(vm_.count("log") ? vm_["log"].as<std::string>() : boost::optional<std::string>())
     , random(vm_.count("random")) {
   if ((component_is("pmstore") || component_is("hstore")) && !path) {
     auto e = "component '" + component + "' requires --path argument for persistent memory store";
@@ -179,6 +180,7 @@ void ProgramOptions::add_program_options(boost::program_options::options_descrip
         ).c_str()
       )
       ("pci_addr", po::value<std::string>(), "Storage device PCI address (e.g. 0b:00.0).")
+      ("log", po::value<std::string>(), "Log file for throughput experiments.")
       ("nopin", "Do not pin down worker threads to cores.")
       ("start_time", po::value<std::string>(),
         "Delay start time of experiment until specified time (HH:MM, 24 hour format expected.")

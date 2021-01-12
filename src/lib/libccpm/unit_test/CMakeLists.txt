@@ -2,7 +2,13 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(libccpm-test CXX)
 
-find_library(GTEST_LIB NAMES GTEST PATHS /usr/local/lib,/usr/lib)
+find_library(GTEST_LIB NAMES gtest PATHS /usr/lib,/usr/lib64/,/usr/local/lib,/usr/local/lib64/)
+
+if(NOT GTEST_LIB)
+  message(FATAL_ERROR "gtest library not found:" ${GTEST_LIB})
+else()
+  message("Found gtest library:" ${GTEST_LIB})
+endif()
 
 find_library(PROFILER_LIB NAMES profiler PATHS /usr/local/lib,/usr/local/lib64,/usr/lib,/usr/lib64)
 if ("${PROFILER_LIB}" STREQUAL "PROFILER_LIB-NOTFOUND")
@@ -21,7 +27,6 @@ link_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/)
 link_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/)
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # ndctl
-link_directories(${GTEST_LIB})
 
 add_executable(libccpm-test1 test1.cpp)
 add_executable(libccpm-test2 test2.cpp)
@@ -33,7 +38,7 @@ target_compile_options(libccpm-test2 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test5 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test6 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 
-target_link_libraries(libccpm-test1 ${ASAN_LIB} gtest nupm gcov) # add profiler for google profiler
-target_link_libraries(libccpm-test2 ${ASAN_LIB} gtest ccpm gcov) # add profiler for google profiler
-target_link_libraries(libccpm-test5 ${ASAN_LIB} gtest ccpm gcov)
-target_link_libraries(libccpm-test6 ${ASAN_LIB} gtest ccpm gcov profiler)
+target_link_libraries(libccpm-test1 ${ASAN_LIB} ${GTEST_LIB} nupm gcov) # add profiler for google profiler
+target_link_libraries(libccpm-test2 ${ASAN_LIB} ${GTEST_LIB} ccpm gcov) # add profiler for google profiler
+target_link_libraries(libccpm-test5 ${ASAN_LIB} ${GTEST_LIB} ccpm gcov)
+target_link_libraries(libccpm-test6 ${ASAN_LIB} ${GTEST_LIB} ccpm gcov profiler)

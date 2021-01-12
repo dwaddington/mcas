@@ -49,8 +49,9 @@ class ProgramOptions {
   unsigned                                               port;
   boost::optional<unsigned>                              port_increment;
   boost::optional<std::string>                           device_name;
-  boost::optional<std::string> src_addr;
+  boost::optional<std::string>                           src_addr;
   boost::optional<std::string>                           pci_addr;
+  boost::optional<std::string>                           log_file;
   bool                                                   random;
 
   ProgramOptions(const boost::program_options::variables_map &);
