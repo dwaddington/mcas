@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <fstream>
 
 struct options {
   unsigned    debug_level;
@@ -16,19 +17,22 @@ struct options {
   std::string device;
   std::string poolname;
   std::string blastkey;
+  std::string log;
   std::uint16_t port;
   bool        async;
   bool        pause;
+  bool        samekey;
   std::string test;
-  unsigned base_core;
-  unsigned threads;
-  unsigned patience;
+  unsigned    base_core;
+  unsigned    threads;
+  unsigned    patience;
 } g_options{};
 
-
+static double total_per_sec = 0;
+static std::mutex total_per_sec_lock;
 
 component::Itf_ref<component::IMCAS> init(const std::string& server_hostname, std::uint16_t port);
-void do_throughput_work(component::IMCAS* mcas);
+void do_throughput_work(component::IMCAS* mcas, unsigned core);
 void do_blast_work(component::IMCAS* mcas, const std::string& blastkey, unsigned core = 0);
 
 
@@ -53,9 +57,11 @@ int main(int argc, char* argv[])
       ("debug", po::value<unsigned>()->default_value(0), "Debug level")
       ("async", "Use asynchronous invocation")
       ("pause", "Pause after data set up")
+      ("samekey", "Use per-client key")
+      ("log", po::value<std::string>()->default_value("/tmp/ado-perf-log.txt"), "File to log results")
       ("blastkey", po::value<std::string>(), "Do repeated invoke_ado on this key")
       ("test", po::value<std::string>()->default_value("put"), "Test to run (put, get, erase)")
-      ("patience", po::value<unsigned>()->default_value(30), "Patience with werver (seconds)")
+      ("patience", po::value<unsigned>()->default_value(30), "Patience with server responses (seconds)")
     ;
 
     po::variables_map vm;
@@ -81,7 +87,9 @@ int main(int argc, char* argv[])
     g_options.debug_level = vm["debug"].as<unsigned>();
     g_options.async       = vm.count("async");
     g_options.pause       = vm.count("pause");
+    g_options.samekey     = vm.count("samekey");
     g_options.test        = vm["test"].as<std::string>();
+    g_options.log         = vm["log"].as<std::string>();
     g_options.poolname    = vm["poolname"].as<std::string>();
     g_options.patience    = vm["patience"].as<unsigned>();
     g_options.threads     = vm["threads"].as<unsigned>();
@@ -92,7 +100,7 @@ int main(int argc, char* argv[])
       auto mcasptr = init(g_options.server, g_options.port);
 
       if(g_options.blastkey.empty())
-        do_throughput_work(&*mcasptr);
+        do_throughput_work(&*mcasptr, 0);
       else
         do_blast_work(&*mcasptr, g_options.blastkey);
     }
@@ -109,7 +117,16 @@ int main(int argc, char* argv[])
     printf("bad command line option\n");
     return -1;
   }
+  
+  if(total_per_sec > 0) {
+    PINF("Total IOPS: %g", total_per_sec);
 
+    if(!g_options.log.empty()) {
+      std::ofstream tmp(g_options.log);
+      tmp << "Total IOPS: " << total_per_sec << "\n";
+    }
+  }
+  
   return 0;
 }
 
@@ -132,7 +149,7 @@ public:
     PMAJOR("Tasklet: starting work on core %u", core);
 
     if(g_options.blastkey.empty())
-      do_throughput_work(&*_mcas);
+      do_throughput_work(&*_mcas, core);
     else
       do_blast_work(&*_mcas, g_options.blastkey, core);
 
@@ -220,7 +237,7 @@ void do_blast_work(component::IMCAS* mcas, const std::string& blastkey, unsigned
   mcas->close_pool(pool);
 }
 
-void do_throughput_work(component::IMCAS* mcas)
+void do_throughput_work(component::IMCAS* mcas, unsigned core)
 {
   using namespace component;
 
@@ -237,11 +254,14 @@ void do_throughput_work(component::IMCAS* mcas)
   std::vector<std::string> value_samples;
 
   PMAJOR("Setting up data...");
-  unsigned       iterations  = 1000000;
+  unsigned       iterations  = 100000;
   const unsigned num_strings = iterations;
   for (unsigned i = 0; i < num_strings; i++) {
-    auto s = common::random_string(8);  //(rdtsc() % 32) + 8);
-    key_samples.push_back(s);
+    //    auto s = common::random_string(8);  //(rdtsc() % 32) + 8);
+    std::stringstream ss;
+    ss << core << common::random_string(6);
+
+    key_samples.push_back(ss.str());
   }
 
   for (unsigned i = 0; i < num_strings; i++) {
@@ -272,6 +292,7 @@ void do_throughput_work(component::IMCAS* mcas)
       throw General_exception("invoke_put_ado failed");
   }
 
+
   __sync_synchronize();
 
   auto secs = std::chrono::duration<double>(clock::now() - start_time).count();
@@ -290,20 +311,34 @@ void do_throughput_work(component::IMCAS* mcas)
 
   start_time = clock::now();
 
-  for (unsigned i = 0; i < iterations; i++) {
-    if(S_OK != mcas->invoke_ado(pool, key_samples[i], "put " + std::to_string(i), flags, response))
-      throw General_exception("invoke_ado failed");
+  for(unsigned j = 0; j < 10; j++) {
+    for (unsigned i = 0; i < iterations; i++) {
+      // hack: hitting same key
+      if(g_options.samekey) {
+	if(S_OK != mcas->invoke_ado(pool, key_samples[0], "message", flags, response))
+	  throw General_exception("invoke_ado failed");
+      }
+      else {
+	if(S_OK != mcas->invoke_ado(pool, key_samples[i], "message", flags, response))
+	  throw General_exception("invoke_ado failed");
+      }
+    }
   }
 
   __sync_synchronize();
 
   secs = std::chrono::duration<double>(clock::now() - start_time).count();
-  per_sec = double(iterations) / secs;
+  per_sec = double(iterations*10) / secs;
 
   PINF("Synchronous ADO invoke_ado RTT");
   PINF("Time: %.2f sec", secs);
   PINF("Rate: %.0f /sec", per_sec);
 
+  {
+    total_per_sec_lock.lock();
+    total_per_sec += per_sec;
+    total_per_sec_lock.unlock();
+  }
 
   if (g_options.test == "get") {
     start_time = clock::now();
