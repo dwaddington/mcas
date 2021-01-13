@@ -26,6 +26,7 @@ struct options {
   unsigned    base_core;
   unsigned    threads;
   unsigned    patience;
+  unsigned    rounds;
 } g_options{};
 
 static double total_per_sec = 0;
@@ -51,6 +52,7 @@ int main(int argc, char* argv[])
       ("server", po::value<std::string>()->default_value("10.0.0.21"),"Server hostname")
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Device (e.g. mlnx5_0)")
       ("base-core", po::value<unsigned>()->default_value(0), "Base core")
+      ("rounds", po::value<unsigned>()->default_value(10), "Number of rounds to measure")
       ("threads", po::value<unsigned>()->default_value(0), "Threads")
       ("poolname", po::value<std::string>()->default_value("adoperf_pool_default"), "Pool name")
       ("port", po::value<std::uint16_t>()->default_value(0), "Server port. Default 0 (mapped to 11911 for verbs, 11921 for sockets)")
@@ -93,6 +95,7 @@ int main(int argc, char* argv[])
     g_options.poolname    = vm["poolname"].as<std::string>();
     g_options.patience    = vm["patience"].as<unsigned>();
     g_options.threads     = vm["threads"].as<unsigned>();
+    g_options.rounds      = vm["rounds"].as<unsigned>();
     g_options.base_core   = vm["base-core"].as<unsigned>();
 
     if(g_options.threads == 0 || g_options.threads == 1) {
@@ -311,7 +314,7 @@ void do_throughput_work(component::IMCAS* mcas, unsigned core)
 
   start_time = clock::now();
 
-  for(unsigned j = 0; j < 10; j++) {
+  for(unsigned j = 0; j < g_options.rounds; j++) {
     for (unsigned i = 0; i < iterations; i++) {
       // hack: hitting same key
       if(g_options.samekey) {
@@ -328,7 +331,7 @@ void do_throughput_work(component::IMCAS* mcas, unsigned core)
   __sync_synchronize();
 
   secs = std::chrono::duration<double>(clock::now() - start_time).count();
-  per_sec = double(iterations*10) / secs;
+  per_sec = double(iterations * g_options.rounds) / secs;
 
   PINF("Synchronous ADO invoke_ado RTT");
   PINF("Time: %.2f sec", secs);
