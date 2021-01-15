@@ -103,6 +103,7 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   else {
     ccaptr = new ccpm::cca(ccpm::region_vector_t(common::make_byte_span(value, value_len)), ccpm::accept_all);
     ccv = reinterpret_cast<cc_vector*>(::base(ccaptr->get_root()));
+    ccv->rollback(); /* in case we're recovering from crash */
   }
 
   auto& min = (double&) ccv->container->at(0);
