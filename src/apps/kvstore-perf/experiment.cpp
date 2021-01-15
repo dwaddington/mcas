@@ -603,7 +603,7 @@ void Experiment::summarize()
 {
   if(g_log_file.empty() == false) {
     std::ofstream ofs(g_log_file);
-    ofs << "total IOPS: " << g_iops << "\n";
+    ofs << "total IOPS: " << long(g_iops) << "\n";
   }
 
   PINF("[TOTAL] %s %s IOPS: %lu", _cores.c_str(), _test_name.c_str(), static_cast<unsigned long>(g_iops));
