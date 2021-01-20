@@ -1,8 +1,8 @@
 #!/bin/bash
 # For CentOS you must enale powertools repo
 #
-# yum install dnf-plugins-core
-# yum config-manager --set-enabled powertools
+yum install dnf-plugins-core
+yum config-manager --set-enabled powertools
 
 dnf -y update
 
