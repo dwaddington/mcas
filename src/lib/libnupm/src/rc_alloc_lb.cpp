@@ -24,7 +24,7 @@
 
 namespace nupm
 {
-Rca_LB::Rca_LB() : _rmap(new Region_map) {}
+Rca_LB::Rca_LB(unsigned debug_level_) : _rmap(new Region_map(debug_level_)) {}
 
 Rca_LB::~Rca_LB() {}
 

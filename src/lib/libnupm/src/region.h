@@ -24,6 +24,7 @@
 #include "mappers.h"
 #include "rc_alloc_avl.h"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <common/logging.h>    /* log_source */
 #include <common/exceptions.h> /* API_exception, Logic_exception */
@@ -65,7 +66,8 @@ class Region : private common::log_source {
     (void) p;
     ++_use_count;
 #endif
-    if ( use_count() == _capacity / 2 )
+    /* If single use, or passing the use_count threshold, reclaim when empty */
+    if ( ! _reclaim_when_empty && _capacity / 2 < use_count() )
     {
       _reclaim_when_empty = true;
     }
@@ -276,8 +278,8 @@ class Region_map : private common::log_source {
   static constexpr int MAX_NUMA_ZONES = 2;
 
 public:
-  Region_map()
-    : common::log_source(0U)
+  Region_map(unsigned debug_level_)
+    : common::log_source(debug_level_)
     , _mapper()
     , _arena_allocator()
     , _buckets()
@@ -293,10 +295,10 @@ public:
        {
          if ( ! bucket_list.empty() )
          {
-           CPLOG(1, "%s: node %d size %d", __func__, node_ix, 1 << list_ix);
+           CPLOG(0, "%s: node %d size %d", __func__, node_ix, 1 << list_ix);
            for ( const auto &bucket : bucket_list )
            {
-             CPLOG(1, "%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
+             CPLOG(0, "%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
            }
          }
          ++list_ix;
@@ -356,7 +358,6 @@ public:
   void free(void *p, int numa_node, size_t object_size) {
     if (UNLIKELY(numa_node < 0 || numa_node >= MAX_NUMA_ZONES))
       throw std::invalid_argument("numa node outside max range");
-
     /* begin and end of buckets to search */
     const auto start_bucket = object_size > 0 ? _mapper.bucket(object_size) : 0;
     const auto end_bucket = object_size > 0 ? start_bucket + 1 : NUM_BUCKETS;
@@ -553,7 +554,13 @@ private:
 private:
   Bucket_mapper _mapper;
   nupm::Rca_AVL _arena_allocator;
-  std::list<std::unique_ptr<Region>> _buckets[MAX_NUMA_ZONES][NUM_BUCKETS];
+  std::array<
+    std::array<
+      std::list<std::unique_ptr<Region>>
+      , NUM_BUCKETS
+    >
+    , MAX_NUMA_ZONES
+  > _buckets;
 };
 
 } // namespace nupm

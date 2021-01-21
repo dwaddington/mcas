@@ -40,7 +40,7 @@
 Data * Experiment::g_data;
 std::mutex Experiment::g_write_lock;
 double Experiment::g_iops;
-std::string g_log_file;
+boost::optional<std::string> Experiment::_log_file;
 
 namespace
 {
@@ -165,7 +165,7 @@ Experiment::Experiment(std::string name_, const ProgramOptions &options)
   , _bin_threshold_max(options.bin_threshold_max)
   , _core_to_device_map(make_core_to_device_map(_cores, _devices))
 {
-  g_log_file = *options.log_file;
+  _log_file = options.log_file;
 }
 
 Experiment::~Experiment()
@@ -601,8 +601,8 @@ void Experiment::_update_aggregate_iops(double iops)
 
 void Experiment::summarize()
 {
-  if(g_log_file.empty() == false) {
-    std::ofstream ofs(g_log_file);
+  if ( _log_file && ! _log_file->empty() ) {
+    std::ofstream ofs(*_log_file);
     ofs << "total IOPS: " << long(g_iops) << "\n";
   }
 
