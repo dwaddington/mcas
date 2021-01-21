@@ -78,7 +78,7 @@ def build_shard_section(shard_count):
     return result
     
 parser = argparse.ArgumentParser(description='Generate configuration file.')
-parser.add_argument('--port', metavar='N', type=int, nargs='?', help='network port', default=11910)
+parser.add_argument('--port', metavar='N', type=int, nargs='?', help='network port', default=11911)
 parser.add_argument('--loadbase', type=auto_int, help='base address for loading (e.g. 0x900000000)', default=0x900000000)
 parser.add_argument('--net', default='mlx5_0', help='network device (e.g., mlx5_0)')
 parser.add_argument('--path', default='/dev/dax0.0', help='persistent memory path (e.g., /dev/dax0.0)')
