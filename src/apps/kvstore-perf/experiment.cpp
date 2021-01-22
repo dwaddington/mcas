@@ -165,7 +165,8 @@ Experiment::Experiment(std::string name_, const ProgramOptions &options)
   , _bin_threshold_max(options.bin_threshold_max)
   , _core_to_device_map(make_core_to_device_map(_cores, _devices))
 {
-  g_log_file = *options.log_file;
+  if(options.log_file)
+    g_log_file = *options.log_file;
 }
 
 Experiment::~Experiment()
