@@ -1,6 +1,10 @@
 /* note: we do not include component source, only the API definition */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
 
 #include <ccpm/cca.h>
 #include <common/errors.h>
