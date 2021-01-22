@@ -2,13 +2,19 @@
 #include <common/cycles.h>
 #include <common/rand.h>
 #include <common/utils.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <iostream>
 #include <string>
 #include <thread>
 
 #include <threadipc/queue.h>
-//#include <common/queue.h>
+
 //#define GPERF_TOOLS
 
 #ifdef GPERF_TOOLS

@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(libnupm-test CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+
 find_library(GTEST_LIB NAMES gtest PATHS /usr/lib,/usr/lib64/,/usr/local/lib,/usr/local/lib64/)
 
 if(NOT GTEST_LIB)

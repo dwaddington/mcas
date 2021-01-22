@@ -3,7 +3,13 @@
 #include <common/str_utils.h>
 #include <common/utils.h>
 #include <common/logging.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <nupm/dax_manager.h>
 #include <nupm/mcas_mod.h>
 #include <thread>
