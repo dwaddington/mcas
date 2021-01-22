@@ -128,6 +128,28 @@ extern "C"
   status_t mcas_close_session(const mcas_session_t session);
 
   /** 
+   * Allocate 64B aligned memory for use in direct calls
+   * 
+   * @param session Session handle
+   * @param size Size to allocate in bytes
+   * @param out_ptr [out] Pointer to allocation
+   * @param out_handle [out] Memory handle
+   * 
+   * @return S_OK or int from ::posix_memalign
+   */
+  status_t mcas_allocate_direct_memory(const mcas_session_t session,
+                                       const size_t size,
+                                       void ** out_ptr,
+                                       void ** out_handle);
+
+  /** 
+   * Free direct memory
+   * 
+   * @param ptr 
+   */
+  void mcas_free_direct_memory(void * ptr);
+
+  /** 
    * Create a new pool
    * 
    * @param session Session handle

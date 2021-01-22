@@ -1,7 +1,8 @@
 #include <unistd.h>
-
+#include <stdlib.h>
 #include <common/logging.h>
 #include <common/errors.h>
+#include <common/utils.h>
 #include <api/components.h>
 #include <api/mcas_itf.h>
 
@@ -53,12 +54,40 @@ extern "C" status_t mcas_open_session_ex(const char * server_addr,
 extern "C" status_t mcas_close_session(const mcas_session_t session)
 {
   auto mcas = static_cast<IMCAS*>(session);
-  if(!session) return -1;
+  if(!session) return E_INVAL;
   
   mcas->release_ref();
   
   return S_OK;
 }
+
+extern "C" status_t mcas_allocate_direct_memory(const mcas_session_t session,
+                                                const size_t size,
+                                                void ** out_ptr,
+                                                void ** out_handle)
+{
+  auto mcas = static_cast<IMCAS*>(session);
+  if(!session) return E_INVAL;
+  if(out_ptr == nullptr || out_handle == nullptr) return E_INVAL;
+
+  void * ptr = nullptr;
+  int rc = ::posix_memalign(&ptr, 64, size);
+
+  //  component::IKVStore::memory_handle_t;
+  auto handle = mcas->register_direct_memory(ptr, size);
+  if(rc || handle == component::IMCAS::MEMORY_HANDLE_NONE)
+    return E_FAIL;
+
+  *out_ptr = ptr;
+  *out_handle = handle;
+  return S_OK;
+}
+
+extern "C" void mcas_free_direct_memory(void * ptr)
+{
+  ::free(ptr);
+}
+
 
 extern "C" status_t mcas_create_pool_ex(const mcas_session_t session,
                                         const char * pool_name,
@@ -75,7 +104,7 @@ extern "C" status_t mcas_create_pool_ex(const mcas_session_t session,
                                   flags,
                                   expected_obj_count,
                                   IKVStore::Addr(base_addr));
-    if(pool == IMCAS::POOL_ERROR) return -1;
+    if(pool == IMCAS::POOL_ERROR) return E_FAIL;
     *out_pool_handle = {mcas, pool};
   }
   catch(...) {
@@ -122,7 +151,7 @@ extern "C" status_t mcas_open_pool(const mcas_session_t session,
 extern "C" status_t mcas_close_pool(const mcas_pool_t pool)
 {
   auto mcas = static_cast<IMCAS*>(pool.session);
-  return mcas->close_pool(pool.handle) == S_OK ? 0 : -1;
+  return mcas->close_pool(pool.handle) == S_OK ? 0 : E_FAIL;
 }
 
 extern "C" status_t mcas_delete_pool(const mcas_session_t session,
@@ -176,7 +205,7 @@ extern "C" status_t mcas_register_direct_memory(const mcas_session_t session,
 {
   auto mcas = static_cast<IMCAS*>(session);
   auto handle = mcas->register_direct_memory(const_cast<void*>(addr), len);
-  if(handle == 0) return -1;
+  if(handle == 0) return E_FAIL;
   *out_handle = handle;
   return 0;
 }
@@ -469,7 +498,7 @@ extern "C" status_t mcas_find(const mcas_pool_t pool,
     memcpy(*out_matched_key, result_key.c_str(), result_key.size());
     return 0;
   }    
-  return -1;
+  return E_FAIL;
 }
 
 extern "C" status_t mcas_erase(const mcas_pool_t pool,
@@ -672,7 +701,7 @@ extern "C" status_t mcas_check_async_invoke_ado(const mcas_pool_t pool,
     return 0;
   }
 
-  return -1;
+  return E_FAIL;
 }
 
 
