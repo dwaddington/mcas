@@ -3,10 +3,21 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(fabric-tests CXX)
 
+# TODO fix to absolute
 include_directories(../../../../components)
 include_directories(../../../../lib/common/include/)
 include_directories(../../../../lib/GSL/include/)
+
+include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl, tbb
+
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # libfabric
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(GTEST_LIB gtest)
+else()
+  set(GTEST_LIB gtestd)
+endif()
 
 add_executable(fabric-test1 test1.cpp
   eyecatcher.cpp
@@ -36,4 +47,4 @@ add_executable(fabric-test1 test1.cpp
   wait_poll.cpp
 )
 
-target_link_libraries(fabric-test1 ${ASAN_LIB} common numa fabric pthread gtest dl)
+target_link_libraries(fabric-test1 ${ASAN_LIB} ${GTEST_LIB} common numa fabric pthread dl)

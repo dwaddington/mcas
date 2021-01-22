@@ -3,7 +3,12 @@
 #include <common/mpmc_bounded_queue.h>
 #include <common/rand.h>
 #include <common/utils.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <thread>
 
 //#define TEST_MPMC

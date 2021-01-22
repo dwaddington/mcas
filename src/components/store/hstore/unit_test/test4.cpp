@@ -13,7 +13,13 @@
 #include "store_map.h"
 #include "timer.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <common/profiler.h>
 #include <common/utils.h>
 #include <api/components.h>
