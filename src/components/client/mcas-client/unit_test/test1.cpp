@@ -19,7 +19,14 @@
 #include <common/cpu.h>
 #include <common/str_utils.h>
 #include <common/task.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <sys/mman.h>
 
 #include <boost/program_options.hpp>

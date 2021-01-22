@@ -15,7 +15,11 @@
 #include "pingpong_cb_ctxt.h"
 #include "pingpong_server_client_state.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
 
 void pingpong_server_cb::recv_cb(cb_ctxt *rx_ctxt_, ::status_t stat_, std::size_t len_)
 {

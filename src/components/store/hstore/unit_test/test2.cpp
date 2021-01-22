@@ -12,7 +12,12 @@
 */
 #include "store_map.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wconversion"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <common/utils.h>
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */

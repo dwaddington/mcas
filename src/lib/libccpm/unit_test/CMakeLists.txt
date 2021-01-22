@@ -2,14 +2,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(libccpm-test CXX)
 
-find_library(GTEST_LIB NAMES gtest PATHS /usr/lib,/usr/lib64/,/usr/local/lib,/usr/local/lib64/)
-
-if(NOT GTEST_LIB)
-  message(FATAL_ERROR "gtest library not found:" ${GTEST_LIB})
-else()
-  message("Found gtest library:" ${GTEST_LIB})
-endif()
-
 find_library(PROFILER_LIB NAMES profiler PATHS /usr/local/lib,/usr/local/lib64,/usr/lib,/usr/lib64)
 if ("${PROFILER_LIB}" STREQUAL "PROFILER_LIB-NOTFOUND")
 set(PROFILER "")
@@ -26,7 +18,15 @@ include_directories(../src)
 link_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/)
 link_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/)
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
-link_directories(${CMAKE_INSTALL_PREFIX}/lib) # ndctl
+link_directories(${CMAKE_INSTALL_PREFIX}/lib)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(GTEST_LIB gtest)
+else()
+  set(GTEST_LIB gtestd)
+endif()
+
 
 add_executable(libccpm-test1 test1.cpp)
 add_executable(libccpm-test2 test2.cpp)
