@@ -4,7 +4,9 @@ project(libcommon-test CXX)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/googletest/googletest/include)
 
+link_directories(${CMAKE_BINARY_DIR}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
