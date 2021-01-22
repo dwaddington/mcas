@@ -2,7 +2,11 @@
 #include "allocator_ra.h"
 #include "rc_alloc_lb.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
 
 #include <memory>
 

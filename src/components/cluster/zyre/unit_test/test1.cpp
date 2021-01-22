@@ -1,5 +1,9 @@
 /* note: we do not include component source, only the API definition */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <api/components.h>
 #include <api/cluster_itf.h>
 #include <common/utils.h>
