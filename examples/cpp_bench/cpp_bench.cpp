@@ -41,9 +41,9 @@ component::IMCAS_factory * factory = nullptr;
 
 struct record_t {
   std::string key;
-  std::string value;
 };
 
+std::string   _value;
 std::mutex    _iops_lock;
 static unsigned long _iops = 0;
 
@@ -70,22 +70,24 @@ class IOPS_task : public common::Tasklet {
     PINF("Setting up data a priori: core %u", core);
 
     /* set up data */
+    _value = common::random_string(Options.value_size);
     for (unsigned long i = 0; i < Options.pairs; i++) {
       _data[i].key = common::random_string(Options.key_size);
-      _data[i].value = common::random_string(Options.value_size);
     }
 
     _ready_flag = true;
-    _start_time = std::chrono::high_resolution_clock::now();
   }
 
   virtual bool do_work(unsigned core) override
   {
-    if (_iterations == 0) PINF("Starting worker: core %u", core);
+    if (_iterations == 0) {
+      PINF("Starting worker: core %u", core);
+      _start_time = std::chrono::high_resolution_clock::now();
+    }
 
     status_t rc = _store->put(_pool,
                               _data[_iterations].key,
-                              _data[_iterations].value.data(),
+                              _value.data(),
                               Options.value_size);
    
     if (rc != S_OK) throw General_exception("put operation failed:rc=%d", rc);
