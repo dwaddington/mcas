@@ -18,7 +18,13 @@
 #include <api/fabric_itf.h> /* IFabric_communicator */
 #include <common/errors.h> /* S_OK */
 #include <boost/io/ios_state.hpp>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <sys/uio.h> /* iovec */
 #include <cstdint> /* uint64_t */
 #include <cstring> /* memcpy */

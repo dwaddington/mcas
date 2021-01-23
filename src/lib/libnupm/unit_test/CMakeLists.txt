@@ -2,14 +2,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(libnupm-test CXX)
 
-find_library(GTEST_LIB NAMES gtest PATHS /usr/lib,/usr/lib64/,/usr/local/lib,/usr/local/lib64/)
-
-if(NOT GTEST_LIB)
-  message(FATAL_ERROR "gtest library not found:" ${GTEST_LIB})
-else()
-  message("Found gtest library:" ${GTEST_LIB})
-endif()
-
+set(CMAKE_CXX_STANDARD 14)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
@@ -19,9 +12,17 @@ include_directories(../src)
 link_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/)
 link_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/)
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
-link_directories(${CMAKE_INSTALL_PREFIX}/lib) # ndctl
+link_directories(${CMAKE_INSTALL_PREFIX}/lib)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
 add_compile_options(-g -fPIC)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(GTEST_LIB gtest)
+else()
+  set(GTEST_LIB gtestd)
+endif()
+
 add_executable(libnupm-test test1.cpp)
 target_link_libraries(libnupm-test ${ASAN_LIB} common numa ndctl ${GTEST_LIB} pthread dl nupm pmem z gcov)  # add profiler for google profiler
 

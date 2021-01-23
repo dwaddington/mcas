@@ -2,7 +2,14 @@
 #include <api/components.h>
 #include <common/str_utils.h>
 #include <common/utils.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <memory>
 #include <vector>
 

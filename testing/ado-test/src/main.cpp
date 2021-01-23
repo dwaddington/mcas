@@ -331,8 +331,7 @@ TEST_F(ADO_test, PersistedDetachedMemory)
 
   pool = mcas->open_pool(poolname);
 
-  unsigned j = 0;
-  while ( rc == S_OK )
+  for ( std::size_t j = 0 ; rc == S_OK; ++j )
   {
     rc = mcas->put(pool, key_saturate + std::to_string(j), std::string(4096, 'x'));
   }

@@ -4,6 +4,8 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 set(CMAKE_CXX_STANDARD 14)
 
 if(BOOTSTRAP_DEPS)
+  set(BUILD_SHARED_LIBS ON)
+  add_subdirectory(googletest)  
   add_subdirectory(flatbuffers)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/flatbuffers/flatc DESTINATION bin PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE OWNER_READ GROUP_READ)
   add_subdirectory(ndctl)

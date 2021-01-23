@@ -34,9 +34,11 @@ def replace(config, var, label):
 
 def increment_dax_path(path):
     result = re.match('/dev/dax(\d+).(\d+)', path)
-    region=result.group(1)
-    device=int(result.group(2))
-    return '/dev/dax' + region + '.' + str(device + 1)
+    if result != None:
+        region=result.group(1)
+        device=int(result.group(2))
+        return '/dev/dax' + region + '.' + str(device + 1)
+    return path
 
 def build_shard_section(shard_count):
     global SHARD
