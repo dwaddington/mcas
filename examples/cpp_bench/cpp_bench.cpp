@@ -12,6 +12,7 @@
 */
 
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <boost/program_options.hpp>
 
@@ -26,6 +27,7 @@
 struct {
   std::string addr;
   std::string device;
+  std::string log;
   unsigned    debug_level;
   unsigned    patience;
   unsigned    base_core;
@@ -148,6 +150,7 @@ int main(int argc, char* argv[])
       ("value", po::value<unsigned>()->default_value(16), "Size of value in bytes")
       ("pairs", po::value<unsigned>()->default_value(100000), "Number of key-value pairs")
       ("poolsize", po::value<unsigned>()->default_value(2), "Size of pool in GiB")
+      ("log", po::value<std::string>()->default_value("/tmp/cpp-bench-log.txt"), "File to log results")
       ;
 
     po::variables_map vm;
@@ -168,6 +171,7 @@ int main(int argc, char* argv[])
     Options.pairs       = vm["pairs"].as<unsigned>();
     Options.device      = vm["device"].as<std::string>();
     Options.pool_size   = vm["poolsize"].as<unsigned>();
+    Options.log         = vm["log"].as<std::string>();
   }
   catch (...) {
     std::cerr << "bad command line option configuration\n";
@@ -196,6 +200,12 @@ int main(int argc, char* argv[])
       common::Per_core_tasking<IOPS_task, unsigned> t(mask, 11911);
       t.wait_for_all();
     }
+
+    {
+      std::ofstream tmp(Options.log);
+      tmp << "Total IOPS: " << reinterpret_cast<unsigned long>(_iops) << "\n";
+    }
+
     PMAJOR("Aggregate IOPS: %lu", reinterpret_cast<unsigned long>(_iops));
   }
 
