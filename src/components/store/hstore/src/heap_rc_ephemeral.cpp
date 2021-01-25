@@ -24,7 +24,7 @@ heap_rc_ephemeral::heap_rc_ephemeral(
 	, const string_view backing_file_
 )
 	: common::log_source(debug_level_)
-	, _heap()
+	, _heap(debug_level_)
 	, _managed_regions(id_, backing_file_, {})
 	, _allocated(0)
 	, _capacity(0)

@@ -132,7 +132,7 @@ TEST_F(Libnupm_test, RCA_LB_allocator)
   auto v1 = std::make_unique<char[]>(region_size);
   ASSERT_NE(nullptr, v0);
   /* AVL_range_allocator requires an addr_t, defined in comanche common/types.h */
-  nupm::Rca_LB lb;
+  nupm::Rca_LB lb(0);
   lb.add_managed_region(v0.get(), region_size, numa_node);
 #if 0 /* a second area would make the EXPECT sanity checks on erturn pointers trickier */
   lb.add_managed_region(v1.get(), region_size, numa_node);

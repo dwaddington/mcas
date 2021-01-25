@@ -188,17 +188,20 @@ private:
   };
 
 public:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++" // several unitialized/default initialized members
-  Pool_handle(size_t nsize)
+  Pool_handle(const std::string & name_, size_t nsize, unsigned flags_)
     : _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
       _tmp({allocate_region_memory(MB(2) /* alignment */, _nsize), _nsize}),
       _regions{_tmp},
-      _map({(_lb.add_managed_region(_tmp.iov_base, _nsize, NUMA_ZONE), aam_t(_lb))})
+      _name{name_},
+      _lb(0U),
+      _map({(_lb.add_managed_region(_tmp.iov_base, _nsize, NUMA_ZONE), aam_t(_lb))}),
+      _map_lock{},
+      _flags{flags_},
+      _iterators{},
+      _writes{}
   {
     CPLOG(1, PREFIX "added memory region (%p,%lu)",_tmp.iov_base, _tmp.iov_len);
   }
-#pragma GCC diagnostic pop
 
   ~Pool_handle() {
     // FIX DAWN-295
@@ -206,6 +209,8 @@ public:
     //      release_region_memory(r.iov_base, r.iov_len);
   }
 
+  const std::string & name() const { return _name; }
+private:
   size_t               _nsize; /*< order important */
   ::iovec              _tmp;
   std::vector<::iovec> _regions;
@@ -216,7 +221,6 @@ public:
   unsigned int         _flags;
   std::set<Iterator*>  _iterators;
 
-private:
   /*
     We use this counter to see if new writes have come in
     during an iteration.  This is essentially an optmistic
@@ -974,14 +978,12 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
       CPLOG(1, PREFIX "using existing pool handle");
     }
     else {
-      handle = new Pool_handle(nsize);
-      handle->_name = name;
-      handle->_flags = flags;
+      handle = new Pool_handle(name, nsize, flags);
       CPLOG(1, PREFIX "creating new pool handle");
     }
 
     session = new Pool_session{handle};
-    _pools[handle->_name] = handle;
+    _pools[handle->name()] = handle;
 
     CPLOG(1, PREFIX "adding new session (%p)", common::p_fmt(session));
 
@@ -1053,7 +1055,7 @@ status_t Map_store::delete_pool(const std::string &poolname) {
   }
 
   for (auto &s : _pool_sessions) {
-    if (s->pool->_name == poolname) {
+    if (s->pool->name() == poolname) {
       PWRN(
            PREFIX "delete_pool (%s) pool delete failed because pool still "
            "open (%p)",

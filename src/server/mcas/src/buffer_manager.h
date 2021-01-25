@@ -104,7 +104,10 @@ public:
       , _region(memory_registered_t(debug_level_, transport_, base_, length_, 0, 0))
       , magic(0xC0FFEE)
     {
-      assert(length_);
+      if ( length_ <= 1 )
+      {
+        throw std::domain_error("buffer length too small");
+      }
       CPLOG(3, "%s::%s %p transport %p region %p", _cname, __func__, common::p_fmt(this),
             common::p_fmt(transport()), common::p_fmt(region()));
     }
@@ -211,22 +214,19 @@ public:
 
   using completion_t = void (*)(void *, buffer_internal *);
 
-  buffer_internal *allocate(completion_t completion_)
+  gsl::not_null<buffer_internal *> allocate(completion_t completion_)
   {
     if (UNLIKELY(_free.empty())) throw Program_exception("Buffer_manager: no shard buffers remaining");
-    auto iob = _free.back();
+    gsl::not_null<buffer_internal *> iob = _free.back();
     _free.pop_back();
     CPLOG(3, "%s::%s %p (%lu free)", _cname, __func__, common::p_fmt(iob), _free.size());
-    assert(iob);
     iob->reset_length();
     iob->set_completion(completion_);
     return iob;
   }
 
-  void free(buffer_internal *iob)
+  void free(gsl::not_null<buffer_internal *> iob)
   {
-    assert(iob);
-
     CPLOG(3, "%s::%s %p (%lu free)", _cname, __func__, common::p_fmt(iob), _free.size());
     iob->reset_length();
     iob->set_completion(nullptr);

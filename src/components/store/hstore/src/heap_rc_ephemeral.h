@@ -71,7 +71,7 @@ public:
 			static bool suppress = false;
 			if ( ! suppress )
 			{
-				hop_hash_log<B>::write(LOG_LOCATION, "pool ", ::base(pool_));
+				hop_hash_log<B>::write(LOG_LOCATION, "pool ", ::base(pool_), " [range] alloc inject free");
 				std::size_t lower_bound = 0;
 				auto limit = std::min(std::size_t(hist_report_upper_bound), _hist_alloc.data().size());
 				for ( unsigned i = log_min_alignment; i != limit; ++i )

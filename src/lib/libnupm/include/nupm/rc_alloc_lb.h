@@ -42,7 +42,7 @@ class Rca_LB : public common::Reconstituting_allocator {
    * Constructor
    *
    */
-  Rca_LB();
+  Rca_LB(unsigned debug_level);
 
   /**
    * Destructor
