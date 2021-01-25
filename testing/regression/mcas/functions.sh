@@ -109,11 +109,11 @@ has_fsdax () {
 }
 
 has_module_mcasmod () {
- /usr/sbin/modinfo mcasmod &> /dev/null
+ /sbin/modinfo mcasmod &> /dev/null
 }
 
 has_module_xpmem () {
- /usr/sbin/modinfo xpmem &> /dev/null
+ /sbin/modinfo xpmem &> /dev/null
 }
 
 # Decide whether to use device DAX or FS DAX, depending on whether this system has devdax configured

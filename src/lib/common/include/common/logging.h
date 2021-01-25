@@ -36,9 +36,29 @@
 #ifndef __COMMON_LOGGING_H__
 #define __COMMON_LOGGING_H__
 
-#include <cassert>
 #include <cstdio>
 #include <cstdarg>
+
+/* optional: print a timestamp */
+#define LOG_PRINT_TIMESTAMP 0
+
+#if LOG_PRINT_TIMESTAMP
+#include <chrono>
+
+namespace
+{
+  double log_ts()
+  {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  }
+}
+
+#define LOG_TS_FMT " %f"
+#define LOG_TS_ARG log_ts(),
+#else
+#define LOG_TS_FMT ""
+#define LOG_TS_ARG
+#endif
 
 namespace common
 {
@@ -103,7 +123,7 @@ inline void pr_info(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[LOG]:%s %s\n", ESC_LOG, buffer, ESC_END);
+  fprintf(stderr, "%s[LOG]:" LOG_TS_FMT " %s %s\n", ESC_LOG, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -119,7 +139,7 @@ inline void pr_error(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[LOG]:%s %s\n", ESC_ERR, buffer, ESC_END);
+  fprintf(stderr, "%s[LOG]:" LOG_TS_FMT " %s %s\n", ESC_ERR, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -135,7 +155,7 @@ inline void PLOG(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[LOG]:%s %s\n", ESC_LOG, buffer, ESC_END);
+  fprintf(stderr, "%s[LOG]:" LOG_TS_FMT " %s %s\n", ESC_LOG, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -151,7 +171,7 @@ inline void PDBG(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[DBG]:%s %s\n", ESC_DBG, buffer, ESC_END);
+  fprintf(stderr, "%s[DBG]:" LOG_TS_FMT " %s %s\n", ESC_DBG, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -183,7 +203,7 @@ inline void PWRN(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[WRN]: %s %s\n", ESC_WRN, buffer, ESC_END);
+  fprintf(stderr, "%s[WRN]:" LOG_TS_FMT " %s %s\n", ESC_WRN, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -199,7 +219,7 @@ inline void PERR(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%sError: %s %s\n", ESC_ERR, buffer, ESC_END);
+  fprintf(stderr, "%sError:" LOG_TS_FMT " %s %s\n", ESC_ERR, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -215,7 +235,7 @@ inline void PEXCEP(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%sException: %s %s\n", ESC_ERR, buffer, ESC_END);
+  fprintf(stderr, "%sException:" LOG_TS_FMT " %s %s\n", ESC_ERR, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -231,7 +251,7 @@ inline void PNOTICE(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%sNOTICE: %s %s\n", BRIGHT_RED, buffer, ESC_END);
+  fprintf(stderr, "%sNOTICE:" LOG_TS_FMT " %s %s\n", BRIGHT_RED, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -247,7 +267,7 @@ inline void PMAJOR(const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[+] %s %s\n", NORMAL_BLUE, buffer, ESC_END);
+  fprintf(stderr, "%s[+]" LOG_TS_FMT " %s %s\n", NORMAL_BLUE, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
 #endif
@@ -263,7 +283,7 @@ inline void PLOG2(const char * color, const char * format, ...)
   char buffer[m_max_buffer];
   vsnprintf(buffer, m_max_buffer, format, args);
   va_end(args);
-  fprintf(stderr, "%s[+] %s %s\n", color, buffer, ESC_END);
+  fprintf(stderr, "%s[+]" LOG_TS_FMT " %s %s\n", color, LOG_TS_ARG buffer, ESC_END);
 #else
   (void) format;
   (void) color;
