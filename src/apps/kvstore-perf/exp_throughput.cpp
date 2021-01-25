@@ -9,7 +9,6 @@
 #include <unistd.h> /* HOST_NAME_MAX, gethostname */
 #include <csignal>
 
-static std::string _log_file;
 std::mutex ExperimentThroughput::_iops_lock;
 unsigned long ExperimentThroughput::_iops;
 bool ExperimentThroughput::_stop= false;
@@ -56,7 +55,6 @@ ExperimentThroughput::ExperimentThroughput(const ProgramOptions &options)
   , _rnd{}
   , _k0_rnd(33, 126)
 {
-  _log_file = *options.log_file;
 }
 
 void ExperimentThroughput::handler(int)
@@ -115,6 +113,7 @@ bool ExperimentThroughput::do_work(unsigned core)
   {
     if ( rnd_pct < _ga_pct )
     {
+      /* the random operation is "get attribute" */
       std::vector<std::uint64_t> memory_type{0};
       {
         StopwatchInterval si(_sw_ga);
@@ -128,8 +127,9 @@ bool ExperimentThroughput::do_work(unsigned core)
 #endif
       ++*ct;
     }
-    if ( rnd_pct < _ga_pct + _rd_pct )
+    else if ( rnd_pct < _ga_pct + _rd_pct )
     {
+      /* the random operation is "read" */
       auto p = std::find(_populated.begin() + _i_rd, _populated.end(), true);
       if ( p == _populated.end() )
       {
@@ -156,7 +156,7 @@ bool ExperimentThroughput::do_work(unsigned core)
     }
     else if ( rnd_pct < _ga_pct + _rd_pct + _ie_pct )
     {
-      /* random operation is "insert or erase" */
+      /* the random operation is "insert or erase" */
       std::uniform_int_distribution<std::size_t> pos_rnd(std::size_t(pool_element_start()), std::size_t(pool_element_end() - 1));
       auto pos = pos_rnd(_rnd);
       const KV_pair &data = g_data->_data[pos];
@@ -181,7 +181,7 @@ bool ExperimentThroughput::do_work(unsigned core)
       if ( rc != S_OK )
       {
         std::ostringstream e;
-        e << "pool_element_end = " << pool_element_end() << " put rc != S_OK: " << rc << " @ pos = " << pos;
+        e << "pool_element_end = " << pool_element_end() << " " << (_populated[pos] ? "erase" : "put(insert)") << " rc != S_OK: " << rc << " @ pos = " << pos;
         PERR("[%u] %s. Exiting.", core, e.str().c_str());
         throw std::runtime_error(e.str());
       }
@@ -193,12 +193,20 @@ bool ExperimentThroughput::do_work(unsigned core)
     }
     else
     {
-      ct = _populated[std::size_t(_i_wr)] ? &_op_count_up : &_op_count_in;
-      const KV_pair &data = g_data->_data[std::size_t(_i_wr)];
+      auto pos = std::size_t(_i_wr);
+      bool upd = _populated[pos];
+      ct = upd ? &_op_count_up : &_op_count_in;
+      const KV_pair &data = g_data->_data[pos];
       {
         StopwatchInterval si(_sw_wr);
         auto rc = store()->put(pool(), data.key, data.value, data.value_len);
-        assert(rc == S_OK);
+        if ( rc != S_OK )
+        {
+          std::ostringstream e;
+          e << "pool_element_end = " << pool_element_end() << " " << (upd ? "put(replace)" : "put(insert)") << " rc != S_OK: " << rc << " @ pos = " << pos;
+          PERR("[%u] %s. Exiting.", core, e.str().c_str());
+          throw std::runtime_error(e.str());
+        }
       }
 #if 0
       PLOG("%s in %zu key %s", ct->name, _i_wr, data.key.c_str());
@@ -314,8 +322,8 @@ void ExperimentThroughput::cleanup_custom(unsigned core)
 
 void ExperimentThroughput::summarize()
 {
-  if(_log_file.empty() == false) {
-    std::ofstream ofs(_log_file);
+  if ( _log_file && ! _log_file->empty() ) {
+    std::ofstream ofs(*_log_file);
     ofs << "total IOPS: " << _iops << "\n";
   }
   PMAJOR("total IOPS: %lu", _iops);

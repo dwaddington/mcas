@@ -64,13 +64,6 @@ public:
         TICK_RESPONSE_CLOSE           = 0xFF,
   };
 
-  enum {
-        ACTION_NONE = 0,
-        ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE,
-        ACTION_POOL_DELETE,
-  };
-
-
 private:
   Connection_state    _state       = Connection_state::INITIAL;
   unsigned option_DEBUG = mcas::global::debug_level;
@@ -156,10 +149,14 @@ private:
   void send_callback2(buffer_t *iob) noexcept
   {
     assert(iob->value_adjunct);
-    if (0 < option_DEBUG) {
+    if (2 < option_DEBUG) {
       PLOG("Completed send2 (value_adjunct %p)", common::p_fmt(iob->value_adjunct));
     }
-    _deferred_unlock.push(iob->value_adjunct);
+/*
+ * Requires that value_adjunct (the value in the second buffer of the pair) have a
+ * reservation which can be undone by ACTION_RELEASE_VALUE_LOCK_SHARED, which is _i_kvstore->unlock()
+ */
+    _deferred_unlock.push(action_t{action_type::ACTION_RELEASE_VALUE_LOCK_SHARED, iob->value_adjunct});
     send_callback(iob);
   }
 
@@ -214,10 +211,10 @@ public:
     while (!_deferred_unlock.empty()) {
       //      void *deferred_unlock = nullptr;
       //???     std::swap(deferred_unlock, _deferred_unlock.front());
-      void *deferred_unlock = _deferred_unlock.front();
+      auto deferred_unlock = _deferred_unlock.front();
       if (option_DEBUG > 2)
-        PLOG("adding action for deferred unlocking value @ %p", deferred_unlock);
-      add_pending_action(action_t{ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE, deferred_unlock});
+        PLOG("adding action for deferred unlocking value @ %p", deferred_unlock.parm);
+      add_pending_action(deferred_unlock);
       _deferred_unlock.pop();
     }
 
@@ -268,7 +265,7 @@ public:
 
     action = _pending_actions.front();
 
-    if (option_DEBUG > 2) PLOG("Connection_handler: popped pending action (%u, %p)", action.op, action.parm);
+    if (option_DEBUG > 2) PLOG("Connection_handler: popped pending action (%d, %p)", int(action.op), action.parm);
 
     _pending_actions.pop();
     return true;

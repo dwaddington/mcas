@@ -476,11 +476,11 @@ auto dax_manager::create_region(
   auto r = arena->region_create(name_, this, size_);
   if ( r.address_map().empty() )
   {
-    CPLOG(2, "%s: %.*s size req 0x%zx create failed", __func__, int(name_.size()), name_.begin(), size_);
+    CPLOG(0, "%s: %.*s size req 0x%zx create failed", __func__, int(name_.size()), name_.begin(), size_);
   }
   else
   {
-    CPLOG(2, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name_.size()), name_.begin(), size_, ::base(r.address_map()[0]), ::size(r.address_map()[0]));
+    CPLOG(1, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name_.size()), name_.begin(), size_, ::base(r.address_map()[0]), ::size(r.address_map()[0]));
   }
   return r;
 }

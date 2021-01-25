@@ -100,6 +100,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
       /* Guess that nullptr indicate a failure */
       if ( v.address_map().empty() )
       {
+        CPLOG(0, PREFIX ": fail: %.*s size %zu", LOCATION, int(path_.str().size()), path_.str().c_str(), size);
         throw pool_error("create_region fail: " + path_.str(), pool_ec::region_fail);
       }
       CPLOG(1, PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), ::base(v.address_map().front()), ::size(v.address_map().front()));
