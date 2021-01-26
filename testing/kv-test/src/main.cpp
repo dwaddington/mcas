@@ -149,19 +149,20 @@ TEST_F(KV_test, BasicPutGetOperations)
   std::string key1   = "key1";
   std::string value0 = "this_is_value_0";
   std::string value1 = "this_is_value_1_and_its_longer";
-  ASSERT_OK(mcas->put(pool, key0, value0, 0));
+TM_INSTANCE
+  ASSERT_OK(mcas->put(TM_REF pool, key0, value0, 0));
 
   std::string out_value;
   ASSERT_OK(mcas->get(pool, key0, out_value));
   ASSERT_TRUE(value0 == out_value);
 
-  ASSERT_OK(mcas->put(pool, key0, value1, 0));
+  ASSERT_OK(mcas->put(TM_REF pool, key0, value1, 0));
   ASSERT_OK(mcas->get(pool, key0, out_value));
   PLOG("value1(%s) out_value(%s)", value1.c_str(), out_value.c_str());
   ASSERT_TRUE(value1 == out_value);
 
   /* try overwrite with DONT STOMP flag */
-  ASSERT_TRUE(mcas->put(pool, key0, value1, IKVStore::FLAGS_DONT_STOMP) == IKVStore::E_KEY_EXISTS);
+  ASSERT_TRUE(mcas->put(TM_REF pool, key0, value1, IKVStore::FLAGS_DONT_STOMP) == IKVStore::E_KEY_EXISTS);
 
   ASSERT_OK(mcas->erase(pool, key0));
 
@@ -307,14 +308,15 @@ void put_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t mh_)
 
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
-  //  ASSERT_OK(mcas->put(pool, key0, value0, 0));
+  //  ASSERT_OK(mcas->put(TM_REF pool, key0, value0, 0));
 
   size_t                 user_buffer_len = MiB(128);
   void *                 user_buffer     = aligned_alloc(KiB(4), user_buffer_len);
   auto mem = mh_(mcas, user_buffer, user_buffer_len);
 
-  ASSERT_OK(mcas->put_direct(pool, "someLargeObject", user_buffer, user_buffer_len, mem->get()));
-  ASSERT_OK(mcas->put_direct(pool, "anotherLargeObject", user_buffer, user_buffer_len, mem->get()));
+TM_INSTANCE
+  ASSERT_OK(mcas->put_direct(TM_REF pool, "someLargeObject", user_buffer, user_buffer_len, mem->get()));
+  ASSERT_OK(mcas->put_direct(TM_REF pool, "anotherLargeObject", user_buffer, user_buffer_len, mem->get()));
 
   std::vector<uint64_t> attrs;
   ASSERT_OK(mcas->get_attribute(pool, IMCAS::Attribute::COUNT, attrs));
@@ -357,7 +359,7 @@ void get_put_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_hand
   auto pool_size = get_pool_size(mcas, mh_, pool, GiB(2));
   PLOG("Pool size 0x%zx", pool_size);
 
-  //  ASSERT_OK(mcas->put(pool, key0, value0, 0));
+  //  ASSERT_OK(mcas->put(TM_REF pool, key0, value0, 0));
 
   /* A prefix of the data, for us to read and modify */
   const char *data_prefix_someLargeObject = "dataSomeLargeObject";
@@ -370,7 +372,8 @@ void get_put_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_hand
     ASSERT_NE(nullptr, user_buffer);
     std::memcpy(user_buffer, data_prefix_someLargeObject, data_prefix_size_someLargeObject);
     auto mem = mh_(mcas, user_buffer, user_buffer_len);
-    ASSERT_OK(mcas->put_direct(pool, key_someLargeObject, user_buffer, user_buffer_len, mem->get()));
+TM_INSTANCE
+    ASSERT_OK(mcas->put_direct(TM_REF pool, key_someLargeObject, user_buffer, user_buffer_len, mem->get()));
     free(user_buffer);
   }
 
@@ -454,7 +457,7 @@ void async_get_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_ha
 
   ASSERT_NE(+component::IKVStore::POOL_ERROR, pool);
 
-  //  ASSERT_OK(mcas->put(pool, key0, value0, 0));
+  //  ASSERT_OK(mcas->put(TM_REF pool, key0, value0, 0));
 
   const char *key_someLargeObject = "someLargeObject";
   auto key_size_someLargeObject = std::strlen(key_someLargeObject);
@@ -465,7 +468,8 @@ void async_get_direct_offset(component::Itf_ref<component::IMCAS> &mcas, make_ha
 
     auto mem = mh_(mcas, user_buffer, user_buffer_len);
 
-    ASSERT_OK(mcas->put_direct(pool, key_someLargeObject, user_buffer, user_buffer_len, mem->get()));
+TM_INSTANCE
+    ASSERT_OK(mcas->put_direct(TM_REF pool, key_someLargeObject, user_buffer, user_buffer_len, mem->get()));
     free(user_buffer);
   }
 
@@ -676,7 +680,8 @@ void async_get_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t 
   {
     user_buffer.push_back(aligned_alloc(KiB(4), user_buffer_len));
     auto mem = mh_(mcas, user_buffer.back(), user_buffer_len);
-    ASSERT_OK(mcas->put_direct(pool, "testKey" + std::to_string(i), user_buffer[i], user_buffer_len, mem->get()));
+TM_INSTANCE
+    ASSERT_OK(mcas->put_direct(TM_REF pool, "testKey" + std::to_string(i), user_buffer[i], user_buffer_len, mem->get()));
   }
 
   /* read buffer slightly large than write buffer, to test reads into a differently-sized buffer */
@@ -764,7 +769,8 @@ TEST_F(KV_test, PoolCapacity)
                                 OBJ_COUNT);       /* obj count */
 
   for (unsigned i = 0; i < OBJ_COUNT; i++) {
-    ASSERT_EQ(S_OK, mcas->put(pool, common::random_string(16), common::random_string(KiB(4))));
+TM_INSTANCE
+    ASSERT_EQ(S_OK, mcas->put(TM_REF pool, common::random_string(16), common::random_string(KiB(4))));
   }
 }
 
@@ -785,17 +791,18 @@ TEST_F(KV_test, BadPutGetOperations)
   std::string key1   = "key1";
   std::string value0 = "this_is_value_0";
   std::string value1 = "this_is_value_1_and_its_longer";
-  ASSERT_OK(mcas->put(pool, key0, value0, 0));
+TM_INSTANCE
+  ASSERT_OK(mcas->put(TM_REF pool, key0, value0, 0));
 
   std::string out_value;
   ASSERT_OK(mcas->get(pool, key0, out_value));
   ASSERT_TRUE(value0 == out_value);
 
   /* bad parameters */
-  ASSERT_TRUE(mcas->put(pool, key1, nullptr, 0) == E_INVAL);
-  ASSERT_TRUE(mcas->put(pool, key1, value0.c_str(), 0) == E_INVAL);
-  ASSERT_TRUE(mcas->put(pool, key1, nullptr, 100) == E_INVAL);
-  ASSERT_TRUE(mcas->put(0x0, key1, nullptr, 100) == E_INVAL);
+  ASSERT_TRUE(mcas->put(TM_REF pool, key1, nullptr, 0) == E_INVAL);
+  ASSERT_TRUE(mcas->put(TM_REF pool, key1, value0.c_str(), 0) == E_INVAL);
+  ASSERT_TRUE(mcas->put(TM_REF pool, key1, nullptr, 100) == E_INVAL);
+  ASSERT_TRUE(mcas->put(TM_REF 0x0, key1, nullptr, 100) == E_INVAL);
 
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));

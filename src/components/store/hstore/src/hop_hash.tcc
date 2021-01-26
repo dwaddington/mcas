@@ -23,6 +23,7 @@
 #include "persistent.h"
 #include "test_flags.h"
 
+#include <common/perf/tm_actual.h>
 #include <boost/iterator/transform_iterator.hpp>
 
 #include <algorithm>
@@ -621,30 +622,49 @@ template <
 		}
 	}
 
+TM_SCOPE_DEF(hop_hash_base_emplace)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner0)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner1)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner2)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner3)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner4)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner5)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner6)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner7)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner8)
+TM_SCOPE_DEF(hop_hash_base_emplace_inner9)
+TM_SCOPE_DEF(hop_hash_base_emplace_innerA)
+TM_SCOPE_DEF(hop_hash_base_emplace_innerB)
+
 template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
 >
 	template <typename ... Args>
 		auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::emplace(
+			TM_ACTUAL
 			AK_ACTUAL
 			Args && ... args
 		) -> std::pair<iterator, bool>
 		try
 		{
+TM_SCOPE_USE(hop_hash_base_emplace)
 			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " BEGIN LIST\n"
 				, dump<HSTORE_TRACE_MANY>::make_hop_hash_dump(*this)
 				, LOG_LOCATION, " END LIST"
 			);
 
 		RETRY:
+tte.split(w_hop_hash_base_emplace_inner0);
 			/* convert the args to a value_type */
 			value_type v(std::forward<Args>(args)...);
 
+tte.split(w_hop_hash_base_emplace_inner1);
 			/* The bucket in which to place the new entry */
 			auto sbw = make_segment_and_bucket(bucket(v.first));
 			auto owner_lk = make_owner_unique_lock(sbw);
 
+tte.split(w_hop_hash_base_emplace_inner2);
 			/* If the key already exists, refuse to emplace */
 			if ( auto cv = owner_lk.ref().ownership_bits(owner_lk) )
 			{
@@ -660,12 +680,14 @@ template <
 				}
 			}
 
+tte.split(w_hop_hash_base_emplace_inner3);
 			/* the nearest free bucket */
 			try
 			{
 				auto b_dst = nearest_free_bucket(sbw);
 				b_dst = make_space_for_insert(owner_lk.index(), std::move(b_dst));
 
+tte.split(w_hop_hash_base_emplace_inner4);
 				b_dst.assert_clear(true, *this);
 				const auto content_index = distance_wrapped(owner_lk.index(), b_dst.index());
 
@@ -682,8 +704,11 @@ template <
 				 *   flush (8 bytes)
 				 */
 				{
+tte.split(w_hop_hash_base_emplace_inner5);
 					persist_size_change<Allocator, size_incr> s(*this);
+tte.split(w_hop_hash_base_emplace_inner6);
 					b_dst.ref().content_construct(owner_lk.index(), std::move(v));
+tte.split(w_hop_hash_base_emplace_inner7);
 					if ( owner_lk.index() == b_dst.index() )
 					{
 						owner_lk.ref().set_adjacent_content_in_use();
@@ -693,14 +718,18 @@ template <
 						auto adjacent_owner_lk = make_owner_unique_lock(b_dst.sb());
 						adjacent_owner_lk.ref().set_adjacent_content_in_use();
 					}
+tte.split(w_hop_hash_base_emplace_inner8);
 					this->persist_controller_t::persist_content(b_dst.ref(), "content in use");
+tte.split(w_hop_hash_base_emplace_inner9);
 					owner_lk.ref().insert(
 						owner_lk.index()
 						, content_index
 						, owner_lk
 						, static_cast<persist_controller_t *>(this)
 					);
+tte.split(w_hop_hash_base_emplace_innerA);
 					this->persist_controller_t::persist_owner(owner_lk.ref(), "owner emplace");
+tte.split(w_hop_hash_base_emplace_innerB);
 					hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " bucket ", owner_lk.index()
 						, " store at ", b_dst.index(), " "
 						, dump<HSTORE_TRACE_MANY>::make_owner_print(this->bucket_count(), owner_lk)

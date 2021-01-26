@@ -7,7 +7,7 @@ import re
 ###############################################################
 
 TEMPLATE="""{
-    \"shards\" : 
+    \"shards\" :
     [
       %%SHARDS%%
     ],
@@ -16,7 +16,7 @@ TEMPLATE="""{
 """
 
 SHARD="""
-     	{
+        {
             \"core\" : %%CORE%%,
             \"port\" : %%PORT%%,
             \"net\"  : \"%%NETDEV%%\",
@@ -78,7 +78,7 @@ def build_shard_section(shard_count):
         loadaddr += 0x100000000
 
     return result
-    
+
 parser = argparse.ArgumentParser(description='Generate configuration file.')
 parser.add_argument('--port', metavar='N', type=int, nargs='?', help='network port', default=11911)
 parser.add_argument('--loadbase', type=auto_int, help='base address for loading (e.g. 0x900000000)', default=0x900000000)
@@ -97,5 +97,5 @@ shard_section=build_shard_section(args.shards)
 
 # build final configuration file
 TEMPLATE=TEMPLATE.replace("%%SHARDS%%", shard_section)
-    
+
 print(TEMPLATE)

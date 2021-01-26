@@ -170,13 +170,13 @@ public:
                              std::size_t increment_size,
                              std::size_t& reconfigured_size ) override;
 
-  status_t put(pool_t pool,
+  status_t put(TM_FORMAL pool_t pool,
                const std::string &key,
                const void * value,
                std::size_t value_len,
                component::IKVStore::flags_t flags = FLAGS_NONE) override;
 
-  status_t put_direct(pool_t pool,
+  status_t put_direct(TM_FORMAL pool_t pool,
                       const std::string& key,
                       const void * value,
                       std::size_t value_len,

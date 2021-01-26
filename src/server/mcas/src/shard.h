@@ -29,6 +29,7 @@
 #include <common/logging.h>
 #include <common/spsc_bounded_queue.h>
 #include <common/string_view.h>
+#include <common/perf/tm_formal.h>
 
 #include <csignal> /* sig_atomic_t */
 #include <list>
@@ -158,7 +159,7 @@ class Shard : public Shard_transport, private common::log_source {
   inline void signal_exit() /*< signal main loop to exit */
   {
     _thread_exit = true;
-  } 
+  }
 
   inline void send_cluster_event(const std::string &sender, const std::string &type, const std::string &content)
   {
@@ -193,7 +194,7 @@ class Shard : public Shard_transport, private common::log_source {
   void release_space_shared(const range<std::uint64_t> &range);
 
   void add_pending_rename(const pool_t pool_id, const void *target, const std::string &from, const std::string &to);
-  void release_pending_rename(const void *target);
+  void release_pending_rename(TM_FORMAL const void *target);
 
   inline void add_target_keyname(const void *target, const std::string& skey) {
     _target_keyname_map[target] = skey;
@@ -215,37 +216,37 @@ class Shard : public Shard_transport, private common::log_source {
 
   void check_for_new_connections();
 
-  void main_loop(common::profiler &);
+  void main_loop(TM_FORMAL common::profiler &);
 
   /* message processing functions */
-  void process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg);
-  void process_message_IO_request(Connection_handler *handler, const protocol::Message_IO_request *msg);
-  void process_info_request(Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
-  void process_ado_request(Connection_handler *handler, const protocol::Message_ado_request *msg);
-  void process_put_ado_request(Connection_handler *handler, const protocol::Message_put_ado_request *msg);
-  void process_messages_from_ado();
+  void process_message_pool_request(TM_FORMAL Connection_handler *handler, const protocol::Message_pool_request *msg);
+  void process_message_IO_request(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg);
+  void process_info_request(TM_FORMAL Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr);
+  void process_ado_request(TM_FORMAL Connection_handler *handler, const protocol::Message_ado_request *msg);
+  void process_put_ado_request(TM_FORMAL Connection_handler *handler, const protocol::Message_put_ado_request *msg);
+  void process_messages_from_ado(TM_FORMAL0);
   status_t process_configure(const protocol::Message_IO_request *msg);
 
   /* response handling functions */
-  void io_response_put_advance(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_put_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_put_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_get_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_get_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_put(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_get(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_erase(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_configure(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_locate(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_release(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
-  void io_response_release_with_flush(Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put_advance(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put_locate(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put_release(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_get_locate(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_get_release(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_put(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_get(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_erase(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_configure(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_locate(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_release(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
+  void io_response_release_with_flush(TM_FORMAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob);
 
   void close_all_ado();
 
   void process_tasks(unsigned &idle);
 
   void service_cluster_signals();
-  
+
   void signal_ado(const char * tag,
                   Connection_handler * handler,
                   const uint64_t client_request_id,
@@ -259,18 +260,18 @@ class Shard : public Shard_transport, private common::log_source {
                                const uint64_t client_request_id,
                                const component::IKVStore::pool_t pool,
                                const std::string& key);
-                        
+
   static protocol::Message_IO_response * prepare_response(const Connection_handler *           handler_,
                                                           buffer_t *                           iob_,
                                                           uint64_t                             request_id,
                                                           int                                  status_);
-  
+
   static void respond(Connection_handler *                 handler,
                       buffer_t *                           iob,
                       const protocol::Message_IO_request * msg,
                       int                                  status,
                       const char *                         func);
-  
+
   component::IKVIndex *lookup_index(const pool_t pool_id)
   {
     if (_index_map) {
@@ -282,7 +283,7 @@ class Shard : public Shard_transport, private common::log_source {
       return nullptr;
   }
 
-  void add_index_key(const pool_t pool_id, const std::string &k)
+  void add_index_key(TM_FORMAL const pool_t pool_id, const std::string &k)
   {
     auto index = lookup_index(pool_id);
     if (index) index->insert(k);
@@ -432,7 +433,7 @@ class Shard : public Shard_transport, private common::log_source {
   const std::string                                 _ado_path;
   std::vector<std::string>                          _ado_plugins;
   std::map<std::string, std::string>                _ado_params;
-  Ado_signal                                        _ado_signal_mask = Ado_signal::NONE;  
+  Ado_signal                                        _ado_signal_mask = Ado_signal::NONE;
   Shard_security                                    _security;
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;

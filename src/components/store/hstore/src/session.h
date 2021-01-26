@@ -33,6 +33,7 @@
 #pragma GCC diagnostic pop
 #include <common/logging.h>
 #include <common/time.h>
+#include <common/perf/tm_actual.h>
 #include <limits>
 #include <map>
 #include <memory>
@@ -55,6 +56,9 @@ struct lock_result
 	std::size_t value_len;
 	const char *key_ptr;
 };
+
+TM_SCOPE_DEF(hstore_session_insert)
+TM_SCOPE_DEF(hstore_session_update_by_issue_41)
 
 /* open_pool_handle, alloc_t, table_t */
 template <typename Handle, typename Allocator, typename Table, typename LockType>
@@ -382,12 +386,13 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto *pool() const { return handle().get(); }
 
 		auto insert(
-			AK_ACTUAL
+			TM_ACTUAL AK_ACTUAL
 			const std::string &key,
 			const void * value,
 			const std::size_t value_len
 		)
 		{
+TM_SCOPE_USE(hstore_session_insert)
 			auto cvalue = static_cast<const char *>(value);
 
 #if USE_CC_HEAP == 4
@@ -401,7 +406,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			++_writes;
 			return
 				map().emplace(
-					AK_REF
+					TM_REF AK_REF
 					std::piecewise_construct
 					, std::forward_as_tuple(AK_REF key.begin(), key.end(), this->allocator())
 					, std::forward_as_tuple(
@@ -418,7 +423,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		}
 
 		void update_by_issue_41(
-			AK_ACTUAL
+			TM_ACTUAL AK_ACTUAL
 			const std::string &key,
 			const void * value,
 			const std::size_t value_len,
@@ -426,6 +431,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			const std::size_t old_value_len
 		)
 		{
+TM_SCOPE_USE(hstore_session_update_by_issue_41)
 			definite_lock dl(AK_REF this->map(), key, _heap);
 
 			/* hstore issue 41: "a put should replace any existing k,v pairs that match.
@@ -565,8 +571,10 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					CPLOG(1, PREFIX "allocating object %zu bytes", LOCATION, value_len);
 
 					++_writes;
+TM_INSTANCE
 					auto r =
 						this->map().emplace(
+							TM_REF
 							AK_REF
 							std::piecewise_construct
 							, std::forward_as_tuple(AK_REF fixed_data_location, key.begin(), key.end(), this->allocator())

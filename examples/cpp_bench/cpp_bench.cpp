@@ -20,6 +20,7 @@
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* MiB */
 #include <common/task.h>
+#include <common/perf/tm_actual.h>
 
 #include <api/components.h>
 #include <api/mcas_itf.h>
@@ -87,7 +88,8 @@ class IOPS_task : public common::Tasklet {
       _start_time = std::chrono::high_resolution_clock::now();
     }
 
-    status_t rc = _store->put(_pool,
+TM_INSTANCE
+    status_t rc = _store->put(TM_REF _pool,
                               _data[_iterations].key,
                               _value.data(),
                               Options.value_size);

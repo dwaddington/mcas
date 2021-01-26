@@ -3,6 +3,7 @@
 #include "data.h"
 
 #include <common/str_utils.h>
+#include <common/perf/tm_actual.h>
 
 #include <mutex>
 #include <sstream>
@@ -52,7 +53,8 @@ bool ExperimentUpdate::do_work(unsigned core)
   try
   {
     StopwatchInterval si(timer);
-    auto rc = store()->put(pool(), g_data->key(_i), new_val.c_str(), g_data->value_len());
+TM_INSTANCE
+    auto rc = store()->put(TM_REF pool(), g_data->key(_i), new_val.c_str(), g_data->value_len());
     if ( rc != S_OK )
     {
       std::ostringstream e;

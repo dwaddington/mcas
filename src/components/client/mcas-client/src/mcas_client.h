@@ -134,13 +134,13 @@ class MCAS_client
 
   virtual status_t configure_pool(const component::IKVStore::pool_t pool, const std::string &json) override;
 
-  virtual status_t put(const pool_t       pool,
+  virtual status_t put(TM_FORMAL const pool_t       pool,
                        const std::string &key,
                        const void *       value,
                        const size_t       value_len,
                        const unsigned int flags = IMCAS::FLAGS_NONE) override;
 
-  virtual status_t put_direct(const pool_t                 pool,
+  virtual status_t put_direct(TM_FORMAL const pool_t                 pool,
                               const std::string &          key,
                               const void *                 value,
                               const size_t                 value_len,
