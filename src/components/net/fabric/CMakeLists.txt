@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 project(component-fabric CXX)
 
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
+add_compile_options("$<$<CONFIG:Release>:-DNDEBUG>")
 
 add_subdirectory(./unit_test)
 

@@ -1178,9 +1178,9 @@ void Experiment::_populate_pool_to_capacity(unsigned core, component::IKVStore::
 
   {
     /* cheat: signal the mcas server to start profiling */
-    std::vector<uint64_t> v(1);
-    auto rc = _store->get_attribute(_pool, component::IKVStore::COUNT, v);
-    assert(rc == S_OK );
+    //    std::vector<uint64_t> v(1);
+    //    auto rc = _store->get_attribute(_pool, component::IKVStore::COUNT, v);
+    //    assert(rc == S_OK );
   }
   if (_verbose)
   {
