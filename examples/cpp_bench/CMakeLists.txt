@@ -4,6 +4,7 @@ project(example-cpp-bench CXX)
 
 #add_compile_options(-O0 -g)
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_compile_options(-DNDEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
