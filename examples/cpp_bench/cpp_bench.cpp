@@ -55,12 +55,13 @@ static unsigned long _iops = 0;
 
 class IOPS_base : public common::Tasklet {
 public:
-  virtual void cleanup(unsigned core)
+  
+  virtual void cleanup(unsigned core) override
   {
     PINF("Cleanup %u", core);
     auto secs = std::chrono::duration<double>(_end_time - _start_time).count();
     _iops_lock.lock();
-    auto iops = double(Options.pairs) / secs;
+    auto iops = (double(Options.pairs) * double(Options.repeats)) / secs;
     PINF("%f iops (core=%u)", iops, core);
     _iops += iops;
     _iops_lock.unlock();
@@ -72,7 +73,7 @@ public:
     delete [] _data;
   }
 
-  bool ready() { return _ready_flag; }
+  virtual bool ready() override { return _ready_flag; }
 
 protected:
   std::chrono::high_resolution_clock::time_point _start_time, _end_time;
@@ -137,9 +138,9 @@ class Write_IOPS_task : public IOPS_base
       if(_repeats_remaining == 0) {
         _end_time = std::chrono::high_resolution_clock::now();
         PINF("Worker: %u complete", core);
+        return false;
       }
-      else _iterations = 0;
-      return false;
+      _iterations = 1;
     }
     return true;
   }
@@ -211,9 +212,9 @@ class Read_IOPS_task : public IOPS_base {
       if(_repeats_remaining == 0) {
         _end_time = std::chrono::high_resolution_clock::now();
         PINF("Worker: %u complete", core);
+        return false;
       }
-      else _iterations = 0;
-      return false;
+      _iterations = 1;
     }
     return true;
   }
@@ -297,9 +298,9 @@ class Mixed_IOPS_task : public IOPS_base {
       if(_repeats_remaining == 0) {
         _end_time = std::chrono::high_resolution_clock::now();
         PINF("Worker: %u complete", core);
+        return false;
       }
-      else _iterations = 0;
-      return false;
+      _iterations = 1;
     }
 
     return true;
@@ -320,7 +321,7 @@ int main(int argc, char* argv[])
     desc.add_options()("help", "Show help")
       ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")
       ("patience", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
-      ("server", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
+      ("server", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:POT[:PROVIDER]")
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")
       ("basecore", po::value<unsigned>()->default_value(0), "Starting base worker core")
       ("cores", po::value<unsigned>()->default_value(1), "Core/thread count")
