@@ -37,6 +37,7 @@ struct {
   unsigned    value_size;
   unsigned    pairs;
   unsigned    iterations;
+  unsigned    repeats;
   unsigned    pool_size;
 } Options;
 
@@ -51,7 +52,42 @@ std::string          _value;
 std::mutex           _iops_lock;
 static unsigned long _iops = 0;
 
-class Write_IOPS_task : public common::Tasklet {
+
+class IOPS_base : public common::Tasklet {
+public:
+  
+  virtual void cleanup(unsigned core) override
+  {
+    PINF("Cleanup %u", core);
+    auto secs = std::chrono::duration<double>(_end_time - _start_time).count();
+    _iops_lock.lock();
+    auto iops = (double(Options.pairs) * double(Options.repeats)) / secs;
+    PINF("%f iops (core=%u)", iops, core);
+    _iops += iops;
+    _iops_lock.unlock();
+
+    for (unsigned long i = 0; i < Options.pairs; i++)
+      _store->free_memory(_data[i].data);
+    
+    _store->close_pool(_pool);
+    delete [] _data;
+  }
+
+  virtual bool ready() override { return _ready_flag; }
+
+protected:
+  std::chrono::high_resolution_clock::time_point _start_time, _end_time;
+  bool                                           _ready_flag = false;
+  unsigned long                                  _iterations = 0;
+  component::Itf_ref<component::IKVStore>        _store;
+  record_t *                                     _data;
+  component::IKVStore::pool_t                    _pool;
+  std::vector<void *>                            _get_results;
+  unsigned                                       _repeats_remaining = Options.repeats;
+};
+
+class Write_IOPS_task : public IOPS_base
+{
  public:
 
   Write_IOPS_task(unsigned arg) {}
@@ -98,39 +134,20 @@ class Write_IOPS_task : public common::Tasklet {
 
     _iterations++;
     if (_iterations >= Options.pairs) {
-      _end_time = std::chrono::high_resolution_clock::now();
-      PINF("Worker: %u complete", core);
-      return false;
+      _repeats_remaining --;
+      if(_repeats_remaining == 0) {
+        _end_time = std::chrono::high_resolution_clock::now();
+        PINF("Worker: %u complete", core);
+        return false;
+      }
+      _iterations = 1;
     }
     return true;
   }
-
-  virtual void cleanup(unsigned core) override
-  {
-    PINF("Cleanup %u", core);
-    auto secs = std::chrono::duration<double>(_end_time - _start_time).count();
-    _iops_lock.lock();
-    auto iops = double(Options.pairs) / secs;
-    PINF("%f iops (core=%u)", iops, core);
-    _iops += iops;
-    _iops_lock.unlock();
-    _store->close_pool(_pool);
-    delete [] _data;
-  }
-
-  virtual bool ready() override { return _ready_flag; }
-
- private:
-  std::chrono::high_resolution_clock::time_point _start_time, _end_time;
-  bool                                           _ready_flag = false;
-  unsigned long                                  _iterations = 0;
-  component::Itf_ref<component::IKVStore>        _store;
-  record_t *                                     _data;
-  component::IKVStore::pool_t                    _pool;
 };
 
 
-class Read_IOPS_task : public common::Tasklet {
+class Read_IOPS_task : public IOPS_base {
  public:
 
   Read_IOPS_task(unsigned arg) {
@@ -190,46 +207,22 @@ class Read_IOPS_task : public common::Tasklet {
       throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
 
     _iterations++;
-   
     if (_iterations >= Options.pairs) {
-      _end_time = std::chrono::high_resolution_clock::now();
-      PINF("Worker: %u complete", core);
-      return false;
+      _repeats_remaining --;
+      if(_repeats_remaining == 0) {
+        _end_time = std::chrono::high_resolution_clock::now();
+        PINF("Worker: %u complete", core);
+        return false;
+      }
+      _iterations = 1;
     }
     return true;
   }
 
-  virtual void cleanup(unsigned core) override
-  {
-    PINF("Cleanup %u", core);
-    auto secs = std::chrono::duration<double>(_end_time - _start_time).count();
-    _iops_lock.lock();
-    auto iops = double(Options.pairs) / secs;
-    PINF("%f iops (core=%u)", iops, core);
-    _iops += iops;
-    _iops_lock.unlock();
-
-    for (unsigned long i = 0; i < Options.pairs; i++)
-      _store->free_memory(_data[i].data);
-    
-    _store->close_pool(_pool);
-    delete [] _data;
-  }
-
-  virtual bool ready() override { return _ready_flag; }
-
- private:
-  std::chrono::high_resolution_clock::time_point _start_time, _end_time;
-  bool                                           _ready_flag = false;
-  unsigned long                                  _iterations = 0;
-  component::Itf_ref<component::IKVStore>        _store;
-  record_t *                                     _data;
-  component::IKVStore::pool_t                    _pool;
-  std::vector<void *>                            _get_results;
 };
 
 
-class Mixed_IOPS_task : public common::Tasklet {
+class Mixed_IOPS_task : public IOPS_base {
  public:
 
   Mixed_IOPS_task(unsigned arg) {
@@ -300,42 +293,19 @@ class Mixed_IOPS_task : public common::Tasklet {
     }
 
     _iterations++;
-   
     if (_iterations >= Options.pairs) {
-      _end_time = std::chrono::high_resolution_clock::now();
-      PINF("Worker: %u complete", core);
-      return false;
+      _repeats_remaining --;
+      if(_repeats_remaining == 0) {
+        _end_time = std::chrono::high_resolution_clock::now();
+        PINF("Worker: %u complete", core);
+        return false;
+      }
+      _iterations = 1;
     }
+
     return true;
   }
 
-  virtual void cleanup(unsigned core) override
-  {
-    PINF("Cleanup %u", core);
-    auto secs = std::chrono::duration<double>(_end_time - _start_time).count();
-    _iops_lock.lock();
-    auto iops = double(Options.pairs) / secs;
-    PINF("%f iops (core=%u)", iops, core);
-    _iops += iops;
-    _iops_lock.unlock();
-
-    for (unsigned long i = 0; i < Options.pairs; i++)
-      _store->free_memory(_data[i].data);
-    
-    _store->close_pool(_pool);
-    delete [] _data;
-  }
-
-  virtual bool ready() override { return _ready_flag; }
-
- private:
-  std::chrono::high_resolution_clock::time_point _start_time, _end_time;
-  bool                                           _ready_flag = false;
-  unsigned long                                  _iterations = 0;
-  component::Itf_ref<component::IKVStore>        _store;
-  record_t *                                     _data;
-  component::IKVStore::pool_t                    _pool;
-  std::vector<void *>                            _get_results;
 };
 
 
@@ -361,6 +331,7 @@ int main(int argc, char* argv[])
       ("poolsize", po::value<unsigned>()->default_value(2), "Size of pool in GiB")
       ("log", po::value<std::string>()->default_value("/tmp/cpp-bench-log.txt"), "File to log results")
       ("test", po::value<std::string>()->default_value("read"), "Test 'read','write','rw50'")
+      ("repeats", po::value<unsigned>()->default_value(1), "Number of experiment repeats")
       ;
 
     po::variables_map vm;
@@ -383,6 +354,7 @@ int main(int argc, char* argv[])
     Options.pool_size   = vm["poolsize"].as<unsigned>();
     Options.log         = vm["log"].as<std::string>();
     Options.test        = vm["test"].as<std::string>();
+    Options.repeats     = vm["repeats"].as<unsigned>();
   }
   catch (...) {
     std::cerr << "bad command line option configuration\n";
