@@ -17,6 +17,8 @@
 #include <common/common.h>
 #include <common/moveable_value.h>
 
+#include <sys/types.h> /* mode_t */
+
 namespace common
 {
   struct fd_open_traits
@@ -30,10 +32,12 @@ namespace common
     void close() noexcept;
   public:
     Fd_open();
+
     /*
      * @throw std::logic_error : initialized with a negative value
      */
     explicit Fd_open(int fd);
+    explicit Fd_open(const char *pathname, int flags, mode_t mode = 0);
 
     ~Fd_open();
     Fd_open(Fd_open &&) noexcept = default;

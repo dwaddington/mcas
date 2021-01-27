@@ -567,7 +567,7 @@ int main(int argc, char* argv[])
 
               assert(memory_type != 0xFF);
 
-              common::Fd_open fd(::open(std::string(mm->pool_name(), mm->pool_name_len).c_str(), O_RDWR));
+              common::Fd_open fd(std::string(mm->pool_name(), mm->pool_name_len).c_str(), O_RDWR);
 
               int flags = MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE;
               common::memory_mapped mme(mm->iov,
