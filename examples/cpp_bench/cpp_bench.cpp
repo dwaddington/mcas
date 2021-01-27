@@ -163,7 +163,8 @@ class Read_IOPS_task : public common::Tasklet {
       _data[i].key = common::random_string(Options.key_size);
 
       /* write data in preparation for read */
-      status_t rc = _store->put(_pool,
+TM_INSTANCE
+      status_t rc = _store->put(TM_REF _pool,
                                 _data[i].key,
                                 _value.data(), /* same value */
                                 Options.value_size);      
@@ -262,7 +263,8 @@ class Mixed_IOPS_task : public common::Tasklet {
       _data[i].key = common::random_string(Options.key_size);
 
       /* write data in preparation for read */
-      status_t rc = _store->put(_pool,
+TM_INSTANCE
+      status_t rc = _store->put(TM_REF _pool,
                                 _data[i].key,
                                 _value.data(), /* same value */
                                 Options.value_size);      
@@ -292,7 +294,8 @@ class Mixed_IOPS_task : public common::Tasklet {
         throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
     }
     else {
-      status_t rc = _store->put(_pool,
+TM_INSTANCE
+      status_t rc = _store->put(TM_REF _pool,
                                 _data[_iterations].key,
                                 _value.data(),
                                 Options.value_size);
