@@ -21,7 +21,7 @@ USE_XTERM=1 USE_GDB=1 ./dist/bin/mcas --conf ./dist/conf/cpp-symtab.conf --debug
 Client:
 
 ```
-./dist/bin/personality-cpp-symtab-test --data ./dist/data/words/google-10000-english.txt --server 10.0.0.101
+./dist/bin/personality-cpp-symtab-test --data ./dist/data/words/google-10000-english.txt --server <server-ip-addr>
 ```
 
   
