@@ -10,11 +10,14 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+
+#include <mpi.h>
 
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <mpi.h>
 #include <iostream>
 #include <fstream>
 #include <boost/program_options.hpp>
@@ -163,3 +166,5 @@ int main(int argc, char** argv)
   // Finalize the MPI environment.
   MPI_Finalize();
 }
+
+#pragma GCC diagnostic pop
