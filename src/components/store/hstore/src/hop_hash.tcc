@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <cassert>
 #include <exception>
+#include <sstream> /* ostringstream */
+#include <thread> /* this_thread */
 #include <utility> /* move */
 
 
@@ -1800,6 +1802,8 @@ template <
 	{
 		if ( 0 < _consistency_check)
 		{
+			std::ostringstream o;
+			o << std::setbase(16) << std::this_thread::get_id();
 			auto sb = make_segment_and_bucket(0U);
 			const auto sb_end =
 				make_segment_and_bucket_at_end();
@@ -1821,23 +1825,24 @@ template <
 				{
 					if ( ownership_mask )
 					{
-						PLOG("%s: %zu owner mask is %" PRIx64, __func__, sb.index(), ownership_mask);
+						PLOG("%s[%s]: %zu owner mask is %" PRIx64, __func__, o.str().c_str(), sb.index(), ownership_mask);
 					}
 					if ( ownership_mask & 1ULL )
 					{
-						PLOG("%s: %zu is owned", __func__, sb.index());
+						PLOG("%s[%s]: %zu is owned", __func__, o.str().c_str(), sb.index());
 					}
 					if ( ! is_free(sb) )
 					{
-						PLOG("%s: %zu is occupied", __func__, sb.index());
+						PLOG("%s[%s]: %zu is occupied", __func__, o.str().c_str(), sb.index());
 					}
 				}
 				bool in_use = ! is_free(sb);
 				bool owned = ownership_mask & 1ULL;
 				if ( owned != in_use )
 				{
-					PLOG("%s: bucket %zu (seg %zu (%p) offset %zu) ownership does not match occupancy: %s %s"
+					PLOG("%s[%s]: bucket %zu (seg %zu (%p) offset %zu) ownership does not match occupancy: %s %s"
 						, __func__
+						, o.str().c_str()
 						, sb.index()
 						, sb.si()
 						, sb.sp()
