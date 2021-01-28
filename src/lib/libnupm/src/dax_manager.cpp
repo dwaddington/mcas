@@ -194,17 +194,17 @@ void nupm::dax_manager::data_map_remove(const fs::directory_entry &e, const std:
 	}
 }
 
-void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::string &origin)
+void nupm::dax_manager::map_register(const fs::directory_entry &de, const std::string &origin)
 {
 	if (
 #if _NUPM_FILESYSTEM_STD_
-		e.is_regular_file()
+		de.is_regular_file()
 #else
-		fs::is_regular_file(e.status())
+		fs::is_regular_file(de.status())
 #endif
 	)
 	{
-		auto p = e.path();
+		auto p = de.path();
 		if ( p.extension().string() == ".data" )
 		{
 			CPLOG(1, "%s %s", __func__, p.c_str());
@@ -221,18 +221,25 @@ void nupm::dax_manager::map_register(const fs::directory_entry &e, const std::st
 			/* NOT CHECKED: if mapping size not equal data file size, there is an inconsistency */
 
 			/* insert and map the file */
-			auto itb =
-				_mapped_spaces.insert(
-					mapped_spaces::value_type(
-						id
-						, space_registered(*this, this, common::fd_locked(::open(pd.c_str(), O_RDWR, 0666)), id, r.first)
-					)
-				);
-			if ( ! itb.second )
+			try
 			{
-				throw std::runtime_error("multiple instances of path " + pd.string() + " in configuration");
+				auto itb =
+					_mapped_spaces.insert(
+						mapped_spaces::value_type(
+							id
+							, space_registered(*this, this, common::fd_locked(::open(pd.c_str(), O_RDWR, 0666)), id, r.first)
+						)
+					);
+				if ( ! itb.second )
+				{
+					throw std::runtime_error("multiple instances of path in configuration");
+				}
+				CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
 			}
-			CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
+			catch ( const std::exception &e )
+			{
+				throw std::runtime_error("failed to register " + pd.string() + " :" + e.what());
+			}
 		}
 	}
 }
@@ -308,26 +315,33 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 	 *     Note: areana_fs may eventually have multiple iov's opened space.
 	 */
 	auto id = p.string();
-	auto itb =
-		_mapped_spaces.insert(
-			mapped_spaces::value_type(
-				id
-				, space_registered(*this, this, common::fd_locked(::open(p.c_str(), O_RDWR, 0666)), id, base_)
-			)
-		);
-	if ( ! itb.second )
+	try
 	{
-		throw std::runtime_error("multiple instances of path " + p.string() + " in configuration");
+		auto itb =
+			_mapped_spaces.insert(
+				mapped_spaces::value_type(
+					id
+					, space_registered(*this, this, common::fd_locked(::open(p.c_str(), O_RDWR, 0666)), id, base_)
+				)
+			);
+		if ( ! itb.second )
+		{
+			throw std::runtime_error("multiple instances of path " + p.string() + " in configuration");
+		}
+		CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
+		return
+			std::make_unique<arena_dev>(
+				static_cast<log_source &>(*this)
+				, recover_metadata(
+					itb.first->second._or.range()[0],
+					force_reset
+				)
+			);
 	}
-	CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
-	return
-		std::make_unique<arena_dev>(
-			static_cast<log_source &>(*this)
-			, recover_metadata(
-				itb.first->second._or.range()[0],
-				force_reset
-			)
-		);
+	catch ( const std::exception &e )
+	{
+		throw std::runtime_error("failed to make an arena for " + p.string() + " :" + e.what());
+	}
 }
 
 bool nupm::dax_manager::enter(
@@ -527,13 +541,14 @@ auto dax_manager::recover_metadata(const byte_span iov_,
   DM_region_header *rh = static_cast<DM_region_header *>(::base(iov_));
 
   if ( force_rebuild || ! rh->check_magic() ) {
-    PLOG("%s::%s: rebuilding.", _cname, __func__);
+    PLOG("%s::%s: creating.", _cname, __func__);
     rh = new (::base(iov_)) DM_region_header(::size(iov_));
-    PLOG("%s::%s: rebuilt.", _cname, __func__);
+    PLOG("%s::%s: created.", _cname, __func__);
   }
   else {
-    PLOG("%s::%s: no rebuild.", _cname, __func__);
+    PLOG("%s::%s: recovering.", _cname, __func__);
     rh->check_undo_logs();
+    PLOG("%s::%s: recovered.", _cname, __func__);
   }
 
   return rh;
