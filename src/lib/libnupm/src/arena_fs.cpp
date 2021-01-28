@@ -243,7 +243,7 @@ auto arena_fs::region_create(
 	}
 	catch (const std::exception & e)
 	{
-		PLOG("%s: create %p failed: %s", __func__, id_.begin(), e.what());
+		PLOG("%s: create %p path %s failed: %s", __func__, id_.begin(), path_data(id_).c_str(), e.what());
 		return region_descriptor();
 	}
 }
