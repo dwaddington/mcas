@@ -1,5 +1,5 @@
 /*
-   Copyright [2019-2020] [IBM Corporation]
+   Copyright [2019-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -46,6 +46,6 @@ bool impl::allocation_state_extend::is_in_use(const void *const ptr_)
 		_psegment_count != nullptr && ( _psegment_count->actual().is_stable() && _psegment_count->actual().value()  == _segment_count_updated_value )
 #endif
 		;
-	PLOG(PREFIX "ptr %p, extend in use %s", LOCATION, ptr_, in_use ? "true" : "false");
+	PLOG(PREFIX "ptr %p, extend %s", LOCATION, ptr_, in_use ? "in_use" : "free");
 	return in_use;
 }

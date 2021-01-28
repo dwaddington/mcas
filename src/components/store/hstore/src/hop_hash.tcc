@@ -1,5 +1,5 @@
 /*
-   Copyright [2018-2019] [IBM Corporation]
+   Copyright [2018-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -35,6 +35,11 @@
  * ===== hop_hash_base =====
  */
 
+namespace
+{
+	const char *hstore_consistency_check() { return std::getenv("HSTORE_CONSISTENCY_CHECK"); }
+}
+
 template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
@@ -54,6 +59,7 @@ template <
 		, _locate_key_unowned(0)
 		, _locate_key_match(0)
 		, _locate_key_mismatch(0)
+		, _consistency_check(hstore_consistency_check() ? atoi(hstore_consistency_check()) : 0)
 	{
 		const auto bp_src = this->persist_controller_t::bp_src();
 		const auto bc_dst =
@@ -175,6 +181,7 @@ template <
 			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, "Restored size ", size());
 
 		}
+		check_consistency();
 	}
 
 template <
@@ -192,7 +199,7 @@ template <
 >
 	auto impl::hop_hash_base<
 		Key, T, Hash, Pred, Allocator, SharedMutex
-	>::owned_by_owner_mask(
+	>::owned_by_owner_mask_old(
 		const segment_and_bucket_t &a_
 	) const -> owner::value_type
 	{
@@ -202,9 +209,9 @@ template <
 		 */
 		owner::value_type c = 0U;
 		auto sbw = make_segment_and_bucket_prev(a_, owner::size);
-		for ( auto owner_lk = make_owner_unique_lock(sbw)
+		for ( auto owner_lk = make_owner_shared_lock(sbw)
 			; owner_lk.sb() != a_
-			; sbw.incr_with_wrap(), owner_lk = make_owner_unique_lock(sbw)
+			; sbw.incr_with_wrap(), owner_lk = make_owner_shared_lock(sbw)
 		)
 		{
 			c >>= 1U;
@@ -260,18 +267,6 @@ template <
 	) const -> bool
 	{
 		auto &b_src = a_.deref();
-		return ! b_src.is_adjacent_content_in_use();
-	}
-
-template <
-	typename Key, typename T, typename Hash, typename Pred
-	, typename Allocator, typename SharedMutex
->
-	auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::is_Free(
-		const segment_and_bucket_t &a_
-	) -> bool
-	{
-		const owner &b_src = a_.deref();
 		return ! b_src.is_adjacent_content_in_use();
 	}
 
@@ -580,7 +575,7 @@ template <
 			bix_t owner_ix = std::numeric_limits<bix_t>::max();
 			if ( owner_lk.ref().ownership_bits(owner_lk) || owner_lk.ref().is_adjacent_content_in_use() )
 			{
-				hop_hash_log<true>::write(LOG_LOCATION, i, " ownership mask ", std::hex, ints_to_string(bits_to_ints(owner_lk.ref().ownership_bits(owner_lk), owner_lk.index())), " in_use ", (owner_lk.ref().is_adjacent_content_in_use() ? "true" : "false"));
+				hop_hash_log<true>::write(LOG_LOCATION, i, " ownership mask ", std::hex, ints_to_string(bits_to_ints(owner_lk.ref().ownership_bits(owner_lk), owner_lk.index())), " ", (owner_lk.ref().is_adjacent_content_in_use() ? "in_use" : "free"));
 			}
 			if ( (owner_lk.ref().ownership_bits(owner_lk) >> 62) & 1 )
 			{
@@ -621,6 +616,25 @@ template <
 		}
 	}
 
+template <typename T>
+	struct consistency_guard
+	{
+	private:
+		const T *_hh;
+	public:
+		explicit consistency_guard(const T *hh_)
+			: _hh(hh_)
+		{
+			_hh->check_consistency();
+		}
+		consistency_guard(consistency_guard &) = delete;
+		consistency_guard &operator=(consistency_guard &) = delete;
+		~consistency_guard()
+		{
+			_hh->check_consistency();
+		}
+	};
+
 template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
@@ -632,6 +646,7 @@ template <
 		) -> std::pair<iterator, bool>
 		try
 		{
+			consistency_guard<impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>> g(this);
 			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " BEGIN LIST\n"
 				, dump<HSTORE_TRACE_MANY>::make_hop_hash_dump(*this)
 				, LOG_LOCATION, " END LIST"
@@ -645,11 +660,12 @@ template <
 			auto sbw = make_segment_and_bucket(bucket(v.first));
 			auto owner_lk = make_owner_unique_lock(sbw);
 
-			/* If the key already exists, refuse to emplace */
+			/* If any positions are in use, the key might already exist. */
 			if ( auto cv = owner_lk.ref().ownership_bits(owner_lk) )
 			{
 				auto sbc = sbw;
 				owner::index_type i = 0;
+				/* Scan for the key. If it exists, refuse to emplace */
 				for ( ; cv ; cv >>= 1U, sbc.incr_with_wrap(), ++i )
 				{
 					if ( (cv & 1U) && key_equal()(sbc.deref().key(), v.first) )
@@ -1500,6 +1516,7 @@ template <
 	) -> iterator
 	try
 	{
+		consistency_guard<impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>> g(this);
 		/* The bucket which owns the entry */
 		auto owner_lk = make_owner_unique_lock(it_.sb_owner());
 
@@ -1553,6 +1570,7 @@ template <
 		) -> size_type
 		try
 		{
+			consistency_guard<impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>> g(this);
 			auto it = find(k_);
 			return
 				it == end()
@@ -1669,5 +1687,193 @@ template <
 	auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::size(
 	) const -> size_type
 	{
+		consistency_guard<impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>> g(this);
 		return this->persist_controller_t::size();
+	}
+
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	auto impl::hop_hash_base<
+		Key, T, Hash, Pred, Allocator, SharedMutex
+	>::finish_owner_mask(
+		owner::value_type owner_mask_
+		, segment_and_bucket_t sb_
+	) const -> owner::value_type
+	{
+		owner_mask_ >>= 1U;
+		/*
+		 * The "used" flag of a bucket is held by at most one owner.
+		 * Therefore, no corresponding bits shall be 1 in both owner_mask_
+		 * (the sum of previous owners) and _buckets[owner_lk.index()]._owner
+		 * (the current owner to be included).
+		 */
+
+		auto owner_lk = make_owner_shared_lock(sb_);
+		const auto v = locate_owner(sb_).ownership_bits(owner_lk);
+		/* If the previous partial ownership mask and v have any bits in common,
+		 * then both some previous slot and sb_ claim to own the content
+		 * at the common bit. Two owners is an error.
+		 */
+		const auto disagree_mask = (owner_mask_ & v);
+		if ( disagree_mask != 0 )
+		{
+			hop_hash_log<trace_perishable_expiry>::write(LOG_LOCATION, "ownership disagreement in range ["
+				, bucket_ix(sb_.index()-owner::size), "..", sb_.index()
+				, "]");
+		}
+
+		assert( trace_perishable_expiry || disagree_mask == 0 );
+
+		/* returns:
+		 *  - in the 0 bit, the "used" aspect of _buckets[sb_+1] : 1 if the bucket is marked owned by an owner field, else 0
+		 *  - in the nth bit, the partially-developed "used" aspect of _buckets[sb_+1+n] : 1 if if the bucket is marked owned by an owner field at or preceding bi, else 0
+		 */
+		return owner_mask_ | v;
+	}
+
+/*
+ * returns the partial ownership mask up to but not including bucket a_:
+ *  - in its 0 bit, the partially-deveoped "used" aspect of _buckets[a_] : 1 if the bucket is marked owned by an owner field, else 0
+ *    The "used" aspect is complete except for the ownership information kept in bucket a_ itself.
+ *  - in its nth bit, the partially-developed "used" aspect of _buckets[a_+n] : 1 if if the bucket is marked owned by an owner field at or preceding bi, else 0
+ *    The "used" aspects are complete except for the ownership information kept in buckets a_ .. a_+n inclusive.
+ */
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	auto impl::hop_hash_base<
+		Key, T, Hash, Pred, Allocator, SharedMutex
+	>::owned_by_owner_pre_mask(
+		const segment_and_bucket_t &a_
+	) const -> owner::value_type
+	{
+		/* In order to develop a mask of "used" (non-free) locations,
+		 * examine the members of every owner starting with the leftmost
+		 * bucket which can include bi in its owner.
+		 */
+		owner::value_type c = 0U;
+		for ( auto sbw = make_segment_and_bucket_prev(a_, owner::size-1)
+			; sbw != a_
+			; sbw.incr_with_wrap()
+		)
+		{
+			auto owner_lk = make_owner_shared_lock(sbw);
+			/*
+			 * The "used" flag of a bucket is held by at most one owner.
+			 * Therefore, no corresponding bits shall be 1 in both c
+			 * (the sum of previous owners) and _buckets[owner_lk.index()]._owner
+			 * (the current owner to be included).
+			 */
+
+			c >>= 1U;
+			const auto v = locate_owner(sbw).ownership_bits(owner_lk);
+			const auto disagree_mask = (c & v);
+			if ( disagree_mask != 0 )
+			{
+				hop_hash_log<trace_perishable_expiry>::write(
+					LOG_LOCATION, "ownership disagreement in range ["
+					, bucket_ix(a_.index()-owner::size), "..", sbw.index()
+					, "]"
+				);
+			}
+
+			assert( trace_perishable_expiry || disagree_mask == 0 );
+
+			c |= v;
+		}
+		/* c now contains:
+		 *  - in its 0 bit, the "used" aspect of _buckets[bi_] : 1 if the bucket is marked owned by an owner field, else 0
+		 *  - in its nth bit, the partially-developed "used" aspect of _buckets[bi_+n] : 1 if if the bucket is marked owned by an owner field at or preceding bi, else 0
+		 */
+		return c;
+	}
+
+/* check that ownership bits match content bits. */
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	void impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::check_consistency() const
+	{
+		if ( 0 < _consistency_check)
+		{
+			auto sb = make_segment_and_bucket(0U);
+			const auto sb_end =
+				make_segment_and_bucket_at_end();
+			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION
+				, " bucket_count ", bucket_count()
+				, " sb_end ", sb_end.si(), ",", sb_end.bi()
+			);
+
+			/* Start with the full ownership mask for position 0 and the partially-developed ownership mask for positions n to owner::size */
+			owner::value_type ownership_mask = owned_by_owner_mask(sb);
+
+			for (
+				; sb != sb_end
+				; sb.incr_without_wrap()
+			)
+			{
+				ownership_mask = finish_owner_mask(ownership_mask, sb);
+				if ( 1 < _consistency_check)
+				{
+					if ( ownership_mask & 1ULL )
+					{
+						PLOG("%s: %zu is owned", __func__, sb.index());
+					}
+					if ( ! is_free(sb) )
+					{
+						PLOG("%s: %zu is occupied", __func__, sb.index());
+					}
+				}
+				bool in_use = ! is_free(sb);
+				bool owned = ownership_mask & 1ULL;
+				if ( owned != in_use )
+				{
+					PLOG("%s: bucket %zu (seg %zu (%p) offset %zu) ownership does not match occupancy: %s %s"
+						, __func__
+						, sb.index()
+						, sb.si()
+						, sb.sp()
+						, sb.bi()
+						, (owned ? "owned" : "unowned")
+						, (in_use ? "in_use" : "free")
+					);
+				}
+				/* Panic: ownership mask does not agree with content "in use" status */
+				assert( owned == in_use );
+			}
+		}
+	}
+
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	auto impl::hop_hash_base<
+		Key, T, Hash, Pred, Allocator, SharedMutex
+	>::owned_by_owner_mask_new(
+		const segment_and_bucket_t &a_
+	) const -> owner::value_type
+	{
+		auto c = owned_by_owner_pre_mask(a_);
+		return finish_owner_mask(c, a_);
+	}
+
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	auto impl::hop_hash_base<
+		Key, T, Hash, Pred, Allocator, SharedMutex
+	>::owned_by_owner_mask(
+		const segment_and_bucket_t &a_
+	) const -> owner::value_type
+	{
+		auto c1 = owned_by_owner_mask_old(a_);
+		auto c2 = owned_by_owner_mask_new(a_);
+		assert(c1 == c2);
+		return c2;
 	}
