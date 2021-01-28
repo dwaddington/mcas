@@ -96,6 +96,8 @@ private:
   core_to_device_map_t _core_to_device_map;
 
   static core_to_device_map_t make_core_to_device_map(const std::string &cores, const std::string &devices);
+protected:
+  static boost::optional<std::string> _log_file;
 
 public:
   static Data * g_data;

@@ -44,8 +44,9 @@ component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
     const std::string                  dst_addr = m[1].str();
     char *                             end;
     const auto                         port = std::uint16_t(strtoul(m[2].str().c_str(), &end, 10));
-    const boost::optional<std::string> provider =
-      m[3].matched ? boost::optional<std::string>(m[3].str()) : boost::optional<std::string>();
+    const boost::optional<std::string> provider = m[3].matched ?
+      boost::optional<std::string>(m[3].str()) : boost::optional<std::string>();
+
     component::IMCAS *obj =
       static_cast<component::IMCAS *>(new MCAS_client(debug_level,
                                                       src_device,
@@ -56,11 +57,11 @@ component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
                                                       patience,  // seconds to wait for single fabric completion
                                                       other
                                                       ));
-    obj->add_ref();
+    obj->add_ref();    
     return obj;
   }
   catch (const std::exception &e) {
-    PLOG("failed to build IMCAS (mcas client): %s", e.what());
+    PLOG("libcomponent-mcasclient.so: failed to build IMCAS (mcas client): %s", e.what());
     /* callers expect nullptr to be the sole indication of failure */
     return nullptr;
   }

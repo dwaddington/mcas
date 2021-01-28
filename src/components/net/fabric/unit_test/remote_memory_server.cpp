@@ -19,9 +19,14 @@
 #include "wait_poll.h"
 #include <api/fabric_itf.h> /* IFabric, IFabric_server_factory */
 #include <common/errors.h> /* S_OK */
-#include <gtest/gtest.h>
-#include <sys/uio.h> /* iovec */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
+#include <sys/uio.h> /* iovec */
 #include <exception>
 #include <functional> /* ref */
 #include <iostream> /* cerr */

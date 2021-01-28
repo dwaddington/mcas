@@ -14,6 +14,12 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(GTEST_LIB gtest)
+else()
+  set(GTEST_LIB gtestd)
+endif()
+
 add_definitions(-DCONFIG_DEBUG)
 add_compile_options(-g -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
 #add_compile_options(-Werror)
@@ -30,14 +36,14 @@ add_executable(mcas-mod-server mcas_server.cpp)
 
 
 target_link_libraries(${PROJECT_NAME} boost_program_options
-	profiler boost_system boost_date_time boost_filesystem gtest pthread
+	profiler boost_system boost_date_time boost_filesystem ${GTEST_LIB} pthread
 	common dl numa nupm tbb)
 
 target_link_libraries(mcas-mod-client boost_program_options
-	profiler boost_system boost_date_time boost_filesystem gtest pthread
+	profiler boost_system boost_date_time boost_filesystem ${GTEST_LIB} pthread
 	common dl numa nupm tbb)
 
 target_link_libraries(mcas-mod-server boost_program_options
-	profiler boost_system boost_date_time boost_filesystem gtest pthread
+	profiler boost_system boost_date_time boost_filesystem ${GTEST_LIB} pthread
 	common dl numa nupm tbb)
 

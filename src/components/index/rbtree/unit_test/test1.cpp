@@ -3,7 +3,12 @@
 #include <api/kvindex_itf.h>
 #include <common/str_utils.h>
 #include <common/utils.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <ctime>
 
 #define COUNT 1000000

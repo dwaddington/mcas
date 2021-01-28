@@ -13,7 +13,12 @@
 
 #include "store_map.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <ccpm/value_tracked.h>
 #include <ccpm/container_cc.h>
 #include <common/utils.h>

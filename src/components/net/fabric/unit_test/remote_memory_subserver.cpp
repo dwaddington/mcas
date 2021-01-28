@@ -14,7 +14,12 @@
 
 #include "server_grouped_connection.h"
 #include <common/errors.h> /* S_OK */
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
 
 remote_memory_subserver::remote_memory_subserver(
   server_grouped_connection &parent_

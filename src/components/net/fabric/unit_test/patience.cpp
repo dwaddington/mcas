@@ -12,7 +12,12 @@
 */
 #include "patience.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <api/fabric_itf.h> /* IFabric, IFabric_client, IFabric_client_grouped */
 #include <system_error>
 

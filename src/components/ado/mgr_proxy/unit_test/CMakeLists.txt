@@ -4,22 +4,21 @@ project (ado-prox-test CXX)
 
 add_definitions(-DCONFIG_DEBUG)
 
-include_directories(../../../../lib/common/include)
-include_directories(../../../../lib/GSL/include)
-include_directories(../../../../lib/libadoproto/include)
-include_directories(../../../../components/)
-include_directories(../../../)
+include_directories(${CMAKE_SOURCE_DIR}/src/components)
+
+include_directories(${CMAKE_INSTALL_PREFIX}/include)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
 add_executable(ado-prox-test test.cpp)
 
-
-#find_library(COMANCHE_DIST NAMES comanche-core common 
-#	HINTS ${CMAKE_SOURCE_DIR}/comanche-dist/lib)
-#find_library(COMANCHE_DIST NAMES common 
-#	HINTS ${CMAKE_SOURCE_DIR}/comanche-dist/lib)
-
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(GTEST_LIB gtest)
+else()
+  set(GTEST_LIB gtestd)
+endif()
 
 target_link_libraries(ado-prox-test boost_program_options
-	profiler boost_system boost_date_time boost_filesystem gtest pthread
+	profiler boost_system boost_date_time boost_filesystem ${GTEST_LIB} pthread
 	common dl numa)
 

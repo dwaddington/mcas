@@ -3,7 +3,12 @@
 #include <common/rand.h>
 #include <common/utils.h>
 #include <boost/icl/split_interval_map.hpp>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
+
 #include <chrono>
 #include <list>
 

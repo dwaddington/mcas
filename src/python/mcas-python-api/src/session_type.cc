@@ -52,8 +52,9 @@ static void
 Session_dealloc(Session *self)
 {
   assert(self);
-  assert(_mcas);
-  self->_mcas->release_ref();
+
+  if(self->_mcas)
+    self->_mcas->release_ref();
   
   assert(self);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -102,7 +103,7 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   addr << p_ip << ":" << port;
 
   if(global::debug_level > 0)
-    PLOG("Session: init (addr=%s)", addr.str().c_str());
+    PLOG("Session: init (addr=%s, device=%s)", addr.str().c_str(), device.c_str());
 
   using namespace component;
   
@@ -128,23 +129,36 @@ static int Session_init(Session *self, PyObject *args, PyObject *kwds)
   if(p_env_user_name) user_name = p_env_user_name;
   else user_name = "unknown";
 
-  
-  if(p_ext) {
-    self->_mcas = fact->mcas_create(debug_level, 30,
-                                    user_name,
-                                    addr.str(),
-                                    device,
-                                    p_ext);
-  }
-  else {
-    self->_mcas = fact->mcas_create(debug_level, 30,
-                                    user_name,
-                                    addr.str(),
-                                    device);
-  }
+  if(global::debug_level > 0)
+    PLOG("Session: about to call mcas_create");
 
+  try {
+    if(p_ext) {
+      self->_mcas = fact->mcas_create(debug_level,
+                                      30, /* patience */
+                                      user_name,
+                                      addr.str(),
+                                      device,
+                                      p_ext);
+    }
+    else {
+      self->_mcas = fact->mcas_create(debug_level,
+                                      30, /* patience */
+                                      user_name,
+                                      addr.str(),
+                                      device);
+    }
+  }
+  catch(...) {
+    if(global::debug_level > 0)
+      PLOG("Session: fact->mcas_create failed (addr=%s, device=%s)", addr.str().c_str(), device.c_str());
+  }
+  
   if(self->_mcas == nullptr) {
-    PyErr_SetString(PyExc_RuntimeError, "mcas.Session failed called to mcas_create");
+    if(global::debug_level > 0)
+      PLOG("Session: fact->mcas_create failed (addr=%s, device=%s)", addr.str().c_str(), device.c_str());
+
+    PyErr_SetString(PyExc_RuntimeError, "mcas.Session failed to create session");
     return -1;
   }
 
