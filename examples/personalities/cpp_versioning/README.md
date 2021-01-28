@@ -9,7 +9,7 @@ protocol.
 ## Running Test
 
 MCAS server (edit configuration file as appropriate):
-    ```
+```
 USE_ODP=1 ./dist/bin/mcas --conf ./dist/conf/example-versioning.conf --debug 0
 ```
 
@@ -21,6 +21,6 @@ USE_ODP=1 USE_XTERM=1 USE_GDB=1 ./dist/bin/mcas --conf ./dist/conf/example-versi
 Client:
 
 ```bash
-./dist/bin/personality-example-fb-test --server 10.0.0.101
+./dist/bin/personality-example-fb-test --server <server-ip-addr> 
 ```
 
