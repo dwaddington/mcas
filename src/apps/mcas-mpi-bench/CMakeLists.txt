@@ -10,12 +10,25 @@ find_package(MPI
   COMPONENTS C
   OPTIONAL_COMPONENTS Fortran)
 
+
+
+if ('${MPI_C_COMPILER}' MATCHES 'MPI_C_COMPILER-NOTFOUND')
+  # let's try again - this is not ideal
+  file(GLOB_RECURSE MPI_C_COMPILER /usr/mpi/mpicc)
+  file(GLOB_RECURSE MPI_C_LIBRARIES /usr/mpi/libmpi.so)
+  file(GLOB_RECURSE MPI_H /usr/mpi/mpi.h)
+  if(NOT '${MPI_H}' MATCHES '')
+    get_filename_component(MPI_C_INCLUDE_PATH ${MPI_H} DIRECTORY)
+    set(MPI_C_FOUND TRUE)
+  endif()
+endif()
+
+if (MPI_C_FOUND)
+
 message("-- Found MPI compiler: ${MPI_C_COMPILER}")
 message("-- Found MPI include path: ${MPI_C_INCLUDE_PATH}")
 message("-- Found MPI libraries: ${MPI_C_LIBRARIES}")
 
-if (MPI_C_FOUND)
-  
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
