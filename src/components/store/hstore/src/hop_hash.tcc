@@ -1808,8 +1808,8 @@ template <
 				, " sb_end ", sb_end.si(), ",", sb_end.bi()
 			);
 
-			/* Start with the full ownership mask for position 0 and the partially-developed ownership mask for positions n to owner::size */
-			owner::value_type ownership_mask = owned_by_owner_mask(sb);
+			/* Start with the partially-developed ownership mask prededing position zero */
+			owner::value_type ownership_mask = owned_by_owner_pre_mask(sb);
 
 			for (
 				; sb != sb_end
@@ -1819,6 +1819,10 @@ template <
 				ownership_mask = finish_owner_mask(ownership_mask, sb);
 				if ( 1 < _consistency_check)
 				{
+					if ( ownership_mask )
+					{
+						PLOG("%s: %zu owner mask is %" PRIx64, __func__, sb.index(), ownership_mask);
+					}
 					if ( ownership_mask & 1ULL )
 					{
 						PLOG("%s: %zu is owned", __func__, sb.index());
@@ -1841,9 +1845,9 @@ template <
 						, (owned ? "owned" : "unowned")
 						, (in_use ? "in_use" : "free")
 					);
+					/* Panic: ownership mask does not agree with content "in use" status */
+					abort();
 				}
-				/* Panic: ownership mask does not agree with content "in use" status */
-				assert( owned == in_use );
 			}
 		}
 	}
@@ -1874,6 +1878,7 @@ template <
 	{
 		auto c1 = owned_by_owner_mask_old(a_);
 		auto c2 = owned_by_owner_mask_new(a_);
+		(void)c1;
 		assert(c1 == c2);
 		return c2;
 	}
