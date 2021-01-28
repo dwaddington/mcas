@@ -21,7 +21,7 @@ DAX_RESET=1 USE_ODP=1 ./dist/bin/mcas --conf ./dist/conf/tabulator-ccpm.conf
 Client:
 
 ``` bash
-./dist/bin/tabulator_test.sh 10.0.0.101
+./dist/bin/./dist/bin/tabulator_ccpm_test.sh  <server-ip-addr>
 ```
 
 Output:
@@ -32,4 +32,5 @@ Min-> 1.0
 Max-> 5.0 
 Mean-> 2.0 
 ```
+
 
