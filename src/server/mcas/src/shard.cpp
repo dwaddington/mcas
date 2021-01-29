@@ -498,15 +498,13 @@ TM_SCOPE(shard_main_loop_closes);
         } // TICK_RESPONSE_CLOSE
 
         /* process ALL deferred actions */
-#ifndef NDEBUG
         int get_pending_iter = 0;
-#endif
         while (handler->get_pending_action(action)) {
 TM_SCOPE(shard_main_loop_pending_action);
           idle = 0;
-#ifndef NDEBUG
+          (void)get_pending_iter;
           assert(get_pending_iter++ < 1000);
-#endif
+
           switch (action.op) {
 #if 0
           case Connection_handler::action_type::ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE:

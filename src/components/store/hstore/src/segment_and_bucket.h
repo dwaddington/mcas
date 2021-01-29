@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2020] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -111,6 +111,8 @@ namespace impl
 			}
 			six_t si() const { return _seg->_index; }
 			bix_t bi() const { return _bi; }
+			/* segment pointer, debug only */
+			const void *sp() const { return _seg; }
 			/* inverse of make_segment_and_bucket */
 			bix_t index() const
 			{

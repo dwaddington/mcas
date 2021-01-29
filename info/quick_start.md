@@ -54,17 +54,17 @@ the following helper script to create your configuration file for the MCAS serve
 For RDMA/verbs networking:
 
 ```bash
-cd ~/mcas/build/dist/testing
-python mapstore-0.py <Your-IP-Address> > myConfig.conf
-cd ../../../
+cd ./dist/testing
+python mapstore-0.py  <server-ip-addr> > myConfig.conf # In our example <server-ip-addr>="10.0.0.101"
+cd ../../
 ```
 
 For TCP/IP sockets networking:
 
 ```bash
-cd ~/mcas/build/dist/testing
-python mapstore-0-sockets.py <Your-IP-Address> <Your-Ethernet-Device(e.g. eth0)> > myConfig.conf
-cd ../../../
+cd ./dist/testing
+python mapstore-0-sockets.py <server-ip-addr> <Your-Ethernet-Device(e.g. eth0)> > myConfig.conf
+cd ../../
 ```
 
 
@@ -91,7 +91,7 @@ Again, from the build directory:
 First open a session to the MCAS server.
 
 ```python
-session = mcas.Session(ip='10.0.0.101', port=11911)
+session = mcas.Session(ip='10.0.0.101', port=11911) 
 ```
 
 If you are using TCP/IP sockets, you will need to additionally specify the network device as follows:

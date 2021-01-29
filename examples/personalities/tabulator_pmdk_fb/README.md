@@ -22,7 +22,7 @@ USE_ODP=1 ./dist/bin/mcas --conf ./dist/conf/tabulator.conf
 Client:
 
 ``` bash
-./dist/bin/tabulator_test.sh 10.0.0.101
+./dist/bin/tabulator_test.sh <server-ip-addr>
 ```
 
 

@@ -13,8 +13,10 @@ DESC=$TESTID-$DAXTYPE
 NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
+$CONFIG_STR="$("./dist/testing/hstore-ado0-sock.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" 11911 )"
 # launch MCAS server
-DAX_RESET=1 ./dist/bin/mcas --config "$("./dist/testing/hstore-ado0-sock.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" 11911 )" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
+DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
 # give time to start server
@@ -23,6 +25,7 @@ sleep 3
 CLIENT_LOG="test$TESTID-client.log"
 
 # launch client
+[ 0 -lt $DEBUG ] && echo ./dist/bin/ado-test --provider sockets --src_addr "$NODE_IP" --server $NODE_IP --port 11911 &> $CLIENT_LOG &
 ./dist/bin/ado-test --provider sockets --src_addr "$NODE_IP" --server $NODE_IP --port 11911 &> $CLIENT_LOG &
 CLIENT_PID=$!
 
