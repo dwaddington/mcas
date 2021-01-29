@@ -24,7 +24,7 @@ USE_XTERM=1 USE_GDB=1 ./dist/bin/mcas --conf ./dist/conf/cpp-list.conf --debug 3
 Client:
 
 ```
-./dist/bin/personality-cpp-list-test --server 10.0.0.101
+./dist/bin/personality-cpp-list-test --server <server-ip-address>
 ```
 
   
