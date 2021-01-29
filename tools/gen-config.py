@@ -15,15 +15,16 @@ TEMPLATE="""{
 }
 """
 
+DAX="""
+            \"dax_config\" : [{ \"path\": \"%%PATH%%\", \"addr\": \"%%LOADADDR%%" }],"""
+
 SHARD="""
      	{
             \"core\" : %%CORE%%,
             \"port\" : %%PORT%%,
-            \"net\"  : \"%%NETDEV%%\",
-            \"default_backend\" : \"%%BACKEND%%\", %%ADO%%
-            \"dax_config\" : [{ \"path\": \"%%PATH%%\", \"addr\": \"%%LOADADDR%%" }]
+            \"default_backend\" : \"%%BACKEND%%\", %%DAX%% %%ADO%%
+            \"net\"  : \"%%NETDEV%%\"
         }"""
-
 
 def auto_int(x):
     return int(x, 0)
@@ -34,9 +35,11 @@ def replace(config, var, label):
 
 def increment_dax_path(path):
     result = re.match('/dev/dax(\d+).(\d+)', path)
-    region=result.group(1)
-    device=int(result.group(2))
-    return '/dev/dax' + region + '.' + str(device + 1)
+    if result != None:
+        region=result.group(1)
+        device=int(result.group(2))
+        return '/dev/dax' + region + '.' + str(device + 1)
+    return path
 
 def build_shard_section(shard_count):
     global SHARD
@@ -45,6 +48,7 @@ def build_shard_section(shard_count):
     path = args.path
     core = args.core
     adocores  = args.adocores
+
     result = ""
     ado = ""
     if args.ado != None:
@@ -53,6 +57,10 @@ def build_shard_section(shard_count):
     while shard_count > 0:
         shard_count -= 1
         new_shard = SHARD
+        if args.backend != 'mapstore':
+            new_shard = new_shard.replace("%%DAX%%", DAX)
+        else:
+            new_shard = new_shard.replace("%%DAX%%", "")
         new_shard = new_shard.replace("%%NETDEV%%", str(args.net))
         new_shard = new_shard.replace("%%PORT%%", str(port))
         new_shard = new_shard.replace("%%LOADADDR%%", hex(loadaddr))
@@ -60,6 +68,7 @@ def build_shard_section(shard_count):
         new_shard = new_shard.replace("%%BACKEND%%", args.backend)
         new_shard = new_shard.replace("%%CORE%%", str(core))
         new_shard = new_shard.replace("%%ADO%%", ado)
+
         if args.ado != None:
             if args.adocores != None:
                 new_shard = new_shard.replace("%%ADOCORES%%", args.adocores)
@@ -73,7 +82,7 @@ def build_shard_section(shard_count):
         path = increment_dax_path(path)
         port += 1
         core += 1
-        loadaddr += 0x100000000
+        loadaddr += int(args.baseincrement,16) 
 
     return result
     
@@ -87,6 +96,7 @@ parser.add_argument('--core', type=int, default=0, help='starting core (default=
 parser.add_argument('--ado', help='optional ado plugin name (e.g., libcomponent-adoplugin-testing.so)')
 parser.add_argument('--adocores', help='optional ADO cores (e.g. 12-23)')
 parser.add_argument('--backend', default='hstore', help='backend storage engine (e.g., hstore, mapstore)')
+parser.add_argument('--baseincrement', default='0x1900000000', help='shard increment (in hex) for virtual address mapping (default 100GB)')
 
 args = parser.parse_args()
 

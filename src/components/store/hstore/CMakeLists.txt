@@ -5,6 +5,7 @@ project(component-hstore CXX)
 include(${CMAKE_SOURCE_DIR}/mk/avoid_boost_type_to_string_bug.cmake)
 
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
+add_compile_options("$<$<CONFIG:Release>:-DNDEBUG>")
 
 add_subdirectory(./unit_test)
 

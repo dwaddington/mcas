@@ -66,9 +66,16 @@ class Fabric_connection_base : protected common::log_source {
   using buffer_t = Buffer_manager<component::IFabric_server>::buffer_internal;
   using pool_t   = component::IKVStore::pool_t;
 
+  enum class action_type {
+        ACTION_NONE = 0, /* unused */
+        ACTION_RELEASE_VALUE_LOCK_SHARED,
+        ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE, /* unused */
+        ACTION_POOL_DELETE, /* unused */
+  };
+
   /* deferred actions */
   struct action_t {
-    int   op;
+    action_type op;
     void *parm;
   };
 
@@ -87,7 +94,7 @@ class Fabric_connection_base : protected common::log_source {
   /* Filled by base class     check_for_posted_value_complete
    * Drained by derived class check_network_completions
    */
-  std::queue<void *> _deferred_unlock;
+  std::queue<action_t> _deferred_unlock;
 
   /* xx_buffer_outstanding is the signal for completion,
      xx_buffer is the buffer pointer that needs to be freed (and set to null)
@@ -206,7 +213,7 @@ class Fabric_connection_base : protected common::log_source {
       transport()->post_send(iov, iov + 1, buffer->desc, buffer);
       ++_send_buffer_posted_count;
       posted_count_log();
-      CPLOG(0, "%s buffer (%p)", __func__, common::p_fmt(buffer));
+      CPLOG(2, "%s buffer (%p)", __func__, common::p_fmt(buffer));
     }
   }
 
@@ -217,7 +224,7 @@ class Fabric_connection_base : protected common::log_source {
 
     ++_send_buffer_posted_count;
     posted_count_log();
-    CPLOG(0, "Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", common::p_fmt(buffer),
+    CPLOG(2, "Posted send (%p) ... value (%.*s) (len=%lu,ptr=%p)", common::p_fmt(buffer),
          int(val_iov.iov_len), static_cast<char *>(val_iov.iov_base), val_iov.iov_len, val_iov.iov_base);
 
     transport()->post_send(buffer->iov, buffer->iov + 2, buffer->desc, buffer);
