@@ -20,7 +20,6 @@
 #include <common/cycles.h>
 #include <common/delete_copy.h>
 #include <common/utils.h>
-#include <common/perf/tm_actual.h>
 #include <unistd.h>
 
 #include <cstdlib>
@@ -1179,17 +1178,17 @@ status_t Connection_handler::configure_pool(const IMCAS::pool_t pool, const std:
  * Memcpy version; both key and value are copied
  *
  */
-status_t Connection_handler::put(TM_ACTUAL const pool_t       pool,
+status_t Connection_handler::put(const pool_t       pool,
                                  const std::string  key,
                                  const void *       value,
                                  const size_t       value_len,
                                  const unsigned int flags)
 {
   if (value == nullptr || value_len == 0) return E_INVAL;
-  return put(TM_REF pool, key.c_str(), key.length(), value, value_len, flags);
+  return put(pool, key.c_str(), key.length(), value, value_len, flags);
 }
 
-status_t Connection_handler::put(TM_ACTUAL const pool_t       pool,
+status_t Connection_handler::put(const pool_t       pool,
                                  const void *       key,
                                  const size_t       key_len,
                                  const void *       value,
@@ -1421,9 +1420,7 @@ Connection_handler::get_locate_async(const pool_t                        pool,
                                                                                                   make_iob_ptr_recv(), pool, auth_id(), value, transfer_len, this, desc_, addr, memory_key));
 }
 
-TM_SCOPE_DEF(connection_handler_put_direct)
-
-status_t Connection_handler::put_direct(TM_ACTUAL const pool_t                              pool_,
+status_t Connection_handler::put_direct(const pool_t                              pool_,
                                         const void *const                         key_,
                                         const size_t                              key_len_,
                                         const void *const                         value_,
@@ -1432,7 +1429,6 @@ status_t Connection_handler::put_direct(TM_ACTUAL const pool_t                  
                                         const IMCAS::memory_handle_t              mem_handle_,
                                         const unsigned int                        flags_)
 {
-TM_SCOPE_USE(connection_handler_put_direct)
   component::IMCAS::async_handle_t async_handle = component::IMCAS::ASYNC_HANDLE_INIT;
 
   auto status = async_put_direct(pool_, key_, key_len_, value_, value_len_, async_handle, rmd_, mem_handle_, flags_);

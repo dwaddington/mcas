@@ -20,7 +20,6 @@
 
 #include <common/utils.h>
 #include <common/str_utils.h>
-#include <common/perf/tm_actual.h>
 #include <api/components.h>
 #include <api/kvstore_itf.h>
 
@@ -90,9 +89,8 @@ TEST_F(KVStore_test, BasicPut)
   //  value.resize(value.length()+1); /* append /0 */
   value.resize(KB(8));
 
-TM_INSTANCE
-  _kvstore->put(TM_REF pool, key, value.c_str(), value.length());
-  _kvstore->put(TM_REF pool, key2, value.c_str(), value.length());
+  _kvstore->put(pool, key, value.c_str(), value.length());
+  _kvstore->put(pool, key2, value.c_str(), value.length());
 }
 
 TEST_F(KVStore_test, BasicGet)
@@ -211,8 +209,7 @@ TEST_F(KVStore_test, Timestamps)
       auto value = common::random_string(16);
       auto key = common::random_string(8);
       PLOG("adding key-value pair (%s)", key.c_str());
-TM_INSTANCE
-      _kvstore->put(TM_REF pool, key, value.c_str(), value.size());
+      _kvstore->put(pool, key, value.c_str(), value.size());
       sleep(2);
     }
 
@@ -269,8 +266,7 @@ TEST_F(KVStore_test, Iterator)
     if(i==5) { sleep(2); now = common::epoch_now(); }
 
     PLOG("(%u) adding key-value pair key(%s) value(%s)", i, key.c_str(),value.c_str());
-TM_INSTANCE
-    _kvstore->put(TM_REF pool, key, value.c_str(), value.size());
+    _kvstore->put(pool, key, value.c_str(), value.size());
   }
 
   _kvstore->map(pool,
@@ -329,8 +325,7 @@ TM_INSTANCE
       auto value = common::random_string(16);
       auto key = common::random_string(8);
       PLOG("adding key-value pair key(%s) value(%s)", key.c_str(),value.c_str());
-TM_INSTANCE
-      _kvstore->put(TM_REF pool, key, value.c_str(), value.size());
+      _kvstore->put(pool, key, value.c_str(), value.size());
     }
   }
   ASSERT_TRUE(rc == E_ITERATOR_DISTURBED);
@@ -351,9 +346,8 @@ TEST_F(KVStore_test, KeySwap)
   std::string left_value = "This is left";
   std::string right_value = "This is right";
 
-TM_INSTANCE
-  ASSERT_OK(_kvstore->put(TM_REF pool, left_key, left_value.c_str(), left_value.length()));
-  ASSERT_OK(_kvstore->put(TM_REF pool, right_key, right_value.c_str(), right_value.length()));
+  ASSERT_OK(_kvstore->put(pool, left_key, left_value.c_str(), left_value.length()));
+  ASSERT_OK(_kvstore->put(pool, right_key, right_value.c_str(), right_value.length()));
 
   ASSERT_OK(_kvstore->swap_keys(pool, left_key, right_key));
 

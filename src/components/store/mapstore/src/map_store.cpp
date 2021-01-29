@@ -16,7 +16,6 @@
 #include <common/rwlock.h>
 #include <common/cycles.h>
 #include <common/utils.h>
-#include <common/perf/tm_actual.h>
 #include <fcntl.h>
 #include <nupm/allocator_ra.h>
 #include <nupm/rc_alloc_lb.h>
@@ -1074,11 +1073,9 @@ status_t Map_store::delete_pool(const std::string &poolname) {
   return S_OK;
 }
 
-TM_SCOPE_DEF(map_store_put)
-status_t Map_store::put(TM_ACTUAL IKVStore::pool_t pid, const std::string &key,
+status_t Map_store::put(IKVStore::pool_t pid, const std::string &key,
                         const void *value, size_t value_len,
                         unsigned int flags) {
-TM_SCOPE_USE(map_store_put)
   auto session = get_session(pid);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
 
@@ -1102,12 +1099,11 @@ status_t Map_store::get_direct(const pool_t pid, const std::string &key,
   return session->pool->get_direct(key, out_value, out_value_len);
 }
 
-TM_SCOPE_DEF(map_store_put_direct)
-status_t Map_store::put_direct(TM_ACTUAL const pool_t pid, const std::string &key,
+status_t Map_store::put_direct(const pool_t pid, const std::string &key,
                                const void *value, const size_t value_len,
                                memory_handle_t /*memory_handle*/,
                                unsigned int flags) {
-  return Map_store::put(TM_REF pid, key, value, value_len, flags);
+  return Map_store::put(pid, key, value, value_len, flags);
 }
 
 status_t Map_store::resize_value(const pool_t pool,

@@ -9,7 +9,6 @@
 #include <common/logging.h>
 #include <common/dump_utils.h>
 #include <common/utils.h>
-#include <common/perf/tm_actual.h>
 #include <Python.h>
 #include <structmember.h>
 #include <numpy/arrayobject.h>
@@ -190,8 +189,7 @@ static PyObject * pool_put(Pool* self, PyObject *args, PyObject *kwds)
   }
 
   unsigned int flags = 0;
-TM_INSTANCE
-  auto hr = self->_mcas->put(TM_REF self->_pool,
+  auto hr = self->_mcas->put(self->_pool,
                              key,
                              p,
                              p_len,
@@ -260,8 +258,7 @@ static PyObject * pool_put_direct(Pool* self, PyObject *args, PyObject *kwds)
     return NULL;
   }
 
-TM_INSTANCE
-  hr = self->_mcas->put_direct(TM_REF self->_pool,
+  hr = self->_mcas->put_direct(self->_pool,
                                key,
                                p,
                                p_len,

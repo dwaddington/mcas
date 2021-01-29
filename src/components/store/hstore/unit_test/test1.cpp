@@ -25,7 +25,6 @@
 #include <common/byte_span.h>
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* MiB, GiB */
-#include <common/perf/tm_actual.h>
 #include <nupm/region_descriptor.h>
 
 #include <algorithm>
@@ -301,8 +300,7 @@ TEST_F(KVStore_test, BasicPut)
   ASSERT_NE(nullptr, _kvstore);
   single_value.resize(single_value_size);
 
-TM_INSTANCE
-  auto r = _kvstore->put(TM_REF pool, single_key, single_value.data(), single_value.length());
+  auto r = _kvstore->put(pool, single_key, single_value.data(), single_value.length());
   EXPECT_EQ(S_OK, r);
 }
 
@@ -336,8 +334,7 @@ TEST_F(KVStore_test, BasicPutLocked)
       auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, value0, value0_len, lk);
       EXPECT_EQ(S_OK, r);
       EXPECT_NE(nullptr, lk);
-TM_INSTANCE
-      r = _kvstore->put(TM_REF pool, single_key, single_value.data(), single_value.length());
+      r = _kvstore->put(pool, single_key, single_value.data(), single_value.length());
       EXPECT_EQ(E_LOCKED, r);
     }
     {
@@ -504,8 +501,7 @@ TEST_F(KVStore_test, BasicReplaceSameSize)
   ASSERT_NE(nullptr, _kvstore);
   {
     single_value_updated_same_size.resize(single_value_size);
-TM_INSTANCE
-    auto r = _kvstore->put(TM_REF pool, single_key, single_value_updated_same_size.data(), single_value_updated_same_size.length());
+    auto r = _kvstore->put(pool, single_key, single_value_updated_same_size.data(), single_value_updated_same_size.length());
     EXPECT_EQ(S_OK, r);
   }
   void * value = nullptr;
@@ -524,8 +520,7 @@ TEST_F(KVStore_test, BasicReplaceDifferentSize)
 {
   ASSERT_NE(nullptr, _kvstore);
   {
-TM_INSTANCE
-    auto r = _kvstore->put(TM_REF pool, single_key, single_value_updated_different_size.data(), single_value_updated_different_size.length());
+    auto r = _kvstore->put(pool, single_key, single_value_updated_different_size.data(), single_value_updated_different_size.length());
     EXPECT_EQ(S_OK, r);
   }
   void * value = nullptr;
@@ -577,8 +572,7 @@ TEST_F(KVStore_test, PutMany)
     }
     else
     {
-TM_INSTANCE
-      auto r = _kvstore->put(TM_REF pool, key, value.data(), value.length());
+      auto r = _kvstore->put(pool, key, value.data(), value.length());
       EXPECT_EQ(S_OK, r);
       if ( r == S_OK )
       {
@@ -1272,8 +1266,7 @@ TEST_F(KVStore_test, Timestamps)
 		{
 			auto value = common::random_string(16);
 			PLOG("adding key-value pair (%s)", keys[i].c_str());
-TM_INSTANCE
-			_kvstore->put(TM_REF pool, keys[i], value.c_str(), value.size());
+			_kvstore->put(pool, keys[i], value.c_str(), value.size());
 			sleep(delay);
 		}
 
@@ -1445,8 +1438,7 @@ TEST_F(KVStore_test, Iterator)
     if(i==5) { sleep(2); now = common::epoch_now(); }
 
     PLOG("(%u) adding key-value pair key(%s) value(%s)", i, key.c_str(),value.c_str());
-TM_INSTANCE
-    _kvstore->put(TM_REF pool, key, value.c_str(), value.size());
+    _kvstore->put(pool, key, value.c_str(), value.size());
   }
 
   _kvstore->map(
@@ -1510,8 +1502,7 @@ TM_INSTANCE
       auto value = common::random_string(16);
       auto key = common::random_string(8);
       PLOG("adding key-value pair key(%s) value(%s)", key.c_str(),value.c_str());
-TM_INSTANCE
-      _kvstore->put(TM_REF pool, key, value.c_str(), value.size());
+      _kvstore->put(pool, key, value.c_str(), value.size());
     }
   }
   ASSERT_TRUE(rc == E_ITERATOR_DISTURBED);
@@ -1533,9 +1524,8 @@ TEST_F(KVStore_test, KeySwap)
   std::string left_value = "This is left";
   std::string right_value = "This is right";
 
-TM_INSTANCE
-  ASSERT_OK(_kvstore->put(TM_REF pool, left_key, left_value.c_str(), left_value.length()));
-  ASSERT_OK(_kvstore->put(TM_REF pool, right_key, right_value.c_str(), right_value.length()));
+  ASSERT_OK(_kvstore->put(pool, left_key, left_value.c_str(), left_value.length()));
+  ASSERT_OK(_kvstore->put(pool, right_key, right_value.c_str(), right_value.length()));
 
   ASSERT_OK(_kvstore->swap_keys(pool, left_key, right_key));
 

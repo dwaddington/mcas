@@ -22,7 +22,6 @@
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
-#include <common/perf/tm_actual.h>
 
 #include <random>
 #include <sstream>
@@ -263,8 +262,7 @@ TEST_F(KVStore_test, PutMany)
         }
         else
         {
-          TM_INSTANCE
-          auto r = _kvstore->put(TM_REF p.pool(), key, value.c_str(), value.length());
+          auto r = _kvstore->put(p.pool(), key, value.c_str(), value.length());
           EXPECT_EQ(S_OK, r);
           if ( r == S_OK )
           {
@@ -369,8 +367,7 @@ TEST_F(KVStore_test, UpdateMany)
         const auto &value = std::get<1>(kv);
         const auto update_value = value + ((key[0] & 1) ? "X" : "") + ((key[0] & 2) ? long_value : "");
         {
-          TM_INSTANCE
-          auto r = _kvstore->put(TM_REF p.pool(), key, update_value.c_str(), update_value.length());
+          auto r = _kvstore->put(p.pool(), key, update_value.c_str(), update_value.length());
           EXPECT_EQ(S_OK, r);
           if ( r == S_OK )
           {

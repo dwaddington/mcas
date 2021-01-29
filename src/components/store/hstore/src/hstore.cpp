@@ -29,7 +29,6 @@
 #include <common/errors.h>
 #include <common/exceptions.h>
 #include <common/utils.h>
-#include <common/perf/tm_actual.h>
 
 #include <city.h>
 
@@ -297,15 +296,12 @@ auto hstore::grow_pool( //
   return S_OK;
 }
 
-TM_SCOPE_DEF(hstore_put)
-
-auto hstore::put(TM_ACTUAL const pool_t pool,
+auto hstore::put(const pool_t pool,
                  const std::string &key,
                  const void * value,
                  const std::size_t value_len,
                  flags_t flags) -> status_t
 {
-TM_SCOPE_USE(hstore_put)
   CPLOG(
     1
     , PREFIX "(key=%s) (value=%.*s)"
@@ -336,14 +332,14 @@ TM_SCOPE_USE(hstore_put)
   {
     try
     {
-      auto i = session->insert(TM_REF AK_INSTANCE key, value, value_len);
+      auto i = session->insert(AK_INSTANCE key, value, value_len);
 
       return
         i.second                   ? S_OK
         : flags & FLAGS_DONT_STOMP ? int(component::IKVStore::E_KEY_EXISTS)
         : (
             session->update_by_issue_41(
-              TM_REF AK_INSTANCE
+              AK_INSTANCE
               key
               , value
               , value_len
@@ -386,14 +382,14 @@ auto hstore::get_pool_regions(const pool_t pool, nupm::region_descriptor & out_r
   return S_OK;
 }
 
-auto hstore::put_direct(TM_ACTUAL const pool_t pool,
+auto hstore::put_direct(const pool_t pool,
                         const std::string& key,
                         const void * value,
                         const std::size_t value_len,
                         memory_handle_t,
                         flags_t flags) -> status_t
 {
-  return put(TM_REF pool, key, value, value_len, flags);
+  return put(pool, key, value, value_len, flags);
 }
 
 auto hstore::get(const pool_t pool,

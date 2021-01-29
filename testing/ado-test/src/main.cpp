@@ -3,7 +3,6 @@
 #include <common/cycles.h>
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* KiB, MiB, GiB */
-#include <common/perf/tm_actual.h>
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <boost/program_options.hpp>
@@ -218,9 +217,8 @@ TEST_F(ADO_test, FindKeyCallback)
 
   ASSERT_OK(mcas->configure_pool(pool, "AddIndex::VolatileTree"));
 
-TM_INSTANCE
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey", "Special-Value"));
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey2", "Special-Value2"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey", "Special-Value"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey2", "Special-Value2"));
 
   status_t                                    rc;
   std::vector<IMCAS::ADO_response> response;
@@ -244,9 +242,8 @@ TEST_F(ADO_test, BasicAllocatePoolMemory)
   ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
 
   ASSERT_OK(mcas->configure_pool(pool, "AddIndex::VolatileTree"));
-TM_INSTANCE
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey", "Special-Value"));
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey2", "Special-Value2"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey", "Special-Value"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey2", "Special-Value2"));
 
   status_t                                    rc;
   std::vector<IMCAS::ADO_response> response;
@@ -336,8 +333,7 @@ TEST_F(ADO_test, PersistedDetachedMemory)
 
   for ( std::size_t j = 0 ; rc == S_OK; ++j )
   {
-TM_INSTANCE
-    rc = mcas->put(TM_REF pool, key_saturate + std::to_string(j), std::string(4096, 'x'));
+    rc = mcas->put(pool, key_saturate + std::to_string(j), std::string(4096, 'x'));
   }
   /* expect to use up all pool space */
   ASSERT_EQ(IKVStore::E_TOO_LARGE, rc);
@@ -364,10 +360,9 @@ TEST_F(ADO_test, GetReferenceVector)
   status_t                                    rc;
   std::vector<IMCAS::ADO_response> response;
 
-TM_INSTANCE
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey", "Special-Value"));
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey2", "Special-Value2"));
-  ASSERT_OK(mcas->put(TM_REF pool, "mySpecialKey3", "Special-Value3"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey", "Special-Value"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey2", "Special-Value2"));
+  ASSERT_OK(mcas->put(pool, "mySpecialKey3", "Special-Value3"));
 
   rc = mcas->invoke_ado(pool, testname, "RUN!TEST-GetReferenceVector", 0, response, KiB(4));
 
@@ -391,15 +386,13 @@ TEST_F(ADO_test, GetReferenceVectorByTime)
   std::vector<IMCAS::ADO_response> response;
 
   for (unsigned i = 0; i < 10; i++) {
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, common::random_string(8), common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
   sleep(2);
 
   for (unsigned i = 0; i < 10; i++) {
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, common::random_string(8), common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
   sleep(2);
@@ -425,13 +418,11 @@ TEST_F(ADO_test, Iterator)
   std::vector<IMCAS::ADO_response> response;
 
   for (unsigned i = 0; i < 10; i++) {
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, common::random_string(8), common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
   sleep(3);
   for (unsigned i = 0; i < 10; i++) {
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, common::random_string(8), common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
   ASSERT_OK(mcas->invoke_ado(pool, testname, /* dummy key to trigger test */
@@ -465,8 +456,7 @@ TEST_F(ADO_test, IteratorTS)
   sleep(3);
 
   for (unsigned i = 0; i < 10; i++) {
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, common::random_string(8), common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
   wmb();
@@ -487,8 +477,7 @@ TM_INSTANCE
   common::epoch_time_t ts2 = common::epoch_now();
   wmb();
   for (unsigned i = 0; i < 10; i++) { /* put another 10 */
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, common::random_string(8), common::random_string(16)));
+    ASSERT_OK(mcas->put(pool, common::random_string(8), common::random_string(16)));
   }
 
 
@@ -518,8 +507,7 @@ TEST_F(ADO_test, Erase)
 
   std::vector<IMCAS::ADO_response> response;
 
-TM_INSTANCE
-  ASSERT_OK(mcas->put(TM_REF pool, testname, common::random_string(16)));
+  ASSERT_OK(mcas->put(pool, testname, common::random_string(16)));
 
   mcas->invoke_ado(pool, testname, /* dummy key to trigger test - this will create another pair */
                    "RUN!TEST-Erase", 0, response, KiB(1));
@@ -663,8 +651,7 @@ TEST_F(ADO_test, PutSignal)
     auto key = common::random_string(8);
     auto val = common::random_string(64);
     keys.push_back(key);
-TM_INSTANCE
-    ASSERT_OK(mcas->put(TM_REF pool, key, val));
+    ASSERT_OK(mcas->put(pool, key, val));
 
     std::string val2;
     ASSERT_OK(mcas->get(pool, key, val2));
@@ -680,9 +667,8 @@ TM_INSTANCE
   
   /* put direct */
   {
-TM_INSTANCE
-    ASSERT_OK(mcas->put_direct(TM_REF pool, "BiGKey", buffer, len, mr));
-    ASSERT_OK(mcas->put_direct(TM_REF pool, "BiGKey-Copy", buffer, len, mr));
+    ASSERT_OK(mcas->put_direct(pool, "BiGKey", buffer, len, mr));
+    ASSERT_OK(mcas->put_direct(pool, "BiGKey-Copy", buffer, len, mr));
   }
 
   /* get direct */

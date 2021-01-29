@@ -19,10 +19,6 @@
 #include <common/profiler.h>
 #include <common/utils.h>
 #include <common/str_utils.h>
-// #include <common/perf/duration_stat.h>
-// #include <common/perf/timer_to_exit.h>
-// #include <common/perf/timer_split.h>
-// #include <common/perf/writer_at_exit.h>
 #include <common/perf/tm_actual.h>
 #include <sys/types.h>
 #include <signal.h>
@@ -335,22 +331,6 @@ void Shard::service_cluster_signals()
   }
 }
 
-TM_SCOPE_DEF(shard_main_loop)
-TM_SCOPE_DEF(io_response_get_locate)
-TM_SCOPE_DEF(io_response_get_release)
-TM_SCOPE_DEF(io_response_put_advance)
-TM_SCOPE_DEF(io_response_put_locate)
-TM_SCOPE_DEF(io_response_put_release)
-TM_SCOPE_DEF(io_response_put)
-TM_SCOPE_DEF(io_response_get)
-TM_SCOPE_DEF(io_response_erase)
-TM_SCOPE_DEF(io_response_configure)
-TM_SCOPE_DEF(io_response_release)
-TM_SCOPE_DEF(io_response_release_with_flush)
-TM_SCOPE_DEF(io_response_locate)
-TM_SCOPE_DEF(process_message_IO_request)
-TM_SCOPE_DEF(process_message_pool_request)
-TM_SCOPE_DEF(process_info_request)
 
 //#define DEBUG_LIVENESS // use this to show how live the shard loop threads are
 #define LIVENESS_DURATION 10000
@@ -358,7 +338,7 @@ TM_SCOPE_DEF(process_info_request)
 
 void Shard::main_loop(TM_ACTUAL common::profiler &pr_)
 {
-TM_SCOPE_USE(shard_main_loop);
+TM_SCOPE(shard_main_loop_fn);
   using namespace mcas::protocol;
 
   std::ostringstream ss;
@@ -382,7 +362,7 @@ TM_SCOPE_USE(shard_main_loop);
   uint64_t tick alignas(8) = 0;
 
   for (; _thread_exit == false; ++idle, ++tick) {
-
+TM_SCOPE(shard_main_loop);
 #ifdef DEBUG_LIVENESS
     assert(_core < LIVENESS_SHARDS);
     /* show report of liveness */
@@ -404,10 +384,12 @@ TM_SCOPE_USE(shard_main_loop);
 
     /* graceful exit on sigint */
     if(signals::sigint > 0) {
+TM_SCOPE(shard_main_loop_sigint);
       PLOG("Shard: received SIGINT");
       _thread_exit = true;
     }
     else if (_handlers.empty()) { /* if there are no sessions, sleep thread */
+TM_SCOPE(shard_main_loop_sleep);
       usleep(SESSIONS_EMPTY_USLEEP);
       try {
         check_for_new_connections();
@@ -422,6 +404,7 @@ TM_SCOPE_USE(shard_main_loop);
 
     /* check for new connections or sleep on none */
     if (tick % CHECK_CONNECTION_INTERVAL == 0) {
+TM_SCOPE(shard_main_loop_connections);
       try {
         check_for_new_connections();
       }
@@ -432,12 +415,17 @@ TM_SCOPE_USE(shard_main_loop);
     }
 
     /* periodic cluster signal handling */
-    if (tick % CHECK_CLUSTER_SIGNAL_INTERVAL == 0) {
-      service_cluster_signals();
+    {
+TM_SCOPE(shard_main_loop_cluster);
+      if (tick % CHECK_CLUSTER_SIGNAL_INTERVAL == 0) {
+TM_SCOPE(shard_main_loop_cluster_check);
+        service_cluster_signals();
+      }
     }
 
     /* output memory usage for debug level > 0 */
     if (debug_level() > 0) {
+TM_SCOPE(shard_main_loop_debug);
       if (tick % OUTPUT_DEBUG_INTERVAL == 0)
         PLOG("Shard_ado: port(%u) '#memory' %s", _port, common::get_DRAM_usage().c_str());
     }
@@ -451,6 +439,7 @@ TM_SCOPE_USE(shard_main_loop);
 
       /* iterate connection handlers (each connection is a client session) */
       for (const auto handler : _handlers) {
+TM_SCOPE(shard_main_loop_handlers);
 
         /* issue tick, unless we are stalling */
         auto tick_response = handler->tick();
@@ -466,6 +455,7 @@ TM_SCOPE_USE(shard_main_loop);
          * not). Also close sessions in response to SIGINT */
         else if ((tick_response == mcas::Connection_handler::TICK_RESPONSE_CLOSE) ||
                  (signals::sigint > 0)) {
+TM_SCOPE(shard_main_loop_closes);
           idle = 0;
 
           /* close all open pools belonging to session  */
@@ -512,6 +502,7 @@ TM_SCOPE_USE(shard_main_loop);
         int get_pending_iter = 0;
 #endif
         while (handler->get_pending_action(action)) {
+TM_SCOPE(shard_main_loop_pending_action);
           idle = 0;
 #ifndef NDEBUG
           assert(get_pending_iter++ < 1000);
@@ -539,12 +530,14 @@ TM_SCOPE_USE(shard_main_loop);
          * handling.
          */
         try {
+TM_SCOPE(shard_main_loop_message_peek);
 
           /* collect ONE available messages ; don't collect them ALL, they just keep coming! */
           if (const protocol::Message *p_msg = handler->peek_pending_msg()) {
 
             idle = 0;
             assert(p_msg);
+/* "split" accepts responsibility for the *preceding* code. Not exactly intuitive. */
             switch (p_msg->type_id()) {
             case MSG_TYPE::IO_REQUEST:
               process_message_IO_request(TM_REF handler, static_cast<const protocol::Message_IO_request *>(p_msg));
@@ -578,6 +571,7 @@ TM_SCOPE_USE(shard_main_loop);
 
       /* handle messages send back from ADO */
       try {
+TM_SCOPE(shard_main_loop_epilogue_ado);
         process_messages_from_ado(TM_REF0);
       }
       catch (const resource_unavailable &e) {
@@ -588,38 +582,47 @@ TM_SCOPE_USE(shard_main_loop);
         throw;
       }
 
-      /* handle tasks */
-      process_tasks(idle);
+      {
+TM_SCOPE(shard_main_loop_epilogue_task);
+        /* handle tasks */
+        process_tasks(idle);
+      }
 
       /* handle pending close sessions */
       assert(pending_close.size() < 1000);
 
       /* process closures */
-      for (auto &h : pending_close) {
-        _handlers.erase(std::remove(_handlers.begin(), _handlers.end(), h), _handlers.end());
-        CPLOG(1, "Deleting handler (%p)", common::p_fmt(h));
+      {
+TM_SCOPE(shard_main_loop_epilogue_closures);
+        for (auto &h : pending_close) {
+          _handlers.erase(std::remove(_handlers.begin(), _handlers.end(), h), _handlers.end());
+          CPLOG(1, "Deleting handler (%p)", common::p_fmt(h));
 
-        assert(h);
-        delete h;
+          assert(h);
+          delete h;
 
-        CPLOG(1, "# remaining handlers (%lu)", _handlers.size());
+          CPLOG(1, "# remaining handlers (%lu)", _handlers.size());
 
-        if (_handlers.empty() && _forced_exit) {
-          CPLOG(1, "Shard: forcing exit..");
-          _thread_exit = true;
+          if (_handlers.empty() && _forced_exit) {
+            CPLOG(1, "Shard: forcing exit..");
+            _thread_exit = true;
+          }
         }
       }
     }
   }
 
-  close_all_ado();
+  {
+TM_SCOPE(shard_main_loop_epilogue_closures);
+    close_all_ado();
+  }
 
   PLOG("Shard (%p) exited", common::p_fmt(this));
 }
 
 void Shard::process_message_pool_request(TM_ACTUAL Connection_handler *handler, const protocol::Message_pool_request *msg)
 {
-TM_SCOPE_USE(process_message_pool_request);
+TM_SCOPE(process_message_pool_request);
   handler->msg_recv_log(msg, __func__);
   using namespace component;
   // validate auth id
@@ -1067,7 +1070,7 @@ void Shard::io_response_get_locate(TM_ACTUAL Connection_handler *handler,
                                    const protocol::Message_IO_request *msg,
                                    buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_get_locate);
+TM_SCOPE(io_response_get_locate);
   CPLOG(2, "GET_LOCATE: (%p) key=(%.*s) value_len=0z%zx request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
 
@@ -1136,7 +1139,7 @@ void Shard::io_response_get_release(TM_ACTUAL Connection_handler *handler,
                                     const protocol::Message_IO_request *msg,
                                     buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_get_release);
+TM_SCOPE(io_response_get_release);
   auto target = reinterpret_cast<const void *>(msg->addr);
   CPLOG(2, "GET_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
         target, msg->request_id());
@@ -1174,7 +1177,7 @@ void Shard::io_response_put_advance(TM_ACTUAL Connection_handler *handler,
                                     const protocol::Message_IO_request *msg,
                                     buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_put_advance);
+TM_SCOPE(io_response_put_advance);
   CPLOG(2, "PUT_ADVANCE: (%p) key=(%.*s) value_len=%zu request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
 
@@ -1262,7 +1265,7 @@ void Shard::io_response_put_locate(TM_ACTUAL Connection_handler *handler,
                                    const protocol::Message_IO_request *msg,
                                    buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_put_locate);
+TM_SCOPE(io_response_put_locate);
   CPLOG(2, "PUT_LOCATE: (%p) key=(%.*s) value_len=0x%zu request_id=%lu", common::p_fmt(this),
         static_cast<int>(msg->key_len()), msg->key(), msg->get_value_len(), msg->request_id());
 
@@ -1340,7 +1343,7 @@ TM_SCOPE_USE(io_response_put_locate);
 /////////////////////
 void Shard::io_response_put_release(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_put_release);
+TM_SCOPE(io_response_put_release);
   auto target = reinterpret_cast<const void *>(msg->addr);
   CPLOG(2, "PUT_RELEASE: (%p) addr=(%p) request_id=%lu", common::p_fmt(this),
         target, msg->request_id());
@@ -1374,12 +1377,18 @@ TM_SCOPE_USE(io_response_put_release);
   }
 }
 
+#if 0
+TM_SCOPE_DEF(io_response_put_respond)
+TM_SCOPE_DEF(io_response_put_ado)
+TM_SCOPE_DEF(io_response_put_kv)
+TM_SCOPE_DEF(io_response_put_prologue)
+#endif
 /////////////////////////////////////////////////////////////////////////////
 //   PUT           //
 /////////////////////
 void Shard::io_response_put(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_put);
+TM_SCOPE(io_response_put);
   /* for basic 'puts' we have to do a memcpy - to support "in-place"
      puts for larger data, we use a two-stage operation
   */
@@ -1400,7 +1409,9 @@ TM_SCOPE_USE(io_response_put);
     else {
       const std::string key = msg->skey();
 
-      status = _i_kvstore->put(TM_REF msg->pool_id(), key, msg->value(), msg->get_value_len(), msg->flags());
+TM_SPLIT(io_response_put_prologue);
+      status = _i_kvstore->put(msg->pool_id(), key, msg->value(), msg->get_value_len(), msg->flags());
+TM_SPLIT(io_response_put_kv);
 
       if (debug_level() > 2) {
         if (status == E_ALREADY_EXISTS) {
@@ -1427,11 +1438,13 @@ TM_SCOPE_USE(io_response_put);
         */
       }
     }
+TM_SPLIT(io_response_put_ado);
     /* update stats */
     ++_stats.op_put_count;
 
     if (!ado_signal_post_put())
       respond(handler, iob, msg, status, __func__);
+TM_SPLIT(io_response_put_respond);
   }
 }
 
@@ -1440,7 +1453,7 @@ TM_SCOPE_USE(io_response_put);
 /////////////////////
 void Shard::io_response_get(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_get);
+TM_SCOPE(io_response_get);
   if (debug_level() > 2)
     PMAJOR("GET: (%p) (request=%lu,buffer_size=%zu) key=(%.*s) ",
            common::p_fmt(this), msg->request_id(),
@@ -1598,7 +1611,7 @@ TM_SCOPE_USE(io_response_get);
 /////////////////////
 void Shard::io_response_erase(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_erase);
+TM_SCOPE(io_response_erase);
   std::string key = msg->skey();
 
   status_t status;
@@ -1637,67 +1650,74 @@ TM_SCOPE_USE(io_response_erase);
 /////////////////////
 void Shard::io_response_configure(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_configure);
+TM_SCOPE(io_response_configure);
   if (debug_level() > 1) PMAJOR("Shard: pool CONFIGURE (%s)", msg->cmd());
   respond(handler, iob, msg, process_configure(msg), __func__);
 }
 
-TM_SCOPE_DEF(process_message_IO_request0)
-TM_SCOPE_DEF(process_message_IO_request1)
-TM_SCOPE_DEF(process_message_IO_request2)
-TM_SCOPE_DEF(process_message_IO_request3)
-
 void Shard::process_message_IO_request(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg)
   try {
-TM_SCOPE_USE(process_message_IO_request);
+TM_SCOPE(process_message_IO_request);
+TM_SPLIT(process_message_IO_request0);
     handler->msg_recv_log(msg, __func__);
-tte.split(w_process_message_IO_request0);
+TM_SPLIT(process_message_IO_request1);
     using namespace component;
 
     const auto iob = handler->allocate_send();
-tte.split(w_process_message_IO_request1);
+TM_SPLIT(process_message_IO_request2);
     assert(iob);
 
     ++_stats.op_request_count;
-tte.split(w_process_message_IO_request2);
+TM_SPLIT(process_message_IO_request3);
     switch (msg->op()) {
     case protocol::OP_PUT_LOCATE:
       io_response_put_locate(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_put_locate);
       break;
     case protocol::OP_PUT_RELEASE:
       io_response_put_release(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_put_release);
       break;
     case protocol::OP_GET_LOCATE:
       io_response_get_locate(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_get_locate);
       break;
     case protocol::OP_GET_RELEASE:
       io_response_get_release(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_get_release);
       break;
     case protocol::OP_LOCATE:
       io_response_locate(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_locate);
       break;
     case protocol::OP_RELEASE:
       io_response_release(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_release);
       break;
     case protocol::OP_RELEASE_WITH_FLUSH:
       io_response_release_with_flush(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_release_with_flush);
       break;
     case protocol::OP_PUT:
       io_response_put(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_put);
       break;
     case protocol::OP_GET:
       io_response_get(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_get);
       break;
     case protocol::OP_ERASE:
       io_response_erase(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_erase);
       break;
     case protocol::OP_CONFIGURE:
       io_response_configure(TM_REF handler, msg, iob);
+TM_SPLIT(process_message_IO_request_configure);
       break;
     default:
       throw Protocol_exception("operation not implemented");
     }
-tte.split(w_process_message_IO_request3);
+TM_SPLIT(process_message_IO_request4);
   }
   catch ( std::exception &e )
     {
@@ -1806,7 +1826,7 @@ auto Shard::offset_to_sg_list(range<std::uint64_t> t,
 /////////////////////
 void Shard::io_response_locate(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_locate);
+TM_SCOPE(io_response_locate);
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
   CPLOG(2, "LOCATE: (%p) offset 0x%zx size 0x%zx request_id=%lu", common::p_fmt(this), msg->get_offset(),
         msg->get_size(), msg->request_id());
@@ -1860,7 +1880,7 @@ TM_SCOPE_USE(io_response_locate);
 /////////////////////
 void Shard::io_response_release(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_release);
+TM_SCOPE(io_response_release);
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
   CPLOG(2, "RELEASE: (%p) offset 0x%zx size %zu request_id=%lu", common::p_fmt(this), t.first,
         msg->get_size(), msg->request_id());
@@ -1882,7 +1902,7 @@ TM_SCOPE_USE(io_response_release);
 ////////////////////////////
 void Shard::io_response_release_with_flush(TM_ACTUAL Connection_handler *handler, const protocol::Message_IO_request *msg, buffer_t *iob)
 {
-TM_SCOPE_USE(io_response_release_with_flush);
+TM_SCOPE(io_response_release_with_flush);
   const char *tag = "RELEASE_WITH_FLUSH";
   range<std::uint64_t> t(msg->get_offset(), msg->get_offset() + msg->get_size());
   CPLOG(2, "%s: (%p) offset 0x%zx size %zu request_id=%lu", tag, common::p_fmt(this), t.first,
@@ -1917,7 +1937,7 @@ TM_SCOPE_USE(io_response_release_with_flush);
 
 void Shard::process_info_request(TM_ACTUAL Connection_handler *handler, const protocol::Message_INFO_request *msg, common::profiler &pr_)
 {
-TM_SCOPE_USE(process_info_request);
+TM_SCOPE(process_info_request);
   handler->msg_recv_log(msg, __func__);
 
   if (msg->type() == protocol::INFO_TYPE_FIND_KEY) {

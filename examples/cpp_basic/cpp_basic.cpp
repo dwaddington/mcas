@@ -18,7 +18,6 @@
 #include <common/exceptions.h>
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* MiB */
-#include <common/perf/tm_actual.h>
 #include <api/components.h>
 #include <api/mcas_itf.h>
 
@@ -92,8 +91,7 @@ int main(int argc, char* argv[])
   std::string value = "This is my value " + common::random_string(8);
 
   /* add new item to pool */
-TM_INSTANCE
-  if(mcas->put(TM_REF pool,
+  if(mcas->put(pool,
                key,
                value) != S_OK)
     throw General_exception("put failed unexpectedly.");

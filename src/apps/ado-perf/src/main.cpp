@@ -3,7 +3,6 @@
 #include <common/cycles.h>
 #include <common/str_utils.h>
 #include <common/task.h>
-#include <common/perf/tm_actual.h>
 #include <stdio.h>
 #include <boost/program_options.hpp>
 #include <chrono>
@@ -216,8 +215,7 @@ void do_blast_work(component::IMCAS* mcas, const std::string& blastkey, unsigned
   ss << blastkey << "-" << core ; // different keys
 
   auto bk = ss.str();
-TM_INSTANCE
-  mcas->put(TM_REF pool, bk, "BlastValue");
+  mcas->put(pool, bk, "BlastValue");
 
   while(1) {
 

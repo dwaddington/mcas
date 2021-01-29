@@ -133,8 +133,7 @@ extern "C" int mcas_put_ex(const mcas_pool_t pool,
 {
   auto mcas = static_cast<IMCAS*>(pool.session);
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
-TM_INSTANCE
-  return mcas->put(TM_REF poolh, std::string(key), value, value_len, flags);
+  return mcas->put(poolh, std::string(key), value, value_len, flags);
 }
 
 extern "C" int mcas_put(const mcas_pool_t pool,
@@ -144,8 +143,7 @@ extern "C" int mcas_put(const mcas_pool_t pool,
 {
   auto mcas = static_cast<IMCAS*>(pool.session);
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
-TM_INSTANCE
-  return mcas->put(TM_REF poolh, std::string(key), value, strlen(value), flags);
+  return mcas->put(poolh, std::string(key), value, strlen(value), flags);
 
 }
 
@@ -177,8 +175,7 @@ extern "C" int mcas_put_direct_ex(const mcas_pool_t pool,
 {
   auto mcas = static_cast<IMCAS*>(pool.session);
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
-TM_INSTANCE
-  return mcas->put_direct(TM_REF poolh, key, value, value_len,
+  return mcas->put_direct(poolh, key, value, value_len,
                           static_cast<IMCAS::memory_handle_t>(handle),
                           flags);
 }

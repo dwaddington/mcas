@@ -144,8 +144,7 @@ template <typename T>
 status_t Durable_list<T>::copy_to_remote()
 {
   /* copies complete memory - could be optimized to copy only used memory */
-TM_INSTANCE
-  return _mcas->put_direct(TM_REF _pool,
+  return _mcas->put_direct(_pool,
                            _name,
                            ::base(_regions[0]),
                            ::size(_regions[0]),

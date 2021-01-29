@@ -3,8 +3,7 @@
 #include "data.h"
 #include "program_options.h"
 
-#include <common/perf/tm_actual.h>
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include "boost/date_time/posix_time/posix_time.hpp"
 
 #include <fstream>
 #include <unistd.h> /* HOST_NAME_MAX, gethostname */
@@ -174,11 +173,10 @@ bool ExperimentThroughput::do_work(unsigned core)
       ct = _populated[pos] ? &_op_count_er : &_op_count_in;
       auto new_val = common::random_string(g_data->value_len());
       StopwatchInterval si(timer);
-TM_INSTANCE
       auto rc =
         _populated[pos]
         ? store()->erase(pool(), data.key)
-        : store()->put(TM_REF pool(), data.key, new_val.c_str(), g_data->value_len())
+        : store()->put(pool(), data.key, new_val.c_str(), g_data->value_len())
         ;
       if ( rc != S_OK )
       {
@@ -201,8 +199,7 @@ TM_INSTANCE
       const KV_pair &data = g_data->_data[pos];
       {
         StopwatchInterval si(_sw_wr);
-TM_INSTANCE
-        auto rc = store()->put(TM_REF pool(), data.key, data.value, data.value_len);
+        auto rc = store()->put(pool(), data.key, data.value, data.value_len);
         if ( rc != S_OK )
         {
           std::ostringstream e;

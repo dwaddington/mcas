@@ -17,7 +17,6 @@
 
 #include <common/exceptions.h>
 #include <common/str_utils.h>
-#include <common/perf/tm_actual.h>
 #include <api/components.h>
 #include <api/mcas_itf.h>
 
@@ -143,8 +142,7 @@ static void perform_RDMA_test(void * buffer, size_t buffer_len)
   assert(mr);
 
   /* add new item to pool */
-TM_INSTANCE
-  if(mcas->put_direct(TM_REF pool,
+  if(mcas->put_direct(pool,
 		      key,
 		      buffer,
 		      buffer_len,

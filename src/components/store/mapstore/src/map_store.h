@@ -92,7 +92,7 @@ public:
 
   virtual status_t delete_pool(const std::string &name) override;
 
-  virtual status_t put(TM_FORMAL const pool_t pool, const std::string &key,
+  virtual status_t put(const pool_t pool, const std::string &key,
                        const void *value, const size_t value_len,
                        unsigned int flags = FLAGS_NONE) override;
 
@@ -103,7 +103,7 @@ public:
                               size_t &out_value_len,
                               IKVStore::memory_handle_t handle) override;
 
-  virtual status_t put_direct(TM_FORMAL const pool_t pool, const std::string &key,
+  virtual status_t put_direct(const pool_t pool, const std::string &key,
                               const void *value, const size_t value_len,
                               IKVStore::memory_handle_t handle = HANDLE_NONE,
                               unsigned int flags = FLAGS_NONE) override;

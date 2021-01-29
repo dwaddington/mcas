@@ -20,7 +20,6 @@
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* MiB */
 #include <common/task.h>
-#include <common/perf/tm_actual.h>
 
 #include <api/components.h>
 #include <api/mcas_itf.h>
@@ -89,8 +88,7 @@ class Write_IOPS_task : public common::Tasklet {
       _start_time = std::chrono::high_resolution_clock::now();
     }
 
-TM_INSTANCE
-    status_t rc = _store->put(TM_REF _pool,
+    status_t rc = _store->put(_pool,
                               _data[_iterations].key,
                               _value.data(),
                               Options.value_size);
@@ -163,8 +161,7 @@ class Read_IOPS_task : public common::Tasklet {
       _data[i].key = common::random_string(Options.key_size);
 
       /* write data in preparation for read */
-TM_INSTANCE
-      status_t rc = _store->put(TM_REF _pool,
+      status_t rc = _store->put(_pool,
                                 _data[i].key,
                                 _value.data(), /* same value */
                                 Options.value_size);      
@@ -263,8 +260,7 @@ class Mixed_IOPS_task : public common::Tasklet {
       _data[i].key = common::random_string(Options.key_size);
 
       /* write data in preparation for read */
-TM_INSTANCE
-      status_t rc = _store->put(TM_REF _pool,
+      status_t rc = _store->put(_pool,
                                 _data[i].key,
                                 _value.data(), /* same value */
                                 Options.value_size);      
@@ -294,8 +290,7 @@ TM_INSTANCE
         throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
     }
     else {
-TM_INSTANCE
-      status_t rc = _store->put(TM_REF _pool,
+      status_t rc = _store->put(_pool,
                                 _data[_iterations].key,
                                 _value.data(),
                                 Options.value_size);

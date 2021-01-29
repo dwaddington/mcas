@@ -4,7 +4,6 @@
 #include "experiment.h"
 
 #include "statistics.h"
-#include <common/perf/tm_actual.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -48,8 +47,7 @@ class ExperimentPut : public Experiment {
     // check time it takes to complete a single put operation
     try {
       StopwatchInterval si(timer);
-TM_INSTANCE
-      auto              rc = store()->put(TM_REF pool(), g_data->key(_i), g_data->value(_i), g_data->value_len(_i));
+      auto              rc = store()->put(pool(), g_data->key(_i), g_data->value(_i), g_data->value_len(_i));
       if (rc != S_OK) {
         auto e = "put returned !S_OK value rc = " + std::to_string(rc);
         PERR("%s.", e.c_str());

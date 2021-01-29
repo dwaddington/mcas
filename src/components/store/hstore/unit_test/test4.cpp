@@ -22,7 +22,6 @@
 
 #include <common/profiler.h>
 #include <common/utils.h>
-#include <common/perf/tm_actual.h>
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
@@ -382,8 +381,7 @@ long unsigned KVStore_test::put_many(
     {
       const auto &key = std::get<0>(kv);
       const auto &value = std::get<1>(kv);
-TM_INSTANCE
-      auto r = _kvstore->put(TM_REF pool_, key, value.data(), value.length());
+      auto r = _kvstore->put(pool_, key, value.data(), value.length());
       if ( r == S_OK )
       {
           ++count;

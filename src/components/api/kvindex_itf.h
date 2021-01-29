@@ -18,7 +18,6 @@
 #include <api/kvstore_itf.h>
 #include <assert.h>
 #include <common/exceptions.h>
-#include <common/perf/tm_formal.h>
 #include <sys/uio.h> /* iovec */
 
 #include <string>

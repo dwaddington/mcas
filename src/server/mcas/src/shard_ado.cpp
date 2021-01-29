@@ -53,9 +53,6 @@ bool check_xpmem_kernel_module()
   return (fd != -1);
 }
 
-TM_SCOPE_DEF(process_put_ado_request)
-TM_SCOPE_DEF(process_ado_request)
-
 status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kvs,
                                                   Connection_handler*         handler,
                                                   component::IKVStore::pool_t pool_id,
@@ -226,7 +223,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
 
 void Shard::process_put_ado_request(TM_ACTUAL Connection_handler* handler, const protocol::Message_put_ado_request* msg)
 {
-TM_SCOPE_USE(process_put_ado_request);
+TM_SCOPE(process_put_ado_request);
   handler->msg_recv_log(msg, __func__);
   using namespace component;
 
@@ -326,7 +323,7 @@ TM_SCOPE_USE(process_put_ado_request);
   }
   else {
     /* write value passed with invocation message */
-    rc = _i_kvstore->put(TM_REF msg->pool_id(), msg->key(), msg->value(), msg->value_len());
+    rc = _i_kvstore->put(msg->pool_id(), msg->key(), msg->value(), msg->value_len());
     if (rc != S_OK) throw Logic_exception("put_ado_invoke: put failed");
   }
 
@@ -364,7 +361,7 @@ TM_SCOPE_USE(process_put_ado_request);
 void Shard::process_ado_request(TM_ACTUAL Connection_handler* handler,
                                 const protocol::Message_ado_request* msg)
 {
-TM_SCOPE_USE(process_ado_request);
+TM_SCOPE(process_ado_request);
   using namespace component;
 
   try {

@@ -19,7 +19,6 @@
 #include <common/cpu.h>
 #include <common/str_utils.h>
 #include <common/task.h>
-#include <common/perf/tm_actual.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
@@ -121,8 +120,7 @@ void basic_test(IKVStore *kv, unsigned shard)
   void *pv;
   for (unsigned i = 0; i < 10; i++) {
     std::string key = common::random_string(8);
-TM_INSTANCE
-    rc              = kv->put(TM_REF pool, key.c_str(), value.c_str(), value.length());
+    rc              = kv->put(pool, key.c_str(), value.c_str(), value.length());
     ASSERT_TRUE(rc == S_OK || rc == -2);
 
     pv            = nullptr;
@@ -281,8 +279,7 @@ TEST_F(mcas_client_test, BasicPutAndGet)
   std::string value = "Hello! Value";  // 12 chars
   void *      pv;
   for (unsigned i = 0; i < 10; i++) {
-TM_INSTANCE
-    rc = _mcas->put(TM_REF pool, "key0", value.c_str(), value.length());
+    rc = _mcas->put(pool, "key0", value.c_str(), value.length());
     PINF("put response:%d", rc);
     ASSERT_TRUE(rc == S_OK || rc == -2);
 
@@ -348,8 +345,7 @@ class IOPS_task : public common::Tasklet {
     if (_iterations == 0) PLOG("Starting worker: %u", core);
 
     _iterations++;
-TM_INSTANCE
-    status_t rc = _store->put(TM_REF _pool, _data[_iterations].key, _data[_iterations].value, VALUE_SIZE);
+    status_t rc = _store->put(_pool, _data[_iterations].key, _data[_iterations].value, VALUE_SIZE);
 
     if (rc != S_OK) throw General_exception("put operation failed:rc=%d", rc);
 
@@ -433,8 +429,7 @@ TEST_F(mcas_client_test, PerfSmallPut)
   auto start = std::chrono::high_resolution_clock::now();
 
   for (unsigned long i = 0; i < ITERATIONS; i++) {
-TM_INSTANCE
-    rc = _mcas->put(TM_REF pool, data[i].key, data[i].value, VALUE_SIZE);
+    rc = _mcas->put(pool, data[i].key, data[i].value, VALUE_SIZE);
     ASSERT_TRUE(rc == S_OK || rc == -2);
   }
 
@@ -491,8 +486,7 @@ TEST_F(mcas_client_test, PerfSmallPutDirect)
 
   for (unsigned long i = 0; i < ITERATIONS; i++) {
     /* different value each iteration; tests memory region registration */
-TM_INSTANCE
-    rc = _mcas->put_direct(TM_REF pool, data[i].key, data[i].value, VALUE_SIZE,
+    rc = _mcas->put_direct(pool, data[i].key, data[i].value, VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK || rc == -6);
   }
@@ -555,8 +549,7 @@ TEST_F(mcas_client_test, PerfLargePutDirect)
 
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     /* different value each iteration; tests memory region registration */
-TM_INSTANCE
-    rc = _mcas->put_direct(TM_REF pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, VALUE_SIZE,
+    rc = _mcas->put_direct(pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK);
   }
@@ -618,8 +611,7 @@ TEST_F(mcas_client_test, PerfLargeGetDirect)
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     //    PLOG("Putting key(%s)", keys[i % PER_ITERATION]->c_str());
     /* different value each iteration; tests memory region registration */
-TM_INSTANCE
-    rc = _mcas->put_direct(TM_REF pool, *keys[i % PER_ITERATION], &data[i % PER_ITERATION], VALUE_SIZE,
+    rc = _mcas->put_direct(pool, *keys[i % PER_ITERATION], &data[i % PER_ITERATION], VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK || rc == -6);
   }
@@ -697,8 +689,7 @@ TEST_F(mcas_client_test, PerfSmallGetDirect)
 
   for (unsigned long i = 0; i < (ITERATIONS * PER_ITERATION); i++) {
     /* different value each iteration; tests memory region registration */
-TM_INSTANCE
-    rc = _mcas->put_direct(TM_REF pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, VALUE_SIZE,
+    rc = _mcas->put_direct(pool, data[i % PER_ITERATION].key, data[i % PER_ITERATION].value, VALUE_SIZE,
                            handle); /* pass handle from memory registration */
     ASSERT_TRUE(rc == S_OK || rc == -2);
   }

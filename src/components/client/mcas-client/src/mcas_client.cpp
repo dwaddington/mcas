@@ -14,7 +14,6 @@
 
 #include <api/fabric_itf.h>
 #include <common/json.h>
-#include <common/perf/tm_actual.h>
 #include <city.h>
 
 #include "connection.h"
@@ -219,24 +218,24 @@ status_t MCAS_client::configure_pool(const IKVStore::pool_t pool, const std::str
   return _connection->configure_pool(pool, json);
 }
 
-status_t MCAS_client::put(TM_ACTUAL const IKVStore::pool_t pool,
+status_t MCAS_client::put(const IKVStore::pool_t pool,
                           const std::string &    key,
                           const void *           value,
                           const size_t           value_len,
                           uint32_t               flags)
 {
   assert(flags <= IMCAS::FLAGS_MAX_VALUE);
-  return _connection->put(TM_REF pool, key, value, value_len, flags);
+  return _connection->put(pool, key, value, value_len, flags);
 }
 
-status_t MCAS_client::put_direct(TM_ACTUAL const pool_t           pool,
+status_t MCAS_client::put_direct(const pool_t           pool,
                                  const std::string &    key,
                                  const void *           value,
                                  const size_t           value_len,
                                  IMCAS::memory_handle_t handle,
                                  uint32_t               flags)
 {
-  return _connection->put_direct(TM_REF pool, key.data(), key.size(), value, value_len, this, handle, flags);
+  return _connection->put_direct(pool, key.data(), key.size(), value, value_len, this, handle, flags);
 }
 
 status_t MCAS_client::async_put(IKVStore::pool_t   pool,

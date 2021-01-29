@@ -4,7 +4,6 @@
 #include "experiment.h"
 
 #include "statistics.h"
-#include <common/perf/tm_actual.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -62,8 +61,7 @@ public:
 
         {
           StopwatchInterval si(timer);
-TM_INSTANCE
-          auto rc = store()->put_direct(TM_REF pool(), g_data->key(_i), g_data->value(_i), g_data->value_len(), memory_handle());
+          auto rc = store()->put_direct(pool(), g_data->key(_i), g_data->value(_i), g_data->value_len(), memory_handle());
           if (rc != S_OK)
           {
             auto e = "put_direct returned !S_OK value rc = " + std::to_string(rc);

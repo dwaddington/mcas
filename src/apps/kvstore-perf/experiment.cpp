@@ -10,7 +10,6 @@
 #include "rapidjson/stringbuffer.h"
 
 #include <boost/filesystem.hpp>
-#include <common/perf/tm_actual.h>
 #if defined(__powerpc64__)
 #include <gperftools/heap-profiler.h>
 #else
@@ -1085,11 +1084,10 @@ void Experiment::_populate_pool_to_capacity(unsigned core, component::IKVStore::
       assert(g_data->value_len() > 0);
       auto current_sz = std::size_t(current);
       // auto write_memory_handle = direct_memory_registered_kv(_store.get(), const_cast<void *>(g_data->value(current_sz)), g_data->value_len());
-TM_INSTANCE
       int rc =
         memory_handle == component::IKVStore::HANDLE_NONE
-        ? _store->put(TM_REF _pool, g_data->key(current_sz), g_data->value(current_sz), g_data->value_len())
-        : _store->put_direct(TM_REF _pool, g_data->key(current_sz), g_data->value(current_sz), g_data->value_len(), memory_handle)
+        ? _store->put(_pool, g_data->key(current_sz), g_data->value(current_sz), g_data->value_len())
+        : _store->put_direct(_pool, g_data->key(current_sz), g_data->value(current_sz), g_data->value_len(), memory_handle)
         ;
 
       if (rc != S_OK)

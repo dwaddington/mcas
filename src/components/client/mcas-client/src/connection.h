@@ -166,20 +166,20 @@ public:
 
   status_t configure_pool(const component::IKVStore::pool_t pool, const std::string &json);
 
-  status_t put(TM_FORMAL const pool_t       pool,
+  status_t put(const pool_t       pool,
                const std::string  key,
                const void *       value,
                const size_t       value_len,
                const unsigned int flags);
 
-  status_t put(TM_FORMAL const pool_t       pool,
+  status_t put(const pool_t       pool,
                const void *       key,
                const size_t       key_len,
                const void *       value,
                const size_t       value_len,
                const unsigned int flags);
 
-  status_t put_direct(TM_FORMAL pool_t                               pool,
+  status_t put_direct(pool_t                               pool,
                       const void *                         key,
                       size_t                               key_len,
                       const void *                         value,

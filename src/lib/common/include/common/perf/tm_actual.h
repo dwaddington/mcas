@@ -37,8 +37,11 @@
 #define TM_REF0 tm_
 #define TM_REF TM_REF0,
 // #define TM_REF_VOID ((void) TM_REF0)
-#define TM_SCOPE_DEF(tag) namespace { common::perf::writer_at_exit<common::perf::duration_stat> w_##tag(std::cerr, QUOTE(tag)); common::perf::writer_at_exit<common::perf::duration_stat> w_##tag##_e(std::cerr, QUOTE(tag##_e)); }
-#define TM_SCOPE_USE(tag) common::perf::timer_to_exit tte{tm_, w_##tag, w_##tag##_e};
+#define _TM_SCOPE_DEF(tag) static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag(std::cerr, QUOTE(tag)); static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag##_e(std::cerr, QUOTE(tag##_e));
+#define _TM_SCOPE_USE(tag) _Pragma("GCC diagnostic push"); _Pragma("GCC diagnostic ignored \"-Wshadow\""); common::perf::timer_to_exit tte{tm_, w_##tag, w_##tag##_e}; _Pragma("GCC diagnostic pop");
+#define TM_SCOPE(tag) _TM_SCOPE_DEF(tag) _TM_SCOPE_USE(tag);
+// #define TM_SPLIT(tag) tte.split(w_##tag)
+#define TM_SPLIT(tag) static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag(std::cerr, QUOTE(tag)); tte.split(w_##tag)
 #else
 #define TM_INSTANCE
 #define TM_ACTUAL0
@@ -46,8 +49,8 @@
 #define TM_REF0
 #define TM_REF
 // #define TM_REF_VOID ((void) 0)
-#define TM_SCOPE_DEF(tag)
-#define TM_SCOPE_USE(wr)
+#define TM_SCOPE(tag)
+#define TM_SPLIT(tag) do {} while (0)
 #endif
 
 #endif

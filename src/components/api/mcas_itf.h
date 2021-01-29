@@ -21,7 +21,6 @@
 #include <common/byte_span.h>
 #include <common/pointer_cast.h>
 #include <common/string_view.h>
-#include <common/perf/tm_actual.h>
 
 #include <cstdint> /* uint16_t */
 #include <memory>
@@ -240,19 +239,19 @@ public:
    *
    * @return S_OK or error code
    */
-  virtual status_t put(TM_FORMAL const IMCAS::pool_t pool,
+  virtual status_t put(const IMCAS::pool_t pool,
                        const std::string&  key,
                        const void*         value,
                        const size_t        value_len,
                        const unsigned int  flags = IMCAS::FLAGS_NONE) = 0;
 
-  virtual status_t put(TM_ACTUAL const IMCAS::pool_t pool,
+  virtual status_t put(const IMCAS::pool_t pool,
                        const std::string&  key,
                        const std::string&  value,
                        const unsigned int  flags = IMCAS::FLAGS_NONE)
   {
     /* this does not store any null terminator */
-    return put(TM_REF pool, key, value.data(), value.length(), flags);
+    return put(pool, key, value.data(), value.length(), flags);
   }
 
   /**
@@ -268,7 +267,7 @@ public:
    *
    * @return S_OK or error code
    */
-  virtual status_t put_direct(TM_FORMAL const IMCAS::pool_t   pool,
+  virtual status_t put_direct(const IMCAS::pool_t   pool,
                               const std::string&    key,
                               const void*           value,
                               const size_t          value_len,

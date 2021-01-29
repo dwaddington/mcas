@@ -17,7 +17,6 @@
 #include <api/components.h>
 #include <common/errors.h> /* ERROR_BASE */
 #include <common/time.h>
-#include <common/perf/tm_formal.h>
 #include <sys/uio.h> /* iovec */
 
 #include <cinttypes> /* PRIx64 */
@@ -327,7 +326,7 @@ class IKVStore : public component::IBase {
    *
    * @return S_OK or E_POOL_NOT_FOUND, E_KEY_EXISTS
    */
-  virtual status_t put(TM_FORMAL const pool_t       pool,
+  virtual status_t put(const pool_t       pool,
                        const std::string& key,
                        const void*        value,
                        const size_t       value_len,
@@ -350,7 +349,7 @@ assert(0);
    *
    * @return S_OK or E_POOL_NOT_FOUND, E_KEY_EXISTS
    */
-  virtual status_t put_direct(TM_FORMAL const pool_t       pool,
+  virtual status_t put_direct(const pool_t       pool,
                               const std::string& key,
                               const void*        value,
                               const size_t       value_len,

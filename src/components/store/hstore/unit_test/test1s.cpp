@@ -23,7 +23,6 @@
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
 #include <common/utils.h> /* MiB, GiB */
-#include <common/perf/tm_actual.h>
 #include <nupm/region_descriptor.h>
 
 #include <algorithm>
@@ -272,8 +271,7 @@ TEST_F(KVStore_test, BasicPut)
 {
   single_value.resize(single_value_size);
 
-  TM_INSTANCE
-  auto r = _kvstore->put(TM_REF pool, single_key, single_value.data(), single_value.length());
+  auto r = _kvstore->put(pool, single_key, single_value.data(), single_value.length());
   EXPECT_EQ(S_OK, r);
 }
 
@@ -305,8 +303,7 @@ TEST_F(KVStore_test, BasicPutLocked)
       auto r = _kvstore->lock(pool, single_key, IKVStore::STORE_LOCK_READ, value0, value0_len, lk);
       EXPECT_EQ(S_OK, r);
       EXPECT_NE(nullptr, lk);
-      TM_INSTANCE
-      r = _kvstore->put(TM_REF pool, single_key, single_value.data(), single_value.length());
+      r = _kvstore->put(pool, single_key, single_value.data(), single_value.length());
       EXPECT_EQ(E_LOCKED, r);
     }
     {
@@ -472,8 +469,7 @@ TEST_F(KVStore_test, BasicReplaceSameSize)
 {
   {
     single_value_updated_same_size.resize(single_value_size);
-    TM_INSTANCE
-    auto r = _kvstore->put(TM_REF pool, single_key, single_value_updated_same_size.data(), single_value_updated_same_size.length());
+    auto r = _kvstore->put(pool, single_key, single_value_updated_same_size.data(), single_value_updated_same_size.length());
     EXPECT_EQ(S_OK, r);
   }
   void * value = nullptr;
@@ -491,8 +487,7 @@ TEST_F(KVStore_test, BasicReplaceSameSize)
 TEST_F(KVStore_test, BasicReplaceDifferentSize)
 {
   {
-    TM_INSTANCE
-    auto r = _kvstore->put(TM_REF pool, single_key, single_value_updated_different_size.data(), single_value_updated_different_size.length());
+    auto r = _kvstore->put(pool, single_key, single_value_updated_different_size.data(), single_value_updated_different_size.length());
     EXPECT_EQ(S_OK, r);
   }
   void * value = nullptr;
@@ -534,8 +529,7 @@ TEST_F(KVStore_test, PutMany)
     const auto &key = std::get<0>(kv);
     const auto &value = std::get<1>(kv);
 
-    TM_INSTANCE
-    auto r = _kvstore->put(TM_REF pool, key, value.data(), value.length());
+    auto r = _kvstore->put(pool, key, value.data(), value.length());
     EXPECT_EQ(S_OK, r);
     if ( r == S_OK )
     {
