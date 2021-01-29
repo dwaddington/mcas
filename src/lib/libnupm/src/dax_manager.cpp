@@ -310,9 +310,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 	/* Create and insert a space_registered.
 	 *   path_use : tracks usage of the path name to ensure no duplicate uses
 	 *   space_opened : tracks opened file descriptors, and the iov each represents
-	 *     Note: areana_fs may eventually have multiple iov's opened space.
 	 *   range_use : tracks vitutal address ranges to ensure no duplicate addresses
-	 *     Note: areana_fs may eventually have multiple iov's opened space.
 	 */
 	auto id = p.string();
 	try
