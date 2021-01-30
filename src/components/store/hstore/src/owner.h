@@ -202,14 +202,11 @@ namespace impl
 	{}
 
 	inline void pos_trace<true>::set_pos(std::size_t pos_,
-#ifndef NDEBUG                                           
                                        unsigned p_
-#else
-                                       unsigned
-#endif
                                        )
 	{
 		assert(_pos == owner::pos_undefined || _pos == pos_);
+		(void)p_;
 		assert(p_ < owner::size);
 		_pos = pos_;
 	}

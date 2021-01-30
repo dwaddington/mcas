@@ -17,8 +17,10 @@ DEBUG=${DEBUG:-0}
 # parameters for MCAS server
 SERVER_CONFIG="hstore-$DAXTYPE-sock-0"
 
+CONFIG_STR="$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP")"
 # launch MCAS server
-DAX_RESET=1 ./dist/bin/mcas --config "$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP")" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
 sleep 3
@@ -29,6 +31,10 @@ SOCKET_SCALE=1000
 ELEMENT_COUNT=$(scale_by_transport 2000000 $SOCKET_SCALE)
 STORE_SIZE=$((ELEMENT_COUNT*VALUE_LENGTH*24/10))
 CLIENT_LOG="test$TESTID-client.log"
+[ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --provider sockets --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
+                        --test put --component mcas --elements $ELEMENT_COUNT \
+                        --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH \
+                        --debug_level $DEBUG &> $CLIENT_LOG &
 ./dist/bin/kvstore-perf --provider sockets --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
                         --test put --component mcas --elements $ELEMENT_COUNT \
                         --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH \
