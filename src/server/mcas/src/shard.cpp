@@ -570,7 +570,8 @@ TM_SCOPE(shard_main_loop_message_peek);
       /* handle messages send back from ADO */
       try {
 TM_SCOPE(shard_main_loop_epilogue_ado);
-        process_messages_from_ado(TM_REF0);
+        if(ado_enabled())
+          process_messages_from_ado(TM_REF0);
       }
       catch (const resource_unavailable &e) {
         PLOG("short of buffers in 'ADO' processing: %s", e.what());

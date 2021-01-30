@@ -90,5 +90,5 @@ unsigned long long duration_stat::sum_durations_ns_squared() const
 
 std::ostream &common::perf::operator<<(std::ostream &o, const duration_stat &d)
 {
-	return o << d.sum_durations_sec() << "/" << d.count();
+	return o << d.sum_durations_sec() << " " << d.count();
 }
