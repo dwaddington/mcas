@@ -378,7 +378,7 @@ extern "C"
    * 
    * @param pool Pool handle
    * @param key Key
-   * @param out_value Pointer to target buffer
+   * @param value Pointer to target buffer
    * @param inout_size_value Size of target buffer, then size of transfer
    * @param handle Handle to direct registered memory
    * 
@@ -386,13 +386,13 @@ extern "C"
    */
   status_t mcas_get_direct_ex(const mcas_pool_t pool,
                               const char * key,
-                              void * out_value,
+                              void * value,
                               size_t * inout_size_value,
                               mcas_memory_handle_t handle);
 
   status_t mcas_get_direct(const mcas_pool_t pool,
                            const char * key,
-                           void * out_value,
+                           void * value,
                            size_t * inout_size_value);
 
 

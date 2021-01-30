@@ -1,4 +1,5 @@
 #![feature(asm)]
+#![feature(slice_fill)]
 
 #[allow(dead_code)]
 mod mcas;
@@ -8,6 +9,7 @@ mod mcas;
 #[allow(non_upper_case_globals)]
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
+
 mod mcasapi_wrapper;
 
 #[cfg(test)]
@@ -32,6 +34,28 @@ mod tests {
             let xs = String::from_utf8(x.clone()).unwrap();
             println!("result=>{:?}< also as UTF8 ({})", x, xs);
 
+            let mut m = session.allocate_direct_memory(64).unwrap();
+            println!("allocate memory=>{:?}<", m);
+
+            let data : &mut [u8] = m.slice();
+            data[0] = 1;
+            data[1] = 2;
+            data[2] = 3;
+            println!("slice=>{:?}<", data);
+            
+            pool.put_direct("dd", &m).expect("put_direct failed");
+
+            data.fill(0); // reset elements to 0
+
+            println!("slice=>{:?}<", data);
+
+            let sz = pool.get_direct("dd", &m).expect("get_direct failed");
+            println!("got {:?} bytes", sz);
+            println!("slice after get_direct =>{:?}<", data);
+
+            /* ADO invocation */
+            pool.invoke_ado("adokey","ADO message!", 8).expect("invoke_ado failed");
+            
         } // implicitly close pool
         
         session.delete_pool("myPool").expect("pool deletion failed")

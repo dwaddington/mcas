@@ -314,24 +314,24 @@ extern "C" status_t mcas_get(const mcas_pool_t pool,
 
 extern "C" status_t mcas_get_direct_ex(const mcas_pool_t pool,
                                        const char * key,
-                                       void * out_value,
+                                       void * value,
                                        size_t * inout_size_value,
                                        mcas_memory_handle_t handle)
 {
   auto mcas = static_cast<IMCAS*>(pool.session);
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
-  return mcas->get_direct(poolh, key, out_value, *inout_size_value,
+  return mcas->get_direct(poolh, key, value, *inout_size_value,
                           static_cast<IMCAS::memory_handle_t>(handle));
 }
 
 extern "C" status_t mcas_get_direct(const mcas_pool_t pool,
                                     const char * key,
-                                    void * out_value,
+                                    void * value,
                                     size_t * inout_size_value)
 {
   auto mcas = static_cast<IMCAS*>(pool.session);
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
-  return mcas->get_direct(poolh, key, out_value, *inout_size_value, IMCAS::MEMORY_HANDLE_NONE);
+  return mcas->get_direct(poolh, key, value, *inout_size_value, IMCAS::MEMORY_HANDLE_NONE);
 }
 
 

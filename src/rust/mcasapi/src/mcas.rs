@@ -7,6 +7,7 @@ use crate::mcasapi_wrapper::*;
 
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
+use std::slice;
 
 type Status = status_t;
 
@@ -30,7 +31,7 @@ fn zero_vec(size: u64) -> Vec<u8> {
 }
 
 //----------------------------------------------------------------------------
-/// Pool 
+/// Pool
 pub struct Pool {
     pool: mcas_pool_t,
 }
@@ -69,6 +70,64 @@ impl Pool {
         } else {
             return Err(rc);
         }
+    }
+
+    /// Put a key-value pair into pool using direct memory
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let m = session.allocate_direct_memory(1024);
+    /// pool.put_direct("mykey", m).expect("put failed");
+    /// ```    
+    pub fn put_direct(&mut self, key: &str, direct_buffer: &DirectMemory) -> Result<(), Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let rc = unsafe {
+            mcas_put_direct_ex(
+                self.pool,
+                key_cstr,
+                direct_buffer.ptr,
+                direct_buffer.size,
+                direct_buffer.handle,
+                0,
+            )
+        };
+
+        if rc != 0 {
+            return Err(rc);
+        }
+        Ok(())
+    }
+
+    /// Get a value from pool using direct memory
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let m = session.allocate_direct_memory(1024);
+    /// pool.get_direct("cat", m);
+    /// ```
+    pub fn get_direct(
+        &mut self,
+        key: &str,
+        direct_buffer: &DirectMemory,
+    ) -> Result<size_t, Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let mut inout_size = direct_buffer.size;
+        let rc = unsafe {
+            mcas_get_direct_ex(
+                self.pool,
+                key_cstr,
+                direct_buffer.ptr,
+                &mut inout_size,
+                direct_buffer.handle,
+            )
+        };
+
+        if rc != 0 {
+            return Err(rc);
+        }
+        Ok(inout_size)
     }
 
     /// Get a value from pool (copy performed)
@@ -120,6 +179,58 @@ impl Pool {
         }
         Ok(())
     }
+
+    /// Invoke ADO
+    ///
+    ///
+    pub fn invoke_ado(
+        &mut self,
+        key: &str,
+        request: &str,
+        value_size: size_t,
+    ) -> Result<(), Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let (_request, request_c_void) = c_convert_void(request);
+        let mut response_vector: mcas_response_array_t = std::ptr::null_mut();
+        let mut response_vector_len : size_t = 0;
+            
+        let rc = unsafe { mcas_invoke_ado(self.pool,
+                                          key_cstr,
+                                          request_c_void,
+                                          request.len() as u64,
+                                          0, // flags
+                                          value_size,
+                                          &mut response_vector,
+                                          &mut response_vector_len) };
+        if rc != 0 {
+            return Err(rc);
+        }
+
+        Ok(())
+    }
+}
+
+//----------------------------------------------------------------------------
+#[derive(Debug)]
+pub struct DirectMemory {
+    session: mcas_session_t,
+    handle: *mut ::std::os::raw::c_void,
+    ptr: *mut ::std::os::raw::c_void,
+    size: size_t,
+}
+
+impl DirectMemory {
+    pub fn slice<'a, T>(&mut self) -> &'a mut [T] {
+        unsafe { slice::from_raw_parts_mut(self.ptr as *mut T, self.size as usize) }
+    }
+}
+
+impl Drop for DirectMemory {
+    fn drop(&mut self) {
+        unsafe {
+            mcas_free_direct_memory(self.ptr);
+        };
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -140,6 +251,28 @@ impl Session {
         Ok(return_value)
     }
 
+    /// Allocate direct memory for zero-copy operation
+    ///
+    pub fn allocate_direct_memory(
+        &mut self,
+        size_in_bytes: size_t,
+    ) -> Result<DirectMemory, Status> {
+        let mut handle: *mut std::os::raw::c_void = std::ptr::null_mut();
+        let mut ptr: *mut std::os::raw::c_void = std::ptr::null_mut();
+        let rc = unsafe {
+            mcas_allocate_direct_memory(self.session, size_in_bytes, &mut ptr, &mut handle)
+        };
+        let result = DirectMemory {
+            session: self.session,
+            handle,
+            ptr,
+            size: size_in_bytes,
+        };
+        if rc != 0 {
+            return Err(rc);
+        }
+        Ok(result)
+    }
 
     /// Open a pool and return handle
     ///
@@ -154,7 +287,7 @@ impl Session {
         if rc != 0 {
             return Err(rc);
         }
-                
+
         let return_value = Pool { pool: mcas_pool };
         Ok(return_value)
     }
@@ -173,7 +306,7 @@ impl Session {
             handle: 0,
         };
         let rc = unsafe { mcas_create_pool(self.session, name_cstr, size, flags, &mut mcas_pool) };
-        
+
         if rc != 0 {
             return Err(rc);
         }
@@ -182,8 +315,7 @@ impl Session {
         Ok(return_value)
     }
 
-    pub fn delete_pool(&mut self,
-                       pool_name : &str) -> Result<(), Status> {
+    pub fn delete_pool(&mut self, pool_name: &str) -> Result<(), Status> {
         let (_name, name_cstr) = c_convert(pool_name);
         let rc = unsafe { mcas_delete_pool(self.session, name_cstr) };
         if rc != 0 {
