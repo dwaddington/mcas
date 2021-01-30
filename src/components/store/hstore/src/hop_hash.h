@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -322,7 +322,6 @@ namespace impl
 		public:
 #endif
 			using segment_and_bucket_t = segment_and_bucket<bucket_t>;
-			void ownership_check() const;
 		public:
 			static constexpr auto _segment_capacity =
 				persist_controller_t::_segment_capacity;
@@ -443,9 +442,10 @@ namespace impl
 				auto bucket(const K &) const -> size_type;
 			auto bucket_size(const size_type n) const -> size_type;
 
+			auto owned_by_owner_mask_new(const segment_and_bucket_t &a) const -> owner::value_type;
+			auto owned_by_owner_mask_old(const segment_and_bucket_t &a) const -> owner::value_type;
 			auto owned_by_owner_mask(const segment_and_bucket_t &a) const -> owner::value_type;
 			bool is_free_by_owner(const segment_and_bucket_t &a) const;
-			bool is_Free(const segment_and_bucket_t &a);
 			bool is_free(const segment_and_bucket_t &a) const;
 
 			/* computed distance from first to last, accounting for the possibility that
@@ -453,11 +453,17 @@ namespace impl
 			 */
 			auto distance_wrapped(bix_t first, bix_t last) -> unsigned;
 
+			/* begin an owner mask (all owners prededing sb) */
+			auto owned_by_owner_pre_mask(const segment_and_bucket_t &sb) const -> owner::value_type;
+			/* finish the owner mask (or in ownership by sb) */
+			auto finish_owner_mask(owner::value_type owner_mask, segment_and_bucket_t sb) const -> owner::value_type;
+
 			unsigned _locate_key_call;
 			unsigned _locate_key_owned;
 			unsigned _locate_key_unowned;
 			unsigned _locate_key_match;
 			unsigned _locate_key_mismatch;
+			int _consistency_check;
 
 		public:
 			explicit hop_hash_base(
@@ -471,6 +477,8 @@ namespace impl
 		public:
 			hop_hash_base(const hop_hash_base &) = delete;
 			hop_hash_base &operator=(const hop_hash_base &) = delete;
+			void check_consistency() const;
+			void ownership_check() const;
 			allocator_type get_allocator() const noexcept
 			{
 				return static_cast<const hop_hash_allocator<Allocator> &>(*this);

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -110,7 +110,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					assert(full_size < SmallLimit);
 					_size = full_size;
 				}
-		} small;
+		};
 
 		struct large_t
 			: public allocator_char_type
@@ -180,20 +180,25 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				}
 			}
 
-		} large;
+		};
+
+		/* First of two members of the union: _small, for strings which are (a) moveable and (b) not more than SmallLimit bytes long */
+		small_t _small;
+		/* Second of two members of the union: _large, for strings which (a) may not be moved, or (b) are more than SmallLimit bytes long */
+		large_t _large;
 	public:
 		template <typename U>
 			using rebind = persist_fixed_string<U, SmallLimit, Allocator>;
 		static_assert(
-			sizeof large <= sizeof small.value
-			, "large_t overlays small.size"
+			sizeof _large <= sizeof _small.value
+			, "large_t overlays _small.size"
 		);
 
 		/* ERROR: caller needs to to persist */
 		persist_fixed_string()
-			: small(0)
+			: _small(0)
 		{
-			large.P = nullptr;
+			_large.P = nullptr;
 		}
 
 		template <typename IT, typename AL>
@@ -206,9 +211,9 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, std::size_t alignment_
 				, AL al_
 			)
-				: small( f_ )
+				: _small( f_ )
 			{
-				large.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
+				_large.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
 			}
 
 		template <typename IT, typename AL>
@@ -243,7 +248,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, std::size_t alignment_
 				, AL al_
 			)
-				: small(
+				: _small(
 					static_cast<std::size_t>(std::size_t(last_ - first_) + fill_len_) * sizeof(T)
 				)
 			{
@@ -253,7 +258,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						std::copy(
 							first_
 							, last_
-							, common::pointer_cast<T>(&small.value[0])
+							, common::pointer_cast<T>(&_small.value[0])
 						)
 						, fill_len_
 						, T()
@@ -265,18 +270,18 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						static_cast<std::size_t>(std::size_t(last_ - first_) + fill_len_) * sizeof(T);
 					using local_allocator_char_type =
 						typename std::allocator_traits<AL>::template rebind_alloc<char>;
-					new (&large.al()) allocator_char_type(al_);
-					new (&large.P) cptr_t{nullptr};
+					new (&_large.al()) allocator_char_type(al_);
+					new (&_large.P) cptr_t{nullptr};
 					local_allocator_char_type(al_).allocate(
 						AK_REF
-						large.P
+						_large.P
 						, element_type::front_skip_element_count(alignment_)
 							+ data_size
 						, alignment_
 					);
-					new (large.ptr())
+					new (_large.ptr())
 						element_type(first_, last_, fill_len_, alignment_);
-					large.ptr()->persist_this(al_);
+					_large.ptr()->persist_this(al_);
 				}
 			}
 
@@ -288,19 +293,19 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, std::size_t alignment_
 				, AL al_
 			)
-				: small(f_)
+				: _small(f_)
 			{
 				auto data_size = data_len_ * sizeof(T);
-				new (&large.al()) allocator_char_type(al_);
-				new (&large.P) cptr_t{nullptr};
+				new (&_large.al()) allocator_char_type(al_);
+				new (&_large.P) cptr_t{nullptr};
 				al_.allocate(
 					AK_REF
-					large.P
+					_large.P
 					, element_type::front_skip_element_count(alignment_)
 					+ data_size
 					, alignment_
 				);
-				new (large.ptr()) element_type(data_size, alignment_);
+				new (_large.ptr()) element_type(data_size, alignment_);
 			}
 
 		/* Needed because the persist_fixed_string arguments are sometimes conveyed via
@@ -382,12 +387,12 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 				if ( (std::size_t(last_ - first_) + fill_len_) * (sizeof *first_) < SmallLimit )
 				{
-					small.assign(first_, last_, fill_len_);
+					_small.assign(first_, last_, fill_len_);
 				}
 				else
 				{
-					large.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
-					small.set_fixed();
+					_large.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
+					_small.set_fixed();
 				}
 				return *this;
 			}
@@ -407,42 +412,42 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		{
 			if ( is_inline() )
 			{
-				small.clear();
+				_small.clear();
 			}
 			else
 			{
-				large.clear();
-				small.clear();
+				_large.clear();
+				_small.clear();
 			}
 		}
 
 		persist_fixed_string(const persist_fixed_string &other)
-			: small(other.small)
+			: _small(other._small)
 		{
 			if ( this != &other )
 			{
 				if ( ! is_inline() )
 				{
-					new (&large.al()) allocator_char_type(other.large.al());
-					new (&large.P) cptr_t{other.large.P};
-					if ( large.ptr() )
+					new (&_large.al()) allocator_char_type(other._large.al());
+					new (&_large.P) cptr_t{other._large.P};
+					if ( _large.ptr() )
 					{
-						large.ptr()->inc_ref(__LINE__, "ctor &");
+						_large.ptr()->inc_ref(__LINE__, "ctor &");
 					}
 				}
 			}
 		}
 
 		persist_fixed_string(persist_fixed_string &&other) noexcept
-			: small(other.small)
+			: _small(other._small)
 		{
 			if ( this != &other )
 			{
 				if ( ! is_inline() )
 				{
-					new (&large.al()) allocator_type_element(other.large.al());
-					new (&large.P) ptr_t(other.large.ptr());
-					other.large.P = nullptr;
+					new (&_large.al()) allocator_type_element(other._large.al());
+					new (&_large.P) ptr_t(other._large.ptr());
+					other._large.P = nullptr;
 				}
 			}
 		}
@@ -456,46 +461,46 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			{
 				if ( other.is_inline() )
 				{
-					/* small <- small */
-					small = other.small;
+					/* _small <- _small */
+					_small = other._small;
 				}
 				else
 				{
-					/* small <- large */
-					small = small_t(fixed_data_location);
-					new (&large.al()) allocator_type_element(other.large.al());
-					new (&large.P) ptr_t(other.large.ptr());
-					large.ptr()->inc_ref(__LINE__, "=&");
+					/* _small <- _large */
+					_small = small_t(fixed_data_location);
+					new (&_large.al()) allocator_type_element(other._large.al());
+					new (&_large.P) ptr_t(other._large.ptr());
+					_large.ptr()->inc_ref(__LINE__, "=&");
 				}
 			}
 			else
 			{
-				/* large <- ? */
+				/* _large <- ? */
 				if (
-					large.ptr()
+					_large.ptr()
 					&&
-					large.ptr()->ref_count() != 0
+					_large.ptr()->ref_count() != 0
 					&&
-					large.ptr()->dec_ref(__LINE__, "=&") == 0
+					_large.ptr()->dec_ref(__LINE__, "=&") == 0
 				)
 				{
-					auto sz = large.ptr()->alloc_element_count();
-					large.ptr()->~element_type();
-					large.al().deallocate(large.P, sz);
+					auto sz = _large.ptr()->alloc_element_count();
+					_large.ptr()->~element_type();
+					_large.al().deallocate(_large.P, sz);
 				}
-				large.al().~allocator_char_type();
+				_large.al().~allocator_char_type();
 
 				if ( other.is_inline() )
 				{
-					/* large <- small */
-					small = other.small;
+					/* _large <- _small */
+					_small = other._small;
 				}
 				else
 				{
-					/* large <- large */
-					large.P = other.large.P;
-					large.ptr()->inc_ref(__LINE__, "=&");
-					new (&large.al()) allocator_type_element(other.large.al());
+					/* _large <- _large */
+					_large.P = other._large.P;
+					_large.ptr()->inc_ref(__LINE__, "=&");
+					new (&_large.al()) allocator_type_element(other._large.al());
 				}
 			}
 			return *this;
@@ -507,46 +512,46 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			{
 				if ( other.is_inline() )
 				{
-					/* small <- small */
-					small = other.small;
+					/* _small <- _small */
+					_small = other._small;
 				}
 				else
 				{
-					/* small <- large */
-					small = small_t(fixed_data_location);
-					new (&large.al()) allocator_type_element(other.large.al());
-					new (&large.cptr) cptr_t(other.large.cptr);
-					other.large.cptr = nullptr;
+					/* _small <- _large */
+					_small = small_t(fixed_data_location);
+					new (&_large.al()) allocator_type_element(other._large.al());
+					new (&_large.cptr) cptr_t(other._large.cptr);
+					other._large.cptr = nullptr;
 				}
 			}
 			else
 			{
-				/* large <- ? */
+				/* _large <- ? */
 				if (
-					large.ptr()
+					_large.ptr()
 					&&
-					large.ptr()->ref_count() != 0
+					_large.ptr()->ref_count() != 0
 					&&
-					large.ptr()->dec_ref(__LINE__, "=&&") == 0
+					_large.ptr()->dec_ref(__LINE__, "=&&") == 0
 				)
 				{
-					auto sz = large.ptr()->alloc_element_count();
-					large.ptr()->~element_type();
-					large.al().deallocate(large.cptr, sz);
+					auto sz = _large.ptr()->alloc_element_count();
+					_large.ptr()->~element_type();
+					_large.al().deallocate(_large.cptr, sz);
 				}
-				large.al().~allocator_char_type();
+				_large.al().~allocator_char_type();
 
 				if ( other.is_inline() )
 				{
-					/* large <- small */
-					small = other.small;
+					/* _large <- _small */
+					_small = other._small;
 				}
 				else
 				{
-					/* large <- large */
-					large.cptr = other.large.cptr;
-					new (&large.al()) allocator_type_element(other.large.al());
-					other.large.cptr = nullptr;
+					/* _large <- _large */
+					_large.cptr = other._large.cptr;
+					new (&_large.al()) allocator_type_element(other._large.al());
+					other._large.cptr = nullptr;
 				}
 			}
 			return *this;
@@ -561,13 +566,13 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				}
 				else
 				{
-					if ( large.ptr() && large.ptr()->dec_ref(__LINE__, "~") == 0 )
+					if ( _large.ptr() && _large.ptr()->dec_ref(__LINE__, "~") == 0 )
 					{
-						auto sz = large.ptr()->alloc_element_count();
-						large.ptr()->~element_type();
-						large.al().deallocate(large.P, sz);
+						auto sz = _large.ptr()->alloc_element_count();
+						_large.ptr()->~element_type();
+						_large.al().deallocate(_large.P, sz);
 					}
-					large.al().~allocator_char_type();
+					_large.al().~allocator_char_type();
 				}
 			}
 		}
@@ -582,9 +587,9 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				 * in decreasing the reference count except to mirror
 				 * reconstitute.
 				 */
-				if ( large.ptr()->dec_ref(__LINE__, "deconstitute") == 0 )
+				if ( _large.ptr()->dec_ref(__LINE__, "deconstitute") == 0 )
 				{
-					large.al().~allocator_char_type();
+					_large.al().~allocator_char_type();
 				}
 			}
 #endif
@@ -599,16 +604,16 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					 * ERROR: If the allocator should contain only a pointer to persisted memory,
 					 * it would not need restoration. Arrange that.
 					 */
-					new (&const_cast<persist_fixed_string *>(this)->large.al()) allocator_char_type(al_);
+					new (&const_cast<persist_fixed_string *>(this)->_large.al()) allocator_char_type(al_);
 #if USE_CC_HEAP == 3
 					using reallocator_char_type =
 						typename std::allocator_traits<AL>::template rebind_alloc<char>;
 					auto alr = reallocator_char_type(al_);
-					if ( alr.is_reconstituted(large.P) )
+					if ( alr.is_reconstituted(_large.P) )
 					{
 						/* The data has already been reconstituted. Increase the reference
 						 * count. */
-						large.ptr()->inc_ref(__LINE__, "reconstitute");
+						_large.ptr()->inc_ref(__LINE__, "reconstitute");
 					}
 					else
 					{
@@ -618,10 +623,10 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						 * second reference, so the refcount must be set to one.
 						 */
 						alr.reconstitute(
-							large.ptr()->alloc_element_count() * sizeof(T), large.P
+							_large.ptr()->alloc_element_count() * sizeof(T), _large.P
 						);
-						new (large.P)
-							element_type( size(), large.ptr()->alignment() );
+						new (_large.P)
+							element_type( size(), _large.ptr()->alignment() );
 					}
 					reset_lock();
 #else
@@ -632,12 +637,12 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		bool is_inline() const
 		{
-			return small.is_inline();
+			return _small.is_inline();
 		}
 
 		std::size_t size() const
 		{
-			return is_inline() ? small.size() : large.ptr()->size();
+			return is_inline() ? _small.size() : _large.ptr()->size();
 		}
 
 		/* There used to be one way to look at data: the current location.
@@ -649,20 +654,20 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		const T *data_fixed() const
 		{
 			assert( ! is_inline() );
-			return large.ptr()->data();
+			return _large.ptr()->data();
 		}
 
 		T *data_fixed()
 		{
 			assert( !is_inline() );
-			return large.ptr()->data();
+			return _large.ptr()->data();
 		}
 
 		const T *data() const
 		{
 			return
 				is_inline()
-				? static_cast<const T *>(&small.value[0])
+				? static_cast<const T *>(&_small.value[0])
 				: data_fixed()
 				;
 		}
@@ -671,7 +676,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		{
 			return
 				is_inline()
-				? static_cast<T *>(&small.value[0])
+				? static_cast<T *>(&_small.value[0])
 				: data_fixed()
 				;
 		}
@@ -682,23 +687,23 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		/* lockable and ! inline are the same thing, at the moment */
 		bool is_fixed() const { return ! is_inline(); }
 		bool lockable() const { return ! is_inline(); }
-		bool try_lock_shared() const { return lockable() && large.ptr()->try_lock_shared(); }
-		bool try_lock_exclusive() const { return lockable() && large.ptr()->try_lock_exclusive(); }
-		bool is_locked() const { return lockable() && large.ptr()->is_locked(); }
+		bool try_lock_shared() const { return lockable() && _large.ptr()->try_lock_shared(); }
+		bool try_lock_exclusive() const { return lockable() && _large.ptr()->try_lock_exclusive(); }
+		bool is_locked() const { return lockable() && _large.ptr()->is_locked(); }
 		template <typename AL>
 			void flush_if_locked_exclusive(AL al_) const
 			{
-				if ( lockable() && large.ptr()->is_locked_exclusive() )
+				if ( lockable() && _large.ptr()->is_locked_exclusive() )
 				{
 #if 0
-					PLOG("FLUSH %p: %zu", large.ptr()->data(), large.ptr()->size());
+					PLOG("FLUSH %p: %zu", _large.ptr()->data(), _large.ptr()->size());
 #endif
-					large.ptr()->persist_this(al_);
+					_large.ptr()->persist_this(al_);
 				}
 				else
 				{
 #if 0
-					PLOG("FLUSH %p: no (shared)", large.ptr()->data());
+					PLOG("FLUSH %p: no (shared)", _large.ptr()->data());
 #endif
 				}
 			}
@@ -706,22 +711,22 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		{
 			if ( lockable() )
 			{
-				large.ptr()->unlock();
+				_large.ptr()->unlock();
 			}
 		}
-		void reset_lock() const { if ( lockable() ) { large.ptr()->reset_lock(); } }
+		void reset_lock() const { if ( lockable() ) { _large.ptr()->reset_lock(); } }
 		/* The "crash consistent" version resets the lock before using allocation_states to
 		 * ensure that the string is in a consistent state. Reset the lock carefully: the
-		 * string lockable() may be inconsistent with large.ptr().
+		 * string lockable() may be inconsistent with _large.ptr().
 		 */
 		void reset_lock_with_pending_retries() const
 		{
-			if ( lockable() && large.ptr() ) { large.ptr()->reset_lock(); }
+			if ( lockable() && _large.ptr() ) { _large.ptr()->reset_lock(); }
 		}
 
 		cptr_t &get_cptr()
 		{
-			return large;
+			return _large;
 		}
 		template <typename AL>
 			void set_cptr(const cptr_t::c_element_type &ptr, AL al_)
@@ -745,12 +750,12 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 #endif
 				std::memcpy(&temp, this, sizeof temp);
 #pragma GCC diagnostic pop
-				temp.large.P = persistent_t<char *>{old_cptr};
+				temp._large.P = persistent_t<char *>{old_cptr};
 				hop_hash_log<false>::write(LOG_LOCATION, "size to copy ", old_cptr, " old cptr was ", old_cptr, " value ", std::string(temp.data(), temp.size()));
 				auto begin = temp.data();
 				auto end = begin + temp.size();
-				large.assign(AK_REF begin, end, 0, default_alignment, al_);
-				small.set_fixed();
+				_large.assign(AK_REF begin, end, 0, default_alignment, al_);
+				_small.set_fixed();
 				hop_hash_log<false>::write(LOG_LOCATION, "result size ", this->size(), " value ", std::string(this->data_fixed(), this->size()));
 			}
 

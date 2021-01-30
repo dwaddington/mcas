@@ -484,14 +484,12 @@ void Shard::main_loop(common::profiler &pr_)
         } // TICK_RESPONSE_CLOSE
 
         /* process ALL deferred actions */
-#ifndef NDEBUG
         int get_pending_iter = 0;
-#endif
         while (handler->get_pending_action(action)) {
           idle = 0;
-#ifndef NDEBUG
+          (void)get_pending_iter;
           assert(get_pending_iter++ < 1000);
-#endif
+
           switch (action.op) {
           case Connection_handler::action_type::ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE:
             CPLOG(2, "releasing esxclusive value lock (%p)", action.parm);

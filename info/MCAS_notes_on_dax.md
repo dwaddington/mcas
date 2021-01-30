@@ -44,9 +44,12 @@ namespace1.  The mount point name need not be pmem1; we could have
 given it any name.
 
 ```
-sudo ndctl create-namespace -e namespace1.0 --align 2M --force
-sudo mkfs -t ext4 /dev/pmem1
 sudo mkdir /mnt/pmem1
+```
+
+```
+sudo ndctl create-namespace -m fsdax -e namespace1.0 --align 2M --force
+sudo mkfs -t ext4 /dev/pmem1
 sudo mount /dev/pmem1 /mnt/pmem1
 sudo chmod go+rw /mnt/pmem1
 mkdir /mnt/pmem1/mystuff

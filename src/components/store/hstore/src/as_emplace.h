@@ -1,5 +1,5 @@
 /*
-   Copyright [2019-2020] [IBM Corporation]
+   Copyright [2019-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -122,7 +122,7 @@ namespace impl
 					}
 					else
 					{
-						hop_hash_log<false>::write(LOG_LOCATION, "cannot record (armed is ", "false");
+						hop_hash_log<false>::write(LOG_LOCATION, "cannot record (armed is false");
 					}
 				}
 
@@ -169,7 +169,7 @@ namespace impl
 					&&
 					std::find(&_ptr[0], &_ptr[_index], ptr_) != &_ptr[_index]
 				;
-				hop_hash_log<false>::write(LOG_LOCATION, "ptr ", ptr_, " in use ", in_use ? "true" : "false");
+				hop_hash_log<false>::write(LOG_LOCATION, "ptr ", ptr_, " ", in_use ? "in_use" : "free");
 				return in_use;
 			}
 
