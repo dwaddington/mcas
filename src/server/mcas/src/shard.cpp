@@ -550,7 +550,8 @@ void Shard::main_loop(common::profiler &pr_)
 
       /* handle messages send back from ADO */
       try {
-        process_messages_from_ado();
+        if(ado_enabled())
+          process_messages_from_ado();
       }
       catch (const resource_unavailable &e) {
         PLOG("short of buffers in 'ADO' processing: %s", e.what());
