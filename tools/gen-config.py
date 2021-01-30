@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import argparse
 import re
+import os
 
 ###############################################################
 # gen-config.py tool for generating MCAS configuration files
@@ -11,6 +12,7 @@ TEMPLATE="""{
     [
       %%SHARDS%%
     ],
+%%ADOPATH%%
     \"net_providers\" : \"verbs\"
 }
 """
@@ -52,8 +54,8 @@ def build_shard_section(shard_count):
     result = ""
     ado = ""
     if args.ado != None:
-        ado = '\n            "ado_plugins" : ["' + args.ado + '"], "ado_cores" : "%%ADOCORES%%", '
-
+        ado     = '\n            "ado_plugins" : ["' + args.ado + '"], "ado_cores" : "%%ADOCORES%%", '        
+    
     while shard_count > 0:
         shard_count -= 1
         new_shard = SHARD
@@ -94,6 +96,7 @@ parser.add_argument('--path', default='/dev/dax0.0', help='persistent memory pat
 parser.add_argument('--shards', type=int, default=1, help='number of shards (default=1)')
 parser.add_argument('--core', type=int, default=0, help='starting core (default=0)')
 parser.add_argument('--ado', help='optional ado plugin name (e.g., libcomponent-adoplugin-testing.so)')
+parser.add_argument('--adopath', default=os.getenv("HOME") + '/mcas/build/dist/bin/ado',help='path of ADO executable')
 parser.add_argument('--adocores', help='optional ADO cores (e.g. 12-23)')
 parser.add_argument('--backend', default='hstore', help='backend storage engine (e.g., hstore, mapstore)')
 parser.add_argument('--baseincrement', default='0x1900000000', help='shard increment (in hex) for virtual address mapping (default 100GB)')
@@ -105,5 +108,11 @@ shard_section=build_shard_section(args.shards)
 
 # build final configuration file
 TEMPLATE=TEMPLATE.replace("%%SHARDS%%", shard_section)
-    
+
+if args.adopath:
+    adopath = '    "ado_path" : "' + args.adopath + '",'
+else:
+    adopath = ''
+
+TEMPLATE=TEMPLATE.replace("%%ADOPATH%%", adopath)
 print(TEMPLATE)
