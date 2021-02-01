@@ -758,6 +758,20 @@ extern "C" int mcas_check_async_invoke_put_ado(const mcas_pool_t pool,
   return mcas_check_async_invoke_ado(pool, handle, out_response_vector, out_response_vector_count);
 }
 
+extern "C" status_t mcas_free_response(mcas_response_array_t out_response_vector,
+                                       size_t out_response_vector_count)
+{
+  if(out_response_vector_count == 0 || out_response_vector == nullptr) return E_INVAL;
+
+  mcas_response_array_t response = out_response_vector;
+
+  // TODO fix:
+  for(unsigned i=0;i<out_response_vector_count;i++)
+    ::free(response[i].ptr);
+  
+  return S_OK;
+}
+
 extern "C" void mcas_debug(const mcas_pool_t pool,
                            const unsigned cmd,
                            const uint64_t arg)
