@@ -44,12 +44,14 @@ mod tests {
             data[2] = 3;
             println!("slice=>{:?}<", data);
 
+            /* put direct */
             pool.put_direct("dd", &m).expect("put_direct failed");
 
             data.fill(0); // reset elements to 0
 
             println!("slice=>{:?}<", data);
 
+            /* get direct */
             let sz = pool.get_direct("dd", &m).expect("get_direct failed");
             println!("got {:?} bytes", sz);
             println!("slice after get_direct =>{:?}<", data);
