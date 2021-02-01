@@ -149,8 +149,8 @@ int main(int argc, char* argv[])
     printf("response count: %lu\n", out_response_vector_count);
     assert(out_response_vector_count == 1);
     printf("response[0]: (%.*s)\n",
-           (int) out_response_vector[0].iov_len,
-           (char*) out_response_vector[0].iov_base);
+           (int) out_response_vector[0].len,
+           (char*) out_response_vector[0].ptr);
 
     mcas_free_responses(out_response_vector);
   }
@@ -182,8 +182,8 @@ int main(int argc, char* argv[])
     printf("response count: %lu\n", out_response_vector_count);
     assert(out_response_vector_count == 1);
     printf("response[0]: (%.*s)\n",
-           (int) out_response_vector[0].iov_len,
-           (char*) out_response_vector[0].iov_base);
+           (int) out_response_vector[0].len,
+           (char*) out_response_vector[0].ptr);
 
     mcas_free_responses(out_response_vector);
   }
