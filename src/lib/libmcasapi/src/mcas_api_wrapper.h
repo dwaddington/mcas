@@ -40,7 +40,15 @@ extern "C"
   typedef uint32_t      mcas_flags_t;
   typedef uint64_t      offset_t;
   typedef unsigned char byte;
-  typedef struct iovec* mcas_response_array_t;
+
+  typedef struct {
+    void *   ptr;
+    size_t   len;
+    uint32_t layer_id;
+  }
+  layer_response_t;
+  
+  typedef layer_response_t * mcas_response_array_t;
 
   typedef struct { /*< pool handle carrying session */
     mcas_session_t session;
