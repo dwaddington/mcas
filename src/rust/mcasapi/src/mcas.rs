@@ -1,8 +1,8 @@
-#[allow(dead_code)]
-#[allow(non_camel_case_types)]
-#[allow(non_upper_case_globals)]
-#[allow(non_snake_case)]
-#[allow(unused_variables)]
+#![allow(dead_code)]
+#![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals)]
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
 use crate::mcasapi_wrapper::*;
 
 use std::ffi::CString;
@@ -67,9 +67,8 @@ impl Pool {
         };
         if rc == 0 {
             return Ok(());
-        } else {
-            return Err(rc);
         }
+        Err(rc)
     }
 
     /// Put a key-value pair into pool using direct memory
@@ -161,7 +160,7 @@ impl Pool {
             panic!("unexpected condition freeing memory from mcas_get");
         }
 
-        return Ok(result);
+        Ok(result)
     }
 
     /// Configure pool
@@ -180,7 +179,7 @@ impl Pool {
         Ok(())
     }
 
-    /// Invoke ADO
+    /// Invoke ADO (Active Data Object)
     ///
     ///
     pub fn invoke_ado(
@@ -188,20 +187,61 @@ impl Pool {
         key: &str,
         request: &str,
         value_size: size_t,
-    ) -> Result<(), Status> {
+    ) -> Result<AdoResponse, Status> {
         let (_key, key_cstr) = c_convert(key);
         let (_request, request_c_void) = c_convert_void(request);
         let mut response_vector: mcas_response_array_t = std::ptr::null_mut();
-        let mut response_vector_len : size_t = 0;
-            
-        let rc = unsafe { mcas_invoke_ado(self.pool,
-                                          key_cstr,
-                                          request_c_void,
-                                          request.len() as u64,
-                                          0, // flags
-                                          value_size,
-                                          &mut response_vector,
-                                          &mut response_vector_len) };
+        let mut response_vector_len: size_t = 0;
+
+        let rc = unsafe {
+            mcas_invoke_ado(
+                self.pool,
+                key_cstr,
+                request_c_void,
+                request.len() as u64,
+                0, // flags
+                value_size,
+                &mut response_vector,
+                &mut response_vector_len,
+            )
+        };
+        if rc != 0 {
+            return Err(rc);
+        }
+
+        Ok(AdoResponse::new(response_vector, response_vector_len))
+    }
+
+    /// Combined put and ADO invoke
+    ///
+    ///
+    pub fn invoke_put_ado(
+        &mut self,
+        key: &str,
+        value: &str,
+        request: &str,
+        root_len: size_t,
+    ) -> Result<(), Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let (_request, request_c_void) = c_convert_void(request);
+        let (_v, v_cstr) = c_convert_void(value);
+        let mut response_vector: mcas_response_array_t = std::ptr::null_mut();
+        let mut response_vector_len: size_t = 0;
+
+        let rc = unsafe {
+            mcas_invoke_put_ado(
+                self.pool,
+                key_cstr,
+                request_c_void,
+                request.len() as u64,
+                v_cstr,
+                value.len() as u64,
+                root_len,
+                0, // flags
+                &mut response_vector,
+                &mut response_vector_len,
+            )
+        };
         if rc != 0 {
             return Err(rc);
         }
@@ -330,5 +370,19 @@ impl Drop for Session {
         unsafe {
             mcas_close_session(self.session);
         };
+    }
+}
+
+pub struct AdoResponse {
+    response_array: mcas_response_array_t,
+    response_count: size_t,
+}
+
+impl AdoResponse {
+    pub fn new(response_array: mcas_response_array_t, response_count: size_t) -> AdoResponse {
+        AdoResponse {
+            response_array,
+            response_count,
+        }
     }
 }

@@ -2187,7 +2187,6 @@ status_t Connection_handler::get(const pool_t pool, const std::string &key, std:
       }
     }
     else {
-      /* Note: Previously, only synchronous invoke_ado path had this error handling. Likely an oversight */
       if (response_msg->get_response_count() > 0) {
         void *   err_msg      = nullptr;
         size_t   err_msg_len  = 0;

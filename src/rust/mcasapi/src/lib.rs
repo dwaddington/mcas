@@ -4,12 +4,12 @@
 #[allow(dead_code)]
 mod mcas;
 
+#[allow(clippy::redundant_static_lifetimes)]
 #[allow(dead_code)]
 #[allow(non_camel_case_types)]
 #[allow(non_upper_case_globals)]
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
-
 mod mcasapi_wrapper;
 
 #[cfg(test)]
@@ -26,10 +26,11 @@ mod tests {
                 .create_pool("myPool", 1024 * 1024, 0)
                 .expect("create_pool failed");
 
-            pool.configure("AddIndex::VolatileTree").expect("pool config failed");
-            
+            pool.configure("AddIndex::VolatileTree")
+                .expect("pool config failed");
+
             pool.put("cat", "Jenny").unwrap();
-            
+
             let x = pool.get("cat").unwrap();
             let xs = String::from_utf8(x.clone()).unwrap();
             println!("result=>{:?}< also as UTF8 ({})", x, xs);
@@ -37,12 +38,12 @@ mod tests {
             let mut m = session.allocate_direct_memory(64).unwrap();
             println!("allocate memory=>{:?}<", m);
 
-            let data : &mut [u8] = m.slice();
+            let data: &mut [u8] = m.slice();
             data[0] = 1;
             data[1] = 2;
             data[2] = 3;
             println!("slice=>{:?}<", data);
-            
+
             pool.put_direct("dd", &m).expect("put_direct failed");
 
             data.fill(0); // reset elements to 0
@@ -54,10 +55,11 @@ mod tests {
             println!("slice after get_direct =>{:?}<", data);
 
             /* ADO invocation */
-            pool.invoke_ado("adokey","ADO message!", 8).expect("invoke_ado failed");
-            
+            let response = pool.invoke_ado("adokey", "ADO message!", 8).expect("invoke_ado failed");
+
+//            pool.invoke_put_ado("adoket2", "value"
         } // implicitly close pool
-        
+
         session.delete_pool("myPool").expect("pool deletion failed")
     }
 }

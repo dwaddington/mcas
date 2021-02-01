@@ -744,6 +744,18 @@ extern "C"
                                            mcas_response_array_t * out_response_vector,
                                            size_t * out_response_vector_count);
 
+  /** 
+   * Free response from invoke_ado or invoke_put_ado
+   * 
+   * @param out_response_vector Response vector
+   * @param out_response_vector_count Num elements in response vector
+   * 
+   * @return 0 on success
+   */
+  status_t mcas_free_response(mcas_response_array_t out_response_vector,
+                              size_t out_response_vector_count);
+
+
 
   /** 
    * Debug operation
