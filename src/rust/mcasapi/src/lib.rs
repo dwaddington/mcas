@@ -55,10 +55,38 @@ mod tests {
             println!("slice after get_direct =>{:?}<", data);
 
             /* ADO invocation */
-            let response = pool.invoke_ado("adokey", "ADO message!", 8).expect("invoke_ado failed");
+            {
+                /* set up target key */
+                pool.put("adokey", "Bonjour");
+                let mut response_v = pool
+                    .invoke_ado("adokey", "ADO::HelloResponse", 8)
+                    .expect("invoke_ado failed");
+                println!("response count {}", response_v.count());
+                println!("response vector {:?}", response_v);
 
-//            pool.invoke_put_ado("adoket2", "value"
-        } // implicitly close pool
+                let response: &mut [u8] = response_v
+                    .slice(0)
+                    .expect("getting individual response failed");
+
+                println!("response {:?}", std::str::from_utf8(response).unwrap());
+            }
+
+            /* ADO put invocation */
+            {
+                let mut response_v = pool
+                    .invoke_put_ado("adokey2", "someValue", "ADO::HelloResponse", 8)
+                    .expect("invoke_ado failed");
+                println!("response count {}", response_v.count());
+                println!("response vector {:?}", response_v);
+
+                let response: &mut [u8] = response_v
+                    .slice(0)
+                    .expect("getting individual response failed");
+
+                println!("response {:?}", std::str::from_utf8(response).unwrap());
+            }
+            
+        } /* implicitly close pool */
 
         session.delete_pool("myPool").expect("pool deletion failed")
     }

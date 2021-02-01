@@ -763,7 +763,20 @@ extern "C"
   status_t mcas_free_response(mcas_response_array_t out_response_vector,
                               size_t out_response_vector_count);
 
-
+  /** 
+   * Helper to index into response array
+   * 
+   * @param response_vector Response vector
+   * @param index Index of requested response
+   * @param out_ptr [out] Pointer to response buffer
+   * @param out_len [out] Size of response buffer
+   * 
+   * @return 0 on success
+   */
+  status_t mcas_get_response(mcas_response_array_t response_vector,
+                             size_t index,
+                             void ** out_ptr,
+                             size_t * out_len);
 
   /** 
    * Debug operation

@@ -725,7 +725,7 @@ extern "C" status_t mcas_invoke_put_ado(const mcas_pool_t pool,
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
 
   std::vector<IMCAS::ADO_response> responses;
-  
+
   auto result = mcas->invoke_put_ado(poolh,
                                      key,
                                      request,
@@ -818,8 +818,28 @@ extern "C" status_t mcas_free_response(mcas_response_array_t out_response_vector
 
   // TODO fix:
   for(unsigned i=0;i<out_response_vector_count;i++)
-    ::free(response[i].iov_base);
+    ::free(response[i].ptr);
   
+  return S_OK;
+}
+
+
+extern "C" status_t mcas_get_response(mcas_response_array_t response_vector,
+                                      size_t index,
+                                      void ** out_ptr,
+                                      size_t * out_len)
+{
+
+  if(out_ptr == nullptr || out_len == nullptr) return E_INVAL;
+  mcas_response_array_t r = response_vector;
+    
+  for(size_t i=0;i<index;i++) {
+    if(r == nullptr) return E_INVAL; /* check we didn't go off end of array */
+    r++;
+  }
+  *out_ptr = r->ptr;
+  *out_len = r->len;
+
   return S_OK;
 }
 

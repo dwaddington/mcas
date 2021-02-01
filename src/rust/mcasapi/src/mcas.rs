@@ -221,7 +221,7 @@ impl Pool {
         value: &str,
         request: &str,
         root_len: size_t,
-    ) -> Result<(), Status> {
+    ) -> Result<AdoResponse, Status> {
         let (_key, key_cstr) = c_convert(key);
         let (_request, request_c_void) = c_convert_void(request);
         let (_v, v_cstr) = c_convert_void(value);
@@ -246,7 +246,7 @@ impl Pool {
             return Err(rc);
         }
 
-        Ok(())
+        Ok(AdoResponse::new(response_vector, response_vector_len))
     }
 }
 
@@ -373,6 +373,7 @@ impl Drop for Session {
     }
 }
 
+#[derive(Debug)]
 pub struct AdoResponse {
     response_array: mcas_response_array_t,
     response_count: size_t,
@@ -384,5 +385,34 @@ impl AdoResponse {
             response_array,
             response_count,
         }
+    }
+
+    pub fn count(&self) -> usize {
+        self.response_count as usize
+    }
+
+    pub fn slice<'a, T>(&mut self, index: usize) -> Result<&'a mut [T], Status> {
+        let mut response_size: size_t = 0;
+        let mut response_ptr: *mut std::os::raw::c_void = std::ptr::null_mut();
+        unsafe {
+            let rc = mcas_get_response(
+                self.response_array,
+                index as size_t,
+                &mut response_ptr,
+                &mut response_size,
+            );
+            if rc != 0 {
+                return Err(rc);
+            }
+        }
+        
+        let result = unsafe { slice::from_raw_parts_mut(response_ptr as *mut T, response_size as usize) };
+        Ok(result)
+    }
+}
+
+impl Drop for AdoResponse {
+    fn drop(&mut self) {
+        unsafe { mcas_free_responses(self.response_array) }
     }
 }
