@@ -575,10 +575,10 @@ extern "C" void mcas_free_responses(mcas_response_array_t out_response_vector)
 {
   assert(out_response_vector);
 
-  struct iovec* iovec_ptr = static_cast<struct iovec*>(out_response_vector);
-  while(iovec_ptr->iov_len > 0) {
-    ::free(iovec_ptr->iov_base);
-    iovec_ptr++;
+  auto response_ptr = static_cast<layer_response_t*>(out_response_vector);
+  while(response_ptr->len > 0) {
+    ::free(response_ptr->ptr);
+    response_ptr++;
   }
   
   ::free(out_response_vector);
@@ -612,18 +612,21 @@ extern "C" status_t mcas_invoke_ado(const mcas_pool_t pool,
   if(result == S_OK) {
     *out_response_vector_count = n_responses;
     if(n_responses > 0) {
-      auto rv = static_cast<struct iovec*>(::malloc((n_responses + 1) * sizeof(iovec)));
+      /* allocate array of pointers */
+      auto rv = static_cast<layer_response_t*>(::malloc((n_responses + 1) * sizeof(layer_response_t)));
       *out_response_vector = rv;
       unsigned i = 0;
       for(auto& r : responses) {
         auto len = r.data_len();
-        rv[i].iov_len = len;
-        rv[i].iov_base = ::malloc(len);
-        memcpy(rv[i].iov_base, r.data(), len); /* may be we can eliminate this? */
+        rv[i].len = len;
+        /* allocate memory individual response */
+        rv[i].ptr = ::malloc(len);
+        rv[i].layer_id = r.layer_id();
+        memcpy(rv[i].ptr, r.data(), len); /* may be we can eliminate this? */
         i++;
       }
-      rv[i].iov_base = nullptr; /* mark end of array */
-      rv[i].iov_len = 0; 
+      rv[i].ptr = nullptr; /* mark end of array */
+      rv[i].len = 0; 
     }
     else {
       *out_response_vector = NULL;
@@ -682,18 +685,19 @@ extern "C" status_t mcas_check_async_invoke_ado(const mcas_pool_t pool,
     auto n_responses = responses.size();
     *out_response_vector_count = n_responses;
     if(n_responses > 0) {
-      auto rv = static_cast<struct iovec*>(::malloc((n_responses + 1) * sizeof(iovec)));
+      auto rv = static_cast<layer_response_t*>(::malloc((n_responses + 1) * sizeof(iovec)));
       *out_response_vector = rv;
       unsigned i = 0;
       for(auto& r : responses) {
         auto len = r.data_len();
-        rv[i].iov_len = len;
-        rv[i].iov_base = ::malloc(len);
-        memcpy(rv[i].iov_base, r.data(), len); /* may be we can eliminate this? */
+        rv[i].len = len;
+        rv[i].ptr = ::malloc(len);
+        rv[i].layer_id = r.layer_id();
+        memcpy(rv[i].ptr, r.data(), len); /* may be we can eliminate this? */
         i++;
       }
-      rv[i].iov_base = nullptr; /* mark end of array */
-      rv[i].iov_len = 0; 
+      rv[i].ptr = nullptr; /* mark end of array */
+      rv[i].len = 0; 
     }
     else {
       *out_response_vector = NULL;
@@ -736,18 +740,19 @@ extern "C" status_t mcas_invoke_put_ado(const mcas_pool_t pool,
   if(result == S_OK) {
     *out_response_vector_count = n_responses;
     if(n_responses > 0) {
-      auto rv = static_cast<struct iovec*>(::malloc((n_responses + 1) * sizeof(iovec)));
+      auto rv = static_cast<layer_response_t*>(::malloc((n_responses + 1) * sizeof(iovec)));
       *out_response_vector = rv;
       unsigned i = 0;
       for(auto& r : responses) {
         auto len = r.data_len();
-        rv[i].iov_len = len;
-        rv[i].iov_base = ::malloc(len);
-        memcpy(rv[i].iov_base, r.data(), len); /* may be we can eliminate this? */
+        rv[i].len = len;
+        rv[i].ptr = ::malloc(len);
+        rv[i].layer_id = r.layer_id();
+        memcpy(rv[i].ptr, r.data(), len); /* may be we can eliminate this? */
         i++;
       }
-      rv[i].iov_base = nullptr; /* mark end of array */
-      rv[i].iov_len = 0; 
+      rv[i].ptr = nullptr; /* mark end of array */
+      rv[i].len = 0; 
     }
     else {
       *out_response_vector = NULL;
