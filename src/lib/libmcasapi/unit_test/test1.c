@@ -34,10 +34,13 @@ int main(int argc, char* argv[])
   }
 
   /* open session */
-  mcas_session_t session = mcas_open_session_ex(argv[1], /* server */
-                                                argv[2], /* net device */
-                                                2,
-                                                30);  
+  mcas_session_t session;
+
+  assert(mcas_open_session_ex(argv[1], /* server */
+                              argv[2], /* net device */
+                              2,
+                              30,
+                              &session) == 0);
 
   /* create a pool */
   mcas_pool_t pool;

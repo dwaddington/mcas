@@ -790,7 +790,7 @@ void Shard::process_messages_from_ado()
         assert(iob);
         assert(iob->base());
 
-        /* handle ADO response that came from signal ADO request */
+        /* handle ADO response that came from ADO signal request (get) */
         if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE) {
 
           /* when this is a 'get' signal then we have to re-get the value 
@@ -826,7 +826,7 @@ void Shard::process_messages_from_ado()
             handler->post_response_with_value(iob, value_out, desc, response, __func__);
           }
         }
-        /* handle ADO response that came from signal ADO request */
+        /* handle ADO response that came from ADO signal request */
         else if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE) {
 
           /* translate back to IO response */

@@ -518,6 +518,35 @@ namespace
     return S_OK;
   }
 
+  status_t adoHelloResponse(
+    IADO_plugin * // ap_
+    , uint64_t // work_key_
+    , const std::vector<string_view> & args_
+    , const string_view key_
+    , value_space_t & values_
+    , response_buffer_vector_t & response_buffers_
+  )
+  {
+    std::string s(args_[0].begin(),args_[0].end());
+    PNOTICE("(%s) \tkey(%.*s) \tvalue at %p \t(%lu)",
+            s.c_str(), boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
+    
+    std::stringstream ss;
+    ss << "Hello " << key_ << "!";
+    if(values_[0].len > 0) {
+      std::string value_str(reinterpret_cast<const char*>(values_[0].ptr), values_[0].len);
+      PNOTICE("Adding value string:(%s)", value_str.c_str());
+      ss << value_str;
+    }
+    auto result_ptr = static_cast<char*>(::malloc(ss.str().size() + 1));
+    memcpy(result_ptr, ss.str().data(), ss.str().size());
+    response_buffers_.emplace_back(result_ptr,
+                                   ss.str().size(),
+                                   IADO_plugin::response_buffer_t::alloc_type_malloc{});
+    return S_OK;
+  }
+
+
   status_t basicAdoResponse(
     IADO_plugin * // ap_
     , uint64_t // work_key_
@@ -715,7 +744,8 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "ADO::Signal::post-put", adoSignal },
     { "ADO::Signal::post-get", adoSignal },
     { "ADO::Signal::post-put-direct", adoSignal },
-    { "ADO::Signal::post-get-direct", adoSignal },    
+    { "ADO::Signal::post-get-direct", adoSignal },
+    { "ADO::HelloResponse",adoHelloResponse },
     { "BLAST ME!", other }, // used by ado-perf
     { "put", other }, // used by ado-perf
     { "erase", erase }, // used by ado-perf

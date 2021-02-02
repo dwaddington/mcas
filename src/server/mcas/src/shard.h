@@ -432,8 +432,8 @@ class Shard : public Shard_transport, private common::log_source {
   const std::string                                 _ado_path;
   std::vector<std::string>                          _ado_plugins;
   std::map<std::string, std::string>                _ado_params;
-  Ado_signal                                        _ado_signal_mask = Ado_signal::NONE;  
-  Shard_security                                    _security;
+  Ado_signal                                        _ado_signal_mask = Ado_signal::NONE;  /* active signals for shard */
+  Shard_security                                    _security; /* manages TLS authentication etc. */
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;
   std::string                                       _dax_config;

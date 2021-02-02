@@ -19,6 +19,10 @@ add_subdirectory(apps)
 # EASTL test build is normally OFF. To build EASTL tests, cmake with -DEASTL_BUILD_TESTS=1
 add_subdirectory(ado)
 
+if(BUILD_RUST)
+  add_subdirectory(rust/mcasapi)
+endif(BUILD_RUST)
+
 if(BUILD_KERNEL_SUPPORT)
   add_subdirectory(kernel/modules/mcas/unit_test)
 endif(BUILD_KERNEL_SUPPORT)
