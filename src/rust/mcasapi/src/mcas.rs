@@ -11,6 +11,13 @@ use std::slice;
 
 type Status = status_t;
 
+/*< error codes. see common/errors.h */
+static S_OK: Status = 0;
+static E_FAIL: Status = -1;
+static E_INVAL: Status = -2;
+static E_NOT_FOUND: Status = -4;
+static E_BUSY: Status = -9;
+
 // USE THIS FOR DEBUG BREAK
 //        unsafe { asm!("int3") };
 
@@ -28,6 +35,52 @@ fn c_convert_void(slice: &str) -> (CString, *const c_void) {
 
 fn zero_vec(size: u64) -> Vec<u8> {
     vec![0; size as usize]
+}
+
+//----------------------------------------------------------------------------
+/// AsyncHandle
+#[derive(Debug)]
+pub struct AsyncHandle {
+    session: mcas_session_t,
+    raw_handle: mcas_async_handle_t,
+    size_field: size_t,
+}
+
+impl AsyncHandle {
+    fn new(
+        session: mcas_session_t,
+        raw_handle: mcas_async_handle_t,
+        size_field: size_t,
+    ) -> AsyncHandle {
+        AsyncHandle {
+            session,
+            raw_handle,
+            size_field,
+        }
+    }
+
+    /// Check asynchronous completion state
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let mut handle = pool
+    ///                .async_put_direct("asyncDirectKey", &m)
+    ///                .expect("async_put_direct failed");
+    /// println!("handle: {:?}", handle);
+    ///
+    /// while handle.check_completion().expect("check completion failed") == false {
+    ///    println!("async_put_direct waiting for response ... {:?}", handle);
+    ///    thread::sleep(Duration::from_millis(1));
+    /// }
+    /// ```
+    pub fn check_completion(&mut self) -> Result<bool, Status> {
+        let rc = unsafe { mcas_check_async_completion(self.session, self.raw_handle) };
+        if rc != S_OK && rc != E_BUSY {
+            return Err(rc);
+        }
+        Ok(rc == S_OK)
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -71,6 +124,44 @@ impl Pool {
         Err(rc)
     }
 
+    /// Asynchronously put a key-value pair into pool (copy performed)
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let handle = pool.aysnc_put("cat", "Jenny").expect("put failed");
+    /// while handle.check_completion().unwrap() == false {
+    ///   println!("waiting {:?}", handle);
+    /// }
+    /// ```    
+    pub fn async_put(&self, key: &str, value: &str) -> Result<AsyncHandle, Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let (_v, v_cstr) = c_convert_void(value);
+        let mut async_handle = mcas_async_handle_t {
+            internal: std::ptr::null_mut(),
+            response_data: std::ptr::null_mut(),
+        };
+
+        let rc = unsafe {
+            mcas_async_put_ex(
+                self.pool,
+                key_cstr,
+                v_cstr,
+                value.len() as u64,
+                0, /* flags */
+                &mut async_handle,
+            )
+        };
+        if rc == 0 {
+            return Ok(AsyncHandle::new(
+                self.pool.session,
+                async_handle,
+                value.len() as u64,
+            ));
+        }
+        Err(rc)
+    }
+
     /// Put a key-value pair into pool using direct memory
     ///
     /// # Examples
@@ -96,6 +187,53 @@ impl Pool {
             return Err(rc);
         }
         Ok(())
+    }
+
+    /// Asynchronously put a value using direct memory
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let mut handle = pool
+    ///                  .async_put_direct("asyncDirectKey", &m)
+    ///                  .expect("async_put_direct failed");
+    /// println!("handle: {:?}", handle);
+    ///
+    /// while handle.check_completion().expect("check completion failed") == false {
+    ///   println!("async_put_direct waiting for response ... {:?}", handle);
+    ///   thread::sleep(Duration::from_millis(1));
+    /// }
+    /// ```
+    pub fn async_put_direct(
+        &self,
+        key: &str,
+        direct_buffer: &DirectMemory,
+    ) -> Result<AsyncHandle, Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let mut async_handle = mcas_async_handle_t {
+            internal: std::ptr::null_mut(),
+            response_data: std::ptr::null_mut(),
+        };
+
+        let rc = unsafe {
+            mcas_async_put_direct_ex(
+                self.pool,
+                key_cstr,
+                direct_buffer.ptr,
+                direct_buffer.size,
+                direct_buffer.handle,
+                0, /* flags */
+                &mut async_handle,
+            )
+        };
+        if rc == 0 {
+            return Ok(AsyncHandle::new(
+                self.pool.session,
+                async_handle,
+                direct_buffer.size,
+            ));
+        }
+        Err(rc)
     }
 
     /// Get a value from pool using direct memory
@@ -127,6 +265,54 @@ impl Pool {
             return Err(rc);
         }
         Ok(inout_size)
+    }
+
+    /// Asynchronously get a value using direct memory
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let mut handle = pool
+    ///                  .async_get_direct("asyncDirectKey", &m)
+    ///                  .expect("async_put_direct failed");
+    /// println!("handle: {:?}", handle);
+    ///
+    /// while handle.check_completion().expect("check completion failed") == false {
+    ///   println!("async_put_direct waiting for response ... {:?}", handle);
+    ///   thread::sleep(Duration::from_millis(1));
+    /// }
+    /// ```
+    pub fn async_get_direct(
+        &self,
+        key: &str,
+        direct_buffer: &mut DirectMemory,
+    ) -> Result<AsyncHandle, Status> {
+        let (_key, key_cstr) = c_convert(key);
+        let mut async_handle = mcas_async_handle_t {
+            internal: std::ptr::null_mut(),
+            response_data: std::ptr::null_mut(),
+        };
+
+        let mut size_field: size_t = direct_buffer.size;
+        let rc = unsafe {
+            mcas_async_get_direct_ex(
+                self.pool,
+                key_cstr,
+                direct_buffer.ptr,
+                &mut size_field,
+                direct_buffer.handle,
+                &mut async_handle,
+            )
+        };
+
+        if rc == 0 {
+            return Ok(AsyncHandle::new(
+                self.pool.session,
+                async_handle,
+                size_field,
+            ));
+        }
+        Err(rc)
     }
 
     /// Get a value from pool (copy performed)
@@ -405,8 +591,9 @@ impl AdoResponse {
                 return Err(rc);
             }
         }
-        
-        let result = unsafe { slice::from_raw_parts_mut(response_ptr as *mut T, response_size as usize) };
+
+        let result =
+            unsafe { slice::from_raw_parts_mut(response_ptr as *mut T, response_size as usize) };
         Ok(result)
     }
 }

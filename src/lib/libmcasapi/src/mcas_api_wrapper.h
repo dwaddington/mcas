@@ -27,14 +27,14 @@
 extern "C"
 {
 #endif
-
+  
   typedef void * mcas_session_t; /*< handle to MCAS session */
   typedef void * mcas_memory_handle_t; /*< handle to registered memory */
   typedef int status_t;
   
   typedef struct {
     void * internal;
-    void * data;
+    void * response_data;
   } mcas_async_handle_t; /*< handle for asynchronous operations */
   
   typedef uint32_t      mcas_flags_t;
@@ -409,7 +409,7 @@ extern "C"
    * 
    * @param pool Pool handle
    * @param key Key
-   * @param out_value Postatus_ter to target buffer
+   * @param out_value Pointer to target buffer
    * @param inout_size_value Size of target buffer, then size of transfer
    * @param handle Handle to direct registered memory
    * @param out_async_handle Out async handle
