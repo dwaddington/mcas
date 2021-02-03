@@ -59,7 +59,7 @@ mod tests {
             /* ADO invocation */
             {
                 /* set up target key */
-                pool.put("adokey", "Bonjour");
+                pool.put("adokey", "Bonjour").expect("put failed");
                 let mut response_v = pool
                     .invoke_ado("adokey", "ADO::HelloResponse", 8)
                     .expect("invoke_ado failed");

@@ -4,7 +4,7 @@ project(rust-mcasapi)
 
 include(ExternalProject)
 
-configure_file(build.rs.in build.rs)
+configure_file(build.rs.in ${CMAKE_CURRENT_SOURCE_DIR}/build.rs)
 
 find_program(CARGO cargo)
 find_program(BINDGEN bindgen)
