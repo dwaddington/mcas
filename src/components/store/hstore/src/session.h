@@ -998,6 +998,8 @@ PLOG("%s", s.str().c_str());
 }
 #endif
 				time_match = ( begin_tsc <= t && t <= end_tsc );
+#else
+				time_match = false;
 #endif
 			}
 
