@@ -34,10 +34,13 @@ int main(int argc, char* argv[])
   }
 
   /* open session */
-  mcas_session_t session = mcas_open_session_ex(argv[1], /* server */
-                                                argv[2], /* net device */
-                                                2,
-                                                30);  
+  mcas_session_t session;
+
+  assert(mcas_open_session_ex(argv[1], /* server */
+                              argv[2], /* net device */
+                              2,
+                              30,
+                              &session) == 0);
 
   /* create a pool */
   mcas_pool_t pool;
@@ -149,8 +152,8 @@ int main(int argc, char* argv[])
     printf("response count: %lu\n", out_response_vector_count);
     assert(out_response_vector_count == 1);
     printf("response[0]: (%.*s)\n",
-           (int) out_response_vector[0].iov_len,
-           (char*) out_response_vector[0].iov_base);
+           (int) out_response_vector[0].len,
+           (char*) out_response_vector[0].ptr);
 
     mcas_free_responses(out_response_vector);
   }
@@ -182,8 +185,8 @@ int main(int argc, char* argv[])
     printf("response count: %lu\n", out_response_vector_count);
     assert(out_response_vector_count == 1);
     printf("response[0]: (%.*s)\n",
-           (int) out_response_vector[0].iov_len,
-           (char*) out_response_vector[0].iov_base);
+           (int) out_response_vector[0].len,
+           (char*) out_response_vector[0].ptr);
 
     mcas_free_responses(out_response_vector);
   }

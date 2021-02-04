@@ -1040,9 +1040,9 @@ void Shard::release_pending_rename(TM_ACTUAL const void *target)
 
 /* like respond2, but omits the final post */
 protocol::Message_IO_response * Shard::prepare_response(const Connection_handler *handler_,
-                                                buffer_t *iob_,
-                                                uint64_t request_id,
-                                                int status_)
+                                                        buffer_t *iob_,
+                                                        uint64_t request_id,
+                                                        int status_)
 {
   auto response =
     new (iob_->base()) protocol::Message_IO_response(iob_->length(), handler_->auth_id(), request_id);
@@ -1053,10 +1053,10 @@ protocol::Message_IO_response * Shard::prepare_response(const Connection_handler
 }
 
 void Shard::respond(Connection_handler *handler_,
-                     buffer_t *iob_,
-                     const protocol::Message_IO_request *msg_,
-                     int status_,
-                     const char * func_)
+                    buffer_t *iob_,
+                    const protocol::Message_IO_request *msg_,
+                    int status_,
+                    const char * func_)
 {
   auto response = prepare_response(handler_, iob_, msg_->request_id(), status_);
   handler_->post_response(iob_, response, func_);  // issue IO request response
@@ -1162,7 +1162,7 @@ TM_SCOPE(io_response_get_release);
                IKVStore::lock_type_t::STORE_LOCK_READ);
     /* note: client will be signalled on return of this ADO call,
        therefore if the ADO operation stalls, the client will be stalled too.
-     */
+    */
   }
   else {
     respond(handler, iob, msg, status, __func__);
@@ -1369,7 +1369,7 @@ TM_SCOPE(io_response_put_release);
                IKVStore::lock_type_t::STORE_LOCK_READ);
     /* note: client will be signalled on return of this ADO call,
        therefore if the ADO operation stalls, the client will be stalled too.
-     */
+    */
   }
   else {
     respond(handler, iob, msg, status, __func__);
@@ -1726,7 +1726,7 @@ TM_SPLIT(process_message_IO_request4);
 
 namespace
 {
-  using byte_span = common::byte_span;
+using byte_span = common::byte_span;
 auto region_breaks(const std::vector<byte_span> regions_) -> std::vector<byte_span>
 {
   std::vector<byte_span> region_breaks;
