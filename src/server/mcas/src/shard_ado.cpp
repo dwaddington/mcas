@@ -38,7 +38,7 @@
 #include "mcas_config.h"
 #include "resource_unavailable.h"
 
-#ifdef PROFILE
+#ifdef HAS_PROFILER
 #include <gperftools/profiler.h>
 #endif
 
@@ -212,7 +212,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       }
     }
 
-#if defined(PROFILE) && defined(PROFILE_POST_ADO)
+#if defined HAS_PROFILER && defined(PROFILE_POST_ADO)
     PLOG("Starting profiler");
     ProfilerStart("post_ado_launch.prof");
 #endif

@@ -5,9 +5,6 @@ include(../../../mk/common.cmake)
 # use this to disable optimizations, e.g. for debugging or profiling
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
-#set(PROFILER "profiler")
-#add_compile_options("-DPROFILE")
-
 project(mcas CXX)
 include(../../../mk/clang-dev-tools.cmake)
 

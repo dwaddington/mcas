@@ -32,7 +32,7 @@
 
 #include "resource_unavailable.h"
 
-#ifdef PROFILE
+#ifdef HAS_PROFILER
 #include <gperftools/profiler.h>
 #else
 int ProfilerStart(const char *)
