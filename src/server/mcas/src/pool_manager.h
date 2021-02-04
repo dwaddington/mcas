@@ -129,7 +129,7 @@ class Pool_manager : common::log_source {
   bool release_pool_reference(pool_t pool)
   {
     auto i = _open_pools.find(pool);
-    if (i == _open_pools.end()) throw std::invalid_argument("invalid pool handle");
+    if (i == _open_pools.end()) throw std::invalid_argument("invalid pool handle %lx", pool);
 
     i->second -= 1;  // _open_pools[pool]
 
