@@ -14,13 +14,14 @@
 #ifndef MCAS_COMMON_PERF_TM_FORMAL_H
 #define MCAS_COMMON_PERF_TM_FORMAL_H
 
-// #include "perf_flags.h" /* TM_USED */
-#define TM_ENABLED 1
+#if ! defined MCAS_TM_ENABLED
+#define MCAS_TM_ENABLED 0
+#endif
 
 /* Definitions for opionally passing a timer_split argument (header file use)
  */
 
-#if TM_ENABLED
+#if MCAS_TM_ENABLED
 namespace common
 {
 	namespace perf

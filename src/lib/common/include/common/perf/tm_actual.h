@@ -28,7 +28,7 @@
 
 #define QUOTE(X) #X
 
-#if TM_ENABLED
+#if MCAS_TM_ENABLED
 /* declaration of the root timer_split instancei: once per thread, and probably in a function call argument list */
 #define TM_INSTANCE common::perf::timer_split tm_;
 /* timer_split actual formal argument (without and with other args) */
