@@ -1,5 +1,3 @@
-use std::env;
-
 fn main()
 {
     let mcas_build_dir = "${CMAKE_INSTALL_PREFIX}/lib";

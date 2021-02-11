@@ -653,7 +653,7 @@ extern "C" status_t mcas_async_invoke_ado(const mcas_pool_t pool,
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
 
   using rv_t = std::vector<IMCAS::ADO_response>;
-  handle->data = new rv_t;
+  handle->response_data = new rv_t;
 
   IMCAS::async_handle_t ahandle;
   auto result = mcas->async_invoke_ado(poolh,
@@ -661,7 +661,7 @@ extern "C" status_t mcas_async_invoke_ado(const mcas_pool_t pool,
                                        request,
                                        request_len,
                                        flags,
-                                       *(reinterpret_cast<rv_t*>(handle->data)),
+                                       *(reinterpret_cast<rv_t*>(handle->response_data)),
                                        ahandle,
                                        value_size);
   handle->internal = static_cast<void*>(ahandle);
@@ -678,9 +678,9 @@ extern "C" status_t mcas_check_async_invoke_ado(const mcas_pool_t pool,
   auto mcas = static_cast<IMCAS*>(pool.session);
 
   if(mcas->check_async_completion(reinterpret_cast<IMCAS::async_handle_t&>(handle.internal)) == S_OK) {
-    if(handle.data == nullptr)
+    if(handle.response_data == nullptr)
       throw General_exception("unexpected null handle data");
-    auto& responses = *(reinterpret_cast<std::vector<IMCAS::ADO_response>*>(handle.data));
+    auto& responses = *(reinterpret_cast<std::vector<IMCAS::ADO_response>*>(handle.response_data));
 
     auto n_responses = responses.size();
     *out_response_vector_count = n_responses;
@@ -781,7 +781,7 @@ extern "C" status_t mcas_async_invoke_put_ado(const mcas_pool_t pool,
   auto poolh = static_cast<IMCAS::pool_t>(pool.handle);
 
   using rv_t = std::vector<IMCAS::ADO_response>;
-  handle->data = new rv_t;
+  handle->response_data = new rv_t;
 
   IMCAS::async_handle_t ahandle;
   auto result = mcas->async_invoke_put_ado(poolh,
@@ -792,7 +792,7 @@ extern "C" status_t mcas_async_invoke_put_ado(const mcas_pool_t pool,
                                            value_len,
                                            root_len,
                                            flags,
-                                           *(reinterpret_cast<rv_t*>(handle->data)),
+                                           *(reinterpret_cast<rv_t*>(handle->response_data)),
                                            ahandle);
 
   handle->internal = static_cast<void*>(ahandle);
