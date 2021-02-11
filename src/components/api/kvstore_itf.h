@@ -348,7 +348,6 @@ class IKVStore : public component::IBase {
                        const size_t       value_len,
                        flags_t            flags = FLAGS_NONE)
   {
-assert(0);
     return E_NOT_SUPPORTED;
   }
 
@@ -372,7 +371,6 @@ assert(0);
                               memory_handle_t    handle = HANDLE_NONE,
                               flags_t            flags  = FLAGS_NONE)
   {
-assert(0);
     return E_NOT_SUPPORTED;
   }
 
