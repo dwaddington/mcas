@@ -143,7 +143,7 @@ template <typename Table>
 			update_finisher uf(*this);
 			char *src = _persist->mod_mapped.data();
 			/* NOTE: depends on mapped type */
-			auto v = _map->at(_persist->mod_key);
+			auto &v = _map->at(_persist->mod_key);
 			char *dst = std::get<0>(v).data();
 			auto mod_ctl = &*(_persist->mod_ctl);
 			for ( auto i = mod_ctl; i != &mod_ctl[_persist->mod_size]; ++i )
