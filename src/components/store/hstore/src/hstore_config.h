@@ -42,6 +42,7 @@
 /* timestamps are enabled to match mapstore. To disable, compile with -DENABLE_TIMESTAMPS=0 */
 
 #if ! defined ENABLE_TIMESTAMPS
+#error Top level CMaleLists.txt should have defined ENABLE_TIMESTAMPS
 #define ENABLE_TIMESTAMPS 1
 #endif
 

@@ -39,6 +39,7 @@ namespace common
 		private:
 			using rep_t = std::uint64_t;
 			std::atomic<duration_t::rep> _duration;
+			std::atomic<duration_t::rep> _delta; /* partial time incurret */
 			std::atomic<rep_t>           _dur_sq;
 			std::atomic<count_t>         _count;
 		private:
@@ -51,10 +52,17 @@ namespace common
 				return clock_t::now();
 			}
 
+			void a_charge(const duration_t &d)
+			{
+				_delta += d.count();
+			}
+
 			void a_record(const duration_t &d)
 			{
-				_duration += d.count();
-				_dur_sq += static_cast<count_t>(d.count() * d.count());
+				auto c = d.count() + _delta;
+				_delta = 0;
+				_duration += c;
+				_dur_sq += static_cast<count_t>(c * c);
 				++_count;
 			}
 
@@ -78,6 +86,10 @@ assert(0);
 				return time_point_t{};
 			}
 
+			void i_charge(const duration_t &)
+			{
+			}
+
 			void i_record(const duration_t &)
 			{
 			}
@@ -94,6 +106,11 @@ assert(0);
 			static time_point_t now()
 			{
 				return _clock_enabled ? a_now() : i_now();
+			}
+
+			void charge(const duration_t &d)
+			{
+				return _clock_enabled ?  a_charge(d) : i_charge(d);
 			}
 
 			void record(const duration_t &d)

@@ -14,6 +14,7 @@
 #ifndef MCAS_COMMON_PERF_WRITER_AT_EXIT_H
 #define MCAS_COMMON_PERF_WRITER_AT_EXIT_H
 
+#include <common/string_view.h>
 #include <string>
 #include <ostream>
 
@@ -55,14 +56,17 @@ namespace common
 						, _tag{tag_}
 					{}
 				template <typename ... Args>
-					writer_at_exit(std::ostream &o_, long line_, const char *file_, Args ... args)
+					writer_at_exit(std::ostream &o_, long line_, common::string_view file_, common::string_view func_, common::string_view tag_, Args ... args)
 						: E{args ...}
 						, _o{o_}
-						, _tag{std::string{file_} + ":" + std::to_string(line_)}
-					{}
+						, _tag{std::string{func_.begin(), func_.end()} + ":" + std::string(tag_.begin(), tag_.end())}
+					{
+						(void)line_;
+						(void)file_;
+					}
 				~writer_at_exit()
 				{
-					if ( bool_or_true(*this, 0) )
+					if ( true || bool_or_true(*this, 0) )
 					{
 						_o << _tag << " " << *this << "\n";
 					}

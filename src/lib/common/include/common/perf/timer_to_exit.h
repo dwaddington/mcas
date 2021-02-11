@@ -26,13 +26,16 @@ namespace common
 		private:
 			timer_split   *_tm;
 			duration_stat *_st;
+			const timer_to_exit **_pp; /* points to the function "active tte" pointer, which is a function argument, or (for the root tte) a function local */
+			const timer_to_exit *_pa;
 		public:
 			/*
-			 * Remember a timer_split and a duration_stat.
+			 * Remember a timer_split and a duration_stati, and the "parent" timer_to_exit.
 			 * When destructed, attribute the timer current "split time" to the duration_stat.
 			 */
-			timer_to_exit(timer_split &tm_, duration_stat &st_);
+			timer_to_exit(const timer_to_exit *&parent_ptr, timer_split &tm, duration_stat &st);
 			timer_to_exit(const timer_to_exit &) = delete;
+			timer_to_exit(const timer_to_exit *&parent_ptr, duration_stat &st);
 			timer_to_exit(timer_to_exit &&t_);
 			timer_to_exit &operator=(const timer_to_exit &) = delete;
 			timer_to_exit &operator=(timer_to_exit &&);
@@ -40,12 +43,16 @@ namespace common
 			/*
 			 * As above, but also attribute the timer split_time at construction to sp_
 			 */
-			timer_to_exit(timer_split &tm_, duration_stat &sp_, duration_stat &st_);
+			timer_to_exit(const timer_to_exit *&pa, timer_split &tm, duration_stat &sp, duration_stat &st);
+#if 0
+			timer_to_exit(timer_split &tm, duration_stat &sp, duration_stat &st);
+#endif
 
 			/*
-			 * iattribute the timer split_time up to now to sp_
+			 * attribute the timer split_time up to now to sp_
 			 */
-			void split(duration_stat &sp_) const;
+			void charge() const;
+			void finish() const;
 			virtual ~timer_to_exit();
 		};
 	}

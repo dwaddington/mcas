@@ -109,13 +109,10 @@ shard_section=build_shard_section(args.shards)
 # build final configuration file
 TEMPLATE=TEMPLATE.replace("%%SHARDS%%", shard_section)
 
-<<<<<<< HEAD
-=======
 if args.adopath:
     adopath = '    "ado_path" : "' + args.adopath + '",'
 else:
     adopath = ''
 
 TEMPLATE=TEMPLATE.replace("%%ADOPATH%%", adopath)
->>>>>>> origin/master
 print(TEMPLATE)

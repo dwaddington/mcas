@@ -28,6 +28,7 @@
 
 #include <common/errors.h>
 #include <common/exceptions.h>
+#include <common/perf/tm.h>
 #include <common/utils.h>
 
 #include <city.h>
@@ -302,6 +303,7 @@ auto hstore::put(const pool_t pool,
                  const std::size_t value_len,
                  flags_t flags) -> status_t
 {
+  TM_ROOT()
   CPLOG(
     1
     , PREFIX "(key=%s) (value=%.*s)"
@@ -332,19 +334,22 @@ auto hstore::put(const pool_t pool,
   {
     try
     {
-      auto i = session->insert(AK_INSTANCE key, value, value_len);
+      TM_SCOPE(insert_or_update)
+      auto it = session->insert(AK_INSTANCE TM_REF key, value, value_len);
 
+      TM_SCOPE(update)
       return
-        i.second                   ? S_OK
+        it.second                  ? S_OK
         : flags & FLAGS_DONT_STOMP ? int(component::IKVStore::E_KEY_EXISTS)
         : (
             session->update_by_issue_41(
               AK_INSTANCE
+              TM_REF
               key
               , value
               , value_len
-              , std::get<0>(i.first->second).data()
-              , std::get<0>(i.first->second).size())
+              , std::get<0>(it.first->second).data()
+              , std::get<0>(it.first->second).size())
             , S_OK
           )
         ;
@@ -397,6 +402,7 @@ auto hstore::get(const pool_t pool,
                  void*& out_value,
                  std::size_t& out_value_len) -> status_t
 {
+  TM_ROOT()
   const auto session = static_cast<const session_t *>(locate_session(pool));
   if ( ! session )
   {
@@ -412,7 +418,7 @@ auto hstore::get(const pool_t pool,
     if ( out_value )
     {
       auto buffer_size = out_value_len;
-      out_value_len = session->get(key, out_value, buffer_size);
+      out_value_len = session->get(TM_REF key, out_value, buffer_size);
       /*
        * It might be reasonable to
        *  a) fill the buffer and/or
@@ -453,6 +459,7 @@ auto hstore::get_direct(const pool_t pool,
                         std::size_t& out_value_len,
                         memory_handle_t) -> status_t
 {
+TM_ROOT()
   const auto session = static_cast<const session_t *>(locate_session(pool));
   if ( ! session )
   {
@@ -462,7 +469,7 @@ auto hstore::get_direct(const pool_t pool,
   try
   {
     const auto buffer_size = out_value_len;
-    out_value_len = session->get(key, out_value, buffer_size);
+    out_value_len = session->get(TM_REF key, out_value, buffer_size);
     if ( buffer_size < out_value_len )
     {
       return E_INSUFFICIENT_BUFFER;
@@ -594,12 +601,13 @@ auto hstore::resize_value(
   , const std::size_t alignment
 ) -> status_t
 {
+  TM_ROOT()
   const auto session = static_cast<session_t *>(locate_session(pool));
   try
   {
     return
       session
-      ? ( session->resize_mapped(AK_INSTANCE key, new_value_len, clean_align(alignment)), S_OK )
+      ? ( session->resize_mapped(AK_INSTANCE TM_REF key, new_value_len, clean_align(alignment)), S_OK )
       : E_FAIL
       ;
   }
@@ -637,9 +645,10 @@ auto hstore::lock(
 ) -> status_t
 try
 {
+  TM_ROOT()
   const auto session = static_cast<session_t *>(locate_session(pool));
   if(!session) return E_FAIL;
-  auto r = session->lock(AK_INSTANCE key, type, out_value, out_value_len);
+  auto r = session->lock(AK_INSTANCE TM_REF key, type, out_value, out_value_len);
 
   out_key = r.key;
   if ( out_key_ptr )
@@ -679,13 +688,14 @@ auto hstore::unlock(const pool_t pool,
                     component::IKVStore::key_t key_,
                     component::IKVStore::unlock_flags_t flags_) -> status_t
 {
+  TM_ROOT()
   /* NOTE: if flags & UNLOCK_FLAGS_PMFLUSH, only flush if the lock held
      is a write lock
   */
   const auto session = static_cast<session_t *>(locate_session(pool));
   return
     session
-    ? session->unlock(key_, flags_)
+    ? session->unlock_indefinite(TM_REF key_, flags_)
     : component::IKVStore::E_POOL_NOT_FOUND
     ;
 }
@@ -694,9 +704,10 @@ auto hstore::erase(const pool_t pool,
                    const std::string &key
                    ) -> status_t
 {
+  TM_ROOT()
   const auto session = static_cast<session_t *>(locate_session(pool));
   return session
-    ? session->erase(key)
+    ? session->erase(TM_REF key)
     : component::IKVStore::E_POOL_NOT_FOUND
     ;
 }
@@ -805,11 +816,13 @@ auto hstore::atomic_update(
 	, const bool take_lock) -> status_t
 try
 {
-  const auto update_method = take_lock ? &session_t::lock_and_atomic_update : &session_t::atomic_update;
+  TM_ROOT(hs_atomic_update)
+  using op_it_type = std::vector<IKVStore::Operation *>::const_iterator;
+  const auto update_method = take_lock ? &session_t::lock_and_atomic_update<op_it_type> : &session_t::atomic_update<op_it_type>;
   const auto session = static_cast<session_t *>(locate_session(pool));
   return
     session
-    ? ( (session->*update_method)(AK_INSTANCE key, op_vector), S_OK )
+    ? ( (session->*update_method)(AK_INSTANCE TM_REF key, op_vector.begin(), op_vector.end()), S_OK )
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }
@@ -846,10 +859,11 @@ auto hstore::swap_keys(
 ) -> status_t
 try
 {
+  TM_ROOT()
   const auto session = static_cast<session_t *>(locate_session(pool));
   return
     session
-    ? session->swap_keys(AK_INSTANCE key0, key1)
+    ? session->swap_keys(AK_INSTANCE TM_REF key0, key1)
     : int(component::IKVStore::E_POOL_NOT_FOUND)
     ;
 }

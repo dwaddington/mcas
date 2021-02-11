@@ -19,6 +19,7 @@
 #include "hstore_config.h"
 #include "cptr.h"
 #include "fixed_string.h"
+#include "lock_state.h"
 #include "persistent.h"
 #include "perishable_expiry.h"
 #include <common/pointer_cast.h>
@@ -140,6 +141,7 @@ template <typename T, typename AllocatorChar, typename PtrT, typename Cptr, type
 				, IT last_
 				, std::size_t fill_len_
 				, std::size_t alignment_
+				, lock_state lock_
 				, AL al_
 			)
 			{
@@ -156,7 +158,7 @@ template <typename T, typename AllocatorChar, typename PtrT, typename Cptr, type
 					, alignment_
 				);
 				new (ptr())
-					element_type(first_, last_, fill_len_, alignment_);
+					element_type(first_, last_, fill_len_, alignment_, lock_);
 				new (&al()) allocator_char_type(al_);
 				ptr()->persist_this(al_);
 			}
@@ -228,11 +230,12 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, IT last_
 				, std::size_t fill_len_
 				, std::size_t alignment_
+				, lock_state lock_
 				, AL al_
 			)
 				: _inline( f_ )
 			{
-				_outline.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
+				_outline.assign(AK_REF first_, last_, fill_len_, alignment_, lock_, al_);
 			}
 
 		template <typename IT, typename AL>
@@ -240,9 +243,10 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				AK_ACTUAL
 				IT first_
 				, IT last_
+				, lock_state lock_
 				, AL al_
 			)
-				: persist_fixed_string(AK_REF first_, last_, 0U, default_alignment, al_)
+				: persist_fixed_string(AK_REF first_, last_, 0U, default_alignment, lock_, al_)
 			{
 			}
 
@@ -252,9 +256,10 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				const fixed_data_location_t &f_
 				, IT first_
 				, IT last_
+				, lock_state lock_
 				, AL al_
 			)
-				: persist_fixed_string(AK_REF f_, first_, last_, 0U, default_alignment, al_)
+				: persist_fixed_string(AK_REF f_, first_, last_, 0U, default_alignment, lock_, al_)
 			{
 			}
 
@@ -265,6 +270,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, IT last_
 				, std::size_t fill_len_
 				, std::size_t alignment_
+				, lock_state lock_
 				, AL al_
 			)
 				: _inline(
@@ -299,7 +305,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 						, alignment_
 					);
 					new (_outline.ptr())
-						element_type(first_, last_, fill_len_, alignment_);
+						element_type(first_, last_, fill_len_, alignment_, lock_);
 					_outline.ptr()->persist_this(al_);
 				}
 			}
@@ -310,6 +316,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				const fixed_data_location_t &f_
 				, std::size_t data_len_
 				, std::size_t alignment_
+				, lock_state lock_
 				, AL al_
 			)
 				: _inline(f_)
@@ -324,7 +331,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					+ data_size
 					, alignment_
 				);
-				new (_outline.ptr()) element_type(data_size, alignment_);
+				new (_outline.ptr()) element_type(data_size, alignment_, lock_);
 			}
 
 		/* Needed because the persist_fixed_string arguments are sometimes conveyed via
@@ -333,14 +340,15 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		 */
 		template <typename IT, typename AL>
 			persist_fixed_string(
-				std::tuple<AK_FORMAL IT&, IT&&, AL>&& p_
+				std::tuple<AK_FORMAL IT&, IT&&, lock_state &&, AL>&& p_
 			)
 				: persist_fixed_string(
 					std::get<0>(p_)
 					, std::get<1>(p_)
 					, std::get<2>(p_)
-#if AK_USED
 					, std::get<3>(p_)
+#if AK_USED
+					, std::get<4>(p_)
 #endif
 				)
 			{}
@@ -351,13 +359,14 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		 */
 		template <typename AL>
 			persist_fixed_string(
-				std::tuple<AK_FORMAL const std::size_t &, AL>&& p_
+				std::tuple<AK_FORMAL const std::size_t &, lock_state &&, AL>&& p_
 			)
 				: persist_fixed_string(
 					std::get<0>(p_)
 					, std::get<1>(p_)
-#if AK_USED
 					, std::get<2>(p_)
+#if AK_USED
+					, std::get<3>(p_)
 #endif
 				)
 			{}
@@ -368,14 +377,15 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		 */
 		template <typename AL>
 			persist_fixed_string(
-				std::tuple<AK_FORMAL const fixed_data_location_t &, const std::size_t &, AL>&& p_
+				std::tuple<AK_FORMAL const fixed_data_location_t &, const std::size_t &, lock_state &&, AL>&& p_
 			)
 				: persist_fixed_string(
 					std::get<0>(p_)
 					, std::get<1>(p_)
 					, std::get<2>(p_)
-#if AK_USED
 					, std::get<3>(p_)
+#if AK_USED
+					, std::get<4>(p_)
 #endif
 				)
 			{
@@ -386,9 +396,10 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				AK_ACTUAL
 				const fixed_data_location_t &f_
 				, std::size_t data_len_
+				, lock_state lock_
 				, AL al_
 			)
-				: persist_fixed_string(AK_REF f_, data_len_, default_alignment, al_)
+				: persist_fixed_string(AK_REF f_, data_len_, default_alignment, lock_, al_)
 			{
 			}
 
@@ -399,6 +410,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				, IT last_
 				, std::size_t fill_len_
 				, std::size_t alignment_
+				, lock_state lock_
 				, AL al_
 			)
 			{
@@ -410,7 +422,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				}
 				else
 				{
-					_outline.assign(AK_REF first_, last_, fill_len_, alignment_, al_);
+					_outline.assign(AK_REF first_, last_, fill_len_, alignment_, lock_, al_);
 					_inline.set_fixed();
 				}
 				return *this;
@@ -421,10 +433,11 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				AK_ACTUAL
 				IT first_
 				, IT last_
+				, lock_state lock_
 				, AL al_
 			)
 			{
-				return assign(AK_REF first_, last_, 0, default_alignment, al_);
+				return assign(AK_REF first_, last_, 0, default_alignment, lock_, al_);
 			}
 
 		void clear()
@@ -517,6 +530,13 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				else
 				{
 					/* _outline <- _outline */
+#if 0
+					bool held_exclusive = _outline.is_locked_exclusive();
+					if ( held_exclusive )
+					{
+						other._outline.ptr()->set_held_exclusive();
+					}
+#endif
 					_outline.P = other._outline.P;
 					_outline.ptr()->inc_ref(__LINE__, "=&");
 					new (&_outline.al()) allocator_type_element(other._outline.al());
@@ -645,7 +665,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 							_outline.ptr()->alloc_element_count() * sizeof(T), _outline.P
 						);
 						new (_outline.P)
-							element_type( size(), _outline.ptr()->alignment() );
+							element_type( size(), _outline.ptr()->alignment(), lock_state::free );
 					}
 					reset_lock();
 #else
@@ -726,6 +746,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		bool lockable() const { return ! is_inline(); }
 		bool try_lock_shared() const { return lockable() && _outline.ptr()->try_lock_shared(); }
 		bool try_lock_exclusive() const { return lockable() && _outline.ptr()->try_lock_exclusive(); }
+		bool is_locked_exclusive() const { return lockable() && _outline.ptr()->is_locked_exclusive(); }
 		bool is_locked() const { return lockable() && _outline.ptr()->is_locked(); }
 		template <typename AL>
 			void flush_if_locked_exclusive(AL al_) const
@@ -744,13 +765,31 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 #endif
 				}
 			}
-		void unlock() const
+
+		void unlock_indefinite() const
 		{
 			if ( lockable() )
 			{
-				_outline.ptr()->unlock();
+				_outline.ptr()->unlock_indefinite();
 			}
 		}
+
+		void unlock_exclusive() const
+		{
+			if ( lockable() )
+			{
+				_outline.ptr()->unlock_exclusive();
+			}
+		}
+
+		void unlock_shared() const
+		{
+			if ( lockable() )
+			{
+				_outline.ptr()->unlock_shared();
+			}
+		}
+
 		void reset_lock() const { if ( lockable() ) { _outline.ptr()->reset_lock(); } }
 		/* The "crash consistent" version resets the lock before using allocation_states to
 		 * ensure that the string is in a consistent state. Reset the lock carefully: the
@@ -791,7 +830,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				hop_hash_log<false>::write(LOG_LOCATION, "size to copy ", old_cptr, " old cptr was ", old_cptr, " value ", std::string(temp.data(), temp.size()));
 				auto begin = temp.data();
 				auto end = begin + temp.size();
-				_outline.assign(AK_REF begin, end, 0, default_alignment, al_);
+				_outline.assign(AK_REF begin, end, 0, default_alignment, lock_state::free, al_);
 				_inline.set_fixed();
 				hop_hash_log<false>::write(LOG_LOCATION, "result size ", this->size(), " value ", std::string(this->data_fixed(), this->size()));
 			}
@@ -809,15 +848,9 @@ template <typename T, std::size_t SmallSize, typename Allocator>
 	)
 	{
 		return
-#if 0
-			a.is_inline() && b.is_inline()
-			? a.inline_match(b)
-			: a.general_match(b)
-#else
 			a.size() == b.size()
 			&&
 			std::equal(a.data(), a.data() + a.size(), b.data())
-#endif
 		;
 	}
 

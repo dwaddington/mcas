@@ -19,51 +19,100 @@
 using namespace common;
 using namespace perf;
 
-timer_to_exit::timer_to_exit(timer_split &tm_, duration_stat &st_)
+/* For the "root" tte, pass a reference to a null timer_to_exit as pe_ */
+timer_to_exit::timer_to_exit(const timer_to_exit *&pa_, timer_split &tm_, duration_stat &st_)
 	: _tm(&tm_)
 	, _st(&st_)
-{}
+	, _pp(&pa_) /* where we got our parent pointer (points to a function argument parent pointer, or root timer_to_exit* if this is root) */
+	, _pa(pa_) /* value of that parent pointer */
+{
+	pa_ = this;
+}
+
+timer_to_exit::timer_to_exit(const timer_to_exit *&pa_, duration_stat &st_)
+	: _tm(pa_->_tm)
+	, _st(&st_)
+	, _pp(&pa_) /* where we got our parent pointer (points to a function argument parent pointer, or root timer_to_exit* if this is root) */
+	, _pa(pa_)
+{
+	pa_ = this;
+	/* If there is a parent, charge time-to-now to the parent */
+	if ( _pa )
+	{
+		_pa->charge();
+	}
+}
 
 timer_to_exit::timer_to_exit(timer_to_exit &&t_)
 	: _tm(t_._tm)
 	, _st(t_._st)
+	, _pp(t_._pp)
+	, _pa(t_._pa)
 {
+	/* If t_ has a durations_stat (and it should), give time until now to that stat */
+	if ( _st )
+	{
+		t_.finish();
+	}
+
 	t_._st = nullptr;
+	t_._pp = nullptr;
 }
 
 timer_to_exit &timer_to_exit::operator=(timer_to_exit &&t_)
 {
-	if ( _st )
-	{
-		this->split(*_st);
-	}
+	this->charge();
 	_tm = t_._tm;
 	_st = t_._st;
+	_pp = t_._pp;
+	_pa = t_._pa;
+
+	/* If t_ has a durations_stat (and it should), give time until now to that stat */
+	if ( _st )
+	{
+		t_.finish();
+	}
 	t_._st = nullptr;
+	t_._pp = nullptr;
 	return *this;
 }
 
+#if 0
 /*
  * As above, but also attribute the timer split_time at construction to sp_
  */
-timer_to_exit::timer_to_exit(timer_split &tm_, duration_stat &sp_, duration_stat &st_)
-	: timer_to_exit(tm_, st_)
+timer_to_exit::timer_to_exit(const timer_to_exit *&pa_, timer_split &tm_, duration_stat &sp_, duration_stat &st_)
+	: timer_to_exit(pa_, tm_, st_)
 {
-	this->split(sp_);
+	this->chargs(sp_);
 }
+#endif
 
 /*
  * iattribute the timer split_time up to now to sp_
  */
-void timer_to_exit::split(duration_stat &sp_) const
+void timer_to_exit::finish() const
 {
-	sp_.record(_tm->split_duration());
+	if ( _st )
+	{
+		_st->record(_tm->split_duration());
+	}
+}
+
+void timer_to_exit::charge() const
+{
+	if ( _st )
+	{
+		_st->charge(_tm->split_duration());
+	}
 }
 
 timer_to_exit::~timer_to_exit()
 {
-	if ( _st )
+	this->finish();
+	/* If there is a current pointer to the "tte address" restore it to its previous value */
+	if ( _pp )
 	{
-		this->split(*_st);
+		*_pp = _pa;
 	}
 }

@@ -23,7 +23,6 @@
 #include <common/errors.h>
 #include <common/exceptions.h>
 #include <common/cycles.h>
-#include <common/perf/tm_actual.h>
 #include <nupm/mcas_mod.h>
 #include <nupm/region_descriptor.h>
 #include <rapidjson/ostreamwrapper.h>
@@ -221,9 +220,8 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
   return S_OK;
 }
 
-void Shard::process_put_ado_request(TM_ACTUAL Connection_handler* handler, const protocol::Message_put_ado_request* msg)
+void Shard::process_put_ado_request(Connection_handler* handler, const protocol::Message_put_ado_request* msg)
 {
-TM_SCOPE(process_put_ado_request);
   handler->msg_recv_log(msg, __func__);
   using namespace component;
 
@@ -358,10 +356,9 @@ TM_SCOPE(process_put_ado_request);
   CPLOG(2, "Shard_ado: sent work request (len=%lu, key=%lx)", msg->request_len(), wr_key);
 }
 
-void Shard::process_ado_request(TM_ACTUAL Connection_handler* handler,
+void Shard::process_ado_request(Connection_handler* handler,
                                 const protocol::Message_ado_request* msg)
 {
-TM_SCOPE(process_ado_request);
   using namespace component;
 
   try {
@@ -696,7 +693,7 @@ void Shard::close_all_ado()
  * Handle messages coming back from the ADO process.
  *
  */
-void Shard::process_messages_from_ado(TM_ACTUAL0)
+void Shard::process_messages_from_ado()
 {
   using namespace component;
 
@@ -952,7 +949,7 @@ void Shard::process_messages_from_ado(TM_ACTUAL0)
               CPLOG(2, "Shard_ado: locked KV pair (keyhandle=%p, value=%p, len=%lu) invoke_completion_unlock=%d",
                     static_cast<void*>(key_handle), value, value_len, invoke_completion_unlock);
 
-              add_index_key(TM_REF ado->pool_id(), key);
+              add_index_key(ado->pool_id(), key);
 
               /* auto-unlock means we add a deferred unlock that happens after
                  the ado invocation (identified by work_id) has completed. */

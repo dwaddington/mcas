@@ -14,7 +14,7 @@
 #ifndef MCAS_COMMON_PERF_TM_ACTUAL_H
 #define MCAS_COMMON_PERF_TM_ACTUAL_H
 
-#include "tm_formal.h"
+#include "tm_fwd.h"
 
 #include <common/perf/duration_stat.h>
 #include <common/perf/timer_split.h>
@@ -25,7 +25,7 @@
 /*
  * Definitions for opionally passing a timer_split argument.
  *
- * TM_INSTANCE define and starts a timer.
+ * TM_ROOT define a timer, sink, and scope. and start the timer.
  * TM_SCOPE(tag) binds a timer to an output (tagged by the name "tag") until the end of scope.
  * TM_SPLIT(tag2) charges time accumulated since the start of scope (or the previous split) from
  *   the scope "tag" to the split "tag2". Note that the time tansferred to the split "tag2"
@@ -38,19 +38,26 @@
 
 #if MCAS_TM_ENABLED
 /* declaration of the root timer_split instancei: once per thread, and probably in a function call argument list */
-#define TM_INSTANCE common::perf::timer_split tm_;
+#define TM_ROOT(tag) common::perf::timer_split tm; const common::perf::timer_to_exit *pa_ = nullptr; _TM_SCOPE_DEF(tag) common::perf::timer_to_exit tte_##tag{pa_, tm, w_##tag};
 /* timer_split actual formal argument (without and with other args) */
-#define TM_ACTUAL0 common::perf::timer_split &tm_
+#define TM_ACTUAL0 const common::perf::timer_to_exit *&pa_
 #define TM_ACTUAL TM_ACTUAL0,
-#define TM_REF0 tm_
+#define TM_REF0 pa_
 #define TM_REF TM_REF0,
-#define _TM_SCOPE_DEF(tag) static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag(std::cerr, QUOTE(tag)); static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag##_e(std::cerr, QUOTE(tag##_e));
-#define _TM_SCOPE_USE(tag) _Pragma("GCC diagnostic push"); _Pragma("GCC diagnostic ignored \"-Wshadow\""); common::perf::timer_to_exit tte{tm_, w_##tag, w_##tag##_e}; _Pragma("GCC diagnostic pop");
+#define _TM_SCOPE_DEF(tag) \
+	static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag(std::cerr, __LINE__, __FILE__, __func__, QUOTE(tag));
+/* Note we with to redefine the name tte_ or this scope. tter is a reference to refer to the old tte_
+ * after its name has been shadowed.
+ */
+#define _TM_SCOPE_USE(tag) \
+	_Pragma("GCC diagnostic push"); \
+       	_Pragma("GCC diagnostic ignored \"-Wshadow\""); \
+	common::perf::timer_to_exit tte_##tag{pa_, w_##tag}; \
+       	_Pragma("GCC diagnostic pop");
 #define TM_SCOPE(tag) _TM_SCOPE_DEF(tag) _TM_SCOPE_USE(tag);
-#define TM_SPLIT(tag) static common::perf::writer_at_exit<common::perf::duration_stat> w_##tag(std::cerr, QUOTE(tag)); tte.split(w_##tag)
+#define TM_SPLIT(tag) _TM_SCOPE_DEF(tag) pa_->split(w_##tag)
 #else
-#error Want TM_ENABLED
-#define TM_INSTANCE
+#define TM_ROOT(tag)
 #define TM_ACTUAL0
 #define TM_ACTUAL
 #define TM_REF0

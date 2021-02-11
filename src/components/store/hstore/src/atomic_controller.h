@@ -17,8 +17,10 @@
 
 #include "alloc_key.h" /* AK_FORMAL */
 #include "construction_mode.h"
+#include "lock_state.h"
 #include "mod_control.h"
 #include <api/kvstore_itf.h> /* component */
+#include <common/perf/tm_fwd.h>
 
 #include <tuple> /* tuple_element */
 #include <type_traits> /* is_base_of */
@@ -52,11 +54,11 @@ namespace impl
 				update_finisher(impl::atomic_controller<table_t> &ctlr_);
 				~update_finisher() noexcept(! TEST_HSTORE_PERISHABLE);
 			};
-			void redo_update();
+			void do_update(TM_FORMAL0);
 			void update_finish();
-			void redo_replace();
-			void redo_swap();
-			void redo_finish();
+			void do_replace();
+			void do_swap();
+			void do_finish();
 #if 0
 			/* Helpers for the perishable test, to avoid an exception in the finish_update destructor */
 			void tick_expired() { _tick_expired = true; }
@@ -86,29 +88,38 @@ namespace impl
 			atomic_controller(const atomic_controller &) = delete;
 			atomic_controller& operator=(const atomic_controller &) = delete;
 
-			void redo();
+		private:
+			void do_op(TM_FORMAL0);
+		public:
+			template <typename IT> /* *IT shall be a component::IKVStore::Operation * */
+				void enter_update(
+					AK_FORMAL
+					TM_FORMAL
+					typename table_t::allocator_type al_
+					, lock_state lock
+					, const std::string &key
+					, IT first
+					, IT last
+				);
 
-			void enter_update(
-				AK_FORMAL
-				typename table_t::allocator_type al_
-				, const std::string &key
-				, std::vector<component::IKVStore::Operation *>::const_iterator first
-				, std::vector<component::IKVStore::Operation *>::const_iterator last
-			);
 			void enter_replace(
 				AK_FORMAL
+				TM_FORMAL
 				typename table_t::allocator_type al
+				, lock_state lock
 				, const std::string &key
 				, const char *data
 				, std::size_t data_len
 				, std::size_t zeros_extend
 				, std::size_t alignment
 			);
+
 			using mt = typename table_t::mapped_type;
 			void enter_swap(
 				mt &d0
 				, mt &d1
 			);
+
 			friend struct atomic_controller<table_t>::update_finisher;
 	};
 }

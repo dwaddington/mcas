@@ -15,7 +15,9 @@
 #ifndef MCAS_HSTORE_FIXED_STRING_H
 #define MCAS_HSTORE_FIXED_STRING_H
 
+#include "lock_state.h"
 #include <common/pointer_cast.h>
+#include <common/perf/tm.h>
 #include <algorithm> /* fill_n, copy */
 #include <cassert>
 #include <cstddef> /* size_t */
@@ -77,10 +79,12 @@ template <typename T>
 				IT first_, IT last_
 				, std::size_t pad_
 				, std::size_t alignment_
+				, lock_state lock_
 			)
 				: fixed_string(
 					std::size_t(last_-first_) + pad_
 					, alignment_
+					, lock_
 				)
 			{
 				/* for small lengths we copy */
@@ -100,10 +104,10 @@ template <typename T>
 				);
 			}
 
-		fixed_string(std::size_t data_len_, std::size_t alignment_)
+		fixed_string(std::size_t data_len_, std::size_t alignment_, lock_state lock_)
 			: _ref_count(1U)
 			, _alignment(unsigned(alignment_))
-			, _lock(0)
+			, _lock(signed(lock_))
 			, _size(data_len_)
 		{
 			if ( _alignment != alignment_ )
@@ -151,18 +155,33 @@ template <typename T>
 			return ok;
 		}
 
-		void unlock()
+		/* unlock when you have forgotten whether the lock you had was
+		 * shared or exclusive.
+		 */
+		void unlock_indefinite()
 		{
 			switch ( _lock )
 			{
-			case 0:
+			case 0: /* no lock held */
 				break;
-			case -1:
+			case -1: /* exclusive lock held */
 				_lock = 0;
 				break;
-			default:
+			default: /* shared lock held */
 				--_lock;
 			}
+		}
+
+		void unlock_exclusive()
+		{
+			assert(-1 == _lock);
+			_lock = 0;
+		}
+
+		void unlock_shared()
+		{
+			assert(0 < _lock);
+			--_lock;
 		}
 
 		bool is_locked() const

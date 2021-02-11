@@ -21,7 +21,9 @@
 #include "segment_layout.h"
 #include "trace_flags.h"
 #include <array>
+#include <cassert>
 #include <cstddef> /* size_t */
+
 
 namespace impl
 {
@@ -110,28 +112,43 @@ namespace impl
 			using bucket_aligned_t = bucket_aligned<Bucket>;
 			using six_t = std::size_t;
 			using bix_t = std::size_t;
-		public:
+		private:
 			six_t _index;
+			std::size_t _bi_mask;
 		public:
-			bucket_control_unlocked<Bucket> *_prev;
+			bucket_control_unlocked<Bucket> *_prev; /* public only for initial linknig by hop_hash_base */
 			bucket_control_unlocked<Bucket> *_next;
-			bucket_aligned_t *_buckets;
+			bucket_aligned_t *_buckets; /* public only so that transform can access the element */
+		private:
 			bucket_aligned_t *_buckets_end;
+
+
+			unsigned log_segment_size() const
+			{
+				return unsigned( segment_layout::log2_base_segment_size + (_index == 0U ? 0U : (_index-1U) ) );
+			}
+
+			std::size_t segment_size_from_log() const {
+				return std::size_t(1) << log_segment_size();
+			}
 		public:
+
 			bucket_control_unlocked(
 				six_t index_
 				, bucket_aligned_t *buckets_
 			)
 				: _index(index_)
+				, _bi_mask(segment_size_from_log()-1U)
 				, _prev(this)
 				, _next(this)
 				, _buckets(buckets_)
 				, _buckets_end(
 					_buckets
-					? buckets_ + ( segment_layout::log2_base_segment_size << (index_ == 0U ? 0U : (index_-1U) ) )
-					: _buckets
+					? _buckets + segment_size()
+					: nullptr
 				)
-			{}
+			{
+			}
 			bucket_control_unlocked(const bucket_control_unlocked &) = delete;
 
 			~bucket_control_unlocked()
@@ -148,8 +165,32 @@ namespace impl
 
 			bucket_control_unlocked operator=(const bucket_control_unlocked &) = delete;
 
+			/* Should be replaced by a placement constructor */
+			void extend(
+				bucket_aligned_t *more_
+				, bucket_control_unlocked *prev_
+				, bucket_control_unlocked *next_
+				, six_t index_
+			)
+			{
+				_buckets = more_;
+				_prev = prev_;
+				_next = next_;
+				_index = index_;
+				_bi_mask = segment_size_from_log()-1U;
+				_buckets_end = _buckets + segment_size();
+			}
+
+			std::size_t bi_mask() const
+			{
+				return _bi_mask;
+			}
 			six_t index() const { return _index; }
-			std::size_t segment_size() const { return std::size_t(_buckets_end - _buckets); }
+			bucket_aligned_t *buckets() const { return _buckets; }
+			bucket_aligned_t *buckets_end() const { return _buckets_end; }
+			bucket_control_unlocked<Bucket> *prev() const { return _prev; }
+			bucket_control_unlocked<Bucket> *next() const { return _next; }
+			std::size_t segment_size() const { return bi_mask() + 1U; }
 			bucket_aligned_t &deref(bix_t bi) const { return _buckets[bi]; }
 
 			template <typename Allocator>

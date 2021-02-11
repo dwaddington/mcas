@@ -20,6 +20,7 @@
 #include "clean_align.h"
 #include "construction_mode.h"
 #include "key_not_found.h"
+#include "lock_state.h"
 #include "logging.h"
 #include "hstore_alloc_type.h"
 #include "hstore_nupm_types.h"
@@ -136,11 +137,13 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		private:
 			typename table_t::iterator _it;
 		public:
+			bool good() const { return data().is_locked_exclusive(); }
 			template <typename K>
 				definite_lock(
 					AK_ACTUAL
+					TM_ACTUAL
 					table_t &map_, const K &key_, allocator_type al_)
-					: _it(map_.find(key_))
+					: _it(map_.find(TM_REF key_))
 				{
 					if ( _it == map_.end() )
 					{
@@ -174,7 +177,27 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					{
 						throw impl::is_locked{};
 					}
+					assert(this->good());
 				}
+
+			~definite_lock()
+			{
+				try
+				{
+					if ( ! perishable_expiry::is_current() )
+					{
+						/* release lock */
+						const auto &d = data();
+						d.unlock_exclusive();
+					}
+				}
+				catch ( const Exception & )
+				{
+				}
+				catch ( const std::exception & )
+				{
+				}
+			}
 
 			auto &mapped() const
 			{
@@ -185,25 +208,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			{
 				auto &m = mapped();
 				return std::get<0>(m);
-			}
-
-			~definite_lock()
-			{
-				try
-				{
-					if ( ! perishable_expiry::is_current() )
-					{
-						/* release lock */
-						const auto &d = data();
-						d.unlock();
-					}
-				}
-				catch ( const Exception & )
-				{
-				}
-				catch ( const std::exception & )
-				{
-				}
 			}
 		};
 
@@ -383,11 +387,13 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 
 		auto insert(
 			AK_ACTUAL
+			TM_ACTUAL
 			const std::string &key,
 			const void * value,
 			const std::size_t value_len
 		)
 		{
+			TM_SCOPE()
 			auto cvalue = static_cast<const char *>(value);
 
 #if USE_CC_HEAP == 4
@@ -399,17 +405,19 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			monitor_emplace<Allocator> m(this->allocator());
 #endif
 			++_writes;
+			TM_SCOPE(emplace)
 			return
 				map().emplace(
 					AK_REF
+					TM_REF
 					std::piecewise_construct
-					, std::forward_as_tuple(AK_REF key.begin(), key.end(), this->allocator())
+					, std::forward_as_tuple(AK_REF key.begin(), key.end(), lock_state::free, this->allocator())
 					, std::forward_as_tuple(
 /* we wish that std::tuple had piecewise_construct, but it does not. */
 #if 0
 						std::piecewise_construct,
 #endif
-						std::forward_as_tuple(AK_REF cvalue, cvalue + value_len, this->allocator())
+						std::forward_as_tuple(AK_REF cvalue, cvalue + value_len, lock_state::free, this->allocator())
 #if ENABLE_TIMESTAMPS
 						, impl::tsc_now()
 #endif
@@ -419,6 +427,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 
 		void update_by_issue_41(
 			AK_ACTUAL
+			TM_ACTUAL
 			const std::string &key,
 			const void * value,
 			const std::size_t value_len,
@@ -426,7 +435,8 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			const std::size_t old_value_len
 		)
 		{
-			definite_lock dl(AK_REF this->map(), key, _heap);
+			TM_SCOPE()
+			definite_lock dl(AK_REF TM_REF this->map(), key, _heap);
 
 			/* hstore issue 41: "a put should replace any existing k,v pairs that match.
 			 * If the new put is a different size, then the object should be reallocated.
@@ -434,33 +444,43 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			 */
 			if ( value_len != old_value_len )
 			{
+				assert(dl.good());
 				_atomic_state.enter_replace(
 					AK_REF
+					TM_REF
 					this->allocator()
+					, lock_state::exclusive
 					, key
 					, static_cast<const char *>(value)
 					, value_len
 					, 0
 					, std::tuple_element<0, mapped_t>::type::default_alignment /* requested default mapped_type alignment */
 				);
+				assert(dl.good());
 			}
 			else
 			{
-				std::vector<std::unique_ptr<component::IKVStore::Operation>> v;
-				v.emplace_back(std::make_unique<component::IKVStore::Operation_write>(0, value_len, value));
-				std::vector<component::IKVStore::Operation *> v2;
-				std::transform(v.begin(), v.end(), std::back_inserter(v2), [] (const auto &i) { return i.get(); });
-				this->atomic_update(AK_REF key, v2);
+				assert(dl.good());
+				component::IKVStore::Operation_write op(0, value_len, value);
+				// v.emplace_back(std::make_unique<component::IKVStore::Operation_write>(0, value_len, value));
+				std::array<component::IKVStore::Operation *, 1> v2{&op};
+				// std::transform(v.begin(), v.end(), std::back_inserter(v2), [] (const auto &i) { return i.get(); });
+				assert(dl.good());
+				this->atomic_update_inner(AK_REF TM_REF key, v2.begin(), v2.end(), lock_state::exclusive);
+				assert(dl.good());
 			}
+			assert(dl.good());
 		}
 
 		auto get(
+			TM_ACTUAL
 			const std::string &key,
 			void* buffer,
 			std::size_t buffer_size
 		) const -> std::size_t
 		{
-			auto &v = map().at(key);
+			TM_SCOPE()
+			auto &v = map().at(TM_REF key);
 			auto value_len = std::get<0>(v).size();
 
 			if ( value_len <= buffer_size )
@@ -474,7 +494,8 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			const std::string &key
 		) const -> std::tuple<void *, std::size_t>
 		{
-			auto &v = map().at(key);
+			TM_ROOT()
+			auto &v = map().at(TM_REF key);
 			auto value_len = std::get<0>(v).size();
 
 			auto value = ::scalable_malloc(value_len);
@@ -491,7 +512,8 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			const std::string & key
 		) const -> std::size_t
 		{
-			auto &v = this->map().at(key);
+			TM_ROOT()
+			auto &v = this->map().at(TM_REF key);
 			return std::get<0>(v).size();
 		}
 
@@ -500,7 +522,8 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			const std::string & key
 		) const -> std::size_t
 		{
-			auto &v = this->map().at(key);
+			TM_ROOT()
+			auto &v = this->map().at(TM_REF key);
 			// TO FIX
 			//                      return impl::tsc_to_epoch(std::get<1>(v));
 			return boost::numeric_cast<std::size_t>(impl::tsc_to_epoch(std::get<1>(v)).seconds());
@@ -517,21 +540,24 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 
 		void resize_mapped(
 			AK_ACTUAL
+			TM_ACTUAL
 			const std::string &key
 			, std::size_t new_mapped_len
 			, std::size_t alignment
 		)
 		{
-			definite_lock dl(AK_REF this->map(), key, _heap);
+			definite_lock dl(AK_REF TM_REF this->map(), key, _heap);
 
-			auto &v = this->map().at(key);
+			auto &v = this->map().at(TM_REF key);
 			auto &d = std::get<0>(v);
 			/* Replace the data if the size changes or if the data should be realigned */
 			if ( d.size() != new_mapped_len || reinterpret_cast<std::size_t>(d.data()) % alignment != 0 )
 			{
 				this->_atomic_state.enter_replace(
 					AK_REF
+					TM_REF
 					this->allocator()
+					, lock_state::exclusive
 					, key
 					, d.data()
 					, std::min(d.size(), new_mapped_len)
@@ -543,18 +569,21 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 
 		auto lock(
 			AK_ACTUAL
+			TM_ACTUAL
 			const std::string &key
 			, lock_type_t type
 			, void *const value
 			, const std::size_t value_len
 		) -> lock_result
 		{
+			TM_SCOPE()
 #if USE_CC_HEAP == 4
 			monitor_emplace<Allocator> me(this->allocator());
 #endif
-			auto it = this->map().find(key);
+			auto it = this->map().find(TM_REF key);
 			if ( it == this->map().end() )
 			{
+				TM_SCOPE(find_false)
 				/* if the key is not found
 				 * we create it and allocate value space equal in size to
 				 * value_len (but, as a special case, the creation is suppressed
@@ -568,14 +597,15 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					auto r =
 						this->map().emplace(
 							AK_REF
+							TM_REF
 							std::piecewise_construct
-							, std::forward_as_tuple(AK_REF fixed_data_location, key.begin(), key.end(), this->allocator())
+							, std::forward_as_tuple(AK_REF fixed_data_location, key.begin(), key.end(), lock_state::free, this->allocator())
 							, std::forward_as_tuple(
 /* we wish that std::tuple had piecewise_construct, but it does not. */
 #if 0
 								std::piecewise_construct,
 #endif
-								std::forward_as_tuple(AK_REF fixed_data_location, value_len, this->allocator())
+								std::forward_as_tuple(AK_REF fixed_data_location, value_len, lock_state::free, this->allocator())
 #if ENABLE_TIMESTAMPS
 								, impl::tsc_now()
 #endif
@@ -613,10 +643,12 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			}
 			else
 			{
+				TM_SCOPE(find_true)
 				auto &v = *it;
 				const key_t &k = v.first;
 				if ( ! k.is_fixed() )
 				{
+					TM_SCOPE(find_true_pin_key)
 					auto &km = const_cast<typename std::remove_const<key_t>::type &>(k);
 					monitor_pin_key<hstore_alloc_type<Persister>::heap_alloc_access_t> mp(km, _heap.pool());
 					/* convert k to a immovable data */
@@ -631,6 +663,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				 */
 				if( ! d.is_fixed() )
 				{
+					TM_SCOPE(find_true_pin_data)
 					monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_access_t> mp(d, _heap.pool());
 					/* convert d to a immovable data */
 					d.pin(AK_REF mp.get_cptr(), this->allocator());
@@ -640,6 +673,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				PLOG(PREFIX "key exposed (extant): %p", LOCATION, k.data_fixed());
 #endif
 				/* Note: now returning E_LOCKED on lock failure as per a private request */
+				TM_SCOPE(find_true_result)
 				lock_result r {
 					lock_result::e_state::extant
 					, try_lock(d, type)
@@ -653,6 +687,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 #if ENABLE_TIMESTAMPS
 				if ( type == component::IKVStore::STORE_LOCK_WRITE && r.key != component::IKVStore::KEY_NONE )
 				{
+					TM_SCOPE(find_true_set_time)
 					std::get<1>(m) = impl::tsc_now();
 				}
 #endif
@@ -660,8 +695,9 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			}
 		}
 
-		auto unlock(component::IKVStore::key_t key_, component::IKVStore::unlock_flags_t flags_) -> status_t
+		auto unlock_indefinite(TM_ACTUAL component::IKVStore::key_t key_, component::IKVStore::unlock_flags_t flags_) -> status_t
 		{
+			TM_SCOPE()
 			if ( key_ )
 			{
 #if 0
@@ -673,14 +709,14 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					PINF(PREFIX "attempt unlock %s", LOCATION, lk->key().c_str());
 #endif
 					try {
-						auto &m = *this->map().find(lk->key());
+						auto &m = *this->map().find(TM_REF lk->key());
 						auto &v = std::get<1>(m);
 						auto &d = std::get<0>(v);
 						if ( flags_ & component::IKVStore::UNLOCK_FLAGS_FLUSH )
 						{
 							d.flush_if_locked_exclusive(this->allocator());
 						}
-						d.unlock();
+						d.unlock_indefinite();
 					}
 					catch ( const std::out_of_range &e )
 					{
@@ -714,10 +750,11 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		}
 
 		auto erase(
+			TM_ACTUAL
 			const std::string &key
 		) -> status_t
 		{
-			auto it = this->map().find(key);
+			auto it = this->map().find(TM_REF key);
 			if ( it != this->map().end() )
 			{
 				auto &v = *it;
@@ -841,33 +878,46 @@ PLOG("%s", s.str().c_str());
 #endif
 		}
 
-		void atomic_update_inner(
-			AK_ACTUAL
-			const std::string &key
-			, const std::vector<component::IKVStore::Operation *> &op_vector
-		)
-		{
-			_atomic_state.enter_update(AK_REF this->allocator(), key, op_vector.begin(), op_vector.end());
-		}
+		template <typename IT> /* *IT shall be a const component::IKVStore::Operation *const */
+			void atomic_update_inner(
+				AK_ACTUAL
+				TM_ACTUAL
+				const std::string &key
+				, IT first
+				, IT last
+				, lock_state lock
+					// , const std::vector<component::IKVStore::Operation *> &op_vector
+			)
+			{
+				_atomic_state.enter_update(AK_REF TM_REF this->allocator(), lock, key, first, last);
+			}
 
-		void atomic_update(
-			AK_ACTUAL
-			const std::string& key
-			, const std::vector<component::IKVStore::Operation *> &op_vector
-		)
-		{
-			this->atomic_update_inner(AK_REF key, op_vector);
-		}
+		template <typename IT> /* *IT shall be a const component::IKVStore::Operation * */
+			void atomic_update(
+				AK_ACTUAL
+				TM_ACTUAL
+				const std::string& key
+				, IT first
+				, IT last
+				// , const std::vector<component::IKVStore::Operation *> &op_vector
+			)
+			{
+				this->atomic_update_inner(AK_REF TM_REF key, first, last, lock_state::free);
+			}
 
-		void lock_and_atomic_update(
-			AK_ACTUAL
-			const std::string& key
-			, const std::vector<component::IKVStore::Operation *> &op_vector
-		)
-		{
-			definite_lock m(AK_REF this->map(), key, _heap.pool());
-			this->atomic_update_inner(AK_REF key, op_vector);
-		}
+		template <typename IT> /* *IT shall be a const component::IKVStore::Operation * */
+			void lock_and_atomic_update(
+				AK_ACTUAL
+				TM_ACTUAL
+				const std::string& key
+				, IT first
+				, IT last
+				// , const std::vector<component::IKVStore::Operation *> &op_vector
+			)
+			{
+				definite_lock m(AK_REF TM_REF this->map(), key, _heap.pool());
+				this->atomic_update_inner(AK_REF TM_REF key, first, last, lock_state::exclusive);
+			}
 
 		void *allocate_memory(
 			AK_ACTUAL
@@ -899,7 +949,7 @@ PLOG("%s", s.str().c_str());
 		)
 		{
 			persistent_t<char *> p = static_cast<char *>(const_cast<void *>(addr));
-            CPLOG(2, "%s: %p %zx", __func__, addr, size);
+			CPLOG(2, "%s: %p %zx", __func__, addr, size);
 			allocator().persist(p, size);
 		}
 
@@ -910,13 +960,14 @@ PLOG("%s", s.str().c_str());
 
 		auto swap_keys(
 			AK_ACTUAL
+			TM_ACTUAL
 			const std::string &key0
 			, const std::string &key1
 		) -> status_t
 		try
 		{
-			definite_lock d0(AK_REF this->map(), key0, _heap.pool());
-			definite_lock d1(AK_REF this->map(), key1, _heap.pool());
+			definite_lock d0(AK_REF TM_REF this->map(), key0, _heap.pool());
+			definite_lock d1(AK_REF TM_REF this->map(), key1, _heap.pool());
 
 			_atomic_state.enter_swap(
 				d0.mapped()

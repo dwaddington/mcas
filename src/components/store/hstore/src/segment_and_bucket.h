@@ -31,6 +31,9 @@ namespace impl
 			const bucket_control_unlocked<Bucket> *_seg;
 			bix_t _bi;
 			bix_t segment_size() const { return _seg->segment_size(); }
+			/* use log_size, not size, for modulus operations. Avoids a divide */
+			// bix_t log_segment_size() const { return _seg->log_segment_size(); }
+			bix_t mod_segment_size(bix_t bi_) const { return bi_ & _seg->bi_mask(); } // ((std::size_t(1)<<_seg->log_segment_size())-1U); }
 		public:
 			explicit segment_and_bucket(const bucket_control_unlocked<Bucket> *seg_, bix_t bi_)
 				: _seg(seg_)
@@ -46,15 +49,15 @@ namespace impl
 				 *    a. Increment the six_t (high) part
 				 *    b. In case of carry, wrap
 				 */
-				_bi = (_bi + 1U) % segment_size();
+				_bi = mod_segment_size(_bi + 1U);
 				if ( _bi == 0U )
 				{
-					_seg = _seg->_next;
+					_seg = _seg->next();
 				}
 				return *this;
 			}
 
-			bool at_end() const { return _bi == segment_size() && _seg->_next->index() == 0; }
+			bool at_end() const { return _bi == segment_size() && _seg->next()->index() == 0; }
 
 			auto incr_without_wrap() -> segment_and_bucket &
 			{
@@ -65,10 +68,10 @@ namespace impl
 				 *    b. In case of carry, do not wrap
 				 */
 				++_bi;
-				if ( _bi == segment_size() && _seg->_next->index() != 0 )
+				if ( _bi == segment_size() && _seg->next()->index() != 0 )
 				{
 					_bi = 0;
-					_seg = _seg->_next;
+					_seg = _seg->next();
 				}
 				return *this;
 			}
@@ -80,11 +83,14 @@ namespace impl
 				 *    a. Increment the six_t (high) part
 				 *    b. In case of carry, wrap
 				 */
-				const auto old_bi = _bi;
-				_bi = (_bi + fwd) % segment_size();
-				if ( _bi < old_bi )
+				if ( fwd != 0 )
 				{
-					_seg = _seg->_next;
+					const auto old_bi = _bi;
+					_bi = mod_segment_size(_bi + fwd);
+					if ( _bi < old_bi )
+					{
+						_seg = _seg->next();
+					}
 				}
 				return *this;
 			}
@@ -99,9 +105,8 @@ namespace impl
 				 */
 				if ( _bi < bkwd )
 				{
-					_bi -= bkwd;
-					_seg = _seg->_prev;
-					_bi %= segment_size();
+					_seg = _seg->prev();
+					_bi = mod_segment_size(_bi-bkwd);
 				}
 				else
 				{
@@ -109,7 +114,7 @@ namespace impl
 				}
 				return *this;
 			}
-			six_t si() const { return _seg->_index; }
+			six_t si() const { return _seg->index(); }
 			bix_t bi() const { return _bi; }
 			/* segment pointer, debug only */
 			const void *sp() const { return _seg; }

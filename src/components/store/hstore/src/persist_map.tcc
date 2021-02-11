@@ -134,6 +134,7 @@ template <typename Allocator>
 				monitor_extend<Allocator> m{bucket_allocator_t(av)};
 				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
 #endif
+
 				bucket_allocator_t(av).allocate(
 					AK_REF
 					_sc[ix].bp
