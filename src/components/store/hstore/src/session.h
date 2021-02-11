@@ -137,7 +137,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		private:
 			typename table_t::iterator _it;
 		public:
-			bool good() const { return data().is_locked_exclusive(); }
 			template <typename K>
 				definite_lock(
 					AK_ACTUAL
@@ -177,7 +176,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					{
 						throw impl::is_locked{};
 					}
-					assert(this->good());
 				}
 
 			~definite_lock()
@@ -444,7 +442,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			 */
 			if ( value_len != old_value_len )
 			{
-				assert(dl.good());
 				_atomic_state.enter_replace(
 					AK_REF
 					TM_REF
@@ -456,20 +453,15 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					, 0
 					, std::tuple_element<0, mapped_t>::type::default_alignment /* requested default mapped_type alignment */
 				);
-				assert(dl.good());
 			}
 			else
 			{
-				assert(dl.good());
 				component::IKVStore::Operation_write op(0, value_len, value);
 				// v.emplace_back(std::make_unique<component::IKVStore::Operation_write>(0, value_len, value));
 				std::array<component::IKVStore::Operation *, 1> v2{&op};
 				// std::transform(v.begin(), v.end(), std::back_inserter(v2), [] (const auto &i) { return i.get(); });
-				assert(dl.good());
 				this->atomic_update_inner(AK_REF TM_REF key, v2.begin(), v2.end(), lock_state::exclusive);
-				assert(dl.good());
 			}
-			assert(dl.good());
 		}
 
 		auto get(

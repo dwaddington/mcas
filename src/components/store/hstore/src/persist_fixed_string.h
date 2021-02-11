@@ -530,13 +530,6 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				else
 				{
 					/* _outline <- _outline */
-#if 0
-					bool held_exclusive = _outline.is_locked_exclusive();
-					if ( held_exclusive )
-					{
-						other._outline.ptr()->set_held_exclusive();
-					}
-#endif
 					_outline.P = other._outline.P;
 					_outline.ptr()->inc_ref(__LINE__, "=&");
 					new (&_outline.al()) allocator_type_element(other._outline.al());

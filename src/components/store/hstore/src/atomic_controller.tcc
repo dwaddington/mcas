@@ -270,7 +270,8 @@ template <typename Table>
 
 template <typename Table>
 	template <typename IT>
-		void impl::atomic_controller<Table>::enter_update(TM_ACTUAL
+		void impl::atomic_controller<Table>::enter_update(
+			TM_ACTUAL
 			AK_ACTUAL
 			typename table_t::allocator_type al_
 			, lock_state lock_
