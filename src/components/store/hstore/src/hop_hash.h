@@ -25,6 +25,7 @@
 #include "persist_controller.h"
 #include "segment_and_bucket.h"
 
+#include <common/perf/tm_fwd.h>
 #include <boost/iterator/transform_iterator.hpp>
 
 #include <atomic>
@@ -207,11 +208,11 @@ namespace impl
 		struct bucket_control
 			: public bucket_control_unlocked<Bucket>
 		{
+			using base = bucket_control_unlocked<Bucket>;
+			using typename base::six_t;
 			std::unique_ptr<bucket_mutexes<Mutex>[]> _bucket_mutexes;
 		public:
-			using base = bucket_control_unlocked<Bucket>;
 			using typename base::bucket_aligned_t;
-			using typename base::six_t;
 			explicit bucket_control(
 				six_t index_
 				, bucket_aligned_t *buckets_
@@ -223,6 +224,16 @@ namespace impl
 			explicit bucket_control()
 				: bucket_control(0U, nullptr)
 			{
+			}
+			void extend(
+				bucket_aligned_t *more_
+				, bucket_control_unlocked<Bucket> *prev_
+				, bucket_control_unlocked<Bucket> *next_
+				, six_t segment_count_
+			)
+			{
+				base::extend(more_, prev_, next_, segment_count_);
+				_bucket_mutexes.reset(new bucket_mutexes<Mutex>[base::segment_size()]);
 			}
 			~bucket_control()
 			{
@@ -378,6 +389,7 @@ namespace impl
 
 			template <typename Lock, typename K>
 				auto locate_key(
+					TM_FORMAL
 					Lock &bi
 					, const K &k
 				) const -> std::tuple<bucket_t *, segment_and_bucket_t>;
@@ -487,27 +499,31 @@ namespace impl
 			template <typename ... Args>
 				auto emplace(
 					AK_FORMAL
+					TM_FORMAL
 					Args && ... args
 				) -> std::pair<iterator, bool>;
-			auto insert(const value_type &value) -> std::pair<iterator, bool>;
+			auto insert(
+				TM_FORMAL
+				const value_type &value
+			) -> std::pair<iterator, bool>;
 
 			template <typename K>
-				auto erase(const K &key) -> size_type;
+				auto erase(TM_FORMAL const K &key) -> size_type;
 
 			auto erase(iterator it) -> iterator;
 
 			template <typename K>
-				auto find(const K &key) -> iterator;
+				auto find(TM_FORMAL const K &key) -> iterator;
 			template <typename K>
-				auto find(const K &key) const -> const_iterator;
+				auto find(TM_FORMAL const K &key) const -> const_iterator;
 
 			template <typename K>
-				auto at(const K &key) -> mapped_type &;
+				auto at(TM_FORMAL const K &key) -> mapped_type &;
 			template <typename K>
-				auto at(const K &key) const -> const mapped_type &;
+				auto at(TM_FORMAL const K &key) const -> const mapped_type &;
 
 			template <typename K>
-				auto count(const K &k) const -> size_type;
+				auto count(TM_FORMAL const K &k) const -> size_type;
 			auto begin() -> iterator
 			{
 				return iterator(make_segment_and_bucket_at_begin(), 0U);

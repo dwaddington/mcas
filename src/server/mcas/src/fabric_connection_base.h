@@ -69,8 +69,10 @@ class Fabric_connection_base : protected common::log_source {
   enum class action_type {
         ACTION_NONE = 0, /* unused */
         ACTION_RELEASE_VALUE_LOCK_SHARED,
+#if 0
         ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE, /* unused */
         ACTION_POOL_DELETE, /* unused */
+#endif
   };
 
   /* deferred actions */

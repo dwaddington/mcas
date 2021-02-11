@@ -8,7 +8,7 @@ import os
 ###############################################################
 
 TEMPLATE="""{
-    \"shards\" : 
+    \"shards\" :
     [
       %%SHARDS%%
     ],
@@ -21,7 +21,7 @@ DAX="""
             \"dax_config\" : [{ \"path\": \"%%PATH%%\", \"addr\": \"%%LOADADDR%%" }],"""
 
 SHARD="""
-     	{
+        {
             \"core\" : %%CORE%%,
             \"port\" : %%PORT%%,
             \"default_backend\" : \"%%BACKEND%%\", %%DAX%% %%ADO%%
@@ -87,7 +87,7 @@ def build_shard_section(shard_count):
         loadaddr += int(args.baseincrement,16) 
 
     return result
-    
+
 parser = argparse.ArgumentParser(description='Generate configuration file.')
 parser.add_argument('--port', metavar='N', type=int, nargs='?', help='network port', default=11911)
 parser.add_argument('--loadbase', type=auto_int, help='base address for loading (e.g. 0x900000000)', default=0x900000000)

@@ -17,6 +17,7 @@
 
 #include <api/kvstore_itf.h>
 #include <common/logging.h> /* log_source */
+#include <common/to_string.h>
 
 #include <cassert>
 #include <cassert>
@@ -129,7 +130,10 @@ class Pool_manager : common::log_source {
   bool release_pool_reference(pool_t pool)
   {
     auto i = _open_pools.find(pool);
-    if (i == _open_pools.end()) throw std::invalid_argument("invalid pool handle");
+    if (i == _open_pools.end())
+    {
+      throw std::invalid_argument(common::to_string(std::showbase, std::setbase(16), "invalid pool handle ", pool));
+    }
 
     i->second -= 1;  // _open_pools[pool]
 

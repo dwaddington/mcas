@@ -149,6 +149,22 @@ class IKVStore : public component::IBase {
     E_ALREADY_OPEN   = E_ERROR_BASE - 6,
   };
 
+  std::string strerro(int e)
+  {
+    static std::map<int, std::string> errs {
+      { S_MORE, "MORE" }
+      , { E_KEY_EXISTS, "E_KEY_EXISTS" }
+      , { E_KEY_NOT_FOUND, "E_KEY_NOT_FOUND" }
+      , { E_POOL_NOT_FOUND, "E_POOL_NOT_FOUND" }
+      , { E_BAD_ALIGNMENT, "E_BAD_ALIGNMENT" }
+      , { E_TOO_LARGE, "E_TOO_LARGE" }
+      , { E_ALREADY_OPEN, "E_ALREADY_OPEN" }
+    };
+    auto it = errs.find(e);
+    return it == errs.end() ? ( "non-IKVStore error " + std::to_string(e) ) : it->second;
+  }
+
+
   class Operation {
     Op_type _type;
     size_t  _offset;

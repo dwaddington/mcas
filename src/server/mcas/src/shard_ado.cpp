@@ -37,7 +37,7 @@
 #include "mcas_config.h"
 #include "resource_unavailable.h"
 
-#ifdef PROFILE
+#ifdef HAS_PROFILER
 #include <gperftools/profiler.h>
 #endif
 
@@ -73,11 +73,11 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
     if (!_ado_map.has_ado_for_pool(desc.name)) {
       /* need to launch new ADO process */
       std::vector<std::string> args;
-      
+
       /* add --plugins options */
       {
         args.push_back("--plugins");
-        
+
         std::string plugin_str;
         for (auto& plugin : _ado_plugins) {
           args.push_back(plugin);
@@ -85,7 +85,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
         }
         plugin_str = plugin_str.substr(0, plugin_str.size() - 1);
         PMAJOR("Shard: ADO plugins: (%s)", plugin_str.c_str());
-        
+
         for (auto& ado_param : _ado_params) {
           args.push_back("--param");
           args.push_back("'{" + ado_param.first + ":" + ado_param.second + "}'");
@@ -211,7 +211,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
       }
     }
 
-#if defined(PROFILE) && defined(PROFILE_POST_ADO)
+#if defined HAS_PROFILER && defined(PROFILE_POST_ADO)
     PLOG("Starting profiler");
     ProfilerStart("post_ado_launch.prof");
 #endif
@@ -360,7 +360,7 @@ void Shard::process_ado_request(Connection_handler* handler,
                                 const protocol::Message_ado_request* msg)
 {
   using namespace component;
-  
+
   try {
     // PLOG("%s: enter", __func__);
     //    PNOTICE("invoke ADO recv (rid=%lu)", msg->request_id());
@@ -414,10 +414,10 @@ void Shard::process_ado_request(Connection_handler* handler,
       if (_i_kvstore->get_attribute(msg->pool_id(), IKVStore::Attribute::VALUE_LEN, answer, &key) !=
           IKVStore::E_KEY_NOT_FOUND) {
         error_func(E_ALREADY_EXISTS, "ADO!ALREADY_EXISTS");
-        
+
         if (debug_level() > 1)
           PWRN("process_ado_request: ADO_FLAG_CREATE_ONLY, key already exists");
-        
+
         return;
       }
 
@@ -477,7 +477,7 @@ void Shard::process_ado_request(Connection_handler* handler,
     if (msg->key_len > 0) {
       locktype = (msg->flags & IMCAS::ADO_FLAG_READ_ONLY)
         ? IKVStore::STORE_LOCK_READ : IKVStore::STORE_LOCK_WRITE;
-      
+
       s = _i_kvstore->lock(msg->pool_id(),
                            msg->key(),
                            locktype,
@@ -547,7 +547,7 @@ void Shard::signal_ado_async_nolock(const char * tag,
   assert(tag);
   assert(handler);
   assert(ado_enabled());
-  
+
   CPLOG(3, "%s: %s %lu %lu", __func__, key.c_str(), client_request_id, pool);
 
   const char* key_ptr = nullptr;
@@ -573,10 +573,10 @@ void Shard::signal_ado_async_nolock(const char * tag,
 
   if(_i_kvstore->unlock(pool, key_handle) != S_OK)
     throw Logic_exception("immediate unlock in %s failed", __func__);
-  
+
   /* create ADO signal work request */
   work_request_t* wr = _wr_allocator.allocate();
-  
+
   *wr = {handler,
          pool,
          IKVStore::KEY_NONE /* prevent attempts to unlock implicitly */,
@@ -591,7 +591,7 @@ void Shard::signal_ado_async_nolock(const char * tag,
 
   std::string msg = "ADO::Signal::";
   msg += tag;
-  
+
   /* now send the work request */
   if (ado->send_work_request(wr_key,
                              key_ptr, key_len, /* key info */
@@ -601,11 +601,11 @@ void Shard::signal_ado_async_nolock(const char * tag,
                              msg.length(),
                              false /* new root */) != S_OK)
     throw General_exception("send_work_request failed");
-  
+
   CPLOG(2, "Shard_ado: sent signal to ADO (value=%p value_len=%lu, key=%s %lu)",
         value, value_len, key_ptr, key_len);
 
-  /* when the work completes, the locks will be released.  The ADO 
+  /* when the work completes, the locks will be released.  The ADO
      response is converted to an IO response */
 
 }
@@ -613,7 +613,7 @@ void Shard::signal_ado_async_nolock(const char * tag,
 
 void Shard::signal_ado(const char * tag,
                        Connection_handler* handler,
-                       const uint64_t client_request_id,                             
+                       const uint64_t client_request_id,
                        const component::IKVStore::pool_t pool,
                        const std::string& key,
                        const component::IKVStore::lock_type_t lock_type,
@@ -622,7 +622,7 @@ void Shard::signal_ado(const char * tag,
   using namespace component;
 
   assert(ado_enabled());
-  
+
   const char* key_ptr = nullptr;
   void * value = nullptr;
   size_t value_len = 0;
@@ -632,7 +632,7 @@ void Shard::signal_ado(const char * tag,
   auto ado = _ado_pool_map.get_proxy(pool);
   if (ado == nullptr)
     throw General_exception("unexpectedly failed to get ADO proxy in async_signal_ado");
-  
+
   if(_i_kvstore->lock(pool,
                       key,
                       lock_type,
@@ -650,7 +650,7 @@ void Shard::signal_ado(const char * tag,
   auto flags = IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE;
   if (is_get_response)
     flags = IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE;
-  
+
   *wr = {handler, pool, key_handle, key_ptr,
          key_len, lock_type, client_request_id,
          flags};
@@ -660,7 +660,7 @@ void Shard::signal_ado(const char * tag,
 
   std::string msg = "ADO::Signal::";
   msg += tag;
-  
+
   /* now send the work request */
   if (ado->send_work_request(wr_key,
                              key_ptr, key_len, /* key info */
@@ -670,11 +670,11 @@ void Shard::signal_ado(const char * tag,
                              msg.length(),
                              false /* new root */) != S_OK)
     throw General_exception("send_work_request failed");
-  
+
   CPLOG(2, "Shard_ado: sent signal to ADO (value=%p value_len=%lu, key=%s %lu)",
         value, value_len, key_ptr, key_len);
 
-  /* when the work completes, the locks will be released.  The ADO 
+  /* when the work completes, the locks will be released.  The ADO
      response is converted to an IO response */
 }
 
@@ -767,7 +767,7 @@ void Shard::process_messages_from_ado()
                                        std::string(request_record->key_ptr, request_record->key_len));
         if (s != S_OK)
           PWRN("Shard_ado: request to erase target failed unexpectedly (key=%s,rc=%d)", request_record->key_ptr, s);
-        
+
         response_status = s;
       }
 
@@ -785,7 +785,7 @@ void Shard::process_messages_from_ado()
       }
       /* for sync, give response, unless the client is disconnected */
       else if (handler->client_connected()) {
-        
+
         auto iob = handler->allocate_send();
         assert(iob);
         assert(iob->base());
@@ -793,13 +793,13 @@ void Shard::process_messages_from_ado()
         /* handle ADO response that came from ADO signal request (get) */
         if(request_record->flags & IMCAS::ADO_FLAG_INTERNAL_IO_RESPONSE_VALUE) {
 
-          /* when this is a 'get' signal then we have to re-get the value 
+          /* when this is a 'get' signal then we have to re-get the value
              so we can send it back with the response.
           */
           component::IKVStore::key_t key_handle;
           ::iovec value_out{nullptr, 0};
 
-          std::string skey(request_record->key_ptr,request_record->key_len);          
+          std::string skey(request_record->key_ptr,request_record->key_len);
           status_t rc = _i_kvstore->lock(request_record->pool,
                                          skey,
                                          IKVStore::STORE_LOCK_READ,
@@ -809,7 +809,7 @@ void Shard::process_messages_from_ado()
           if(rc != S_OK)
             throw Logic_exception("unable to re-lock for 'get' signal response");
 
-          memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);            
+          memory_registered<Connection_base> mr(debug_level(), handler, value_out.iov_base, value_out.iov_len, 0, 0);
           auto desc = mr.desc();
           auto response = prepare_response(handler, iob, request_record->request_id, S_OK);
 
@@ -819,7 +819,7 @@ void Shard::process_messages_from_ado()
             iob->set_length(response->msg_len());
 
             _i_kvstore->unlock(request_record->pool, key_handle);
-            
+
             handler->post_response(iob, response, __func__);
           }
           else {
@@ -835,14 +835,14 @@ void Shard::process_messages_from_ado()
                                                                                request_record->request_id);
           response_msg->set_status(response_status);
           iob->set_length(response_msg->base_message_size());
-          
+
           CPLOG(2,"Shard_ado: posting translated IO response");
-          
+
           handler->post_send_buffer(iob, response_msg, __func__);
         }
         /* plain ADO response */
         else {
-          
+
           auto response_msg = new (iob->base()) protocol::Message_ado_response(iob->length(),
                                                                                response_status,
                                                                                handler->auth_id(),
@@ -852,7 +852,7 @@ void Shard::process_messages_from_ado()
              be able to do zero copy though.
           */
           size_t appended_buffer_size = 0;
-          
+
           for (auto& rb : response_buffers) {
             assert(rb.ptr);
             try
@@ -861,11 +861,11 @@ void Shard::process_messages_from_ado()
               } catch ( const std::exception &e ) { PLOG("%s: exception building response: %s", __func__, e.what()); throw; }
             appended_buffer_size += rb.len;
           }
-          
+
           iob->set_length(response_msg->message_size());
-          
+
           CPLOG(2,"Shard_ado: posting ADO response");
-          
+
           handler->post_send_buffer(iob, response_msg, __func__);
         }
       }
@@ -979,7 +979,7 @@ void Shard::process_messages_from_ado()
               assert(reinterpret_cast<uint64_t>(addr) <= 1);
 
               if (ado->send_table_op_response(S_OK, static_cast<void*>(value), value_len, key_ptr, key_handle) != S_OK)
-                throw General_exception("send_table_op_response failed");            
+                throw General_exception("send_table_op_response failed");
             }
           } break;
         case ADO_op::ERASE: {
@@ -989,9 +989,9 @@ void Shard::process_messages_from_ado()
             throw General_exception("send_table_op_response failed");
           break;
         }
-        case ADO_op::VALUE_RESIZE: 
+        case ADO_op::VALUE_RESIZE:
           {
-            /* resize_value can only be performed on keys not already */            
+            /* resize_value can only be performed on keys not already */
             CPLOG(2, "Shard_ado: received table op resize value (work_id=%p)",
                   reinterpret_cast<const void*>(work_id));
 
@@ -1023,7 +1023,7 @@ void Shard::process_messages_from_ado()
                 throw Logic_exception("unlocking target key-value for resize_value failed");
             }
 
-            
+
             /* perform resize, which will need to take the lock */
             void*  new_value      = nullptr;
             size_t new_value_len  = 0;
@@ -1049,9 +1049,9 @@ void Shard::process_messages_from_ado()
 
             if (ado->send_table_op_response(rc, new_value, new_value_len, nullptr) != S_OK)
               throw General_exception("send_table_op_response failed");
-            
+
             CPLOG(1, "Shard_ado: resize_value response (%d)", rc);
-            
+
             break;
           }
         case ADO_op::ALLOCATE_POOL_MEMORY: {
@@ -1095,7 +1095,7 @@ void Shard::process_messages_from_ado()
 
           if (ado->send_table_op_response(rc, out_addr) != S_OK)
             throw General_exception("send_table_op_response failed");
-            
+
           break;
         }
         case ADO_op::FREE_POOL_MEMORY: {
@@ -1104,7 +1104,7 @@ void Shard::process_messages_from_ado()
           if (value_len == 0) {
             if (ado->send_table_op_response(E_INVAL) != S_OK)
               throw General_exception("send_table_op_response failed");
-            
+
             break;
           }
 
@@ -1115,7 +1115,7 @@ void Shard::process_messages_from_ado()
 
           if (ado->send_table_op_response(rc) != S_OK)
             throw General_exception("send_table_op_response failed");
-          
+
           break;
         }
         default:
@@ -1345,7 +1345,7 @@ void Shard::process_messages_from_ado()
         }
         else {
           auto rc = _i_kvstore->unlock(ado->pool_id(), key_handle);
-          
+
           if(ado->check_for_implicit_unlock(work_id, key_handle)) {
             CPLOG(2, "ADO callback: unlock request target lock is implicit");
             if(rc == S_OK)

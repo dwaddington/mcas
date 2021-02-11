@@ -31,7 +31,7 @@
 
 #include "resource_unavailable.h"
 
-#ifdef PROFILE
+#ifdef HAS_PROFILER
 #include <gperftools/profiler.h>
 #else
 int ProfilerStart(const char *)
@@ -329,6 +329,7 @@ void Shard::service_cluster_signals()
   }
 }
 
+
 //#define DEBUG_LIVENESS // use this to show how live the shard loop threads are
 #define LIVENESS_DURATION 10000
 #define LIVENESS_SHARDS 18
@@ -358,7 +359,6 @@ void Shard::main_loop(common::profiler &pr_)
   uint64_t tick alignas(8) = 0;
 
   for (; _thread_exit == false; ++idle, ++tick) {
-
 #ifdef DEBUG_LIVENESS
     assert(_core < LIVENESS_SHARDS);
     /* show report of liveness */
@@ -408,8 +408,10 @@ void Shard::main_loop(common::profiler &pr_)
     }
 
     /* periodic cluster signal handling */
-    if (tick % CHECK_CLUSTER_SIGNAL_INTERVAL == 0) {
-      service_cluster_signals();
+    {
+      if (tick % CHECK_CLUSTER_SIGNAL_INTERVAL == 0) {
+        service_cluster_signals();
+      }
     }
 
     /* output memory usage for debug level > 0 */
@@ -491,11 +493,13 @@ void Shard::main_loop(common::profiler &pr_)
           assert(get_pending_iter++ < 1000);
 
           switch (action.op) {
+#if 0
           case Connection_handler::action_type::ACTION_RELEASE_VALUE_LOCK_EXCLUSIVE:
             CPLOG(2, "releasing esxclusive value lock (%p)", action.parm);
             release_locked_value_exclusive(action.parm);
             release_pending_rename(action.parm);
             break;
+#endif
           case Connection_handler::action_type::ACTION_RELEASE_VALUE_LOCK_SHARED:
             CPLOG(2, "releasing shared value lock (%p)", action.parm);
             release_locked_value_shared(action.parm);
@@ -517,6 +521,7 @@ void Shard::main_loop(common::profiler &pr_)
 
             idle = 0;
             assert(p_msg);
+/* "split" accepts responsibility for the *preceding* code. Not exactly intuitive. */
             switch (p_msg->type_id()) {
             case MSG_TYPE::IO_REQUEST:
               process_message_IO_request(handler, static_cast<const protocol::Message_IO_request *>(p_msg));
@@ -561,31 +566,37 @@ void Shard::main_loop(common::profiler &pr_)
         throw;
       }
 
-      /* handle tasks */
-      process_tasks(idle);
+      {
+        /* handle tasks */
+        process_tasks(idle);
+      }
 
       /* handle pending close sessions */
       assert(pending_close.size() < 1000);
 
       /* process closures */
-      for (auto &h : pending_close) {
-        _handlers.erase(std::remove(_handlers.begin(), _handlers.end(), h), _handlers.end());
-        CPLOG(1, "Deleting handler (%p)", common::p_fmt(h));
+      {
+        for (auto &h : pending_close) {
+          _handlers.erase(std::remove(_handlers.begin(), _handlers.end(), h), _handlers.end());
+          CPLOG(1, "Deleting handler (%p)", common::p_fmt(h));
 
-        assert(h);
-        delete h;
+          assert(h);
+          delete h;
 
-        CPLOG(1, "# remaining handlers (%lu)", _handlers.size());
+          CPLOG(1, "# remaining handlers (%lu)", _handlers.size());
 
-        if (_handlers.empty() && _forced_exit) {
-          CPLOG(1, "Shard: forcing exit..");
-          _thread_exit = true;
+          if (_handlers.empty() && _forced_exit) {
+            CPLOG(1, "Shard: forcing exit..");
+            _thread_exit = true;
+          }
         }
       }
     }
   }
 
-  close_all_ado();
+  {
+    close_all_ado();
+  }
 
   PLOG("Shard (%p) exited", common::p_fmt(this));
 }
@@ -1614,7 +1625,6 @@ void Shard::process_message_IO_request(Connection_handler *handler, const protoc
     assert(iob);
 
     ++_stats.op_request_count;
-
     switch (msg->op()) {
     case protocol::OP_PUT_LOCATE:
       io_response_put_locate(handler, msg, iob);

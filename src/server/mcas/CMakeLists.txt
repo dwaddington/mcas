@@ -5,9 +5,6 @@ include(../../../mk/common.cmake)
 # use this to disable optimizations, e.g. for debugging or profiling
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
-#set(PROFILER "profiler")
-#add_compile_options("-DPROFILE")
-
 project(mcas CXX)
 include(../../../mk/clang-dev-tools.cmake)
 
@@ -45,4 +42,5 @@ add_dependencies(${PROJECT_NAME} threadipc common nupm)
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
 install(FILES "example-ado.conf" DESTINATION bin)
-
+install(FILES "mcas-logged.sh" DESTINATION bin
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)

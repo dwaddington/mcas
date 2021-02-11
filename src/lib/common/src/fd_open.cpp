@@ -18,9 +18,14 @@
 
 #include <common/fd_open.h>
 
-#include <unistd.h> /* close */
-
+#include <cstring> /* strerror */
+#include <iomanip> /* setbase, showbase */
 #include <stdexcept>
+#include <sstream> /* ostringstream */
+
+#include <sys/types.h>
+#include <fcntl.h> /* open */
+#include <unistd.h> /* close */
 
 common::Fd_open::Fd_open()
   : _fd(-1)
@@ -33,6 +38,18 @@ common::Fd_open::Fd_open(int fd_)
   {
     throw std::logic_error(std::string(__func__) + ": negative fd");
   }
+}
+
+common::Fd_open::Fd_open(const char *pathname_, int flags_, ::mode_t mode_)
+try
+  : Fd_open(::open(pathname_, flags_, mode_))
+{}
+catch ( const std::logic_error &e_ )
+{
+  auto er = errno;
+  std::ostringstream o;
+  o << e_.what() << " " << strerror(er) << " opening " << pathname_ << " flags " << std::showbase << std::setbase(8) << flags_ << " mode " + mode_;
+  throw std::runtime_error(o.str());
 }
 
 common::Fd_open::~Fd_open()

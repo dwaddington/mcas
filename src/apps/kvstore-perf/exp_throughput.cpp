@@ -8,6 +8,7 @@
 #include <fstream>
 #include <unistd.h> /* HOST_NAME_MAX, gethostname */
 #include <csignal>
+#include <fstream>
 
 std::mutex ExperimentThroughput::_iops_lock;
 unsigned long ExperimentThroughput::_iops;

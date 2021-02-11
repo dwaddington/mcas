@@ -273,7 +273,7 @@ void ND_control::map_regions(unsigned long base_addr)
                numa_zone);
           std::string path = "/dev/" + _ns_to_dax[i.first];
 
-          common::Fd_open ofd(open(path.c_str(), O_RDWR, 0666));
+          common::Fd_open ofd(path.c_str(), O_RDWR, 0666);
 
           /* get size of the DAX device */
           size_t size = get_dax_device_size(ofd.fd());
