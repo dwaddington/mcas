@@ -78,22 +78,6 @@ else()
   message("profiler not requested")
 endif()
 
-if(PROFILE)
-	#find_library(PROFILER_LIB NAMES profiler PATHS /usr/local/lib,/usr/local/lib64,/usr/lib,/usr/lib64)
-  find_library(PROFILER_LIB NAMES profiler PATHS /usr/lib,/usr/lib64)
-  if ("${PROFILER_LIB}" STREQUAL "PROFILER_LIB-NOTFOUND")
-    set(PROFILER "")
-    message("profiler not found")
-  else()
-    set(PROFILER "profiler")
-    add_definitions(-DHAS_PROFILER=1)
-    add_definitions(-DPROFILE=1) # mcas server expectation
-    message("profiler found")
-  endif()
-else()
-  message("profiler not requested")
-endif()
-
 # run 'make bootstrap' to  make comanche deps and core
 # then run 'make' to build components/tests
 add_custom_target(bootstrap
