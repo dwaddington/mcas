@@ -2,15 +2,22 @@ cmake_minimum_required(VERSION 3.5)
 
 option(FORCE_OTT_BUILD "force out of tree build" ON)
 option(BOOTSTRAP_DEPS "bootstrap to build deps" ON)
-option(TEST_HSTORE_PERISHABLE "hstore perishable testing enabled" OFF)
+
+# build scope options
 option(BUILD_RUST "enabled Rust-based dependencies" ON)
 option(BUILD_KERNEL_SUPPORT "build kernel module dependencies" OFF)
-option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples (requires PMDK to be installed)" OFF)
+option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples (requires PMDK installed)" OFF)
+
+# features
+option(FEATURE_TIMESTAMPS "feature: enable timestamps in hstore map" ON)
+option(FEATURE_POOL_ACL "feature: enable pool access control" OFF)
+
+# debug options
+option(TEST_HSTORE_PERISHABLE "hstore perishable testing enabled" OFF)
 option(CODE_COVERAGE "enable gcc code coverage" OFF)
 option(SPAN_USES_GSL "span data uses gsl::span, not iovec" OFF)
 option(BYTE_USES_STD "byte data uses std::byte, not gsl::byte" OFF)
 option(INVASIVE_PERF "enable invasive performance trace" OFF)
-option(TIMESTAMPS "enable timestamps in hstore map" ON)
 option(PROFILE "profile the code" OFF)
 
 set(DM_REGION_LOG_GRAIN_SIZE 25 CACHE STRING "log base 2 of the device_manager allocation granularity")
@@ -46,7 +53,7 @@ else()
   add_definitions(-DMCAS_TM_ENABLED=0)
 endif()
 
-if(TIMESTAMPS)
+if(FEATURE_TIMESTAMPS)
   add_definitions(-DENABLE_TIMESTAMPS=1)
 else()
   add_definitions(-DENABLE_TIMESTAMPS=0)
