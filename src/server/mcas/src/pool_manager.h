@@ -94,8 +94,9 @@ private:
   }
 
 private:
-  
-  /** 
+   
+#ifdef FEATURE_POOL_ACL
+   /** 
    * Derive the name of the metadata pool from the pool name
    * 
    * @param pool_name Pool name
@@ -106,6 +107,7 @@ private:
     std::string mpn = METADATA_POOL_PREFIX + pool_name;
     return mpn;
   }
+#endif
 
 public:
   
