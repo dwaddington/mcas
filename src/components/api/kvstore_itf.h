@@ -124,6 +124,7 @@ class IKVStore : public component::IBase {
     WRITE_EPOCH_TIME         = 6, /* epoch time at which the key-value pair was last
                                      written or locked with STORE_LOCK_WRITE */
     MEMORY_TYPE              = 7, /* type of memory */
+    MEMORY_SIZE              = 8, /* size of pool or store in bytes */
   };
 
   enum {
