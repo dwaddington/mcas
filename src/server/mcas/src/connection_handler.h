@@ -75,10 +75,9 @@ private:
   uint64_t                            _auth_id;
   std::queue<buffer_t *>              _pending_msgs;
   std::queue<action_t>                _pending_actions;
-  Pool_manager                        _pool_manager; /* instance shared across connections */
-
+  Pool_manager                        _pool_manager; /* per-connection */
   
-  /* Adaptor point for different transports */
+  /* adaptor point for different transports */
   using Connection = component::IFabric_server;
   using Factory    = component::IFabric_server_factory;
 
@@ -388,7 +387,7 @@ public:
   inline uint64_t       auth_id() const { return _auth_id; }
   inline void           set_auth_id(uint64_t id) { _auth_id = id; }
   inline size_t         max_message_size() const { return _max_message_size; }
-  inline Pool_manager & pool_manager() { return _pool_manager; }
+  inline Pool_manager&  pool_manager() { return _pool_manager; }
 
 private:
   common::Byte_buffer _tls_buffer;

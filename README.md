@@ -15,7 +15,7 @@ The key attributes of the solution are:
 3. Support for both RDMA and traditional TCP/IP network transports.
 4. Zero-copy transfer capable with RDMA and GPU-Direct capable.
 5. Support for C++ and Rust (experimental) based in-store compute plugins.
-6. Support for C++ and Python clients. 
+6. Support for C++, Python and Rust (experimental) clients. 
 
 ## Documentation
 

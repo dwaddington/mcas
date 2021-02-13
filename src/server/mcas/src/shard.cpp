@@ -197,7 +197,7 @@ void Shard::thread_entry(const std::string &backend,
                          const bool         triggered_profile_)
 {
   (void) _max_message_size;  // unused
-  CPLOG(2, "shard:%u worker thread entered.", _core);
+  CPLOG(2, "Shard: %u worker thread entered.", _core);
 
   /* pin thread */
   cpu_mask_t mask;
@@ -206,8 +206,8 @@ void Shard::thread_entry(const std::string &backend,
     PLOG("%s: bad mask parameter", __FILE__);
   }
 
-  CPLOG(2, "CPU_MASK: SHARD thread %p configured with cpu mask: [%s]", common::p_fmt(this),
-        mask.string_form().c_str());
+  CPLOG(2, "Shard: CPU_MASK thread %p configured with cpu mask: [%s]",
+        common::p_fmt(this), mask.string_form().c_str());
 
   try {
     try {
@@ -235,7 +235,7 @@ void Shard::thread_entry(const std::string &backend,
   /* main_loop sets _thread_exit true, but it will not be called on early failure */
   _thread_exit = true;
 
-  CPLOG(2, "Shard:%u worker thread exited.", _core);
+  CPLOG(2, "Shard: %u worker thread exited.", _core);
 }
 
 void Shard::initialize_components(const std::string &backend,
@@ -260,7 +260,7 @@ void Shard::initialize_components(const std::string &backend,
     else
       throw General_exception("unrecognized backend (%s)", backend.c_str());
 
-    CPLOG(2, "Shard: using store backend (%s)", backend.c_str());
+    CPINF(1, "Shard: using store backend (%s)", backend.c_str());
 
     if (!comp) throw General_exception("unable to initialize mcas backend component");
 
@@ -311,15 +311,15 @@ void Shard::service_cluster_signals()
 
   while (_cluster_signal_queue.recv_message(cmsg)) {
 
-    if(debug_level() > 1)
-      PMAJOR("Shard::Cluster (%p) got message !! (sender=%s,type=%s,content=%s)", common::p_fmt(this),
-             cmsg->_sender.c_str(), cmsg->_type.c_str(), cmsg->_content.c_str());
+    CPLOG(2,"Shard: (%p) got message !! (sender=%s,type=%s,content=%s)",
+          common::p_fmt(this),
+          cmsg->_sender.c_str(), cmsg->_type.c_str(), cmsg->_content.c_str());
 
     assert(cmsg);
 
     /* if we have ADOs then forward to them */
     for (auto &proxy : _ado_map) {
-      CPLOG(2, "Sending cluster event to ADO (%p)...", common::p_fmt(proxy.second));
+      CPLOG(2, "Shard: sending cluster event to ADO (%p)...", common::p_fmt(proxy.second));
 
       if (proxy.second->send_cluster_event(cmsg->_sender, cmsg->_type, cmsg->_content) != S_OK)
         throw General_exception("send_cluster_event to ADO failed");
@@ -380,7 +380,7 @@ void Shard::main_loop(common::profiler &pr_)
 
     /* graceful exit on sigint */
     if(signals::sigint > 0) {
-      PLOG("Shard: received SIGINT");
+      CPLOG(2, "Shard: received SIGINT");
       _thread_exit = true;
     }
     else if (_handlers.empty()) { /* if there are no sessions, sleep thread */
@@ -417,7 +417,7 @@ void Shard::main_loop(common::profiler &pr_)
     /* output memory usage for debug level > 0 */
     if (debug_level() > 0) {
       if (tick % OUTPUT_DEBUG_INTERVAL == 0)
-        PLOG("Shard_ado: port(%u) '#memory' %s", _port, common::get_DRAM_usage().c_str());
+        CPINF(2, "Shard_ado: port(%u) '#memory' %s", _port, common::get_DRAM_usage().c_str());
     }
 
     {
@@ -463,13 +463,14 @@ void Shard::main_loop(common::profiler &pr_)
                    when zero */
                 auto ado_itf = get_ado_interface(pool_id);
 
-                CPLOG(1, "check for ADO close ref count=%u", ado_itf->ref_count());
+                CPLOG(2, "Shard: check for ADO close ref count=%u", ado_itf->ref_count());
 
                 if (ado_itf->ref_count() == 1) {
                   ado_itf->shutdown();
                   _ado_map.remove(ado_itf);
 
-                  if (_i_kvstore->close_pool(pool_id) != S_OK) throw Logic_exception("failed to close pool");
+                  if (_i_kvstore->close_pool(pool_id) != S_OK)
+                    throw Logic_exception("failed to close pool");
                 }
 
                 ado_itf->release_ref();
@@ -478,10 +479,10 @@ void Shard::main_loop(common::profiler &pr_)
               _ado_pool_map.release(pool_id);
             }
 
-            CPLOG(1, "Shard: closed pool handle %lx for connection close request", pool_id);
+            CPLOG(2, "Shard: closed pool handle %lx for connection close request", pool_id);
           }
 
-          if (debug_level() > 1) PMAJOR("Shard: closing connection %p", common::p_fmt(handler));
+          CPLOG(1,"Shard: closing connection %p", common::p_fmt(handler));
           pending_close.push_back(handler);
         } // TICK_RESPONSE_CLOSE
 
@@ -521,7 +522,7 @@ void Shard::main_loop(common::profiler &pr_)
 
             idle = 0;
             assert(p_msg);
-/* "split" accepts responsibility for the *preceding* code. Not exactly intuitive. */
+            /* "split" accepts responsibility for the *preceding* code. Not exactly intuitive. */
             switch (p_msg->type_id()) {
             case MSG_TYPE::IO_REQUEST:
               process_message_IO_request(handler, static_cast<const protocol::Message_IO_request *>(p_msg));
@@ -545,10 +546,10 @@ void Shard::main_loop(common::profiler &pr_)
           }
         }
         catch (const resource_unavailable &e) {
-          PLOG("%s: short of buffers in 'handler' processing: %s", __func__, e.what());
+          PWRN("%s: short of buffers in 'handler' processing: %s", __func__, e.what());
         }
         catch (const std::exception &e) {
-          PLOG("%s: exception in 'handler' processing: %s", __func__, e.what());
+          PWRN("%s: exception in 'handler' processing: %s", __func__, e.what());
           throw;
         }
       }  // iteration of handlers
@@ -559,10 +560,10 @@ void Shard::main_loop(common::profiler &pr_)
           process_messages_from_ado();
       }
       catch (const resource_unavailable &e) {
-        PLOG("short of buffers in 'ADO' processing: %s", e.what());
+        PWRN("short of buffers in 'ADO' processing: %s", e.what());
       }
       catch (const std::exception &e) {
-        PLOG("%s: exception in 'ADO' processing: %s", __func__, e.what());
+        PWRN("%s: exception in 'ADO' processing: %s", __func__, e.what());
         throw;
       }
 
@@ -578,12 +579,12 @@ void Shard::main_loop(common::profiler &pr_)
       {
         for (auto &h : pending_close) {
           _handlers.erase(std::remove(_handlers.begin(), _handlers.end(), h), _handlers.end());
-          CPLOG(1, "Deleting handler (%p)", common::p_fmt(h));
+          CPLOG(2, "Shard: deleting handler (%p)", common::p_fmt(h));
 
           assert(h);
           delete h;
 
-          CPLOG(1, "# remaining handlers (%lu)", _handlers.size());
+          CPLOG(2, "Shard: #remaining handlers (%lu)", _handlers.size());
 
           if (_handlers.empty() && _forced_exit) {
             CPLOG(1, "Shard: forcing exit..");
@@ -598,10 +599,11 @@ void Shard::main_loop(common::profiler &pr_)
     close_all_ado();
   }
 
-  PLOG("Shard (%p) exited", common::p_fmt(this));
+  CPLOG(1, "Shard: shard (%p) exited", common::p_fmt(this));
 }
 
-void Shard::process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg)
+void Shard::process_message_pool_request(Connection_handler *handler,
+                                         const protocol::Message_pool_request *msg)
 {
   handler->msg_recv_log(msg, __func__);
   using namespace component;
@@ -630,7 +632,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         static unsigned count = 0;
         count++;
 
-        CPLOG(1,"POOL CREATE: op=%u name=%s size=%lu obj-count=%lu (%u) base_addr=0x%lx",
+        CPINF(1,"POOL CREATE: op=%u name=%s size=%lu obj-count=%lu (%u) base_addr=0x%lx",
               msg->op(), msg->pool_name(), msg->pool_size(), msg->expected_object_count(),
               count, msg->base_addr());
 
@@ -639,7 +641,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         IKVStore::pool_t pool;
         if (pool_mgr.check_for_open_pool(pool_name, pool)) {
           if (msg->flags() & IMCAS::ADO_FLAG_CREATE_ONLY) {
-            if (debug_level())
+            if (debug_level() > 0)
               PWRN("request to create pool denied, create only specified on existing pool");
             response->pool_id = IKVStore::POOL_ERROR;
             response->set_status(E_FAIL);
@@ -649,30 +651,30 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
           }
         }
         else {
-          pool =
-            _i_kvstore->create_pool(msg->pool_name(), msg->pool_size(), msg->flags(), msg->expected_object_count());
+          pool = pool_mgr.create_and_register_pool(_i_kvstore.get(),
+                                                   msg->pool_name(),
+                                                   msg->pool_size(),
+                                                   msg->expected_object_count(),
+                                                   msg->flags());
 
           if (pool == IKVStore::POOL_ERROR) {
             response->pool_id = 0;
-            response->set_status(IKVStore::POOL_ERROR);
+            response->set_status(E_FAIL);
             PWRN("unable to create pool (%s)", pool_name.c_str());
           }
           else {
-            /* register pool handle */
-            pool_mgr.register_pool(pool_name, pool, msg->expected_object_count(), msg->pool_size(), msg->flags());
-
             response->pool_id = pool;
             response->set_status(S_OK);
           }
 
-          CPLOG(2, "OP_CREATE: new pool id: %lx", pool);
+          CPINF(1, "OP_CREATE: new pool id: %lx", pool);
 
           /* check for ability to pre-register memory with RDMA stack */
           nupm::region_descriptor regions;
           status_t             hr;
           if ((hr = _i_kvstore->get_pool_regions(pool, regions)) == S_OK) {
             for (auto &r : regions.address_map()) {
-              CPLOG(1, "region: %p %lu MiB", ::base(r), REDUCE_MB(::size(r)));
+              CPLOG(2, "region: %p %lu MiB", ::base(r), REDUCE_MB(::size(r)));
               /* pre-register memory region with RDMA */
 #if 0
               handler->ondemand_register(r.iov_base, r.iov_len);
@@ -681,7 +683,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
             }
           }
           else {
-            PLOG("pool region query NOT supported, using on-demand");
+            CPLOG(2, "pool region query NOT supported, using on-demand");
           }
         }
 
@@ -696,37 +698,38 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         static unsigned count2 = 0;
         count2++;
 
-        CPLOG(2,"POOL CREATE: OK, pool_id=%lx (%u)", pool, count2);
+        CPINF(1, "POOL CREATE: OK, pool_id=%lx (%u)", pool, count2);
 
       } break;
       case mcas::protocol::OP_OPEN: {
-        if (debug_level() > 1) PMAJOR("POOL OPEN: name=%s", msg->pool_name());
+        CPINF(1, "POOL OPEN: name=%s", msg->pool_name());
 
         IKVStore::pool_t pool;
         const std::string pool_name(msg->pool_name());
 
         /* check that pool is not already open */
         if (pool_mgr.check_for_open_pool(pool_name, pool)) {
-          PLOG("reusing existing open pool (%p)", reinterpret_cast<void *>(pool));
-          /* pool exists, increment reference */
+
+          CPLOG(2,"Shard: reusing existing open pool (%p)", reinterpret_cast<void *>(pool));
+          /* if pool already open just increment reference */
           pool_mgr.add_reference(pool);
           response->pool_id = pool;
         }
         else {
-          /* pool does not exist yet */
-          pool = _i_kvstore->open_pool(msg->pool_name());
+
+          /* pool is not open yet, open and register it */
+          pool = pool_mgr.open_and_register_pool(_i_kvstore.get(), msg->pool_name());
 
           if (pool == IKVStore::POOL_ERROR) {
             response->pool_id = 0;
             response->set_status(E_INVAL);
           }
           else {
-            /* register pool handle */
-            pool_mgr.register_pool(pool_name, pool, 0, 0, msg->flags());
             response->pool_id = pool;
+            response->set_status(S_OK);
           }
         }
-        if (debug_level() > 1) PMAJOR("POOL OPEN: pool id: %lx", pool);
+        CPINF(2, "POOL OPEN: pool id: %lx", pool);
 
         if (pool != IKVStore::POOL_ERROR && ado_enabled()) { /* if ADO is enabled start ADO process */
           IADO_proxy *ado  = nullptr;
@@ -739,14 +742,14 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         }
       } break;
       case mcas::protocol::OP_CLOSE: {
-        if (debug_level() > 1) PMAJOR("POOL CLOSE: pool_id=%lx", msg->pool_id());
+        CPINF(1, "POOL CLOSE: pool_id=%lx", msg->pool_id());
 
         if (!pool_mgr.is_pool_open(msg->pool_id())) {
           response->set_status(E_INVAL);
         }
         else {
           /* release pool reference, if its zero, we can close pool for real */
-          if (pool_mgr.release_pool_reference(msg->pool_id())) {
+          if (pool_mgr.release_pool_reference(_i_kvstore.get(), msg->pool_id())) {
             CPLOG(1, "Shard: pool reference now zero. pool_id=%lx", msg->pool_id());
 
             /* close ADO process on pool close */
@@ -766,7 +769,10 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
             }
 
             auto rc = _i_kvstore->close_pool(msg->pool_id());
-            if (debug_level() && rc != S_OK) PWRN("Shard: close_pool result:%d", rc);
+            
+            if (debug_level() && rc != S_OK)
+              PWRN("Shard: close_pool result:%d", rc);
+            
             response->set_status(rc);
           }
           else {
@@ -775,19 +781,19 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         }
       } break;
       case mcas::protocol::OP_DELETE: {
-        PLOG("POOL DELETE pool_id=%lx (name %s)", msg->pool_id(), msg->pool_name());
-        /* msg->pool_id may be invalid */
+        CPINF(1, "POOL DELETE pool_id=%lx (name %s)", msg->pool_id(), msg->pool_name());
+
         if (msg->pool_id() > 0 && pool_mgr.is_pool_open(msg->pool_id())) {
-          if (debug_level() > 1) PMAJOR("POOL DELETE by handle: pool_id=%lx", msg->pool_id());
+          CPLOG(2, "POOL DELETE by handle: pool_id=%lx", msg->pool_id());
 
           try {
             if (pool_mgr.pool_reference_count(msg->pool_id()) == 1) {
-              if (debug_level() > 1) PMAJOR("POOL DELETE reference count is 1 deleting for real");
+              CPLOG(2,"POOL DELETE reference count is 1 deleting for real");
 
               auto pool_name = pool_mgr.pool_name(msg->pool_id());
 
-              if (!pool_mgr.release_pool_reference(msg->pool_id()))
-                throw Logic_exception("unexpected pool reference count");
+              if (!pool_mgr.release_pool_reference(_i_kvstore.get(), msg->pool_id()))
+                throw Logic_exception("invalid pool reference count");
 
               /* notify ADO if needed */
               if (ado_enabled()) {
@@ -824,7 +830,7 @@ void Shard::process_message_pool_request(Connection_handler *handler, const prot
         }
         /* try delete by pool name */
         else {
-          if (debug_level() > 2) PMAJOR("POOL DELETE by name: name=%s", msg->pool_name());
+          CPLOG(2, "POOL DELETE by name: name=%s", msg->pool_name());
 
           IKVStore::pool_t pool;
           const auto       pool_name = msg->pool_name();
@@ -1381,7 +1387,7 @@ void Shard::io_response_put(Connection_handler *handler, const protocol::Message
 
       if (debug_level() > 2) {
         if (status == E_ALREADY_EXISTS) {
-          PLOG("kvstore->put returned E_ALREADY_EXISTS");
+          PWRN("kvstore->put returned E_ALREADY_EXISTS");
           _stats.op_failed_request_count++;
         }
         else {
@@ -1665,7 +1671,7 @@ void Shard::process_message_IO_request(Connection_handler *handler, const protoc
   }
   catch ( std::exception &e )
     {
-      PLOG("%s: exception in op %i handling", __func__, int(msg->op()));
+      PWRN("%s: exception in op %i handling", __func__, int(msg->op()));
       throw;
     }
 
@@ -2044,8 +2050,8 @@ void Shard::check_for_new_connections()
 
   static int connections = 1;
   while ((handler = get_new_connection()) != nullptr) {
-    if (debug_level() > 1 || true) PMAJOR("Shard: processing new connection (%p) total %d",
-                                          common::p_fmt(handler), connections);
+    CPLOG(2, "Shard: processing new connection (%p) total %d",
+          common::p_fmt(handler), connections);
     connections++;
     _handlers.push_back(handler);
   }
