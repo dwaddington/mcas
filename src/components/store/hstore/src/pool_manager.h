@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,14 +12,16 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_POOL_MANAGER_H
-#define COMANCHE_HSTORE_POOL_MANAGER_H
+#ifndef _MCAS_HSTORE_POOL_MANAGER_H
+#define _MCAS_HSTORE_POOL_MANAGER_H
 
 #include <api/kvstore_itf.h> /* status_t */
 
-#include "alloc_key.h"
+#include "alloc_key.h" /* AK_FORMAL */
+#include "pool_error.h"
 
 #include <common/logging.h> /* log_source */
+#include <common/string_view.h>
 #include <nupm/region_descriptor.h>
 #include <gsl/pointers>
 #include <sys/uio.h>
@@ -30,71 +32,19 @@
 
 struct pool_path;
 
-#pragma GCC diagnostic push
-// #pragma GCC diagnostic ignored "-Wunused-parameter"
-
-enum class pool_ec
-{
-  pool_fail,
-  pool_unsupported_mode,
-  region_fail,
-  region_fail_general_exception,
-  region_fail_api_exception,
-};
-
-struct pool_category
-  : public std::error_category
-{
-  const char* name() const noexcept override { return "pool_category"; }
-  std::string message( int condition ) const noexcept override
-  {
-    switch ( condition )
-    {
-    case int(pool_ec::pool_fail):
-      return "default pool failure";
-    case int(pool_ec::pool_unsupported_mode):
-      return "pool unsupported flags";
-    case int(pool_ec::region_fail):
-      return "region-backed pool failure";
-    case int(pool_ec::region_fail_general_exception):
-      return "region-backed pool failure (General_exception)";
-    case int(pool_ec::region_fail_api_exception):
-      return "region-backed pool failure (API_exception)";
-    default:
-      return "unknown pool failure";
-    }
-  }
-};
-
-namespace
-{
-  pool_category pool_error_category;
-}
-
-struct pool_error
-  : public std::error_condition
-{
-  std::string _msg;
-public:
-  pool_error(const std::string &msg_, pool_ec val_)
-    : std::error_condition(int(val_), pool_error_category)
-    , _msg(msg_)
-  {}
-
-};
-
 struct dax_manager;
 
 template <typename Pool>
   struct pool_manager
     : protected common::log_source
   {
+    using string_view = common::string_view;
     pool_manager(unsigned debug_level_) : common::log_source(debug_level_) {}
     virtual ~pool_manager() {}
 
     virtual void pool_create_check(const std::size_t size_) = 0;
 
-    virtual void pool_close_check(const std::string &) = 0;
+    virtual void pool_close_check(const string_view) = 0;
 
     virtual nupm::region_descriptor pool_get_regions(const Pool &) const = 0;
 
@@ -126,6 +76,5 @@ template <typename Pool>
     virtual void pool_delete(const pool_path &path) = 0;
     virtual const std::unique_ptr<dax_manager> & get_dax_manager() const = 0;
   };
-#pragma GCC diagnostic pop
 
 #endif

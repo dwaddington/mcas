@@ -12,28 +12,41 @@
 */
 
 
-#ifndef _MCAS_HSTORE_BAD_ALLOC_H
-#define _MCAS_HSTORE_BAD_ALLOC_H
-
-#include <new> /* bad_alloc */
-
-/* Every function which takes an alloc_key may throw bad_alloc.
- * Every constructor of an alloc_key must catch BAD_ALLOC and return an error, e.g. E_TOO_LARGE.
- */
-#include "alloc_key.h" /* AK_FORMAL */
+#ifndef _MCAS_HSTORE_HOP_HASH_EXCPETIONS_H
+#define _MCAS_HSTORE_HOP_HASH_EXCPETIONS_H
 
 #include <cstddef> /* size_t */
+#include <stdexcept> /* range_error */
 #include <string>
 
-struct bad_alloc_cc
-	: public std::bad_alloc
-{
-private:
-	std::string _what;
-public:
-	bad_alloc_cc(AK_FORMAL std::size_t pad, std::size_t count, std::size_t size);
+/*
+ * Exceptions thrown by hop_hash
+ */
 
-	const char *what() const noexcept override;
-};
+namespace impl
+{
+	struct no_near_empty_bucket
+		: public std::range_error
+	{
+		using bix_t = std::size_t;
+	private:
+		bix_t _bi;
+	public:
+		no_near_empty_bucket(bix_t bi, std::size_t size, const std::string &why);
+		bix_t bi() const { return _bi; }
+	};
+
+	struct move_stuck
+		: public no_near_empty_bucket
+	{
+		move_stuck(bix_t bi, std::size_t size);
+	};
+
+	struct hop_hash_full
+		: public no_near_empty_bucket
+	{
+		hop_hash_full(bix_t bi, std::size_t size);
+	};
+}
 
 #endif

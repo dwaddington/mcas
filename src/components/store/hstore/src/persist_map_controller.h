@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,6 +15,7 @@
 #ifndef MCAS_HSTORE_PERSIST_CONTROLLER_H
 #define MCAS_HSTORE_PERSIST_CONTROLLER_H
 
+#include "alloc_key.h" /* AK_FORMAL */
 #include "construction_mode.h"
 #include "hop_hash_log.h"
 #include "persist_data.h"
@@ -41,9 +42,9 @@ namespace impl
 			: public SizeChange
 		{
 		private:
-			persist_controller<Allocator> *_pc;
+			persist_map_controller<Allocator> *_pc;
 		public:
-			persist_size_change(persist_controller<Allocator> &pc_)
+			persist_size_change(persist_map_controller<Allocator> &pc_)
 				: SizeChange(pc_.get_size_control())
 				, _pc(&pc_)
 			{
@@ -63,7 +64,7 @@ namespace impl
 		};
 
 	template <typename Allocator>
-		struct persist_controller
+		struct persist_map_controller
 			: public Allocator
 		{
 		private:
@@ -96,14 +97,15 @@ namespace impl
 			}
 
 		public:
-			explicit persist_controller(
+			explicit persist_map_controller(
 				AK_FORMAL
 				const allocator_type &av, persist_data_t *persist, construction_mode mode);
 
-			persist_controller(const persist_controller &) = delete;
+			persist_map_controller(const persist_map_controller &) = delete;
+			persist_map_controller(persist_map_controller &&) noexcept = default;
 			auto operator=(
-				const persist_controller &
-			) -> persist_controller & = delete;
+				const persist_map_controller &
+			) -> persist_map_controller & = delete;
 
 			auto resize_prolog(AK_FORMAL0) -> bucket_aligned_t *;
 			auto resize_restart_prolog() -> bucket_aligned_t *;
@@ -241,5 +243,7 @@ namespace impl
 			}
 		};
 }
+
+#include "persist_map_controller.tcc"
 
 #endif

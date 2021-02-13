@@ -11,33 +11,34 @@
    limitations under the License.
 */
 
-#ifndef _MCAS_HSTORE_OPEN_POOL_H
-#define _MCAS_HSTORE_OPEN_POOL_H
+#ifndef MCAS_HSTORE_SESSION_BASE_H
+#define MCAS_HSTORE_SESSION_BASE_H
 
-#include "non_owner.h"
+#include "hstore_config.h"
+#include <common/logging.h> /* log_source */
 
-#include <utility> /* forward */
+#include <common/string_view.h>
+#include <array>
+#include <cstddef> /* size_t */
+#include <cstdint> /* uint64_t */
+#include <string>
 
 template <typename Handle>
-	struct open_pool
-		: private Handle
+	struct session_base
+		: public Handle
+		, protected common::log_source
 	{
+	protected:
 		using handle_type = Handle;
-		using pool_type = typename handle_type::element_type;
+		using pool_type = typename handle_type::pool_type;
+		using string_view = common::string_view;
+		std::uint64_t _writes;
+		static const std::string ac_prefix;
 
-		template <typename ... Args>
-			explicit open_pool(
-				Args && ... args_
-			)
-				: Handle(std::forward<Args>(args_)...)
-			{}
-
-		open_pool(const open_pool &) = delete;
-		virtual ~open_pool() {}
-		open_pool& operator=(const open_pool &) = delete;
-		using Handle::get;
-		using Handle::operator bool;
-		using Handle::operator->;
+		session_base(
+			Handle &&pop
+			, unsigned debug_level
+		);
 	};
 
 #endif

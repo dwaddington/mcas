@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 
 /* requires persist_data_t definition */
 #include "hstore_config.h"
+#include "alloc_key.h" /* AK_ACTUAL */
 #include "persist_data.h"
 
 #include <nupm/region_descriptor.h>
@@ -30,10 +31,10 @@
 struct dax_manager;
 
 template <
-  typename PersistData /* persistent data for the hash table impl::persist_data<allocator_segment_t, table_t::value_type> */
+  typename PersistData /* persistent data for the hash table: impl::persist_data<allocator_segment_t, table_type> */
   , typename Heap /* heap_[cr]c */
 >
-  struct region
+  struct alignas(64) region
   {
     using heap_access_t = heap_access<Heap>;
   private:
@@ -51,7 +52,14 @@ template <
      * for devdax grow.
      */
     std::uint64_t _uuid;
+    /* The storage allocator for persistent data.
+     * One of two types: hstore_rc (reconsituting allocator)
+     *  or hstore_cc (crash-consistent allocator)
+     */
     heap_type _heap;
+    /*
+     * Allocated persistent storage.
+     */
     persist_data_type _persist_data;
 
   public:
@@ -87,7 +95,7 @@ template <
       , _persist_data(
         AK_REF
         expected_obj_count
-        , typename PersistData::allocator_type(make_heap_access())
+        , typename persist_data_type::allocator_type(make_heap_access())
     )
     {
       magic = magic_value;

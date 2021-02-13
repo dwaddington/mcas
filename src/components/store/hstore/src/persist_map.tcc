@@ -1,5 +1,5 @@
 /*
-   Copyright [2019-2020] [IBM Corporation]
+   Copyright [2019-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,6 +12,7 @@
 */
 
 #include "hstore_config.h"
+#include "alloc_key.h" /* AK_ACTUAL */
 #include "construction_mode.h"
 #include "perishable.h"
 #include "segment_layout.h"
@@ -70,20 +71,20 @@ template <typename Allocator>
 		, _aspk{aspk_}
 		, _asx{asx_}
 	{
-		/* do_initial_allocation now requires a persist_controller, to interpret the
+		/* do_initial_allocation now requires a persist_map_controller, to interpret the
 		 * allocation_state_combined field. Construct a temporary one here.
-		 * The permanent persist_controller will be constructed later.
-		 * ERROR: See if we can use a single persist_controller, constructed at an
+		 * The permanent persist_map_controller will be constructed later.
+		 * ERROR: See if we can use a single persist_map_controller, constructed at an
 		 * appropriate time.
 		 */
-		persist_controller<Allocator> pc(AK_REF av_, this, construction_mode::create);
+		persist_map_controller<Allocator> pc(AK_REF av_, this, construction_mode::create);
 		do_initial_allocation(AK_REF &pc);
 	}
 
 template <typename Allocator>
 	void impl::persist_map<Allocator>::do_initial_allocation(
 		AK_ACTUAL
-		persist_controller<Allocator> *pc_)
+		persist_map_controller<Allocator> *pc_)
 	{
 		auto &av = static_cast<Allocator &>(*pc_);
 		if ( _segment_count.actual().is_stable() )

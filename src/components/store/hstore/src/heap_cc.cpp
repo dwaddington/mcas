@@ -369,7 +369,7 @@ void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align
 		/* IHeap interface does not support abstract pointers. Cast to regular pointer */
 		_eph->_heap->allocate(*reinterpret_cast<void **>(p_), sz, align);
 		/* We would like to carry the persistent_t through to the crash-conssitent allocator,
-		 * but for now just assume that the allocator has modifed p_, and call tick ti indicate that.
+		 * but for now just assume that the allocator has modifed p_, and call tick to indicate that.
 		 */
 		perishable::tick();
 

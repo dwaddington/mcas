@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -100,7 +100,7 @@ namespace impl
 		}
 
 		/* ERROR: it is being a bit lazy to make PersistController as a template parameter.
-		 * Chances are that what we need of the persist_controller_t could be provided
+		 * Chances are that what we need of the persist_map_controller_t could be provided
 		 * in a more limited manner.
 		 */
 		template<typename Bucket, typename Referent, typename SharedMutex, typename PersistController>

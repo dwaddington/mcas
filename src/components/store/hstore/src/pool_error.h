@@ -12,28 +12,41 @@
 */
 
 
-#ifndef _MCAS_HSTORE_BAD_ALLOC_H
-#define _MCAS_HSTORE_BAD_ALLOC_H
+#ifndef _MCAS_HSTORE_POOL_ERROR_H
+#define _MCAS_HSTORE_POOL_ERROR_H
 
-#include <new> /* bad_alloc */
-
-/* Every function which takes an alloc_key may throw bad_alloc.
- * Every constructor of an alloc_key must catch BAD_ALLOC and return an error, e.g. E_TOO_LARGE.
- */
-#include "alloc_key.h" /* AK_FORMAL */
-
-#include <cstddef> /* size_t */
 #include <string>
+#include <system_error>
 
-struct bad_alloc_cc
-	: public std::bad_alloc
+enum class pool_ec
+{
+  pool_fail,
+  pool_unsupported_mode,
+  region_fail,
+  region_fail_general_exception,
+  region_fail_api_exception,
+};
+
+struct pool_category
+  : public std::error_category
+{
+  const char* name() const noexcept override;
+  std::string message( int condition ) const noexcept override;
+};
+
+namespace
+{
+	pool_category pool_error_category;
+}
+
+struct pool_error
+  : public std::error_condition
 {
 private:
-	std::string _what;
+  std::string _msg;
 public:
-	bad_alloc_cc(AK_FORMAL std::size_t pad, std::size_t count, std::size_t size);
+  pool_error(const std::string &msg, pool_ec val);
 
-	const char *what() const noexcept override;
 };
 
 #endif

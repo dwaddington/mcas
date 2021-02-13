@@ -17,6 +17,7 @@
 #include "dax_manager.h"
 
 #include <common/json.h>
+#include <common/string_view.h>
 #include <common/utils.h>
 
 #include <algorithm> /* max */
@@ -66,13 +67,14 @@ auto hstore_factory::create(
 
   namespace c_json = common::json;
   using json = c_json::serializer<c_json::dummy_writer>;
+  using common::string_view;
   unsigned map_debug_level = unsigned(debug_it == mc.end() ? 0 : std::stoul(debug_it->second));
   unsigned effective_debug_level = std::max(debug_level_, map_debug_level);
   component::IKVStore *obj =
     new hstore(
       effective_debug_level
-      , owner_it == mc.end() ? "owner" : owner_it->second
-      , name_it == mc.end() ? "name" : name_it->second
+      , owner_it == mc.end() ? string_view{} : string_view(owner_it->second)
+      , name_it == mc.end() ? string_view{} : string_view(name_it->second)
       , std::make_unique<dax_manager>(
           common::log_source(effective_debug_level)
           , dax_config_it == mc.end() ? json::array().str() : dax_config_it->second

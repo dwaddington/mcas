@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,11 +11,21 @@
    limitations under the License.
 */
 
-#include "hop_hash_log.h"
+#include "session.h"
 
-#include <iostream>
+template <typename Iterator>
+	pool_iterator<Iterator>::pool_iterator(
+		std::uint64_t writes_
+		, iterator_t first_
+		, iterator_t last_
+	)
+		: _mark(writes_)
+		, _iter(first_)
+		, _end(last_)
+	{}
 
-void hop_hash_log_impl::wr(const std::string &s)
-{
-	std::cerr << s << std::endl;
-}
+template <typename Iterator>
+	bool pool_iterator<Iterator>::is_end() const { return _iter == _end; }
+
+template <typename Iterator>
+	bool pool_iterator<Iterator>::check_mark(std::uint64_t writes) const { return _mark == writes; }

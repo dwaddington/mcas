@@ -17,10 +17,13 @@
 
 #include <cassert>
 
+#include "owner.h"
 #include "owner_debug.tcc"
 #include "content_debug.tcc"
 #include "bits_to_ints.h"
 #include <boost/io/ios_state.hpp>
+#include <algorithm> /* set_difference */
+#include <iostream> /* ostream */
 
 template <typename LockOwner, typename LockContent>
 	impl::bucket_print<LockOwner, LockContent>::bucket_print(

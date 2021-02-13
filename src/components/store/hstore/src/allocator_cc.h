@@ -17,6 +17,7 @@
 
 #include "deallocator_cc.h"
 
+#include "alloc_key.h" /* AK_ACTUAL */
 #include "bad_alloc_cc.h"
 #include "heap_access.h"
 #include "persister_cc.h"
@@ -89,7 +90,7 @@ template <typename T, typename Persister = persister>
 			 */
 			if ( p_ == 0 )
 			{
-				throw bad_alloc_cc(AK_REF s_, sizeof(T), alignment_);
+				throw bad_alloc_cc(AK_REF alignment_, s_, sizeof(T));
 			}
 		}
 

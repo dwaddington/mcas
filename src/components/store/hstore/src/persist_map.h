@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,6 +15,7 @@
 #ifndef MCAS_HSTORE_PERSIST_MAP_H
 #define MCAS_HSTORE_PERSIST_MAP_H
 
+#include "alloc_key.h" /* AK_ACTUAL */
 #include "bucket_aligned.h"
 #include "hash_bucket.h"
 #include "persist_fixed_string.h"
@@ -37,7 +38,7 @@ namespace impl
 	using segment_count_actual_t = value_unstable<segment_layout::six_t, 1>;
 
 	template <typename Allocator>
-		struct persist_controller;
+		struct persist_map_controller;
 
 	template <typename Allocator>
 		struct persist_map
@@ -79,7 +80,7 @@ namespace impl
 
 			segment_control _sc[_segment_capacity];
 
-			/* Three types of allocation states at the moment. At most one at a time is "active" */
+			/* Four types of allocation states at the moment. At most one at a time is "active" */
 			allocation_state_emplace *_ase;
 			allocation_state_pin *_aspd;
 			allocation_state_pin *_aspk;
@@ -97,12 +98,12 @@ namespace impl
 			persist_map(persist_map &&) noexcept(!perishable_testing) = default;
 			void do_initial_allocation(
 				AK_ACTUAL
-				persist_controller<Allocator> *pc
+				persist_map_controller<Allocator> *pc
 			);
 			void reconstitute(Allocator av);
 			allocation_state_emplace &ase() { return *_ase; }
 			allocation_state_extend &asx() { return *_asx; }
-			friend struct persist_controller<Allocator>;
+			friend struct persist_map_controller<Allocator>;
 		};
 }
 

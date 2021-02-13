@@ -11,8 +11,7 @@
    limitations under the License.
 */
 
-
 #include "size_control.h"
 
-constexpr unsigned impl::size_control::N;
-constexpr std::size_t impl::size_control::count_1;
+template <>
+	constexpr std::size_t impl::size_control::count_1;

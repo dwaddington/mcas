@@ -47,11 +47,11 @@ inline common::tsc_time_t tsc_now()
 template <typename Deallocator>
 	struct hstore_kv_types
 	{
-		using dealloc_t = Deallocator;
-		using key_t = persist_fixed_string<char, 24, dealloc_t>;
-		using mapped_t =
+		using dealloc_type = Deallocator;
+		using key_type = persist_fixed_string<char, 24, dealloc_type>;
+		using mapped_type =
 			std::tuple<
-				persist_fixed_string<char, 24, dealloc_t>
+				persist_fixed_string<char, 24, dealloc_type>
 #if ENABLE_TIMESTAMPS
 				, common::tsc_time_t
 #endif

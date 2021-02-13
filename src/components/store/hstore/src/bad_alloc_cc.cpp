@@ -1,5 +1,5 @@
 /*
-   Copyright [2020] [IBM Corporation]
+   Copyright [2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,3 +12,12 @@
 */
 
 #include "bad_alloc_cc.h"
+
+bad_alloc_cc::bad_alloc_cc(AK_ACTUAL std::size_t pad, std::size_t count, std::size_t size)
+	: _what(std::string(__func__) + ": " + std::to_string(pad) + "+" + std::to_string(count) + "*" + std::to_string(size))
+{}
+
+const char *bad_alloc_cc::what() const noexcept
+{
+	return _what.c_str();
+}

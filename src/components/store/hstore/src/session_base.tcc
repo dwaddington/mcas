@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,11 +11,12 @@
    limitations under the License.
 */
 
-#include "hop_hash_log.h"
-
-#include <iostream>
-
-void hop_hash_log_impl::wr(const std::string &s)
-{
-	std::cerr << s << std::endl;
-}
+template <typename Handle>
+	session_base<Handle>::session_base(
+		Handle &&pop_
+		, unsigned debug_level_
+	)
+		: Handle(std::move(pop_))
+		, common::log_source(debug_level_)
+		, _writes(0)
+	{}
