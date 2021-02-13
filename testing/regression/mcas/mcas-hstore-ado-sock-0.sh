@@ -25,7 +25,7 @@ sleep 3
 CLIENT_LOG="test$TESTID-client.log"
 
 # launch client
-[ 0 -lt $DEBUG ] && echo ./dist/bin/ado-test --provider sockets --src_addr "$NODE_IP" --server $NODE_IP --port 11911 &> $CLIENT_LOG &
+[ 0 -lt $DEBUG ] && echo ./dist/bin/ado-test --provider sockets --src_addr "$NODE_IP" --server $NODE_IP --port 11911
 ./dist/bin/ado-test --provider sockets --src_addr "$NODE_IP" --server $NODE_IP --port 11911 &> $CLIENT_LOG &
 CLIENT_PID=$!
 

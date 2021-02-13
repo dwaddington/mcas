@@ -14,7 +14,7 @@ DEBUG=${DEBUG:-0}
 
 CONFIG_STR="$("./dist/testing/hstore-ado0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" 11911 )"
 # launch MCAS server
-[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
@@ -24,7 +24,7 @@ sleep 3
 CLIENT_LOG="test$TESTID-client.log"
 
 # launch client
-[ 0 -lt $DEBUG ] && echo ./dist/bin/ado-test --src_addr "$NODE_IP" --server $NODE_IP --port 11911 --debug $DEBUG &> $CLIENT_LOG &
+[ 0 -lt $DEBUG ] && echo ./dist/bin/ado-test --src_addr "$NODE_IP" --server $NODE_IP --port 11911 --debug $DEBUG
 ./dist/bin/ado-test --src_addr "$NODE_IP" --server $NODE_IP --port 11911 --debug $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 

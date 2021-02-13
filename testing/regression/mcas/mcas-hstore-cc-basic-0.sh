@@ -16,7 +16,7 @@ DEBUG=${DEBUG:-0}
 
 CONFIG_STR="$("./dist/testing/hstore-0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" 11911)"
 # launch MCAS server
-[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
@@ -30,7 +30,7 @@ CLIENT_LOG="test$TESTID-client.log"
 
 [ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --cores "$(clamp_cpu 3)" --src_addr $NODE_IP --server $NODE_IP --port 11911 \
                         --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting \
-                        --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
+                        --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG
 ./dist/bin/kvstore-perf --cores "$(clamp_cpu 3)" --src_addr $NODE_IP --server $NODE_IP --port 11911 \
                         --test put --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting \
                         --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &

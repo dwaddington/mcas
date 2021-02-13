@@ -15,7 +15,7 @@ DEBUG=${DEBUG:-0}
 
 CONFIG_STR="$("./dist/testing/hstore-0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP")"
 # launch MCAS server
-[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+[ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \`"$CONFIG_STR"\` --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
@@ -24,7 +24,7 @@ sleep 3
 # launch client
 CLIENT_LOG="test$TESTID-client.log"
 # OBJECT_COUNT=5531 is experimental limit for PoolCapacity test using hstore-cc allocator
-[ 0 -lt $DEBUG ] && echo OBJECT_COUNT=5500 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --debug $DEBUG &> $CLIENT_LOG &
+[ 0 -lt $DEBUG ] && echo OBJECT_COUNT=5500 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --debug $DEBUG
 OBJECT_COUNT=5500 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --debug $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 
