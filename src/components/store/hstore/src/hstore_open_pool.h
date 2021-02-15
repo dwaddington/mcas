@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,34 +11,19 @@
    limitations under the License.
 */
 
+#ifndef _MCAS_HSTORE_OPEN_POOL_H
+#define _MCAS_HSTORE_OPEN_POOL_H
 
-#ifndef COMANCHE_HSTORE_OPEN_POOL_H
-#define COMANCHE_HSTORE_OPEN_POOL_H
+#include "non_owner.h"
 
 #include <utility> /* forward */
-
-/* A struct which resembles unique_ptr or shared_ptr, but for non-owing uses */
-template <typename T>
-	struct non_owner
-	{
-	private:
-		T *_p;
-	public:
-		explicit non_owner() : non_owner(nullptr) {}
-		explicit non_owner(T *p_) : _p(p_) {}
-		non_owner(const non_owner &other) = default;
-		non_owner &operator=(const non_owner &other) = default;
-		auto get() const { return _p; }
-		operator bool() const { return bool(_p); }
-		auto operator->() const { return _p; }
-		auto operator*() const { return *_p; }
-	};
 
 template <typename Handle>
 	struct open_pool
 		: private Handle
 	{
 		using handle_type = Handle;
+		using pool_type = typename handle_type::element_type;
 
 		template <typename ... Args>
 			explicit open_pool(

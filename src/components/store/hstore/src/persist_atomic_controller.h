@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -22,6 +22,7 @@
 #include <api/kvstore_itf.h> /* component */
 #include <common/perf/tm_fwd.h>
 
+#include <common/string_view.h>
 #include <tuple> /* tuple_element */
 #include <type_traits> /* is_base_of */
 #include <vector>
@@ -32,28 +33,29 @@ namespace impl
 		struct persist_atomic;
 
 	template <typename Table>
-		struct atomic_controller
+		struct persist_atomic_controller
 			: private std::allocator_traits<typename Table::allocator_type>::template rebind_alloc<mod_control>
 		{
 		private:
-			using table_t = Table;
+			using string_view = common::string_view;
+			using table_type = Table;
 			using allocator_type =
-				typename std::allocator_traits<typename table_t::allocator_type>::template rebind_alloc<mod_control>;
+				typename std::allocator_traits<typename table_type::allocator_type>::template rebind_alloc<mod_control>;
 
-			using persist_t = persist_atomic<typename table_t::value_type>;
-			persist_t *_persist; /* persist_atomic is a bad name. Should be a noun. */
-			table_t *_map;
+			using persist_type = persist_atomic<table_type>;
+			persist_type *_persist; /* persist_atomic is a bad name. Should be a noun. */
 #if 0
 			bool _tick_expired;
 #endif
 			struct update_finisher
 			{
 			private:
-				impl::atomic_controller<table_t> &_ctlr;
+				impl::persist_atomic_controller<table_type> &_ctlr;
 			public:
-				update_finisher(impl::atomic_controller<table_t> &ctlr_);
+				update_finisher(impl::persist_atomic_controller<table_type> &ctlr_);
 				~update_finisher() noexcept(! TEST_HSTORE_PERISHABLE);
 			};
+
 			void do_update(TM_FORMAL0);
 			void update_finish();
 			void do_replace();
@@ -65,28 +67,14 @@ namespace impl
 			bool is_tick_expired() { auto r = _tick_expired; _tick_expired = false; return r; }
 #endif
 			void persist_range(const void *first_, const void *last_, const char *what_);
-
-			void emm_record_owner_addr_and_bitmask(
-				persistent_atomic_t<std::uint64_t> *pmask_
-				, std::uint64_t mask_
-			)
-			{
-				auto pe = static_cast<allocator_type *>(this);
-				_persist->ase()
-					.em_record_owner_addr_and_bitmask(
-						pmask_
-						, mask_
-						, *pe
-					);
-			}
 		public:
-			atomic_controller(
-				persist_atomic<typename table_t::value_type> &persist_
-				, table_t &map_
+			persist_atomic_controller(
+				persist_type &persist_
+				, allocator_type al_
 				, construction_mode mode_
 			);
-			atomic_controller(const atomic_controller &) = delete;
-			atomic_controller& operator=(const atomic_controller &) = delete;
+			persist_atomic_controller(const persist_atomic_controller &) = delete;
+			persist_atomic_controller& operator=(const persist_atomic_controller &) = delete;
 
 		private:
 			void do_op(TM_FORMAL0);
@@ -95,9 +83,10 @@ namespace impl
 				void enter_update(
 					AK_FORMAL
 					TM_FORMAL
-					typename table_t::allocator_type al_
+					typename table_type::allocator_type al_
+					, table_type *map_
 					, lock_state lock
-					, const std::string &key
+					, string_view key
 					, IT first
 					, IT last
 				);
@@ -105,25 +94,27 @@ namespace impl
 			void enter_replace(
 				AK_FORMAL
 				TM_FORMAL
-				typename table_t::allocator_type al
+				typename table_type::allocator_type al
+				, table_type *map_
 				, lock_state lock
-				, const std::string &key
+				, string_view key
 				, const char *data
 				, std::size_t data_len
 				, std::size_t zeros_extend
 				, std::size_t alignment
 			);
 
-			using mt = typename table_t::mapped_type;
+			using mt = typename table_type::mapped_type;
+
 			void enter_swap(
 				mt &d0
 				, mt &d1
 			);
 
-			friend struct atomic_controller<table_t>::update_finisher;
+			friend struct persist_atomic_controller<table_type>::update_finisher;
 	};
 }
 
-#include "atomic_controller.tcc"
+#include "persist_atomic_controller.tcc"
 
 #endif

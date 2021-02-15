@@ -11,7 +11,6 @@
    limitations under the License.
 */
 
-
 #include "hop_hash_log.h"
 
 #include <iostream>

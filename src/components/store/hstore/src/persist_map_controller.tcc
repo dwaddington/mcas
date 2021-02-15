@@ -1,5 +1,5 @@
 /*
-   Copyright [2018-2020] [IBM Corporation]
+   Copyright [2018-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,6 +12,8 @@
 */
 
 #include "hstore_config.h"
+#include "alloc_key.h" /* AK_ACTUAL */
+#include <common/logging.h>
 
 /*
  * Hopscotch hash table - template Key, Value, and allocators
@@ -31,7 +33,7 @@
  */
 
 template <typename Allocator>
-	impl::persist_controller<Allocator>::persist_controller(
+	impl::persist_map_controller<Allocator>::persist_map_controller(
         AK_ACTUAL
 		const Allocator &av_
 		, persist_data_t *persist_
@@ -61,7 +63,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_segment_count()
+	void impl::persist_map_controller<Allocator>::persist_segment_count()
 	{
 		persist_internal(
 			&_persist->_segment_count
@@ -71,7 +73,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_owner(
+	void impl::persist_map_controller<Allocator>::persist_owner(
 		const owner &c_
 		, const char *why_
 	)
@@ -80,7 +82,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_content(
+	void impl::persist_map_controller<Allocator>::persist_content(
 		const content_t &c_
 		, const char *why_
 	)
@@ -99,7 +101,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_internal(
+	void impl::persist_map_controller<Allocator>::persist_internal(
 		const void *first_
 		, const void *last_
 		, const char * // what_
@@ -109,7 +111,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_existing_segments(const char *)
+	void impl::persist_map_controller<Allocator>::persist_existing_segments(const char *)
 	{
 /* This persist goes through pmemobj address translation to find the addresses.
  * That is unecessary, as the virtual addresses are kept (in a separate table).
@@ -127,7 +129,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_new_segment(const char *)
+	void impl::persist_map_controller<Allocator>::persist_new_segment(const char *)
 	{
 /* This persist goes through pmemobj address translation to find the addresses.
  * That is unnecessary, as the virtual addresses are kept (in a separate table).
@@ -143,7 +145,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_segment_table()
+	void impl::persist_map_controller<Allocator>::persist_segment_table()
 	{
 /* This persist goes through pmemobj address translation to find the addresses.
  * That su unnecessary, as the virtual addresses are kept (in a separate table).
@@ -153,7 +155,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::persist_size()
+	void impl::persist_map_controller<Allocator>::persist_size()
 	{
 		persist_internal(
 			&_persist->_size_control
@@ -163,36 +165,37 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	bool impl::persist_controller<Allocator>::is_size_stable() const
+	bool impl::persist_map_controller<Allocator>::is_size_stable() const
 	{
 		return _persist->_size_control.is_stable();
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::size_set(std::size_t n)
+	void impl::persist_map_controller<Allocator>::size_set(std::size_t n)
 	{
 		_persist->_size_control.value_set_stable(n);
 		persist_size();
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::size_destabilize()
+	void impl::persist_map_controller<Allocator>::size_destabilize()
 	{
 		_persist->_size_control.destabilize();
 		persist_size();
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::size_stabilize()
+	void impl::persist_map_controller<Allocator>::size_stabilize()
 	{
 		_persist->_size_control.stabilize();
 		persist_size();
 	}
 
 template <typename Allocator>
-	auto impl::persist_controller<Allocator>::resize_prolog(
+	auto impl::persist_map_controller<Allocator>::resize_prolog(
 		AK_ACTUAL0
 	) -> bucket_aligned_t *
+	try
 	{
 		persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
 
@@ -213,9 +216,14 @@ template <typename Allocator>
 		auto sc = &*_persist->_sc;
 		return &*(sc[segment_count_actual().value()].bp);
 	}
+	catch ( const std::exception & )
+	{
+		PLOG("%s: %s 0x%zx", __func__, "failed resizing to 0x%zx", bucket_count());
+		throw;
+	}
 
 template <typename Allocator>
-	auto impl::persist_controller<Allocator>::resize_restart_prolog(
+	auto impl::persist_map_controller<Allocator>::resize_restart_prolog(
 	) -> bucket_aligned_t *
 	{
 		auto sc = &*_persist->_sc;
@@ -223,7 +231,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::resize_interlog()
+	void impl::persist_map_controller<Allocator>::resize_interlog()
 	{
 		persist_segment_table();
 		_persist->_segment_count.actual_destabilize();
@@ -231,7 +239,7 @@ template <typename Allocator>
 	}
 
 template <typename Allocator>
-	void impl::persist_controller<Allocator>::resize_epilog()
+	void impl::persist_map_controller<Allocator>::resize_epilog()
 	{
 		_persist->_segment_count.actual_value_set_stable(_persist->_segment_count.actual().value_not_stable() + 1U);
 		_bucket_count_cached = bucket_count_uncached();

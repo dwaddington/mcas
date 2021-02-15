@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -11,33 +11,4 @@
    limitations under the License.
 */
 
-
 #include "hop_hash.h"
-
-/* Inteded to implement Hopscotch hashing
- * http://mcg.cs.tau.ac.il/papers/disc2008-hopscotch.pdf
- */
-
-impl::no_near_empty_bucket::no_near_empty_bucket(
-	bix_t bi_
-	, std::size_t size_
-	, const std::string &why_
-)
-	: std::range_error{
-		"no_near_empty_bucket (index "
-		+ std::to_string(bi_)
-		+ " of "
-		+ std::to_string(size_)
-		+ " buckets) because "
-		+ why_
-	}
-	, _bi(bi_)
-{}
-
-impl::move_stuck::move_stuck(bix_t bi_, std::size_t size_)
-	: no_near_empty_bucket{bi_, size_, __func__}
-{}
-
-impl::hop_hash_full::hop_hash_full(bix_t bi_, std::size_t size_)
-	: no_near_empty_bucket{bi_, size_, __func__}
-{}

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -46,6 +46,7 @@
 
 #include <api/kvstore_itf.h>
 #include <common/logging.h>
+#include <common/string_view.h>
 #include <map>
 #include <memory>
 #include <string>
@@ -61,54 +62,55 @@ struct hstore
   , private common::log_source
 {
 private:
-  using alloc_t = typename hstore_alloc_type<Persister>::alloc_t;
-  using heap_alloc_shared_t = typename hstore_alloc_type<Persister>::heap_alloc_shared_t;
-  using dealloc_t = typename alloc_t::deallocator_type;
-  using key_t = typename hstore_kv_types<dealloc_t>::key_t;
-  using mapped_t = typename hstore_kv_types<dealloc_t>::mapped_t;
-  using allocator_segment_t = std::allocator_traits<alloc_t>::rebind_alloc<std::pair<const key_t, mapped_t>>;
+  using alloc_type = typename hstore_alloc_type<Persister>::alloc_type;
+  using heap_alloc_shared_type = typename hstore_alloc_type<Persister>::heap_alloc_shared_type;
+  using dealloc_type = typename alloc_type::deallocator_type;
+  using key_type = typename hstore_kv_types<dealloc_type>::key_type;
+  using mapped_type = typename hstore_kv_types<dealloc_type>::mapped_type;
+  using allocator_segment_type = std::allocator_traits<alloc_type>::rebind_alloc<std::pair<const key_type, mapped_type>>;
+  using string_view = common::string_view;
 #if THREAD_SAFE_HASH == 1
   /* thread-safe hash */
   using hstore_shared_mutex = std::shared_timed_mutex;
-  static constexpr auto thread_model = component::IKVStore::THREAD_MODEL_MULTI_PER_POOL;
+  static constexpr auto thread_model = THREAD_MODEL_MULTI_PER_POOL;
   static constexpr auto is_thread_safe = true;
 #else
 /* not a thread-safe hash */
   using hstore_shared_mutex = dummy::shared_mutex;
-  static constexpr auto thread_model = component::IKVStore::THREAD_MODEL_SINGLE_PER_POOL;
+  static constexpr auto thread_model = THREAD_MODEL_SINGLE_PER_POOL;
   static constexpr auto is_thread_safe = false;
 #endif
 
-  using table_t =
+  using table_type =
     hop_hash<
-      key_t
-      , mapped_t
-      , pstr_hash<key_t>
-      , pstr_equal<key_t>
-      , allocator_segment_t
+      key_type
+      , mapped_type
+      , pstr_hash<key_type>
+      , pstr_equal<key_type>
+      , allocator_segment_type
       , hstore_shared_mutex
     >;
 public:
-  using persist_data_t = typename impl::persist_data<allocator_segment_t, table_t::value_type>;
-  using pm = hstore_nupm<region<persist_data_t, heap_alloc_shared_t>, table_t, table_t::allocator_type, lock_type_t>;
-  using open_pool_t = pm::open_pool_handle;
+  using persist_data_type = typename impl::persist_data<allocator_segment_type, table_type>;
+  using pm_type = hstore_nupm<region<persist_data_type, heap_alloc_shared_type>, table_type, table_type::allocator_type, lock_type_t>;
+  using open_pool_type = pm_type::open_pool_handle;
 private:
-  using session_t = session<open_pool_t, alloc_t, table_t, lock_type_t>;
+  using session_type = session<open_pool_type, alloc_type, table_type, lock_type_t>;
+  using pool_manager_type = pool_manager<open_pool_type>;
 
-  using pool_manager_t = pool_manager<open_pool_t>;
-  std::shared_ptr<pool_manager_t> _pool_manager;
+  std::shared_ptr<pool_manager_type> _pool_manager;
   std::mutex _pools_mutex;
-  using pools_map = std::multimap<void *, std::shared_ptr<open_pool_t>>;
+  using pools_map = std::multimap<void *, std::shared_ptr<open_pool_type>>;
   pools_map _pools;
-  auto locate_session(component::IKVStore::pool_t pid) -> open_pool_t *;
-  auto move_pool(IKVStore::pool_t pid) -> std::shared_ptr<open_pool_t>;
+  auto locate_session(pool_t pid) -> open_pool_type *;
+  auto move_pool(pool_t pid) -> std::shared_ptr<open_pool_type>;
 
 public:
   /**
    * Constructor
    *
    */
-  hstore(unsigned debug_level, const std::string &owner, const std::string &name, std::unique_ptr<dax_manager> &&mgr);
+  hstore(unsigned debug_level, const string_view owner, const string_view name, std::unique_ptr<dax_manager> &&mgr);
 
   /**
    * Destructor
@@ -127,7 +129,7 @@ public:
 
   void * query_interface(component::uuid_t& itf_uuid) override {
     return
-      itf_uuid == component::IKVStore::iid()
+      itf_uuid == iid()
       ? static_cast<component::IKVStore *>(this)
       : nullptr
       ;
@@ -152,14 +154,14 @@ public:
 
   pool_t create_pool(const std::string &name,
                      std::size_t size,
-                     component::IKVStore::flags_t flags,
+                     flags_t flags,
                      std::uint64_t expected_obj_count,
-                     component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}
+                     Addr base_addr_unused
                      ) override;
 
   pool_t open_pool(const std::string &name,
-                   component::IKVStore::flags_t flags,
-                   component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}
+                   flags_t flags,
+                   Addr base_addr_unused
                    ) override;
 
   status_t delete_pool(const std::string &name) override;
@@ -174,14 +176,14 @@ public:
                const std::string &key,
                const void * value,
                std::size_t value_len,
-               component::IKVStore::flags_t flags = FLAGS_NONE) override;
+               flags_t flags) override;
 
   status_t put_direct(pool_t pool,
                       const std::string& key,
                       const void * value,
                       std::size_t value_len,
-                      memory_handle_t handle = HANDLE_NONE,
-                      component::IKVStore::flags_t flags = FLAGS_NONE) override;
+                      memory_handle_t handle,
+                      flags_t flags) override;
 
   status_t get(pool_t pool,
                const std::string &key,
@@ -192,7 +194,7 @@ public:
                       const std::string &key,
                       void* out_value,
                       std::size_t& out_value_len,
-                      component::IKVStore::memory_handle_t handle) override;
+                      memory_handle_t handle) override;
 
   status_t get_attribute(pool_t pool,
                                  Attribute attr,
@@ -209,7 +211,7 @@ public:
                 lock_type_t type,
                 void*& out_value,
                 std::size_t& out_value_len,
-                component::IKVStore::key_t& out_key,
+                key_t& out_key,
                 const char ** out_key_ptr) override;
 
   status_t resize_value(pool_t pool
@@ -218,8 +220,8 @@ public:
                         , std::size_t        alignment) override;
 
   status_t unlock(pool_t pool,
-                  component::IKVStore::key_t key_handle,
-                  component::IKVStore::unlock_flags_t flags) override;
+                  key_t key_handle,
+                  unlock_flags_t flags) override;
 
   status_t apply(pool_t pool,
                  const std::string& key,

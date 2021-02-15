@@ -1,5 +1,5 @@
 /*
-   Copyright [2018-2019] [IBM Corporation]
+   Copyright [2018-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,10 +12,12 @@
 */
 
 #include "hstore_config.h"
+#include "alloc_key.h" /* AK_ACTUAL */
 #include "hstore_kv_types.h"
 #include "monitor_emplace.h"
 #include <common/perf/tm.h>
 #include <algorithm> /* copy, move */
+#include <array>
 #include <stdexcept> /* out_of_range */
 #include <string>
 #include <vector>
@@ -25,14 +27,13 @@ struct perishable_expiry;
 /* NOTE: assumes a valid map, so must be constructed *after* the map
  */
 template <typename Table>
-	impl::atomic_controller<Table>::atomic_controller(
-			persist_atomic<typename table_t::value_type> &persist_
-			, table_t &map_
+	impl::persist_atomic_controller<Table>::persist_atomic_controller(
+			persist_type &persist_
+			, allocator_type al_
 			, construction_mode mode_
 		)
-			: allocator_type(map_.get_allocator())
+			: allocator_type(al_)
 			, _persist(&persist_)
-			, _map(&map_)
 #if 0
 			, _tick_expired(false)
 #endif
@@ -63,7 +64,7 @@ template <typename Table>
 		}
 
 template <typename Table>
-	auto impl::atomic_controller<Table>::do_op(TM_ACTUAL0) -> void
+	auto impl::persist_atomic_controller<Table>::do_op(TM_ACTUAL0) -> void
 	{
 		if ( _persist->mod_size != 0 )
 		{
@@ -83,7 +84,7 @@ template <typename Table>
 	}
 
 template <typename Table>
-	auto impl::atomic_controller<Table>::do_finish() -> void
+	auto impl::persist_atomic_controller<Table>::do_finish() -> void
 	{
 		_persist->mod_size = 0;
 		persist_range(&_persist->mod_size, &_persist->mod_size + 1, "atomic size");
@@ -106,14 +107,14 @@ template <typename Table>
 	}
 
 template <typename Table>
-	auto impl::atomic_controller<Table>::do_replace() -> void
+	auto impl::persist_atomic_controller<Table>::do_replace() -> void
 	{
 		TM_ROOT()
 		/*
 		 * Note: relies on the Table::mapped_type::operator=(Table::mapped_type &)
 		 * being restartable after a crash.
 		 */
-		auto &v = _map->at(TM_REF _persist->mod_key);
+		auto &v = _persist->map->at(TM_REF _persist->mod_key);
 		std::get<0>(v) = _persist->mod_mapped;
 		/* Unclear whether timestamps should be updated. The only guidance we have is the
 		 * mapstore implementation, which does update timestamps on a replace.
@@ -126,12 +127,12 @@ template <typename Table>
 	}
 
 template <typename Table>
-	impl::atomic_controller<Table>::update_finisher::update_finisher(impl::atomic_controller<Table> &ctlr_)
+	impl::persist_atomic_controller<Table>::update_finisher::update_finisher(impl::persist_atomic_controller<Table> &ctlr_)
 		: _ctlr(ctlr_)
 	{}
 
 template <typename Table>
-	impl::atomic_controller<Table>::update_finisher::~update_finisher() noexcept(! TEST_HSTORE_PERISHABLE)
+	impl::persist_atomic_controller<Table>::update_finisher::~update_finisher() noexcept(! TEST_HSTORE_PERISHABLE)
 	{
 		if ( ! perishable_expiry::is_current() )
 		{
@@ -140,14 +141,14 @@ template <typename Table>
 	}
 
 template <typename Table>
-	auto impl::atomic_controller<Table>::do_update(TM_ACTUAL0) -> void
+	auto impl::persist_atomic_controller<Table>::do_update(TM_ACTUAL0) -> void
 	{
 		TM_SCOPE()
 		{
 			update_finisher uf(*this);
 			char *src = _persist->mod_mapped.data();
 			/* NOTE: depends on mapped type */
-			auto &v = _map->at(TM_REF _persist->mod_key);
+			auto &v = _persist->map->at(TM_REF _persist->mod_key);
 			char *dst = std::get<0>(v).data();
 			auto mod_ctl = &*(_persist->mod_ctl);
 			for ( auto i = mod_ctl; i != &mod_ctl[_persist->mod_size]; ++i )
@@ -181,7 +182,7 @@ template <typename Table>
 	}
 
 template <typename Table>
-	auto impl::atomic_controller<Table>::update_finish() -> void
+	auto impl::persist_atomic_controller<Table>::update_finish() -> void
 	{
 		std::size_t ct = std::size_t(_persist->mod_size);
 		do_finish();
@@ -189,7 +190,7 @@ template <typename Table>
 	}
 
 template <typename Table>
-	auto impl::atomic_controller<Table>::do_swap() -> void
+	auto impl::persist_atomic_controller<Table>::do_swap() -> void
 	{
 #pragma GCC diagnostic push
 #if 9 <= __GNUC__
@@ -223,7 +224,7 @@ template <typename Table>
 	}
 
 template <typename Table>
-	void impl::atomic_controller<Table>::persist_range(
+	void impl::persist_atomic_controller<Table>::persist_range(
 		const void *first_
 		, const void *last_
 		, const char *what_
@@ -233,11 +234,13 @@ template <typename Table>
 	}
 
 template <typename Table>
-	void impl::atomic_controller<Table>::enter_replace(TM_ACTUAL
+	void impl::persist_atomic_controller<Table>::enter_replace(
 		AK_ACTUAL
-		typename table_t::allocator_type al_
+		TM_ACTUAL
+		typename table_type::allocator_type al_
+		, table_type *map_
 		, lock_state lock_
-		, const std::string &key
+		, const string_view key
 		, const char *data_
 		, std::size_t data_len_
 		, std::size_t zeros_extend_
@@ -258,6 +261,8 @@ template <typename Table>
 #endif
 			_persist->mod_key.assign(AK_REF key.begin(), key.end(), lock_state::free, al_);
 			_persist->mod_mapped.assign(AK_REF data_, data_ + data_len_, zeros_extend_, alignment_, lock_, al_);
+			_persist->map = map_;
+			this->persist(&_persist->map, sizeof _persist->map);
 			_persist->mod_owner = 1;
 			this->persist(&_persist->mod_owner, sizeof _persist->mod_owner);
 		}
@@ -270,12 +275,13 @@ template <typename Table>
 
 template <typename Table>
 	template <typename IT>
-		void impl::atomic_controller<Table>::enter_update(
+		void impl::persist_atomic_controller<Table>::enter_update(
 			TM_ACTUAL
 			AK_ACTUAL
-			typename table_t::allocator_type al_
+			typename table_type::allocator_type al_
+			, table_type *map_
 			, lock_state lock_
-			, const std::string &key
+			, const string_view key
 			, IT first
 			, IT last
 		)
@@ -329,6 +335,8 @@ template <typename Table>
 			, &*_persist->mod_ctl + mods.size()
 			, "mod control"
 		);
+		_persist->map = map_;
+		this->persist(&_persist->map, sizeof _persist->map);
 		/* 8-byte atomic write */
 		_persist->mod_size = std::ptrdiff_t(mods.size());
 		this->persist(&_persist->mod_size, sizeof _persist->mod_size);
@@ -336,7 +344,7 @@ template <typename Table>
 	}
 
 template <typename Table>
-	void impl::atomic_controller<Table>::enter_swap(
+	void impl::persist_atomic_controller<Table>::enter_swap(
 		mt &d0
 		, mt &d1
 	)

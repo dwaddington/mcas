@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,15 +12,15 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_BAD_ALLOC_H
-#define COMANCHE_HSTORE_BAD_ALLOC_H
+#ifndef _MCAS_HSTORE_BAD_ALLOC_H
+#define _MCAS_HSTORE_BAD_ALLOC_H
 
 #include <new> /* bad_alloc */
 
 /* Every function which takes an alloc_key may throw bad_alloc.
  * Every constructor of an alloc_key must catch BAD_ALLOC and return an error, e.g. E_TOO_LARGE.
  */
-#include "alloc_key.h"
+#include "alloc_key.h" /* AK_FORMAL */
 
 #include <cstddef> /* size_t */
 #include <string>
@@ -31,13 +31,9 @@ struct bad_alloc_cc
 private:
 	std::string _what;
 public:
-	bad_alloc_cc(AK_FORMAL std::size_t pad, std::size_t count, std::size_t size)
-		: _what(std::string(__func__) + ": " + std::to_string(pad) + "+" + std::to_string(count) + "*" + std::to_string(size))
-	{}
-	const char *what() const noexcept override
-	{
-		return _what.c_str();
-	}
+	bad_alloc_cc(AK_FORMAL std::size_t pad, std::size_t count, std::size_t size);
+
+	const char *what() const noexcept override;
 };
 
 #endif

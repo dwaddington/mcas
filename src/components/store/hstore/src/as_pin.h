@@ -103,14 +103,14 @@ namespace impl
 	struct allocation_state_pin
 	{
 	private:
-		using alloc_t = typename hstore_alloc_type<Persister>::alloc_t;
+		using alloc_t = typename hstore_alloc_type<Persister>::alloc_type;
 		using dealloc_t = typename alloc_t::deallocator_type;
 #if 0
 		/* Use of hstore_kv_types is primarily to establish a size for _temp
 		 *
 		 */
-		using key_t = typename hstore_kv_types<dealloc_t>::key_t;
-		using mapped_t = typename hstore_kv_types<dealloc_t>::mapped_t;
+		using key_t = typename hstore_kv_types<dealloc_t>::key_type;
+		using mapped_t = typename hstore_kv_types<dealloc_t>::mapped_type;
 		using data_t = typename std::tuple_element<0, mapped_t>::type;
 #endif
 		cptr _old_cptr;

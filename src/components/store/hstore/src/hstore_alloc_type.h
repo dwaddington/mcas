@@ -29,16 +29,16 @@ template <typename Persister>
 	struct hstore_alloc_type
 	{
 #if USE_CC_HEAP == 2
-		using alloc_t = allocator_co<char, Persister>;
-		using heap_alloc_t = heap_co;
+		using alloc_type = allocator_co<char, Persister>;
+		using heap_alloc_type = heap_co;
 #elif USE_CC_HEAP == 3
-		using alloc_t = allocator_rc<char, Persister>;
-		using heap_alloc_shared_t = heap_rc;
+		using alloc_type = allocator_rc<char, Persister>;
+		using heap_alloc_shared_type = heap_rc;
 #elif USE_CC_HEAP == 4
-		using alloc_t = allocator_cc<char, Persister>;
-		using heap_alloc_shared_t = heap_cc;
+		using alloc_type = allocator_cc<char, Persister>;
+		using heap_alloc_shared_type = heap_cc;
 #endif
-		using heap_alloc_access_t = heap_access<heap_alloc_shared_t>;
+		using heap_alloc_access_type = heap_access<heap_alloc_shared_type>;
 	};
 
 #endif

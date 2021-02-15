@@ -15,7 +15,9 @@
  * Hopscotch hash table - template Key, Value, and allocators
  */
 
+#include "alloc_key.h" /* AK_ACTUAL */
 #include "bits_to_ints.h"
+#include "hop_hash_exceptions.h"
 #include "hop_hash_log.h"
 #include "key_not_found.h"
 #include "perishable.h"
@@ -49,12 +51,12 @@ template <
 >
 	impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::hop_hash_base(
 		AK_ACTUAL
-		persist_data_t *pc_
+		persist_data_type *pc_
 		, construction_mode mode_
 		, const Allocator &av_
 	)
 		: hop_hash_allocator<Allocator>{av_}
-		, persist_controller_t(AK_REF av_, pc_, mode_)
+		, persist_map_controller_t(AK_REF av_, pc_, mode_)
 		, _hasher{}
 		, _auto_resize{true}
 		, _locate_key_call(0)
@@ -64,7 +66,7 @@ template <
 		, _locate_key_mismatch(0)
 		, _consistency_check(hstore_consistency_check() ? atoi(hstore_consistency_check()) : 0)
 	{
-		const auto bp_src = this->persist_controller_t::bp_src();
+		const auto bp_src = this->persist_map_controller_t::bp_src();
 		const auto bc_dst =
 			boost::make_transform_iterator(_bc, std::mem_fn(&bucket_control_t::_buckets));
 		/*
@@ -89,7 +91,7 @@ template <
 			}
 		}
 
-		for ( segment_layout::six_t ix = 1U; ix != this->persist_controller_t::segment_count_actual().value_not_stable(); ++ix )
+		for ( segment_layout::six_t ix = 1U; ix != this->persist_map_controller_t::segment_count_actual().value_not_stable(); ++ix )
 		{
 			_bc[ix-1]._next = &_bc[ix];
 			_bc[0]._prev = &_bc[ix];
@@ -100,22 +102,21 @@ template <
 				_bc[ix].reconstitute(av_);
 			}
 		}
-		hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " segment_count ", this->persist_controller_t::segment_count_actual().value_not_stable()
-			, " segment_count_specified ", this->persist_controller_t::segment_count_specified());
+		hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " segment_count ", this->persist_map_controller_t::segment_count_actual().value_not_stable()
+			, " segment_count_specified ", this->persist_map_controller_t::segment_count_specified());
 		/* If table allocation incomplete (perhaps in the middle of a resize op), resize until large enough. */
 
 		hop_hash_log<TEST_HSTORE_PERISHABLE>::write(LOG_LOCATION, "HopHash base constructor: "
 			, (this->is_size_stable() ? "stable" : "unstable"), " segment_count ", this->segment_count_actual().value_not_stable());
 
-		if ( ! this->persist_controller_t::segment_count_actual().is_stable() )
+		if ( ! this->persist_map_controller_t::segment_count_actual().is_stable() )
 		{
 			/* ERROR: reconstruction code for resize state not written. */
-			const auto ix = this->persist_controller_t::segment_count_actual().value_not_stable();
+			const auto ix = this->persist_map_controller_t::segment_count_actual().value_not_stable();
 			bucket_control_t &junior_bucket_control = _bc[ix];
 
-
 			junior_bucket_control.extend(
-				this->persist_controller_t::resize_restart_prolog()
+				this->persist_map_controller_t::resize_restart_prolog()
 				, &_bc[ix-1]
 				, &_bc[0]
 				, ix
@@ -127,13 +128,13 @@ template <
 				, " finishing resize in constructor"
 			);
 			resize_pass2();
-			this->persist_controller_t::resize_epilog();
+			this->persist_map_controller_t::resize_epilog();
 		}
 
 		hop_hash_log<TEST_HSTORE_PERISHABLE>::write(LOG_LOCATION, "HopHash base constructor: "
-			, (this->persist_controller_t::is_size_stable() ? "stable" : "unstable"), " size ", this->persist_controller_t::size_unstable());
+			, (this->persist_map_controller_t::is_size_stable() ? "stable" : "unstable"), " size ", this->persist_map_controller_t::size_unstable());
 
-		if ( ! this->persist_controller_t::is_size_stable() )
+		if ( ! this->persist_map_controller_t::is_size_stable() )
 		{
 			/* The size is unknown.
 			 * Also, the content state (FREE or IN_USE) of each element is unknown.
@@ -166,12 +167,12 @@ template <
 					/*
 					 * Persists the entire owner, although only the in_use bit has changed.
 					 * Persisting only the in_uze bit would require an additional function
-					 * in persist_controller_t.
+					 * in persist_map_controller_t.
 					 */
-					this->persist_controller_t::persist_owner(content_lk.owner_ref(), "summary content state from owner");
+					this->persist_map_controller_t::persist_owner(content_lk.owner_ref(), "summary content state from owner");
 				}
 			}
-			this->persist_controller_t::size_set(s);
+			this->persist_map_controller_t::size_set(s);
 
 			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, "Restored size ", size());
 
@@ -516,11 +517,11 @@ template <
 				b_dst_lock_.ref().content_share(b_src_lock.ref());
 				b_dst_lock_.owner_ref().set_adjacent_content_in_use(true);
 
-				this->persist_controller_t::persist_content(b_src_lock.ref(), "content free");
-				this->persist_controller_t::persist_content(b_dst_lock_.ref(), "content in use");
+				this->persist_map_controller_t::persist_content(b_src_lock.ref(), "content free");
+				this->persist_map_controller_t::persist_content(b_dst_lock_.ref(), "content in use");
 
 				owner_lock.ref().move(q, p, owner_lock);
-				this->persist_controller_t::persist_owner(owner_lock.ref(), "owner update");
+				this->persist_map_controller_t::persist_owner(owner_lock.ref(), "owner update");
 
 				b_src_lock.ref().content_erase();
 				b_src_lock.owner_ref().set_adjacent_content_in_use(false);
@@ -717,14 +718,14 @@ template <
 						auto adjacent_owner_lk = make_owner_unique_lock(b_dst.sb());
 						adjacent_owner_lk.ref().set_adjacent_content_in_use();
 					}
-					this->persist_controller_t::persist_content(b_dst.ref(), "content in use");
+					this->persist_map_controller_t::persist_content(b_dst.ref(), "content in use");
 					owner_lk.ref().insert(
 						owner_lk.index()
 						, content_index
 						, owner_lk
-						, static_cast<persist_controller_t *>(this)
+						, static_cast<persist_map_controller_t *>(this)
 					);
-					this->persist_controller_t::persist_owner(owner_lk.ref(), "owner emplace");
+					this->persist_map_controller_t::persist_owner(owner_lk.ref(), "owner emplace");
 					hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " bucket ", owner_lk.index()
 						, " store at ", b_dst.index(), " "
 						, dump<HSTORE_TRACE_MANY>::make_owner_print(this->bucket_count(), owner_lk)
@@ -794,7 +795,7 @@ template <
 			monitor_extend<Allocator> m{bucket_allocator_t(av)};
 #endif
 			_bc[segment_count()].extend(
-				this->persist_controller_t::resize_prolog(AK_REF0)
+				this->persist_map_controller_t::resize_prolog(AK_REF0)
 				, &_bc[segment_count()-1]
 				, &_bc[0]
 				, segment_count()
@@ -831,7 +832,7 @@ template <
 		 * and the "need to scan junior content bit" must be updated together.
 		 */
 
-		this->persist_controller_t::resize_interlog();
+		this->persist_map_controller_t::resize_interlog();
 
 		/* PASS 2: remove old content, update owners. Some old content mave have been
 		 * removed if pass 2 was restarted, so use the new (junior) content to drive
@@ -839,7 +840,7 @@ template <
 		 */
 		resize_pass2();
 
-		this->persist_controller_t::resize_epilog();
+		this->persist_map_controller_t::resize_epilog();
 	}
 
 template <
@@ -926,7 +927,7 @@ template <
 		}
 
 		/* persist new content */
-		this->persist_controller_t::persist_new_segment("pass 1 copied content");
+		this->persist_map_controller_t::persist_new_segment("pass 1 copied content");
 	}
 
 /* Returns true iff ownership wraps the table, i.e. the owner is near the end of the table
@@ -998,16 +999,16 @@ template <
 				ix_junior_owner
 				, owner_pos
 				, junior_owner_lk
-				, static_cast<persist_controller_t *>(this)
+				, static_cast<persist_map_controller_t *>(this)
 			);
 			hop_hash_log<false>::write(LOG_LOCATION, "resize moves content at +", owner_pos, " from senior ", senior_owner_lk.index(), " to junior ", junior_owner_lk.index());
 			senior_owner_lk.ref().erase(
 				owner_pos
 				, senior_owner_lk
-				, static_cast<persist_controller_t *>(this)
+				, static_cast<persist_map_controller_t *>(this)
 			);
-			this->persist_controller_t::persist_owner(junior_owner_lk.ref(), "pass 2 junior owner");
-			this->persist_controller_t::persist_owner(senior_owner_lk.ref(), "pass 2 senior owner");
+			this->persist_map_controller_t::persist_owner(junior_owner_lk.ref(), "pass 2 junior owner");
+			this->persist_map_controller_t::persist_owner(senior_owner_lk.ref(), "pass 2 senior owner");
 			/*
 			 * If the owner index exceeds the content index (which can only happen due to wrap)
 			 * the owner needs to change (be incremented by the bucket count).
@@ -1030,7 +1031,7 @@ template <
 		 * removed if pass 2 was restarted, so use the new (junior) content to drive
 		 * the operations.
 		 */
-		const auto old_segment_count = this->persist_controller_t::segment_count_actual().value_not_stable();
+		const auto old_segment_count = this->persist_map_controller_t::segment_count_actual().value_not_stable();
 		bucket_control_t &junior_bucket_control = _bc[old_segment_count];
 
 		bix_t ix_senior = 0U;
@@ -1087,9 +1088,9 @@ template <
 		}
 
 		/* flush for state_set bucket_t::FREE in loop above. */
-		this->persist_controller_t::persist_existing_segments("pass 2 senior content");
+		this->persist_map_controller_t::persist_existing_segments("pass 2 senior content");
 		/* flush for state_set owner::LIVE in loop above. */
-		this->persist_controller_t::persist_new_segment("pass 2 junior owner");
+		this->persist_map_controller_t::persist_new_segment("pass 2 junior owner");
 
 		/* link in new segment in non-persistent circular list of segments */
 		_bc[old_segment_count-1]._next = &junior_bucket_control;
@@ -1553,15 +1554,15 @@ template <
 		 *  persist
 		 */
 
-		this->persist_controller_t::persist_content(erase_src_lk.ref(), "content erase exiting");
+		this->persist_map_controller_t::persist_content(erase_src_lk.ref(), "content erase exiting");
 		{
 			persist_size_change<Allocator, size_decr> s(*this);
 			owner_lk.ref().erase(
 				static_cast<unsigned>(erase_src_lk.index()-owner_lk.index())
 				, owner_lk
-				, static_cast<persist_controller_t *>(this)
+				, static_cast<persist_map_controller_t *>(this)
 			);
-			this->persist_controller_t::persist_owner(owner_lk.ref(), "owner erase");
+			this->persist_map_controller_t::persist_owner(owner_lk.ref(), "owner erase");
 			erase_src_lk.ref().content_erase();
 			/* write a "FREE" mark for the content */
 			erase_src_lk.owner_ref().set_adjacent_content_in_use(false);
@@ -1714,7 +1715,7 @@ template <
 	) const -> size_type
 	{
 		consistency_guard<impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>> g(this);
-		return this->persist_controller_t::size();
+		return this->persist_map_controller_t::size();
 	}
 
 template <
