@@ -163,7 +163,7 @@ namespace impl
 #endif
 			using segment_and_bucket_t = segment_and_bucket<bucket_t>;
 			void ownership_check() const;
-		public:
+		private:
 			static constexpr auto _segment_capacity =
 				persist_map_controller_t::_segment_capacity;
 			/* Need to adjust hash and bucket_ix interpretations in more places
@@ -212,17 +212,11 @@ namespace impl
 			) -> content_unique_lock_t;
 
 			template <typename Lock, typename K>
-				auto content_index_of_key(
-					Lock &bi
-					, const K &k
-				) const -> owner::index_type;
-
-			template <typename Lock, typename K>
 				auto locate_key(
 					TM_FORMAL
 					Lock &bi
 					, const K &k
-				) const -> std::tuple<bucket_t *, segment_and_bucket_t>;
+				) const -> segment_and_bucket_t;
 
 			void resize(AK_FORMAL0);
 			void resize_pass1();
@@ -284,28 +278,22 @@ namespace impl
 				auto bucket(const K &) const -> size_type;
 			auto bucket_size(const size_type n) const -> size_type;
 
-			auto owned_by_owner_mask_new(const segment_and_bucket_t &a) const -> owner::value_type;
-			auto owned_by_owner_mask_old(const segment_and_bucket_t &a) const -> owner::value_type;
-			auto owned_by_owner_mask(const segment_and_bucket_t &a) const -> owner::value_type;
+			auto in_use_by_owner_mask(const segment_and_bucket_t &a) const -> owner::value_type;
+#if 0
 			bool is_free_by_owner(const segment_and_bucket_t &a) const;
-			bool is_Free(const segment_and_bucket_t &a);
-			bool is_free(const segment_and_bucket_t &a) const;
+#endif
+			bool is_in_use(const segment_and_bucket_t &a) const;
 
 			/* computed distance from first to last, accounting for the possibility that
 			 * last is smaller than first due to wrapping.
 			 */
-			auto distance_wrapped(bix_t first, bix_t last) -> unsigned;
+			auto distance_wrapped(bix_t first, bix_t last) const -> unsigned;
 
 			/* begin an owner mask (all owners prededing sb) */
-			auto owned_by_owner_pre_mask(const segment_and_bucket_t &sb) const -> owner::value_type;
+			auto in_use_by_owner_pre_mask(const segment_and_bucket_t &sb) const -> owner::value_type;
 			/* finish the owner mask (or in ownership by sb) */
 			auto finish_owner_mask(owner::value_type owner_mask, segment_and_bucket_t sb) const -> owner::value_type;
 
-			unsigned _locate_key_call;
-			unsigned _locate_key_owned;
-			unsigned _locate_key_unowned;
-			unsigned _locate_key_match;
-			unsigned _locate_key_mismatch;
 			int _consistency_check;
 
 		public:

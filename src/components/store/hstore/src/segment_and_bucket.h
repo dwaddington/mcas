@@ -20,8 +20,18 @@
 #include <cstddef> /* size_t */
 #include <ostream>
 
+#include <cassert>
 namespace impl
 {
+	template <typename Bucket>
+		struct segment_and_bucket;
+
+	template <typename Bucket>
+		auto distance_small(
+			const segment_and_bucket<Bucket> &a_
+			, const segment_and_bucket<Bucket> &b_
+		) -> unsigned;
+
 	template <typename Bucket>
 		struct segment_and_bucket
 		{
@@ -130,6 +140,12 @@ namespace impl
 					+ _bi
 				;
 			}
+			// template <>
+				friend
+				auto distance_small<Bucket>(
+					const segment_and_bucket<Bucket> &a_
+					, const segment_and_bucket<Bucket> &b_
+				) -> unsigned;
 		};
 
 	template <typename Bucket>
@@ -159,6 +175,24 @@ namespace impl
 		{
 			return ! ( a_ == b_);
 		}
+
+	template <typename Bucket>
+		auto distance_small(
+			const segment_and_bucket<Bucket> &a_
+			, const segment_and_bucket<Bucket> &b_
+		) -> unsigned
+	{
+		assert(a_._seg == b_._seg || a_._seg == b_._seg->prev());
+		unsigned d =
+			a_._seg == b_._seg
+			?	a_.bi() <= b_.bi()
+				? unsigned(b_.bi() - a_.bi())
+				: unsigned(a_.mod_segment_size(b_.bi() - a_.bi()))
+			: unsigned(b_.bi() + (a_._seg->segment_size() - a_.bi()))
+			;
+		assert(d <= 63);
+		return d;
+	}
 }
 
 #endif
