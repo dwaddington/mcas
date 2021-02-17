@@ -54,24 +54,24 @@ template <typename T>
 	struct fixed_string
 	{
 	private:
-		unsigned _ref_count;
-		unsigned _alignment;
-		signed _lock;
 		uint64_t _size;
+		uint8_t _ref_count;
+		uint8_t _log_alignment;
+		signed _lock;
+		std::size_t _data_offset;
 
 		/* offset to data, for a particular alignment */
-		std::size_t front_pad() const noexcept { return data_offset() - sizeof *this; }
+		std::size_t front_pad() const noexcept { return _data_offset - sizeof *this; }
 
 		std::size_t front_skip_element_count() const
 		{
-			return front_skip_element_count(_alignment);
+			return front_skip_element_count(alignment());
 		}
 
 		static std::size_t data_offset(std::size_t alignment_) noexcept
 		{
 			return front_skip_element_count(alignment_) * sizeof(T);
 		}
-		std::size_t data_offset() const noexcept { return data_offset(_alignment); }
 
 	public:
 		template <typename IT>
@@ -105,18 +105,25 @@ template <typename T>
 			}
 
 		fixed_string(std::size_t data_len_, std::size_t alignment_, lock_state lock_)
-			: _ref_count(1U)
-			, _alignment(unsigned(alignment_))
+			: _size(data_len_)
+			, _ref_count(1U)
+			, _log_alignment(log2(alignment_))
 			, _lock(signed(lock_))
-			, _size(data_len_)
+			, _data_offset(data_offset(alignment()))
 		{
-			if ( _alignment != alignment_ )
+		}
+
+		static uint8_t log2(std::size_t a)
+		{
+			auto n = a ? __builtin_ctzl(a) : 0UL;
+			if ( (a >> n) > 1 )
 			{
 				throw
 					std::domain_error(
-						"object alignment too large; probably exceeds 2^31"
+						"object alignment " + std::to_string(a) + " not a power of 2"
 					);
 			}
+			return uint8_t(n);
 		}
 
 	public:
@@ -126,7 +133,7 @@ template <typename T>
 				al_.persist(this, sizeof *this + alloc_element_count() * sizeof(T));
 			}
 		uint64_t size() const { return _size; }
-		uint64_t alignment() const noexcept { return _alignment; }
+		uint64_t alignment() const noexcept { return uint64_t(1) << _log_alignment; }
 		unsigned inc_ref(int, const char *) noexcept { return _ref_count++; }
 		unsigned dec_ref(int, const char *) noexcept
 		{
@@ -201,19 +208,15 @@ template <typename T>
 
 		T *data()
 		{
-			auto c0 = common::pointer_cast<char>(this) + data_offset();
+			auto c0 = common::pointer_cast<char>(this) + _data_offset;
 			auto e0 = common::pointer_cast<T>(c0);
 			return e0;
 		}
 
 		static std::size_t front_skip_element_count(std::size_t alignment_) noexcept
 		{
-			if ( alignment_ == 0 )
-			{
-				alignment_ = 1;
-			}
 			/* the offset in bytes must be a multiple of both alignment (to align the data)
-			 * and sizeof(T) (since the returned unit is sizeof(T) bytes
+			 * and sizeof(T) (since the returned unit is sizeof(T) bytes)
 			 */
 			auto s = lcm(alignment_, sizeof(T));
 			auto b = sizeof(fixed_string<T>) + s - 1; /* maximum required size in bytes */
