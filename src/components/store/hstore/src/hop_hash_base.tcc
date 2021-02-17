@@ -601,41 +601,43 @@ template <
 			, const K &k_
 		) const -> segment_and_bucket_t
 		{
-			TM_SCOPE()
-			/* Use the ownership bits to filter key checks, a performance aid to reduce the number of key compares. */
-			if ( auto cv = bi_.ref().ownership_bits(bi_) )
-			{
-				hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION
-					, " owner "
-					, dump<HSTORE_TRACE_MANY>::make_owner_print(this->bucket_count(), bi_)
-					, " value ", cv
-				);
-
-				auto bfp = bi_.sb();
-
-				while ( cv )
-				{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-					auto distance = unsigned(__builtin_ctzl(cv));
-#pragma GCC diagnostic pop
-					bfp.add_small(distance);
-					if ( key_equal()(bfp.deref().key(), k_) )
-					{
-						hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (success) ", bfp.index());
-						assert(distance_small(bi_.sb(), bfp) < owner::size);
-						return bfp;
-					}
-					cv = (cv >> distance) & ~owner::value_type(1);
-				}
-			}
-
-			auto bfp = bi_.sb();
-			bfp.add_small(owner::size);
-			assert(distance_small( bi_.sb(), bfp ) == owner::size);
-			return bfp;
+			return locate_key_inner(TM_REF bi_.ref().ownership_bits(bi_), bi_.sb(), common::string_view(k_.data(), k_.size()));
 		}
 
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::locate_key_inner(
+		TM_ACTUAL
+		owner::value_type ownership_bits_
+		, segment_and_bucket_t sb_
+		, const common::string_view k_
+	) const -> segment_and_bucket_t
+	{
+		TM_SCOPE()
+		/* Use the ownership bits to filter key checks, a performance aid to reduce the number of key compares. */
+		auto distance_to_end = owner::size;
+
+		while ( ownership_bits_ )
+		{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+			auto distance = unsigned(__builtin_ctzl(ownership_bits_));
+#pragma GCC diagnostic pop
+			sb_.add_small(distance);
+			distance_to_end -= distance;
+			if ( key_equal()(sb_.deref().key(), k_) )
+			{
+				hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (success) ", sb_.index());
+				return sb_;
+			}
+			ownership_bits_ = (ownership_bits_ >> distance) & ~owner::value_type(1);
+		}
+
+		sb_.add_small(distance_to_end);
+		return sb_;
+	}
 
 template <
 	typename Key, typename T, typename Hash, typename Pred

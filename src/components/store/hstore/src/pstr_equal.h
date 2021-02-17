@@ -14,19 +14,15 @@
 #ifndef _MCAS_PSTR_EQUAL_H_
 #define _MCAS_PSTR_EQUAL_H_
 
+#include <common/string_view.h>
 #include <cstring>
-#include <string>
 
 template <typename Key>
   struct pstr_equal
   {
     using argument_type = Key;
     using result_type = bool;
-    result_type operator()(const argument_type &a, const argument_type &b) const
-    {
-      return a == b;
-    }
-    result_type operator()(const argument_type &a, const std::string &b) const
+    result_type operator()(const argument_type &a, const common::string_view b) const
     {
       return a.size() == b.size() && 0 == std::memcmp(a.data(), b.data(), a.size());
     }

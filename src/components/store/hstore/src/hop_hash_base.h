@@ -25,6 +25,7 @@
 #include "construction_mode.h"
 #include "hop_hash_iterators.h"
 #include "trace_flags.h"
+#include <common/string_view.h>
 
 #include <cstddef> /* size_t */
 #include <memory> /* allocator_traits */
@@ -211,12 +212,25 @@ namespace impl
 				, content_unique_lock_t bf
 			) -> content_unique_lock_t;
 
+			/*
+			 * Note in use:
+			 * locate key is called with two flavors of arguments:
+			 *   For emplace: Lock is owner_unique_lock and K is persist_fixed_string
+			 *   For other uses (find, count, at): Lock is owner_shared_lock and K is std::string
+			 */
 			template <typename Lock, typename K>
 				auto locate_key(
 					TM_FORMAL
 					Lock &bi
 					, const K &k
 				) const -> segment_and_bucket_t;
+
+			auto locate_key_inner(
+				TM_FORMAL
+				owner::value_type ownership_bits_
+				, segment_and_bucket_t sb_
+				, common::string_view k_
+			) const -> segment_and_bucket_t;
 
 			void resize(AK_FORMAL0);
 			void resize_pass1();
@@ -279,9 +293,6 @@ namespace impl
 			auto bucket_size(const size_type n) const -> size_type;
 
 			auto in_use_by_owner_mask(const segment_and_bucket_t &a) const -> owner::value_type;
-#if 0
-			bool is_free_by_owner(const segment_and_bucket_t &a) const;
-#endif
 			bool is_in_use(const segment_and_bucket_t &a) const;
 
 			/* computed distance from first to last, accounting for the possibility that
