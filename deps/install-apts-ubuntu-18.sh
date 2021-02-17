@@ -45,3 +45,6 @@ mkdir /usr/local/lib/googletest
 ln -s /usr/lib/libgtest.a /usr/local/lib/googletest/libgtest.a
 ln -s /usr/lib/libgtest_main.a /usr/local/lib/googletest/libgtest_main.a
 
+# python packages
+pip3 install setuptools --user
+
