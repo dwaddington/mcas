@@ -70,7 +70,8 @@ setup (name = 'McasApiPackage',
        author_email = 'daniel.waddington@ibm.com',
        description = 'Mcas API library',
        package_dir={ '': '${CMAKE_CURRENT_SOURCE_DIR}' },
-       ext_modules = [module_core]
+       ext_modules = [module_core],
+       python_requires='>=3.5',
 )
 
 
