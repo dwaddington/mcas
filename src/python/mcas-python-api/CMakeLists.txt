@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 
+project(mcas-python-api CXX)
+
 option(BUILD_PYTHON_SUPPORT "Build Python support" OFF)
 
 find_program(PYTHON NAMES "python3.7" "python3.6" "python3.5")
@@ -41,12 +43,13 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
     COMMAND ${CMAKE_COMMAND} -E touch ${OUTPUT}
     DEPENDS ${DEPS})
 
-  add_custom_target(target ALL DEPENDS ${OUTPUT})
-  add_custom_target(debug COMMAND ${DEBUG_COMMAND})
-  add_custom_target(check COMMAND ${CHECK_COMMAND})
-  add_custom_target(wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution
+  add_custom_target(${PROJECT_NAME}-target ALL DEPENDS ${OUTPUT})
+  add_custom_target(${PROJECT_NAME}-debug COMMAND ${DEBUG_COMMAND})
+  add_custom_target(${PROJECT_NAME}-check COMMAND ${CHECK_COMMAND})
+  add_custom_target(${PROJECT_NAME}-wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution
 
-  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --home=${CMAKE_INSTALL_PREFIX})")
+  # install as a site-package
+  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")
   
   install(FILES mcas-shell DESTINATION ${CMAKE_INSTALL_PREFIX}/bin PERMISSIONS
     OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE OWNER_READ GROUP_READ WORLD_READ)
