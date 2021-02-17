@@ -24,6 +24,15 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   configure_file(${CONFIG_H_IN} ${CONFIG_H})
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mcas-shell.in ${CMAKE_CURRENT_SOURCE_DIR}/mcas-shell)
 
+  # copy python files to build
+  set(PKG_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/mcas_pkg")
+  file(MAKE_DIRECTORY ${PKG_SOURCE_DIR})
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/LICENSE ${CMAKE_CURRENT_BINARY_DIR}/LICENSE)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mcasapi.py ${PKG_SOURCE_DIR}/mcasapi.py COPYONLY)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/__init__.py ${PKG_SOURCE_DIR}/__init__.py COPYONLY)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/normal_start.py ${PKG_SOURCE_DIR}/normal_start.py COPYONLY)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test.py ${PKG_SOURCE_DIR}/test.py COPYONLY)
+ 
   set(DEBUG_COMMAND "${LD_PATH}" "PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}/build/${LIBDIR}" gdb --args "${PYTHON}" ${PYTHON_FLAGS} -i "${CMAKE_CURRENT_SOURCE_DIR}/normal_start.py")
   set(CHECK_COMMAND "${LD_PATH}" "PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}/build/${LIBDIR}" "${PYTHON}" ${PYTHON_FLAGS} -i "${CMAKE_CURRENT_SOURCE_DIR}/normal_start.py")
 

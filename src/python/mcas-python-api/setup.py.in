@@ -1,8 +1,6 @@
-# template file for setup.py
-# see https://docs.python.org/2/distutils/apiref.html
-# use CC="ccache gcc"
-# use CXX=""
+# Python setup.py file
 
+import setuptools
 import os
 from distutils.core import setup, Extension
 import distutils.sysconfig
@@ -65,12 +63,13 @@ module_core = Extension('mcas',
 
 
 setup (name = 'McasApiPackage',
-       version = '0.1',
-       author = 'Daniel Waddington',
-       author_email = 'daniel.waddington@ibm.com',
-       description = 'Mcas API library',
-       package_dir={ '': '${CMAKE_CURRENT_SOURCE_DIR}' },
-       ext_modules = [module_core],
+       version='0.2',
+       author='Daniel Waddington',
+       author_email='daniel.waddington@ibm.com',
+       description='MCAS API library',
+       package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+       packages=setuptools.find_packages(),
+       ext_modules=[module_core],
        python_requires='>=3.5',
 )
 
