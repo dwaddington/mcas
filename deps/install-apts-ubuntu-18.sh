@@ -29,7 +29,8 @@ apt-get install -y --no-install-recommends \
         libgoogle-perftools-dev libcurl4-openssl-dev \
         linux-headers-generic \
         uuid-dev golang gnutls-dev libgnutls30 \
-        lcov libzmq5-dev libczmq-dev
+        lcov libzmq5-dev libczmq-dev \
+        python3-setuptools
 
 # special handling of googletest
 #
@@ -44,4 +45,5 @@ rm -rf build
 mkdir /usr/local/lib/googletest
 ln -s /usr/lib/libgtest.a /usr/local/lib/googletest/libgtest.a
 ln -s /usr/lib/libgtest_main.a /usr/local/lib/googletest/libgtest_main.a
+
 
