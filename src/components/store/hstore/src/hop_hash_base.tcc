@@ -59,11 +59,6 @@ template <
 		, persist_map_controller_t(AK_REF av_, pc_, mode_)
 		, _hasher{}
 		, _auto_resize{true}
-		, _locate_key_call(0)
-		, _locate_key_owned(0)
-		, _locate_key_unowned(0)
-		, _locate_key_match(0)
-		, _locate_key_mismatch(0)
 		, _consistency_check(hstore_consistency_check() ? atoi(hstore_consistency_check()) : 0)
 	{
 		const auto bp_src = this->persist_map_controller_t::bp_src();
@@ -149,7 +144,7 @@ template <
 			const auto sb_end =
 				make_segment_and_bucket_at_end();
 			/* Develop the mask as if we have not yet read the ownership for element 0 */
-			auto owned_mask = ( owned_by_owner_mask(sb) << 1U ) & owner::ownership_bit_mask();
+			auto owned_mask = ( in_use_by_owner_mask(sb) << 1U ) & owner::ownership_bit_mask();
 			for ( ; sb != sb_end ; sb.incr_without_wrap() )
 			{
 				auto owner_lk = make_owner_unique_lock(sb);
@@ -189,81 +184,41 @@ template <
 		perishable::report();
 	}
 
+/*
+ * Return a bit mask describing which contents are owned by the owner at a_.
+ * bit 0 (LSB) is 1 iff the owner at a_ owns the content at a_, bit n is 1 iff
+ * the owner at a_ owns the content at a_+n (modulo size of the hash table).
+ *
+ * Note: Whether content at a location a is "free" or "in use" can be determined
+ * in two ways:
+ * 1) examination of the "ownership" bits of all possible owners of the content,
+ *    which are the the owners at locations [a .. a-owner::size).
+ * 2) a summary bit at location a.
+ */
 template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
 >
 	auto impl::hop_hash_base<
 		Key, T, Hash, Pred, Allocator, SharedMutex
-	>::owned_by_owner_mask_old(
+	>::in_use_by_owner_mask(
 		const segment_and_bucket_t &a_
 	) const -> owner::value_type
 	{
-		/* In order to develop a mask of "used" (non-free) locations,
-		 * examine the members of every owner starting with the leftmost
-		 * bucket which can include bi in its owner.
-		 */
-		owner::value_type c = 0U;
-		auto sbw = make_segment_and_bucket_prev(a_, owner::size);
-		for ( auto owner_lk = make_owner_shared_lock(sbw)
-			; owner_lk.sb() != a_
-			; sbw.incr_with_wrap(), owner_lk = make_owner_shared_lock(sbw)
-		)
-		{
-			c >>= 1U;
-			/*
-			 * The "used" flag of a bucket is held by at most one owner.
-			 * Therefore, no corresponding bits shall be 1 in both c
-			 * (the sum of previous owners) and _buckets[owner_lk.index()]._owner
-			 * (the current owner to be included).
-			 */
-
-			auto sbw2 = sbw;
-			sbw2.incr_with_wrap();
-			const auto v = locate_owner(sbw2).ownership_bits(owner_lk);
-			const auto disagree_mask = (c & v);
-			if ( disagree_mask != 0 )
-			{
-				hop_hash_log<trace_perishable_expiry>::write(LOG_LOCATION, "ownership disagreement in range ["
-					, bucket_ix(a_.index()-owner::size), "..", sbw2.index()
-					, "]");
-			}
-
-			assert( trace_perishable_expiry || disagree_mask == 0 );
-
-			c |= v;
-		}
-		/* c now contains:
-		 *  - in its 0 bit, the "used" aspect of _buckets[bi_] : 1 if the bucket is marked owned by an owner field, else 0
-		 *  - in its 1 bit, the partially-developed "used" aspect of _buckets[bi_+1] : 1 if if the bucket is marked owned by an owner field at or preceding bi, else 0
-		 */
-		return c;
+		auto c = in_use_by_owner_pre_mask(a_);
+		return finish_owner_mask(c, a_);
 	}
 
 template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
 >
-	auto impl::hop_hash_base<
-		Key, T, Hash, Pred, Allocator, SharedMutex
-	>::is_free_by_owner(
-		const segment_and_bucket_t &a_
-	) const -> bool
-	{
-		return ( owned_by_owner_mask(a_) & 1U ) == 0U;
-	}
-
-/* NOTE: is_free is inherently non-const, except where checking program logic */
-template <
-	typename Key, typename T, typename Hash, typename Pred
-	, typename Allocator, typename SharedMutex
->
-	auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::is_free(
+	auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::is_in_use(
 		const segment_and_bucket_t &a_
 	) const -> bool
 	{
 		auto &b_src = a_.deref();
-		return ! b_src.is_adjacent_content_in_use();
+		return b_src.is_adjacent_content_in_use();
 	}
 
 /* From a hash, return the index of the bucket (in seg_entry) to which it maps */
@@ -282,6 +237,7 @@ template <
 
 /* From a hash, return the index of the bucket (in seg_entry) to which it maps,
  * including a single new segment not in count.
+ * For use when "resizeing" the hash table to double its pervious size.
  */
 template <
 	typename Key, typename T, typename Hash, typename Pred
@@ -300,6 +256,9 @@ template <
 	}
 
 /*
+ * Starting at bucket bi_, scan forward to find the next free bucket.
+ 8 Throws hop_hash_full is there in free bucket.
+ *
  * Precondition: hold owner unique lock on bi.
  * Exit with content unique lock on the free bucket (while retaining owner
  * unique lock on bi).
@@ -318,7 +277,7 @@ template <
 		const auto start = bi_;
 		auto content_lk = make_content_unique_lock(bi_);
 
-		while ( ! is_free(content_lk.sb()) )
+		while ( is_in_use(content_lk.sb()) )
 		{
 			bi_.incr_with_wrap();
 			content_lk = make_content_unique_lock(bi_);
@@ -343,7 +302,7 @@ template <
 		Key, T, Hash, Pred, Allocator, SharedMutex
 	>::distance_wrapped(
 		bix_t first, bix_t last
-	) -> unsigned
+	) const -> unsigned
 	{
 		return
 			unsigned
@@ -400,7 +359,7 @@ template <
 			 * The owners to check are, in order,
 			 *   b_dst_lock_-owner::size-1 through b_dst_lock__-1.
 			 * That is (currently)
-			 *  b_dst_lock_-62 through b_dst_lock__-1
+			 *  b_dst_lock_-owner::size-1 through b_dst_lock__-1
 			 */
 
 			/* A bucket containing an item to be relocated.
@@ -496,7 +455,7 @@ template <
 			 *  a) lose at element at position p and
 			 *  b) gain the element at position b_dst_lock_ (relative to lock.index())
 			 */
-			const auto q = distance_wrapped(owner_lock.index(), b_dst_lock_.index());
+			const auto q = distance_small(owner_lock.sb(), b_dst_lock_.sb());
 			/*
 			 * ownership is moving from bf to owner
 			 * Mark the size "unstable" to indicate that content state must be rebuilt
@@ -511,8 +470,8 @@ template <
 			 */
 			{
 				persist_size_change<Allocator, size_no_change> s(*this);
-				assert(!is_free(b_src_lock.sb()));
-				assert(is_free(b_dst_lock_.sb()));
+				assert(is_in_use(b_src_lock.sb()));
+				assert(!is_in_use(b_dst_lock_.sb()));
 
 				b_dst_lock_.ref().content_share(b_src_lock.ref());
 				b_dst_lock_.owner_ref().set_adjacent_content_in_use(true);
@@ -573,11 +532,11 @@ template <
 			{
 				hop_hash_log<true>::write(LOG_LOCATION, i, " ownership mask ", std::hex, ints_to_string(bits_to_ints(owner_lk.ref().ownership_bits(owner_lk), owner_lk.index())), " ", (owner_lk.ref().is_adjacent_content_in_use() ? "in_use" : "free"));
 			}
-			if ( (owner_lk.ref().ownership_bits(owner_lk) >> 62) & 1 )
+			if ( (owner_lk.ref().ownership_bits(owner_lk) >> (owner::size-1U)) & 1 )
 			{
 				owner_ix = owner_lk.index();
 			}
-			for ( auto j = 1; j != owner::size; ++j )
+			for ( owner::index_type j = 1; j != owner::size; ++j )
 			{
 				sbo.incr_with_wrap();
 				auto other_lk = make_owner_shared_lock(sbo);
@@ -588,7 +547,7 @@ template <
 						, std::dec, other_lk.index(), "=", std::hex, other_lk.ref().ownership_bits(other_lk)
 					);
 				}
-				if ( (other_lk.ref().ownership_bits(other_lk) >> (62-j)) & 1 )
+				if ( (other_lk.ref().ownership_bits(other_lk) >> ((owner::size-1U)-j)) & 1 )
 				{
 					if ( owner_ix == std::numeric_limits<bix_t>::max() )
 					{
@@ -596,7 +555,7 @@ template <
 					}
 					else
 					{
-						hop_hash_log<true>::write(LOG_LOCATION, "XX two owners: ", owner_ix, " and ", other_lk.index(), " own ", owner_ix + 62);
+						hop_hash_log<true>::write(LOG_LOCATION, "XX two owners: ", owner_ix, " and ", other_lk.index(), " own ", owner_ix + (owner::size-1U));
 					}
 				}
 			}
@@ -635,6 +594,55 @@ template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
 >
+	template <typename Lock, typename K>
+		auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::locate_key(
+			TM_ACTUAL
+			Lock &bi_
+			, const K &k_
+		) const -> segment_and_bucket_t
+		{
+			return locate_key_inner(TM_REF bi_.ref().ownership_bits(bi_), bi_.sb(), common::string_view(k_.data(), k_.size()));
+		}
+
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
+	auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::locate_key_inner(
+		TM_ACTUAL
+		owner::value_type ownership_bits_
+		, segment_and_bucket_t sb_
+		, const common::string_view k_
+	) const -> segment_and_bucket_t
+	{
+		TM_SCOPE()
+		/* Use the ownership bits to filter key checks, a performance aid to reduce the number of key compares. */
+		auto distance_to_end = owner::size;
+
+		while ( ownership_bits_ )
+		{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+			auto distance = unsigned(__builtin_ctzl(ownership_bits_));
+#pragma GCC diagnostic pop
+			sb_.add_small(distance);
+			distance_to_end -= distance;
+			if ( key_equal()(sb_.deref().key(), k_) )
+			{
+				hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (success) ", sb_.index());
+				return sb_;
+			}
+			ownership_bits_ = (ownership_bits_ >> distance) & ~owner::value_type(1);
+		}
+
+		sb_.add_small(distance_to_end);
+		return sb_;
+	}
+
+template <
+	typename Key, typename T, typename Hash, typename Pred
+	, typename Allocator, typename SharedMutex
+>
 	template <typename ... Args>
 		auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::emplace(
 			AK_ACTUAL
@@ -659,26 +667,13 @@ template <
 			auto owner_lk = make_owner_unique_lock(sbw);
 
 			TM_SCOPE(check_exists)
-			/* If any positions are in use, the key might already exist. */
-			if ( auto cv = owner_lk.ref().ownership_bits(owner_lk) )
+			auto key_bi = locate_key(TM_REF owner_lk, v.first);
+			/* If the key is found, refuse to emplace */
 			{
-				auto sbc = sbw;
-				owner::index_type i = 0;
-				/* Scan for the key. If it exists, refuse to emplace */
-				while ( cv )
+				auto content_offset = distance_small(sbw, key_bi);
+				if ( content_offset != owner::size )
 				{
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-					auto distance = unsigned(__builtin_ctz(cv));
-#pragma GCC diagnostic pop
-					sbc.add_small(distance);
-					i += distance;
-					if ( key_equal()(sbc.deref().key(), v.first) )
-					{
-						hop_hash_log<HSTORE_TRACE_MANY>::write(__func__, " (already present)");
-						return {iterator{sbw, i}, false};
-					}
-					cv = (cv >> distance) & ~1U;
+					return {iterator{sbw, content_offset}, false};
 				}
 			}
 
@@ -691,7 +686,7 @@ template <
 				b_dst = make_space_for_insert(owner_lk.index(), std::move(b_dst));
 
 				b_dst.assert_clear(true, *this);
-				const auto content_index = distance_wrapped(owner_lk.index(), b_dst.index());
+				const auto content_index = distance_small(owner_lk.sb(), b_dst.sb());
 
 				/* 4-step change to owner:
 				 *  1. mark the size "unstable"
@@ -871,7 +866,7 @@ template <
 			/* special locate, used to access junior new buckets */
 			content<value_type> &junior_content = _bc[segment_count()].buckets()[ix_senior];
 			owner &junior_owner = _bc[segment_count()]._buckets[ix_senior];
-			if ( ! is_free(senior_content_lk.sb()) )
+			if ( is_in_use(senior_content_lk.sb()) )
 			{
 				/* examine hash(key) to determine whether to copy content */
 				auto hash = _hasher.hf(senior_content_lk.ref().key());
@@ -1367,135 +1362,6 @@ template <
 		return make_content_unique_lock(a);
 	}
 
-/* Note: much duplicated logic between content_index and locate_key.
- * Difference is only in what each returns.
- */
-template <
-	typename Key, typename T, typename Hash, typename Pred
-	, typename Allocator, typename SharedMutex
->
-	template <typename Lock, typename K>
-		auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::content_index_of_key(
-			Lock &bi_
-			, const K &k_
-		) const -> owner::index_type
-		{
-			/* Use the owner to filter key checks, a performance aid
-			 * to reduce the number of key compares.
-			 */
-			auto wv = bi_.ref().ownership_bits(bi_);
-
-			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION
-				, " owner "
-				, dump<HSTORE_TRACE_MANY>::make_owner_print(this->bucket_count(), bi_)
-				, " value ", wv
-			);
-
-			auto bfp = bi_.sb();
-			auto &t =
-				*const_cast<hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex> *>(this);
-			++t._locate_key_call;
-
-			typename owner::index_type content_index = 0U;
-			for (
-				; content_index != owner::size
-				; ++content_index
-			)
-			{
-				if ( ( wv & 1 ) == 1 )
-				{
-					++t._locate_key_owned;
-					auto c = &bfp.deref();
-					if ( key_equal()(c->key(), k_) )
-					{
-						++t._locate_key_match;
-						hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (success) ", bfp.index());
-						return content_index;
-					}
-					else
-					{
-						++t._locate_key_mismatch;
-					}
-				}
-				{
-					++t._locate_key_unowned;
-				}
-				bfp.incr_with_wrap();
-				wv >>= 1U;
-			}
-
-			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (failure) ", bfp.index());
-
-			return content_index;
-		}
-
-template <
-	typename Key, typename T, typename Hash, typename Pred
-	, typename Allocator, typename SharedMutex
->
-	template <typename Lock, typename K>
-		auto impl::hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex>::locate_key(
-			TM_ACTUAL
-			Lock &bi_
-			, const K &k_
-		) const -> std::tuple<bucket_t *, segment_and_bucket_t>
-		{
-			TM_SCOPE()
-			/* Use the ownership bits to filter key checks, a performance aid
-			 * to reduce the number of key compares.
-			 */
-			auto wv = bi_.ref().ownership_bits(bi_);
-
-			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION
-				, " owner "
-				, dump<HSTORE_TRACE_MANY>::make_owner_print(this->bucket_count(), bi_)
-				, " value ", wv
-			);
-
-			auto bfp = bi_.sb();
-			auto &t =
-				*const_cast<hop_hash_base<Key, T, Hash, Pred, Allocator, SharedMutex> *>(this);
-			++t._locate_key_call;
-			typename owner::index_type content_index = 0U;
-			for (
-				; content_index != owner::size
-				; ++content_index
-			)
-			{
-				if ( ( wv & 1 ) == 1 )
-				{
-					++t._locate_key_owned;
-					auto c = &bfp.deref();
-					if ( key_equal()(c->key(), k_) )
-					{
-						++t._locate_key_match;
-
-						hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (success) ", bfp.index());
-
-						bucket_t *bb = static_cast<bucket_t *>(c);
-						return std::tuple<bucket_t *, segment_and_bucket_t>(bb, bfp);
-					}
-					else
-					{
-						++t._locate_key_mismatch;
-					}
-				}
-				{
-					++t._locate_key_unowned;
-				}
-				bfp.incr_with_wrap();
-				wv >>= 1U;
-			}
-
-			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " returns (failure) ", bfp.index());
-
-			return
-				std::tuple<bucket_t *, segment_and_bucket_t>(
-					nullptr
-					, segment_and_bucket_t(0, 0)
-				);
-		}
-
 template <
 	typename Key, typename T, typename Hash, typename Pred
 	, typename Allocator, typename SharedMutex
@@ -1508,7 +1374,8 @@ template <
 		{
 			TM_SCOPE()
 			auto bi_lk = make_owner_shared_lock(k_);
-			const auto content_ix = content_index_of_key(bi_lk, k_);
+			auto key_bi = locate_key(TM_REF bi_lk, k_);
+			auto content_ix = distance_small(bi_lk.sb(), key_bi);
 			return content_ix == owner::size ? end() : iterator{bi_lk.sb(), content_ix};
 		}
 
@@ -1524,8 +1391,8 @@ template <
 		{
 			TM_SCOPE()
 			auto bi_lk = make_owner_shared_lock(k_);
-			const auto bf = locate_key(TM_REF bi_lk, k_);
-			return std::get<0>(bf) ? std::get<1>(bf) : end();
+			auto key_bi = locate_key(TM_REF bi_lk, k_);
+			return distance_small(bi_lk.si(), key_bi.si()) == owner::size ? end() : key_bi;
 		}
 
 template <
@@ -1618,17 +1485,8 @@ template <
 		) const -> size_type
 		{
 			auto bi_lk = make_owner_shared_lock(k_);
-			const auto bf = locate_key(TM_REF bi_lk, k_);
-
-			hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION
-				, " ", k_
-				, " starting at ", bi_lk.index()
-				, " "
-				, dump<HSTORE_TRACE_MANY>::make_owner_print(this->bucket_count(), bi_lk)
-				, " found "
-				, *bf);
-
-			return std::get<0>(bf) ? 1U : 0U;
+			auto key_bi = locate_key(TM_REF bi_lk, k_);
+			return distance_small(bi_lk.sb(), key_bi.sb()) == owner::size ? 0U : 1U;
 		}
 
 template <
@@ -1644,14 +1502,14 @@ template <
 			TM_SCOPE()
 			/* The bucket which owns the entry */
 			auto bi_lk = make_owner_shared_lock(k_);
-			const auto bf = std::get<0>(locate_key(TM_REF bi_lk, k_));
-			if ( ! bf )
+			const auto key_bi = locate_key(TM_REF bi_lk, k_);
+			if ( distance_small(bi_lk.sb(), key_bi) == owner::size )
 			{
 				/* no such element */
 				throw impl::key_not_found{};
 			}
 			/* element found at bf */
-			return bf->mapped();
+			return static_cast<bucket_t &>(key_bi.deref()).mapped();
 		}
 
 template <
@@ -1667,14 +1525,14 @@ template <
 			TM_SCOPE()
 			/* Lock the entry owner */
 			auto bi_lk = make_owner_shared_lock(k_);
-			const auto bf = std::get<0>(locate_key(TM_REF bi_lk, k_));
-			if ( ! bf )
+			const auto key_bi = locate_key(TM_REF bi_lk, k_);
+			if ( distance_small(bi_lk.sb(), key_bi) == owner::size )
 			{
 				/* no such element */
 				throw impl::key_not_found{};
 			}
 			/* element found at bf */
-			return bf->mapped();
+			return static_cast<bucket_t &>(key_bi.deref()).mapped();
 		}
 
 template <
@@ -1773,7 +1631,7 @@ template <
 >
 	auto impl::hop_hash_base<
 		Key, T, Hash, Pred, Allocator, SharedMutex
-	>::owned_by_owner_pre_mask(
+	>::in_use_by_owner_pre_mask(
 		const segment_and_bucket_t &a_
 	) const -> owner::value_type
 	{
@@ -1838,7 +1696,7 @@ template <
 			);
 
 			/* Start with the partially-developed ownership mask prededing position zero */
-			owner::value_type ownership_mask = owned_by_owner_pre_mask(sb);
+			owner::value_type ownership_mask = in_use_by_owner_pre_mask(sb);
 
 			for (
 				; sb != sb_end
@@ -1856,12 +1714,12 @@ template <
 					{
 						PLOG("%s[%s]: %zu is owned", __func__, o.str().c_str(), sb.index());
 					}
-					if ( ! is_free(sb) )
+					if ( is_in_use(sb) )
 					{
 						PLOG("%s[%s]: %zu is occupied", __func__, o.str().c_str(), sb.index());
 					}
 				}
-				bool in_use = ! is_free(sb);
+				bool in_use = is_in_use(sb);
 				bool owned = ownership_mask & 1ULL;
 				if ( owned != in_use )
 				{
@@ -1880,35 +1738,4 @@ template <
 				}
 			}
 		}
-	}
-
-template <
-	typename Key, typename T, typename Hash, typename Pred
-	, typename Allocator, typename SharedMutex
->
-	auto impl::hop_hash_base<
-		Key, T, Hash, Pred, Allocator, SharedMutex
-	>::owned_by_owner_mask_new(
-		const segment_and_bucket_t &a_
-	) const -> owner::value_type
-	{
-		auto c = owned_by_owner_pre_mask(a_);
-		return finish_owner_mask(c, a_);
-	}
-
-template <
-	typename Key, typename T, typename Hash, typename Pred
-	, typename Allocator, typename SharedMutex
->
-	auto impl::hop_hash_base<
-		Key, T, Hash, Pred, Allocator, SharedMutex
-	>::owned_by_owner_mask(
-		const segment_and_bucket_t &a_
-	) const -> owner::value_type
-	{
-		auto c1 = owned_by_owner_mask_old(a_);
-		auto c2 = owned_by_owner_mask_new(a_);
-		(void)c1;
-		assert(c1 == c2);
-		return c2;
 	}

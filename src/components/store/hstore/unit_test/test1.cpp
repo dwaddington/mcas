@@ -239,7 +239,7 @@ TEST_F(KVStore_test, CreatePool)
    * requires size multiplied
    *  - by 8U to account for current AVL_LB allocator alignment requirements
    */
-  pool = _kvstore->create_pool(pool_name(), ( many_count_target * 64U * 3U * 2U + 4 * single_value_size ) * 8U, 0, estimated_object_count);
+  pool = _kvstore->create_pool(pool_name(), ( many_count_target * 64U * 3U * 2U + 4 * single_value_size ) * 8U, component::IKVStore::FLAGS_CREATE_ONLY, estimated_object_count);
   ASSERT_NE(0, int64_t(pool));
   auto pool2 = _kvstore->open_pool(pool_name());
   {
@@ -1248,7 +1248,8 @@ TEST_F(KVStore_test, Timestamps)
 	(void) KVStore_test::single_value_size;
 	(void) KVStore_test::many_count_actual;
 	(void) KVStore_test::extant_count;
-	pool = _kvstore->create_pool("timestamp-test.pool", MiB(32));
+	pool = _kvstore->create_pool("timestamp-test.pool", MiB(32), component::IKVStore::FLAGS_CREATE_ONLY);
+	ASSERT_NE(0, int64_t(pool));
 
 	/* if timestamping is enabled */
 	if ( _kvstore->get_capability(IKVStore::Capability::WRITE_TIMESTAMPS) )
@@ -1426,7 +1427,8 @@ TEST_F(KVStore_test, Timestamps)
 TEST_F(KVStore_test, Iterator)
 {
   ASSERT_TRUE(_kvstore);
-  pool = _kvstore->create_pool("iterator-test.pool", MiB(32));
+  pool = _kvstore->create_pool("iterator-test.pool", MiB(32), component::IKVStore::FLAGS_CREATE_ONLY);
+  ASSERT_NE(0, int64_t(pool));
 
   common::epoch_time_t now = 0;
 
@@ -1471,10 +1473,10 @@ TEST_F(KVStore_test, Iterator)
          ref.timestamp.seconds());
   }
   _kvstore->close_pool_iterator(pool, iter);
-  ASSERT_TRUE(rc == E_OUT_OF_BOUNDS);
+  ASSERT_EQ(E_OUT_OF_BOUNDS, rc);
 
   iter = _kvstore->open_pool_iterator(pool);
-  ASSERT_TRUE(now.seconds() > 0);
+  ASSERT_LT(0, now.seconds());
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, now, ref, time_match, true)) == S_OK) {
     PLOG("(time-constrained) iterator: key(%.*s) value(%.*s) %lu (match=%s)",
          int(ref.key_len), static_cast<const char *>(ref.key),
@@ -1483,7 +1485,7 @@ TEST_F(KVStore_test, Iterator)
          time_match ? "y":"n");
   }
   _kvstore->close_pool_iterator(pool, iter);
-  ASSERT_TRUE(rc == E_OUT_OF_BOUNDS);
+  ASSERT_EQ(E_OUT_OF_BOUNDS, rc);
 
 
 
@@ -1505,11 +1507,11 @@ TEST_F(KVStore_test, Iterator)
       _kvstore->put(pool, key, value.c_str(), value.size());
     }
   }
-  ASSERT_TRUE(rc == E_ITERATOR_DISTURBED);
+  ASSERT_EQ(E_ITERATOR_DISTURBED, rc);
 
   PLOG("Closing pool.");
-  ASSERT_TRUE(pool != IKVStore::POOL_ERROR);
-  ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
+  ASSERT_NE(+IKVStore::POOL_ERROR, pool);
+  ASSERT_EQ(S_OK, _kvstore->close_pool(pool));
 }
 
 /* copied from mapstore */
@@ -1517,7 +1519,7 @@ TEST_F(KVStore_test, Iterator)
 TEST_F(KVStore_test, KeySwap)
 {
   ASSERT_TRUE(_kvstore);
-  pool = _kvstore->create_pool("keyswap", MiB(32));
+  pool = _kvstore->create_pool("keyswap", MiB(32), component::IKVStore::FLAGS_CREATE_ONLY);
 
   std::string left_key = "LeftKey";
   std::string right_key = "RightKey";
@@ -1548,7 +1550,7 @@ TEST_F(KVStore_test, KeySwap)
 TEST_F(KVStore_test, OutOfMemory)
 {
   ASSERT_TRUE(_kvstore);
-  pool = _kvstore->create_pool("oom", MiB(32));
+  pool = _kvstore->create_pool("oom", MiB(32), component::IKVStore::FLAGS_CREATE_ONLY);
 
   {
     status_t rc = S_OK;
@@ -1560,7 +1562,7 @@ TEST_F(KVStore_test, OutOfMemory)
     }
     EXPECT_EQ(IKVStore::E_TOO_LARGE, rc);
   }
-  ASSERT_TRUE(_kvstore->close_pool(pool) == S_OK);
+  ASSERT_EQ(S_OK, _kvstore->close_pool(pool));
 }
 
 

@@ -113,7 +113,8 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     }
     catch ( const std::bad_alloc& e)
     {
-      throw pool_error("create_region fail: '" + path_.str() + "'", pool_ec::region_fail_general_exception);
+      /* Note: nupm::DM_region_header::allocate_region uses bad_alloc to signal attempt to create an existing region */
+      throw pool_error("create_region fail: '" + path_.str() + "'", pool_ec::region_fail);
     }
     catch ( const API_exception &e )
     {

@@ -21,11 +21,11 @@
 inline std::vector<std::size_t> bits_to_ints(std::uint64_t b, std::size_t offset)
 {
 	std::vector<std::size_t> v;
-	for ( unsigned ix = 0U; b != 0; b>>=1, ++ix)
+	for ( ; b != 0; b>>=1, ++offset)
 	{
 		if ( b & 1 )
 		{
-			v.push_back(ix + offset);
+			v.push_back(offset);
 		}
 	}
 	return v;
