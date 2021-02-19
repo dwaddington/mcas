@@ -1,8 +1,13 @@
 #!/bin/bash
 
-#yum repolist
-#dnf config-manager --add-repo /etc/yum.repos.d/fedora-updates.repo
-#dnf config-manager --set-enabled redhat-updates
+# required subscriptions
+#
+# subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms
+
+# enable epel repo
+#
+dnf -y install dnf-plugins-core
+dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
 dnf -y update
 
