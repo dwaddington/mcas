@@ -1,6 +1,3 @@
-#ifndef __TYPES_H__
-#define __TYPES_H__
-
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define NO_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
@@ -48,6 +45,7 @@ Pool * Pool_new()
   return (Pool *) PyType_GenericAlloc(&PoolType,1);
 }
 
+
 /** 
  * tp_dealloc: Called when reference count is 0
  * 
@@ -57,6 +55,12 @@ static void
 Pool_dealloc(Pool *self)
 {
   assert(self);
+  assert(self->_mcas);
+  assert(self->_pool);
+  
+  /* implicitly close pool */
+  self->_mcas->close_pool(self->_pool);
+  
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -812,4 +816,4 @@ static PyObject * pool_get_attribute(Pool* self, PyObject *args, PyObject *kwds)
     return list;
   }
 }
-#endif
+
