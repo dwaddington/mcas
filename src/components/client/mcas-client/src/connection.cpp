@@ -1043,6 +1043,8 @@ Connection_handler::create_pool(const std::string  name,
 
 status_t Connection_handler::close_pool(const pool_t pool)
 {
+  PMAJOR("Close pool: 0x%lx", pool);
+  
   API_LOCK();
   /* send pool request message */
   const auto iobs = make_iob_ptr_send();

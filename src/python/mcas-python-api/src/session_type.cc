@@ -1,6 +1,3 @@
-#ifndef __TYPES_H__
-#define __TYPES_H__
-
 #define DEFAULT_DEVICE "mlx5_0"
 #define DEFAULT_PORT 11911
 
@@ -384,4 +381,4 @@ static PyObject * get_stats(Session* self, PyObject *args, PyObject *kwds)
   return dict;
 }
 
-#endif
+
