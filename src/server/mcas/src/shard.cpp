@@ -1434,11 +1434,43 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
     respond(handler, iob, msg, S_OK, __func__);
   }
   else {
-    ::iovec value_out{nullptr, 0};
-    std::string k             = msg->skey();
+    char buffer[32];
+    ::iovec value_out{buffer, sizeof buffer};
+    std::string k = msg->skey();
+
+    status_t rc = _i_kvstore->get_direct(msg->pool_id(), k, buffer, value_out.iov_len);
+     /* If got the whole value */
+    if ( rc == S_OK && value_out.iov_len <= sizeof buffer )
+    {
+      /* value can fit in message buffer, copy */
+      CPLOG(2, "Shard: performing memcpy for very small get");
+
+      if(ado_signal_post_get()) {
+        /* this will override the memcpy optimization and
+           do a dual buffer send. */
+        signal_ado("post-get",
+                   handler,
+                   msg->request_id(),
+                   msg->pool_id(),
+                   k,
+                   IKVStore::lock_type_t::STORE_LOCK_READ,
+                   true /* special 'get' response */);
+      }
+      else {
+        auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
+        response->copy_in_data(value_out.iov_base, value_out.iov_len);
+        iob->set_length(response->msg_len());
+        handler->post_response(iob, response, __func__);
+      }
+      _stats.op_get_count++;
+      return;
+    }
+
+    value_out.iov_len = 0;
 
     component::IKVStore::key_t key_handle;
-    status_t rc = _i_kvstore->lock(msg->pool_id(),
+
+    rc = _i_kvstore->lock(msg->pool_id(),
                                    k,
                                    IKVStore::STORE_LOCK_READ,
                                    value_out.iov_base,
@@ -1515,10 +1547,8 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
       else {
         CPLOG(2, "Shard: get using two stage get response (value_out_len=%lu)", value_out.iov_len);
 
-        size_t client_side_value_len = msg->get_value_len();
-
         /* check if client has allocated sufficient space */
-        if (client_side_value_len < value_out.iov_len) {
+        if (msg->get_value_len() < value_out.iov_len) {
           _i_kvstore->unlock(msg->pool_id(), lk.release()); /* no flush needed ? */
           PWRN("Shard: client posted insufficient space for get operation.");
           ++_stats.op_failed_request_count;
