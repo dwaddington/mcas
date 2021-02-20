@@ -1,15 +1,13 @@
+#define MCAS_API_VERSION "v0.2"
 #define PAGE_SIZE 4096
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
-#include <numpy/arrayobject.h>
 
-//now, everything is setup, just include the numpy-arrays:
 #include <numpy/arrayobject.h>
 #include <Python.h>
 #include <structmember.h>
 #include <objimpl.h>
 #include <pythread.h>
-//#include <numpy/npy_math.h>
 
 #include <api/components.h>
 #include <api/kvstore_itf.h>
@@ -28,15 +26,22 @@ extern PyTypeObject ZcStringType;
 extern PyTypeObject SessionType;
 extern PyTypeObject PoolType;
 
+PyDoc_STRVAR(mcas_version_doc,
+             "version() -> Get module version");
 PyDoc_STRVAR(mcas_allocate_direct_memory_doc,
              "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
 PyDoc_STRVAR(mcas_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
 
 
+static PyObject * mcas_version(PyObject * self,
+                               PyObject * args,
+                               PyObject * kwargs);
+
 static PyObject * mcas_allocate_direct_memory(PyObject * self,
                                               PyObject * args,
                                               PyObject * kwargs);
+
 static PyObject * mcas_free_direct_memory(PyObject * self,
                                           PyObject * args,
                                           PyObject * kwargs);
@@ -44,6 +49,8 @@ static PyObject * mcas_free_direct_memory(PyObject * self,
 
 static PyMethodDef mcas_methods[] =
   {
+   {"version",
+    (PyCFunction) mcas_version, METH_NOARGS, mcas_version_doc },
    {"allocate_direct_memory",
     (PyCFunction) mcas_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, mcas_allocate_direct_memory_doc },
    {"free_direct_memory",
@@ -55,7 +62,7 @@ static PyMethodDef mcas_methods[] =
 static PyModuleDef mcas_module = {
     PyModuleDef_HEAD_INIT,
     "mcas",
-    "mcas client API extension module",
+    "MCAS client API module",
     -1,
     mcas_methods,
     NULL, NULL, NULL, NULL
@@ -202,4 +209,11 @@ static PyObject * mcas_free_direct_memory(PyObject * self,
   buffer->len = 0;
   PyBuffer_Release(buffer);
   Py_RETURN_NONE;
+}
+
+static PyObject * mcas_version(PyObject * self,
+                               PyObject * args,
+                               PyObject * kwds)
+{
+  return PyUnicode_FromString(MCAS_API_VERSION);
 }
