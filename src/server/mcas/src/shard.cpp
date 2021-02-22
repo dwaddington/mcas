@@ -1025,7 +1025,6 @@ void Shard::release_pending_rename(const void *target)
   }
 }
 
-/* like respond2, but omits the final post */
 protocol::Message_IO_response * Shard::prepare_response(const Connection_handler *handler_,
                                                         buffer_t *iob_,
                                                         uint64_t request_id,
@@ -1434,43 +1433,43 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
     respond(handler, iob, msg, S_OK, __func__);
   }
   else {
-    char buffer[32];
-    ::iovec value_out{buffer, sizeof buffer};
+    /* Maximum length of a speculative get. If the value length exceeds,
+     * GET_DIRECT_THRESHOLD, the memcpy will have been wasted. Do not
+     * specify a larger value that you are willing to re-fetch in that
+     * (A get with a callback to a client-controlled allocator would avoid
+     * wasting the memcpy by consulting the client before running the
+     * memcpy.)
+     */
+    static constexpr std::size_t GET_DIRECT_THRESHOLD = KiB(8);
+    static_assert(GET_DIRECT_THRESHOLD <= TWO_STAGE_THRESHOLD, "get_direct threshold must not exceed a single-message data size");
     std::string k = msg->skey();
 
-    status_t rc = _i_kvstore->get_direct(msg->pool_id(), k, buffer, value_out.iov_len);
-     /* If got the whole value */
-    if ( rc == S_OK && value_out.iov_len <= sizeof buffer )
+    if ( ! ado_signal_post_get() )
     {
-      /* value can fit in message buffer, copy */
-      CPLOG(2, "Shard: performing memcpy for very small get");
+      auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
+      /* Maximum possible size for buffer */
+      std::size_t data_len = GET_DIRECT_THRESHOLD;
+      status_t rc = _i_kvstore->get_direct(msg->pool_id(), k, response->data(), data_len);
+       /* If got the whole value */
+      if ( rc == S_OK && data_len <= GET_DIRECT_THRESHOLD )
+      {
+        /* value can fit in message buffer, copy */
+        CPLOG(2, "Shard: performing memcpy for very small get");
 
-      if(ado_signal_post_get()) {
-        /* this will override the memcpy optimization and
-           do a dual buffer send. */
-        signal_ado("post-get",
-                   handler,
-                   msg->request_id(),
-                   msg->pool_id(),
-                   k,
-                   IKVStore::lock_type_t::STORE_LOCK_READ,
-                   true /* special 'get' response */);
-      }
-      else {
-        auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
-        response->copy_in_data(value_out.iov_base, value_out.iov_len);
+        response->set_data_len(data_len);
         iob->set_length(response->msg_len());
         handler->post_response(iob, response, __func__);
+
+        _stats.op_get_count++;
+        return;
       }
-      _stats.op_get_count++;
-      return;
     }
 
-    value_out.iov_len = 0;
+    ::iovec value_out{nullptr, 0};
 
     component::IKVStore::key_t key_handle;
 
-    rc = _i_kvstore->lock(msg->pool_id(),
+    status_t rc = _i_kvstore->lock(msg->pool_id(),
                                    k,
                                    IKVStore::STORE_LOCK_READ,
                                    value_out.iov_base,

@@ -623,6 +623,7 @@ class Message_IO_response : public Message_numbered_response {
  private:
   using data_t = uint8_t; /* some trailing data is typed uint8_t, some is typed
                              charu. This used to be char */
+ public: /* exposed to allow direct copy to data buffer by speculative get_direct */
   auto data() { return common::pointer_cast<data_t>(this + 1); }
 
  public:
@@ -640,12 +641,17 @@ class Message_IO_response : public Message_numbered_response {
   {
   }
 
+  void set_data_len(size_t len)
+  {
+    _data_len = len;
+    increase_msg_len(_data_len);
+  }
+
   void copy_in_data(const void* in_data, size_t len)
   {
     assert(!is_set_twostage_bit());
     std::memcpy(data(), in_data, len);
-    _data_len = len;
-    increase_msg_len(_data_len);
+    set_data_len(len);
   }
 
   void set_data_len_without_data(size_t len)
