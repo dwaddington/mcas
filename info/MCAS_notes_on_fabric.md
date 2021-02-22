@@ -1,9 +1,13 @@
 ## Fabric Background
 
+First, make sure the RDMA install is working and the appropriate 'memlock'
+limits set (check with ulimit -l, should be unlimited or larger).
+
 The MCAS client and server use the libfabric package to communicate.
-A typical system (with libfabric insalled) has many libfabric "interfaces" with various attributes.
-You can use libfabric's fi_info command to view all interfaces.
-(An MCAS build places a copy of fi_info in the ./dist/bin directory.)
+A typical system (with libfabric insalled) has many libfabric
+"interfaces" with various attributes.  You can use libfabric's fi_info
+command to view all interfaces.  (An MCAS build places a copy of
+fi_info in the ./dist/bin directory.)
 
 ```
 $ ./dist/bin/fi_info
@@ -14,7 +18,9 @@ MCAS requires:
 2. an endpoint type of FI_EP_MSG
 3. an interface with an IPv4 address (not IPv6)
 
-You can get a list of feasible interfaces by specifying the desired provider (verbs for InfiniBand; sockets for TCP), required ep_type, and reachable IPv4 address on the desired network:
+You can get a list of feasible interfaces by specifying the desired
+provider (verbs for InfiniBand; sockets for TCP), required ep_type,
+and reachable IPv4 address on the desired network:
 
 ```
 ./dist/bin/fi_info --provider verbs --ep_type FI_EP_MSG --node 10.0.0.1
@@ -70,3 +76,39 @@ If the server is unreachable or is not listening, The client log will contain an
 Connection refused (while in open_client)
 ```
 
+## Trouble Shooting
+
+### RHEL 8
+
+Make sure user has privileges to pin memory:
+
+```bash
+cat /etc/security/limits.d/rdma.conf 
+# configuration for rdma tuning
+*       soft    memlock         unlimited
+*       hard    memlock         unlimited
+# rdma tuning end
+```
+
+For systemd user.conf and system.conf:
+
+```
+# You can override the directives in this file by creating files in
+# /etc/systemd/user.conf.d/*.conf.
+#
+# See systemd-user.conf(5) for details
+
+[Manager]
+#LogLevel=info
+#LogTarget=console
+#LogColor=yes
+#LogLocation=no
+#SystemCallArchitectures=
+...
+#DefaultLimitNPROC=
+DefaultLimitMEMLOCK=infinity
+#DefaultLimitLOCKS=
+#DefaultLimitSIGPENDING=
+#DefaultLimitMSGQUEUE=
+...
+```
