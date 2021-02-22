@@ -1025,7 +1025,6 @@ void Shard::release_pending_rename(const void *target)
   }
 }
 
-/* like respond2, but omits the final post */
 protocol::Message_IO_response * Shard::prepare_response(const Connection_handler *handler_,
                                                         buffer_t *iob_,
                                                         uint64_t request_id,
@@ -1434,10 +1433,42 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
     respond(handler, iob, msg, S_OK, __func__);
   }
   else {
+    /* Maximum length of a speculative get. If the value length exceeds,
+     * GET_DIRECT_THRESHOLD, the memcpy will have been wasted. Do not
+     * specify a larger value that you are willing to re-fetch in that
+     * (A get with a callback to a client-controlled allocator would avoid
+     * wasting the memcpy by consulting the client before running the
+     * memcpy.)
+     */
+    static constexpr std::size_t GET_DIRECT_THRESHOLD = KiB(8);
+    static_assert(GET_DIRECT_THRESHOLD <= TWO_STAGE_THRESHOLD, "get_direct threshold must not exceed a single-message data size");
+    std::string k = msg->skey();
+
+    if ( ! ado_signal_post_get() )
+    {
+      auto response = prepare_response(handler, iob, msg->request_id(), S_OK);
+      /* Maximum possible size for buffer */
+      std::size_t data_len = GET_DIRECT_THRESHOLD;
+      status_t rc = _i_kvstore->get_direct(msg->pool_id(), k, response->data(), data_len);
+       /* If got the whole value */
+      if ( rc == S_OK && data_len <= GET_DIRECT_THRESHOLD )
+      {
+        /* value can fit in message buffer, copy */
+        CPLOG(2, "Shard: performing memcpy for very small get");
+
+        response->set_data_len(data_len);
+        iob->set_length(response->msg_len());
+        handler->post_response(iob, response, __func__);
+
+        _stats.op_get_count++;
+        return;
+      }
+    }
+
     ::iovec value_out{nullptr, 0};
-    std::string k             = msg->skey();
 
     component::IKVStore::key_t key_handle;
+
     status_t rc = _i_kvstore->lock(msg->pool_id(),
                                    k,
                                    IKVStore::STORE_LOCK_READ,
@@ -1515,10 +1546,8 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
       else {
         CPLOG(2, "Shard: get using two stage get response (value_out_len=%lu)", value_out.iov_len);
 
-        size_t client_side_value_len = msg->get_value_len();
-
         /* check if client has allocated sufficient space */
-        if (client_side_value_len < value_out.iov_len) {
+        if (msg->get_value_len() < value_out.iov_len) {
           _i_kvstore->unlock(msg->pool_id(), lk.release()); /* no flush needed ? */
           PWRN("Shard: client posted insufficient space for get operation.");
           ++_stats.op_failed_request_count;
