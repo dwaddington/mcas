@@ -50,13 +50,15 @@ Session_dealloc(Session *self)
 {
   assert(self);
 
+  if(global::debug_level > 0)
+    PLOG("Session: dealloc (%p)", self);
+  
   if(self->_mcas)
     self->_mcas->release_ref();
   
   assert(self);
   Py_TYPE(self)->tp_free((PyObject*)self);
-  if(global::debug_level > 0)
-    PLOG("Session: dealloc");
+
 }
 
 
@@ -262,6 +264,7 @@ static PyObject * open_pool(Session* self, PyObject *args, PyObject *kwds)
 
   assert(self->_mcas);
   p->_mcas = self->_mcas;
+  p->_mcas->add_ref(); /* pool handle must hold reference to owner */
   p->_pool = self->_mcas->open_pool(pool_name, flags);  
 
   if(p->_pool == IKVStore::POOL_ERROR) {
@@ -305,6 +308,7 @@ static PyObject * create_pool(Session* self, PyObject *args, PyObject *kwds)
 
   assert(self->_mcas);
   p->_mcas = self->_mcas;
+  p->_mcas->add_ref(); /* pool handle must hold reference to owner */
   p->_pool = self->_mcas->create_pool(pool_name,
                                          size,
                                          flags,

@@ -11,6 +11,11 @@
 #include <numpy/arrayobject.h>
 #include "pool_type.h"
 
+namespace global
+{
+extern unsigned debug_level;
+}
+
 /* size of values created on demand from ADO invocation */
 static constexpr unsigned long DEFAULT_ADO_ONDEMAND_VALUE_SIZE = 64;
 
@@ -37,12 +42,15 @@ Pool_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
   auto self = (Pool *)type->tp_alloc(type, 0);
   assert(self);
+
   return (PyObject*)self;
 }
 
 Pool * Pool_new()
 {
-  return (Pool *) PyType_GenericAlloc(&PoolType,1);
+  auto pool = (Pool *) PyType_GenericAlloc(&PoolType,1);
+  PLOG("Pool_new (%p)", pool);
+  return pool;
 }
 
 
@@ -57,9 +65,11 @@ Pool_dealloc(Pool *self)
   assert(self);
   assert(self->_mcas);
   assert(self->_pool);
+  PLOG("Pool_dealloc (%p)", self);
   
   /* implicitly close pool */
   self->_mcas->close_pool(self->_pool);
+  self->_mcas->release_ref();
   
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -605,7 +615,6 @@ static PyObject * pool_type(Pool* self)
 
 static PyObject * pool_close(Pool* self)
 {
-  
   assert(self->_mcas);
   assert(self->_pool != IKVStore::POOL_ERROR);
 
