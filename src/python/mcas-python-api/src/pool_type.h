@@ -12,5 +12,9 @@ typedef struct {
 
 Pool * Pool_new();
 
+extern PyTypeObject PoolType;
+
+#define PyPool_Check(op) PyObject_TypeCheck(op, &PoolType)
+
 #endif
 
