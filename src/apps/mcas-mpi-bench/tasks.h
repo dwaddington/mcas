@@ -26,8 +26,6 @@ struct record_t {
   void * data;
 };
 
-std::string          _value;
-
 component::IMCAS_factory * factory = nullptr;
 
 class IOPS_base {
@@ -41,17 +39,15 @@ public:
     PINF("%f iops (rank=%u)", iops, rank);
     unsigned long i_iops = boost::numeric_cast<unsigned long>(iops);
 
-    for (unsigned long i = 0; i < Options.pairs; i++)
-      _store->free_memory(_data[i].data);
+    if(!Options.direct) {
+      for (unsigned long i = 0; i < Options.pairs; i++)
+        _store->free_memory(_data[i].data);
+    }
     
     _store->close_pool(_pool);
 
-    if(Options.direct) {
-      _store->unregister_direct_memory(_memhandle);
-    }
-
-    //delete [] _data;
-    ::free(_data);
+    ::free(_value);
+    delete [] _data;
     return i_iops;
   }
 
@@ -64,6 +60,7 @@ protected:
   std::vector<void *>                            _get_results;
   unsigned                                       _repeats_remaining = Options.repeats;
   component::IMCAS::memory_handle_t              _memhandle;
+  char *                                         _value;  
 };
 
 class Write_IOPS_task : public IOPS_base
@@ -78,22 +75,22 @@ public:
     sprintf(poolname, "cpp_bench.pool.%u", rank);
 
     _store->delete_pool(poolname); /* delete any existing pool */
-    
     _pool = _store->create_pool(poolname, GiB(Options.pool_size));
 
-    //_data = new record_t [Options.pairs];
-    _data = static_cast<record_t*>(aligned_alloc(4096, sizeof(record_t)*Options.pairs));
-    assert(_data);
+    _data = new record_t [Options.pairs];
 
-    if(Options.direct) {
-      _memhandle = _store->register_direct_memory(_data, sizeof(record_t)*Options.pairs);
-      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
-    }
-    
     PINF("Setting up data a priori: rank %u", rank);
 
     /* set up value and key space */
-    _value = common::random_string(Options.value_size);
+    _value = static_cast<char*>(aligned_alloc(64, Options.value_size));
+    auto svalue = common::random_string(Options.value_size);
+    memcpy(_value, svalue.data(), Options.value_size);
+
+    if(Options.direct) {
+      _memhandle = _store->register_direct_memory(_value, Options.value_size);
+      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
+    }
+        
     for (unsigned long i = 0; i < Options.pairs; i++) {
       _data[i].key = common::random_string(Options.key_size);
     }
@@ -111,14 +108,14 @@ public:
     if(Options.direct) {
       rc = _store->put_direct(_pool,
                               _data[_iterations].key,
-                              _value.data(),
+                              _value,
                               Options.value_size,
                               _memhandle);
     }
     else {
       rc = _store->put(_pool,
                        _data[_iterations].key,
-                       _value.data(),
+                       _value,
                        Options.value_size);
     }
       
@@ -159,13 +156,15 @@ public:
     
     PINF("Setting up data prior to reading: rank %u", rank);
     
+    /* set up value and key space */
+    _value = static_cast<char*>(aligned_alloc(64, Options.value_size));
+    auto svalue = common::random_string(Options.value_size);
+    memcpy(_value, svalue.data(), Options.value_size);
+
     if(Options.direct) {
-      _memhandle = _store->register_direct_memory(_data, sizeof(record_t)*Options.pairs);
+      _memhandle = _store->register_direct_memory(_value, Options.value_size);
       assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
     }
-    
-    /* set up value and key space */
-    _value = common::random_string(Options.value_size);
 
     status_t rc;
     for (unsigned long i = 0; i < Options.pairs; i++) {
@@ -176,14 +175,14 @@ public:
       if(Options.direct) {
         rc = _store->put_direct(_pool,
                                 _data[i].key,
-                                _value.data(), /* same value */
+                                _value, /* same value */
                                 Options.value_size,
                                 _memhandle);
       }
       else {
         rc = _store->put(_pool,
                          _data[i].key,
-                         _value.data(), /* same value */
+                         _value, /* same value */
                          Options.value_size);
       }
         
@@ -206,7 +205,7 @@ public:
     if(Options.direct) {
       rc = _store->get_direct(_pool,
                               _data[_iterations].key,
-                              _data[_iterations].data,
+                              _value,
                               out_value_size,
                               _memhandle);
     }
@@ -253,15 +252,17 @@ public:
     _data = new record_t [Options.pairs];
     assert(_data);
 
-    if(Options.direct) {
-      _memhandle = _store->register_direct_memory(_data, sizeof(record_t)*Options.pairs);
-      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
-    }
-
     PINF("Setting up data prior to rw50: rank %u", rank);
 
     /* set up value and key space */
-    _value = common::random_string(Options.value_size);
+    _value = static_cast<char*>(aligned_alloc(64, Options.value_size));
+    auto svalue = common::random_string(Options.value_size);
+    memcpy(_value, svalue.data(), Options.value_size);
+
+    if(Options.direct) {
+      _memhandle = _store->register_direct_memory(_value, Options.value_size);
+      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
+    }
 
     status_t rc;
     for (unsigned long i = 0; i < Options.pairs; i++) {
@@ -272,14 +273,14 @@ public:
       if(Options.direct) {
         rc = _store->put_direct(_pool,
                                 _data[i].key,
-                                _value.data(), /* same value */
+                                _value, /* same value */
                                 Options.value_size,
                                 _memhandle);
       }
       else {
         rc = _store->put(_pool,
                          _data[i].key,
-                         _value.data(), /* same value */
+                         _value, /* same value */
                          Options.value_size);
       }
       
@@ -303,7 +304,7 @@ public:
       if(Options.direct) {
         rc = _store->get_direct(_pool,
                                 _data[_iterations].key,
-                                _data[_iterations].data,
+                                _value,
                                 out_value_size,
                                 _memhandle);
       }
@@ -323,14 +324,14 @@ public:
       if(Options.direct) {
         rc = _store->put_direct(_pool,
                                 _data[_iterations].key,
-                                _value.data(),
+                                _value,
                                 Options.value_size,
                                 _memhandle);        
       }
       else {
         rc = _store->put(_pool,
                          _data[_iterations].key,
-                         _value.data(),
+                         _value,
                          Options.value_size);
       }
       
