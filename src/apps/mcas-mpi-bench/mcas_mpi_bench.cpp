@@ -145,7 +145,7 @@ int main(int argc, char** argv)
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  /* collect results */
+  /* primary to collect results */
   if(world_rank == 0) {
     unsigned long total_iops = iops;
     
@@ -162,7 +162,6 @@ int main(int argc, char** argv)
   else {    
     MPI_Send(&iops, 1, MPI_UNSIGNED_LONG, 0, 0, MPI_COMM_WORLD);
   }
-
 
   factory->release_ref();
 
