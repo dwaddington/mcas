@@ -235,9 +235,12 @@ public:
     }
 
 #ifdef MEMORY_TRANSFER_SANITY_CHECK
+    
       for(unsigned i=0;i<Options.value_size;i++) {
-        if(_value[i] != 0xA)
-          throw General_exception("memory sanity check failed");
+        if(Options.direct && _value[i] != 0xA)
+          throw General_exception("(direct) memory sanity check failed (i=%u)(data=%x)", i, _value[i]);
+        else if(reinterpret_cast<char*>(_data[_iterations].data)[i] != 0xA)
+          throw General_exception("(copy) memory sanity check failed (i=%u)(data=%x)", i, _value[i]);
       }
 #endif
 
