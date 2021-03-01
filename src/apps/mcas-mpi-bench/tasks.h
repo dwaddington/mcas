@@ -30,12 +30,17 @@ component::IMCAS_factory * factory = nullptr;
 
 class IOPS_base {
 public:
+
+  IOPS_base() {
+    PINF("Value size:%u", Options.value_size);
+  }
   
   unsigned long cleanup(unsigned rank)
   {
     PINF("Cleanup %u", rank);
     std::chrono::duration<double, std::milli> elapsed = _end_time - _start_time;
     auto secs = elapsed.count() / 1000.0;
+    PINF("%f seconds duration", secs);
     auto iops = double(Options.pairs * Options.repeats) / secs;
     PINF("%f iops (rank=%u)", iops, rank);
     unsigned long i_iops = boost::numeric_cast<unsigned long>(iops);
