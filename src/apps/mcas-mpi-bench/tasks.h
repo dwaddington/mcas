@@ -238,6 +238,7 @@ public:
       for(unsigned i=0;i<Options.value_size;i++) {
         if(_value[i] != 0xA)
           throw General_exception("memory sanity check failed");
+      }
 #endif
 
     if (rc != S_OK)
