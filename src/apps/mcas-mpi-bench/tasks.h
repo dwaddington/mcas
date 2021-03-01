@@ -54,6 +54,7 @@ public:
 protected:
   std::chrono::high_resolution_clock::time_point _start_time, _end_time;
   unsigned long                                  _iterations = 0;
+  bool                                           _first = true;
   component::Itf_ref<component::IKVStore>        _store;
   record_t *                                     _data;
   component::IKVStore::pool_t                    _pool;
@@ -98,9 +99,10 @@ public:
 
   bool do_work(unsigned rank)
   {
-    if (_iterations == 0) {
+    if (_first) {
+      _first = false;
       PINF("Starting WRITE worker: rank %u", rank);
-      _start_time = std::chrono::high_resolution_clock::now();
+      _start_time = std::chrono::high_resolution_clock::now();     
     }
 
     status_t rc;
@@ -130,7 +132,7 @@ public:
         PINF("Worker: %u complete", rank);
         return false;
       }
-      _iterations = 1;
+      _iterations = 0;
     }
     return true;
   }
@@ -194,7 +196,8 @@ public:
 
   bool do_work(unsigned rank)
   {
-    if (_iterations == 0) {
+    if (_first) {
+      _first = false;
       PINF("Starting READ worker: rank %u", rank);
       _start_time = std::chrono::high_resolution_clock::now();
     }
@@ -227,7 +230,7 @@ public:
         PINF("Worker: %u complete", rank);
         return false;
       }
-      _iterations = 1;
+      _iterations = 0;
     }
     return true;
   }
@@ -292,7 +295,8 @@ public:
 
   virtual bool do_work(unsigned rank)
   {
-    if (_iterations == 0) {
+    if (_first) {
+      _first = false;
       PINF("Starting RW50 worker: rank %u", rank);
       _start_time = std::chrono::high_resolution_clock::now();
     }
@@ -347,7 +351,7 @@ public:
         PINF("Worker: %u complete", rank);
         return false;
       }
-      _iterations = 1;
+      _iterations = 0;
     }
 
     return true;
