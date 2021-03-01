@@ -34,8 +34,9 @@ public:
   unsigned long cleanup(unsigned rank)
   {
     PINF("Cleanup %u", rank);
-    auto secs = std::chrono::duration<double>(_end_time - _start_time).count();
-    auto iops = (double(Options.pairs) * double(Options.repeats)) / secs;
+    std::chrono::duration<double, std::milli> elapsed = _end_time - _start_time;
+    auto secs = elapsed.count() / 1000.0;
+    auto iops = double(Options.pairs * Options.repeats) / secs;
     PINF("%f iops (rank=%u)", iops, rank);
     unsigned long i_iops = boost::numeric_cast<unsigned long>(iops);
 
