@@ -1,6 +1,8 @@
 #ifndef __TASKS_H__
 #define __TASKS_H__
 
+#define MEMORY_TRANSFER_SANITY_CHECK
+
 struct {
   std::string addr;
   std::string device;
@@ -169,6 +171,10 @@ public:
       assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
     }
 
+#ifdef MEMORY_TRANSFER_SANITY_CHECK
+    memset(_value,0xA,Options.value_size);
+#endif
+    
     status_t rc;
     for (unsigned long i = 0; i < Options.pairs; i++) {
       
@@ -187,12 +193,11 @@ public:
                          _data[i].key,
                          _value, /* same value */
                          Options.value_size);
-      }
+      }      
         
       if (rc != S_OK)
         throw General_exception("put operation failed:rc=%d", rc);
     }
-
   }
 
   bool do_work(unsigned rank)
@@ -205,6 +210,10 @@ public:
 
     size_t out_value_size = 0;
     status_t rc;
+
+#ifdef MEMORY_TRANSFER_SANITY_CHECK
+    memset(_value,0xF,Options.value_size);
+#endif
 
     if(Options.direct) {
       rc = _store->get_direct(_pool,
@@ -219,6 +228,12 @@ public:
                        _data[_iterations].data,
                        out_value_size);      
     }
+
+#ifdef MEMORY_TRANSFER_SANITY_CHECK
+      for(unsigned i=0;i<Options.value_size;i++) {
+        if(_value[i] != 0xA)
+          throw General_exception("memory sanity check failed");
+#endif
 
     if (rc != S_OK)
       throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
