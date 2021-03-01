@@ -18,6 +18,7 @@ struct {
   unsigned    pool_size;
   unsigned    port;
   unsigned    cps;
+  bool        direct;
 } Options;
 
 struct record_t {
@@ -44,7 +45,13 @@ public:
       _store->free_memory(_data[i].data);
     
     _store->close_pool(_pool);
-    delete [] _data;
+
+    if(Options.direct) {
+      _store->unregister_direct_memory(_memhandle);
+    }
+
+    //delete [] _data;
+    ::free(_data);
     return i_iops;
   }
 
@@ -56,11 +63,12 @@ protected:
   component::IKVStore::pool_t                    _pool;
   std::vector<void *>                            _get_results;
   unsigned                                       _repeats_remaining = Options.repeats;
+  component::IMCAS::memory_handle_t              _memhandle;
 };
 
 class Write_IOPS_task : public IOPS_base
 {
- public:
+public:
 
   Write_IOPS_task(unsigned rank)
   {
@@ -73,12 +81,18 @@ class Write_IOPS_task : public IOPS_base
     
     _pool = _store->create_pool(poolname, GiB(Options.pool_size));
 
-    _data = new record_t [Options.pairs];
+    //_data = new record_t [Options.pairs];
+    _data = static_cast<record_t*>(aligned_alloc(4096, sizeof(record_t)*Options.pairs));
     assert(_data);
+
+    if(Options.direct) {
+      _memhandle = _store->register_direct_memory(_data, sizeof(record_t)*Options.pairs);
+      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
+    }
     
     PINF("Setting up data a priori: rank %u", rank);
 
-    /* set up data */
+    /* set up value and key space */
     _value = common::random_string(Options.value_size);
     for (unsigned long i = 0; i < Options.pairs; i++) {
       _data[i].key = common::random_string(Options.key_size);
@@ -92,11 +106,22 @@ class Write_IOPS_task : public IOPS_base
       _start_time = std::chrono::high_resolution_clock::now();
     }
 
-    status_t rc = _store->put(_pool,
+    status_t rc;
+
+    if(Options.direct) {
+      rc = _store->put_direct(_pool,
                               _data[_iterations].key,
                               _value.data(),
-                              Options.value_size);
-   
+                              Options.value_size,
+                              _memhandle);
+    }
+    else {
+      rc = _store->put(_pool,
+                       _data[_iterations].key,
+                       _value.data(),
+                       Options.value_size);
+    }
+      
     if (rc != S_OK)
       throw General_exception("put operation failed:rc=%d", rc);
 
@@ -116,7 +141,7 @@ class Write_IOPS_task : public IOPS_base
 
 
 class Read_IOPS_task : public IOPS_base {
- public:
+public:
 
   Read_IOPS_task(unsigned rank)
   {
@@ -133,19 +158,35 @@ class Read_IOPS_task : public IOPS_base {
     assert(_data);
     
     PINF("Setting up data prior to reading: rank %u", rank);
-
-    /* set up data */
+    
+    if(Options.direct) {
+      _memhandle = _store->register_direct_memory(_data, sizeof(record_t)*Options.pairs);
+      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
+    }
+    
+    /* set up value and key space */
     _value = common::random_string(Options.value_size);
+
+    status_t rc;
     for (unsigned long i = 0; i < Options.pairs; i++) {
       
       _data[i].key = common::random_string(Options.key_size);
 
       /* write data in preparation for read */
-      status_t rc = _store->put(_pool,
+      if(Options.direct) {
+        rc = _store->put_direct(_pool,
                                 _data[i].key,
                                 _value.data(), /* same value */
-                                Options.value_size);      
-      
+                                Options.value_size,
+                                _memhandle);
+      }
+      else {
+        rc = _store->put(_pool,
+                         _data[i].key,
+                         _value.data(), /* same value */
+                         Options.value_size);
+      }
+        
       if (rc != S_OK)
         throw General_exception("put operation failed:rc=%d", rc);
     }
@@ -160,10 +201,21 @@ class Read_IOPS_task : public IOPS_base {
     }
 
     size_t out_value_size = 0;
-    status_t rc = _store->get(_pool,
+    status_t rc;
+
+    if(Options.direct) {
+      rc = _store->get_direct(_pool,
                               _data[_iterations].key,
                               _data[_iterations].data,
-                              out_value_size);
+                              out_value_size,
+                              _memhandle);
+    }
+    else {      
+      rc = _store->get(_pool,
+                       _data[_iterations].key,
+                       _data[_iterations].data,
+                       out_value_size);      
+    }
 
     if (rc != S_OK)
       throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
@@ -185,7 +237,7 @@ class Read_IOPS_task : public IOPS_base {
 
 
 class Mixed_IOPS_task : public IOPS_base {
- public:
+public:
 
   Mixed_IOPS_task(unsigned rank)
   {
@@ -200,20 +252,36 @@ class Mixed_IOPS_task : public IOPS_base {
 
     _data = new record_t [Options.pairs];
     assert(_data);
-    
+
+    if(Options.direct) {
+      _memhandle = _store->register_direct_memory(_data, sizeof(record_t)*Options.pairs);
+      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
+    }
+
     PINF("Setting up data prior to rw50: rank %u", rank);
 
-    /* set up data */
+    /* set up value and key space */
     _value = common::random_string(Options.value_size);
+
+    status_t rc;
     for (unsigned long i = 0; i < Options.pairs; i++) {
       
       _data[i].key = common::random_string(Options.key_size);
 
       /* write data in preparation for read */
-      status_t rc = _store->put(_pool,
+      if(Options.direct) {
+        rc = _store->put_direct(_pool,
                                 _data[i].key,
                                 _value.data(), /* same value */
-                                Options.value_size);      
+                                Options.value_size,
+                                _memhandle);
+      }
+      else {
+        rc = _store->put(_pool,
+                         _data[i].key,
+                         _value.data(), /* same value */
+                         Options.value_size);
+      }
       
       if (rc != S_OK)
         throw General_exception("put operation failed:rc=%d", rc);
@@ -230,19 +298,41 @@ class Mixed_IOPS_task : public IOPS_base {
 
     if (_iterations % 2 == 0) {
       size_t out_value_size = 0;
-      status_t rc = _store->get(_pool,
+      status_t rc;
+
+      if(Options.direct) {
+        rc = _store->get_direct(_pool,
                                 _data[_iterations].key,
                                 _data[_iterations].data,
-                                out_value_size);
+                                out_value_size,
+                                _memhandle);
+      }
+      else {
+        rc = _store->get(_pool,
+                         _data[_iterations].key,
+                         _data[_iterations].data,
+                         out_value_size);
+      }
 
       if (rc != S_OK)
         throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
     }
     else {
-      status_t rc = _store->put(_pool,
+      status_t rc;
+
+      if(Options.direct) {
+        rc = _store->put_direct(_pool,
                                 _data[_iterations].key,
                                 _value.data(),
-                                Options.value_size);
+                                Options.value_size,
+                                _memhandle);        
+      }
+      else {
+        rc = _store->put(_pool,
+                         _data[_iterations].key,
+                         _value.data(),
+                         Options.value_size);
+      }
       
       if (rc != S_OK)
         throw General_exception("put operation failed:rc=%d", rc);
