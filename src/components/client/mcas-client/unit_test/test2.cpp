@@ -150,6 +150,7 @@ TEST_F(mcas_client_test, GetDirectWithContent)
 
   /* check content */
   for(size_t i=0;i<size;i++) {
+    if(buffer[i] != 0xA) PWRN("bad data");
     ASSERT_TRUE(buffer[i] == 0xA);
   }
   PMAJOR("Data check OK!");
