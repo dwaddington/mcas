@@ -255,8 +255,9 @@ public:
   }
 
   /**
-   * Zero-copy put operation.  If there does not exist an object
-   * with matching key, then an error E_KEY_EXISTS should be returned.
+   * Zero-copy put operation (if value size < ~2MiB).  If there does
+   * not exist an object with matching key, then an error E_KEY_EXISTS
+   * should be returned.  Use FORCE_DIRECT=1 to force zero-copy.
    *
    * @param pool Pool handle
    * @param key Object key

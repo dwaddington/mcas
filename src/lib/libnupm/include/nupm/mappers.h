@@ -47,7 +47,7 @@ protected:
   /* Objects not exceeding 8K size are allocated in 1MB pools.
    * Objects exceding 8K are allocated singly.
    */
-  static constexpr size_t L0_MAX_SMALL_OBJECT_SIZE = KiB(8);
+  static constexpr size_t L0_MAX_SMALL_OBJECT_SIZE = KiB(256);
   static constexpr size_t L0_REGION_SIZE           = MiB(1);
 
  public:

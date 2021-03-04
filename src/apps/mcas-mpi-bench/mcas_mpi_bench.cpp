@@ -55,7 +55,8 @@ int main(int argc, char** argv)
   try {
     namespace po = boost::program_options;
     po::options_description desc("Options");
-    desc.add_options()("help", "Show help")
+    desc.add_options()
+      ("help", "Show help")
       ("debug", po::value<unsigned>()->default_value(0), "Debug level 0-3")
       ("patience", po::value<unsigned>()->default_value(30), "Patience with server (seconds)")
       ("server", po::value<std::string>()->default_value("10.0.0.101"), "Server network IP address")
@@ -71,6 +72,7 @@ int main(int argc, char** argv)
       ("test", po::value<std::string>()->default_value("read"), "Test 'read','write','rw50'")
       ("repeats", po::value<unsigned>()->default_value(1), "Number of experiment repeats")
       ("cps", po::value<unsigned>()->default_value(5), "Number of clients per shard (port)")
+      ("direct","Use put_direct and get_direct APIs")
       ;
 
     po::variables_map vm;
@@ -96,6 +98,7 @@ int main(int argc, char** argv)
     Options.repeats     = vm["repeats"].as<unsigned>();
     Options.port        = vm["port"].as<unsigned>();
     Options.cps         = vm["cps"].as<unsigned>();
+    Options.direct      = vm.count("direct");
   }
   catch (...) {
     std::cerr << "bad command line option configuration\n";
@@ -142,7 +145,7 @@ int main(int argc, char** argv)
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  /* collect results */
+  /* primary to collect results */
   if(world_rank == 0) {
     unsigned long total_iops = iops;
     
@@ -159,7 +162,6 @@ int main(int argc, char** argv)
   else {    
     MPI_Send(&iops, 1, MPI_UNSIGNED_LONG, 0, 0, MPI_COMM_WORLD);
   }
-
 
   factory->release_ref();
 
