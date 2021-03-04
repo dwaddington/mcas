@@ -241,6 +241,9 @@ public:
                               _value,
                               out_value_size,
                               _memhandle);
+
+      if(out_value_size != Options.value_size)
+        throw General_exception("bad data from get_direct in read test");
     }
     else {      
       rc = _store->get(_pool,
@@ -249,27 +252,28 @@ public:
                        out_value_size);      
     }
 
-#ifdef MEMORY_TRANSFER_SANITY_CHECK
-    
-      for(unsigned i=0;i<Options.value_size;i++) {
-        if(Options.direct && _value[i] != 0xA)
-          throw General_exception("(direct) memory sanity check failed (i=%u)(data=%x)", i, _value[i]);
-
-        if(!Options.direct && reinterpret_cast<char*>(_data[_iterations].data)[i] != 0xA)
-          throw General_exception("(copy) memory sanity check failed (i=%u)(data=%x)", i, _value[i]);
-      }
-#endif
-
     if (rc != S_OK)
       throw General_exception("get operation failed: (key=%s) rc=%d", _data[_iterations].key.c_str(),rc);
+
+#ifdef MEMORY_TRANSFER_SANITY_CHECK
+    
+    for(unsigned i=0;i<Options.value_size;i++) {
+      if(Options.direct && _value[i] != 0xA)
+        throw General_exception("(direct) memory sanity check failed (i=%u)(data=%x)", i, _value[i]);
+      
+      if(!Options.direct && reinterpret_cast<char*>(_data[_iterations].data)[i] != 0xA)
+        throw General_exception("(copy) memory sanity check failed (i=%u)(data=%x)", i, _value[i]);
+    }
+#endif
 
     _iterations++;
     if (_iterations >= Options.pairs) {
       _repeats_remaining --;
-     
+
+      _end_time = std::chrono::high_resolution_clock::now();
+      _elapsed += _end_time - _start_time;
+      
       if(_repeats_remaining == 0) {
-        _end_time = std::chrono::high_resolution_clock::now();
-        _elapsed += _end_time - _start_time;
         PINF("Worker: %u complete", rank);
         return false;
       }
@@ -388,9 +392,11 @@ public:
     _iterations++;
     if (_iterations >= Options.pairs) {
       _repeats_remaining --;
+
+      _end_time = std::chrono::high_resolution_clock::now();
+      _elapsed += _end_time - _start_time;
+      
       if(_repeats_remaining == 0) {
-        _end_time = std::chrono::high_resolution_clock::now();
-        _elapsed += _end_time - _start_time;
         PINF("Worker: %u complete", rank);
         return false;
       }
