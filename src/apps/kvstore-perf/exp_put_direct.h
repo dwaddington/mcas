@@ -61,6 +61,7 @@ public:
 
         {
           StopwatchInterval si(timer);
+
           auto rc = store()->put_direct(pool(), g_data->key(_i), g_data->value(_i), g_data->value_len(), memory_handle());
           if (rc != S_OK)
           {
