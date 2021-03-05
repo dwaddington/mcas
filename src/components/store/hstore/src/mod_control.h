@@ -16,21 +16,24 @@
 #define _MCAS_HSTORE_MOD_CONTROL_H
 
 #include "persistent.h" /* persistent_t */
+#include <api/kvstore_itf.h> /* Component::IKVStore::Op_type */
 #include <cstddef> /* size_t */
 
 namespace impl
 {
 	struct mod_control
 	{
-		persistent_t<std::size_t> offset_src;
+		persistent_t<component::IKVStore::Op_type> op;
+		persistent_t<std::size_t> offset_src; /* For operations which have a source: WRITE, CAS */
 		persistent_t<std::size_t> offset_dst;
-		persistent_t<std::size_t> size;
-		explicit mod_control(std::size_t s, std::size_t d, std::size_t z)
-			: offset_src(s)
-			, offset_dst(d)
-			, size(z)
+		persistent_t<std::size_t> size; /* For operations which have a size: WRITE, ZERO */
+		explicit mod_control(component::IKVStore::Op_type op_, std::size_t s_, std::size_t d_, std::size_t z_)
+			: op(op_)
+			, offset_src(s_)
+			, offset_dst(d_)
+			, size(z_)
 		{}
-		explicit mod_control() : mod_control(0, 0, 0) {}
+		explicit mod_control() : mod_control(component::IKVStore::Op_type::ZERO, 0, 0, 0) {}
 	};
 }
 
