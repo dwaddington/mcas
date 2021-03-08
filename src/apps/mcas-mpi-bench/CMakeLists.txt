@@ -10,8 +10,6 @@ find_package(MPI
   COMPONENTS C
   OPTIONAL_COMPONENTS Fortran)
 
-
-
 if ('${MPI_C_COMPILER}' MATCHES 'MPI_C_COMPILER-NOTFOUND')
   # let's try again - this is not ideal
   file(GLOB_RECURSE MPI_C_COMPILER /usr/mpi/mpicc)
