@@ -4,5 +4,8 @@ add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wc
 
 add_subdirectory(kvstore-perf)
 add_subdirectory(ado-perf)
-add_subdirectory(mcas-mpi-bench)
+
+if(BUILD_MPI_APPS)
+  add_subdirectory(mcas-mpi-bench)
+endif(BUILD_MPI_APPS)
 
