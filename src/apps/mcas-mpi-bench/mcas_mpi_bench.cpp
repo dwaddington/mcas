@@ -14,7 +14,7 @@
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 
 #include <mpi.h>
-
+#include <numa.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,6 +72,7 @@ int main(int argc, char** argv)
       ("test", po::value<std::string>()->default_value("read"), "Test 'read','write','rw50'")
       ("repeats", po::value<unsigned>()->default_value(1), "Number of experiment repeats")
       ("cps", po::value<unsigned>()->default_value(5), "Number of clients per shard (port)")
+      ("numazone", po::value<unsigned>()->default_value(999), "NUMA zone for threads (999=no affinity)")
       ("direct","Use put_direct and get_direct APIs")
       ;
 
@@ -99,6 +100,14 @@ int main(int argc, char** argv)
     Options.port        = vm["port"].as<unsigned>();
     Options.cps         = vm["cps"].as<unsigned>();
     Options.direct      = vm.count("direct");
+
+    /* configure NUMA zone */
+    int numa_zone = vm["numazone"].as<unsigned>();
+    if(numa_zone < 999) {
+      PLOG("Using NUMA zone (%d)", numa_zone);
+      if(numa_run_on_node(numa_zone) != 0)
+        throw std::invalid_argument("invalid NUMA zone");
+    }
   }
   catch (...) {
     std::cerr << "bad command line option configuration\n";

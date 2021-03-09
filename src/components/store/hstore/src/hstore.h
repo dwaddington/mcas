@@ -15,6 +15,8 @@
 #ifndef MCAS_HSTORE_H_
 #define MCAS_HSTORE_H_
 
+#include <api/kvstore_itf.h>
+
 #include "hstore_config.h"
 
 #if THREAD_SAFE_HASH == 1
@@ -44,7 +46,6 @@
 #include "pstr_equal.h"
 #include "pstr_hash.h"
 
-#include <api/kvstore_itf.h>
 #include <common/logging.h>
 #include <common/string_view.h>
 #include <map>

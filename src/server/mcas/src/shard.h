@@ -75,7 +75,7 @@ using Shard_transport = Fabric_transport;
 
 class Shard : public Shard_transport, private common::log_source {
  private:
-  static constexpr size_t TWO_STAGE_THRESHOLD = KiB(8); /* above this two stage protocol is used */
+  static constexpr size_t TWO_STAGE_THRESHOLD = KiB(128); /* above this two stage protocol is used */
   static constexpr const char *const _cname = "Shard";
 
   using byte_span = common::byte_span;

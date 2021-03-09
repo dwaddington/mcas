@@ -976,6 +976,7 @@ bool is_locked(status_t rc)
     return false;
   case IKVStore::E_TOO_LARGE:
     PWRN("%s failed to lock value: E_TOO_LARGE", __func__);
+    dump_backtrace();
     return false;
   case E_NOT_SUPPORTED:
     PWRN("%s failed to lock value: E_NOT_SUPPORTED", __func__);
@@ -1440,7 +1441,7 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
      * wasting the memcpy by consulting the client before running the
      * memcpy.)
      */
-    static constexpr std::size_t GET_DIRECT_THRESHOLD = KiB(8);
+    static constexpr std::size_t GET_DIRECT_THRESHOLD = KiB(128);
     static_assert(GET_DIRECT_THRESHOLD <= TWO_STAGE_THRESHOLD, "get_direct threshold must not exceed a single-message data size");
     std::string k = msg->skey();
 

@@ -244,7 +244,7 @@ class Fabric_connection_base : protected common::log_source {
 
   void posted_count_log() const
   {
-    CPLOG(1, "POSTs recv %u send %u value %u", _recv_buffer_posted_count, _send_buffer_posted_count,
+    CPLOG(2, "POSTs recv %u send %u value %u", _recv_buffer_posted_count, _send_buffer_posted_count,
            _send_value_posted_count);
   }
 

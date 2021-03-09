@@ -36,36 +36,8 @@ namespace component
  * mcas client interface (this will include both KV and AS capabilities)
  */
 
-class Registrar_memory_direct
-{
-protected:
-  ~Registrar_memory_direct() {}
-public:
-  using memory_handle_t = IKVStore::memory_handle_t;
-  
-  /**
-   * Register memory for zero copy DMA
-   *
-   * @param vaddr Appropriately aligned memory buffer
-   * @param len Length of memory buffer in bytes
-   *
-   * @return Memory handle or NULL on not supported.
-   */
-  virtual memory_handle_t register_direct_memory(void* vaddr, const size_t len) = 0;
-
-  /**
-   * Direct memory regions should be unregistered before the memory is released
-   * on the client side.
-   *
-   * @param vaddr Address of region to unregister.
-   *
-   * @return S_OK on success
-   */
-  virtual status_t unregister_direct_memory(const memory_handle_t handle) = 0;
-};
-
 class IMCAS : public component::IBase,
-              public Registrar_memory_direct
+              public KVStore
 {
 public:
   // clang-format off
@@ -76,28 +48,31 @@ public:
   DECLARE_OPAQUE_TYPE(async_handle);
 
   using async_handle_t  = Opaque_async_handle*;
-  using pool_t          = component::IKVStore::pool_t;
-  using key_t           = IKVStore::key_t;
-  using Attribute       = IKVStore::Attribute;
-  using Addr            = IKVStore::Addr;
+  using pool_t          = component::KVStore::pool_t;
+  using key_t           = KVStore::key_t;
+  using Attribute       = KVStore::Attribute;
+  using Addr            = KVStore::Addr;
   using byte            = common::byte;
+  using memory_handle_t = KVStore::memory_handle_t;
   
   template <typename T>
     using basic_string_view = std::experimental::basic_string_view<T>;
 
-  static constexpr key_t           KEY_NONE           = IKVStore::KEY_NONE;
-  static constexpr memory_handle_t MEMORY_HANDLE_NONE = IKVStore::HANDLE_NONE;
-  static constexpr pool_t          POOL_ERROR         = IKVStore::POOL_ERROR;
+#if 0
+  static constexpr key_t           KEY_NONE           = KVStore::KEY_NONE;
+  static constexpr memory_handle_t MEMORY_HANDLE_NONE = KVStore::HANDLE_NONE;
+  static constexpr pool_t          POOL_ERROR         = KVStore::POOL_ERROR;
+#endif
   static constexpr async_handle_t  ASYNC_HANDLE_INIT  = nullptr;
 
   enum {
-        FLAGS_NONE        = IKVStore::FLAGS_NONE,
-        FLAGS_READ_ONLY   = IKVStore::FLAGS_READ_ONLY,
-        FLAGS_SET_SIZE    = IKVStore::FLAGS_SET_SIZE,
-        FLAGS_CREATE_ONLY = IKVStore::FLAGS_CREATE_ONLY,
-        FLAGS_DONT_STOMP  = IKVStore::FLAGS_DONT_STOMP,
-        FLAGS_NO_RESIZE   = IKVStore::FLAGS_NO_RESIZE,
-        FLAGS_MAX_VALUE   = IKVStore::FLAGS_MAX_VALUE,
+        FLAGS_NONE        = KVStore::FLAGS_NONE,
+        FLAGS_READ_ONLY   = KVStore::FLAGS_READ_ONLY,
+        FLAGS_SET_SIZE    = KVStore::FLAGS_SET_SIZE,
+        FLAGS_CREATE_ONLY = KVStore::FLAGS_CREATE_ONLY,
+        FLAGS_DONT_STOMP  = KVStore::FLAGS_DONT_STOMP,
+        FLAGS_NO_RESIZE   = KVStore::FLAGS_NO_RESIZE,
+        FLAGS_MAX_VALUE   = KVStore::FLAGS_MAX_VALUE,
   };
 
   
@@ -158,52 +133,15 @@ public:
   virtual int thread_safety() const = 0;
 
   /**
-   * Create an object pool.  If the ADO is configured for the shard then
-   * the ADO process is instantiated "attached" to the pool.
+   * If the ADO is configured for the shard then the ADO process is
+   * instantiated "attached" to the pool.
    *
-   * @param pool_name Unique pool name
-   * @param size Size of pool in bytes (for keys,values and metadata)
-   * @param flags Creation flags
-   * @param expected_obj_count Expected maximum object count (optimization)
-   * @param base Optional base address
-   *
-   * @return Pool handle
+   * The "base" parameter is unused.
    */
-  virtual IMCAS::pool_t create_pool(const std::string& pool_name,
-                                    const size_t       size,
-                                    const unsigned int flags              = 0,
-                                    const uint64_t     expected_obj_count = 0,
-                                    const Addr         base = Addr{0}) = 0;
+  using KVStore::create_pool;
+  using KVStore::open_pool;
 
-  /**
-   * Open an existing pool. If the ADO is configured for the shard then
-   * the ADO process is instantiated "attached" to the pool.
-   *
-   * @param pool_name Name of object pool
-   * @param flags Optional flags e.g., FLAGS_READ_ONLY
-   * @param base Optional base address
-   *
-   * @return Pool handle
-   */
-  virtual IMCAS::pool_t open_pool(const std::string& pool_name,
-                                  const unsigned int flags = 0,
-                                  const Addr base = Addr{0}) = 0;
-
-  /**
-   * Close pool handle
-   *
-   * @param pool Pool handle
-   */
-  virtual status_t close_pool(const IMCAS::pool_t pool) = 0;
-
-  /**
-   * Delete an existing pool. Pool must not be open
-   *
-   * @param pool Pool name
-   *
-   * @return S_OK or E_ALREADY_OPEN
-   */
-  virtual status_t delete_pool(const std::string& pool_name) = 0;
+  using KVStore::delete_pool;
 
   /**
    * Close and delete an existing pool from a pool handle. Only one
@@ -214,7 +152,7 @@ public:
    *
    * @return S_OK or E_BUSY if reference count > 1
    */
-  virtual status_t delete_pool(const IMCAS::pool_t pool) = 0;
+  virtual status_t delete_pool(const pool_t pool) = 0;
 
   /**
    * Configure a pool
@@ -224,56 +162,18 @@ public:
    *
    * @return S_OK on success
    */
-  virtual status_t configure_pool(const IMCAS::pool_t pool, const std::string& setting) = 0;
+  virtual status_t configure_pool(const pool_t pool, const std::string& setting) = 0;
 
-  /**
-   * Write or overwrite an object value. If there already exists a
-   * object with matching key, then it should be replaced
-   * (i.e. reallocated) or overwritten.
-   *
-   * @param pool Pool handle
-   * @param key Object key
-   * @param value Value data
-   * @param value_len Size of value in bytes
-   * @param flags Optional flags
-   *
-   * @return S_OK or error code
-   */
-  virtual status_t put(const IMCAS::pool_t pool,
-                       const std::string&  key,
-                       const void*         value,
-                       const size_t        value_len,
-                       const unsigned int  flags = IMCAS::FLAGS_NONE) = 0;
+  using KVStore::put;
 
-  virtual status_t put(const IMCAS::pool_t pool,
+  virtual status_t put(const pool_t pool,
                        const std::string&  key,
                        const std::string&  value,
-                       const unsigned int  flags = IMCAS::FLAGS_NONE)
+                       const unsigned int  flags = FLAGS_NONE)
   {
     /* this does not store any null terminator */
     return put(pool, key, value.data(), value.length(), flags);
   }
-
-  /**
-   * Zero-copy put operation (if value size < ~2MiB).  If there does
-   * not exist an object with matching key, then an error E_KEY_EXISTS
-   * should be returned.  Use FORCE_DIRECT=1 to force zero-copy.
-   *
-   * @param pool Pool handle
-   * @param key Object key
-   * @param value Value
-   * @param value_len Value length in bytes
-   * @param handle Memory registration handle
-   * @param flags Optional flags
-   *
-   * @return S_OK or error code
-   */
-  virtual status_t put_direct(const IMCAS::pool_t   pool,
-                              const std::string&    key,
-                              const void*           value,
-                              const size_t          value_len,
-                              const memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
-                              const unsigned int    flags  = IMCAS::FLAGS_NONE) = 0;
 
   /**
    * Asynchronous put operation.  Use check_async_completion to check for
@@ -282,6 +182,7 @@ public:
    * @param pool Pool handle
    * @param key Object key
    * @param value Value
+
    * @param value_len Value length in bytes
    * @param out_handle Async work handle
    * @param flags Optional flags
@@ -306,6 +207,11 @@ public:
   }
 
   /**
+   * Zero-copy only if value size > ~2MiB or FORCE_DIRECT=1 is set.
+   */
+  using KVStore::put_direct;
+
+  /**
    * Asynchronous put_direct operation.  Use check_async_completion to check for
    * completion.
    *
@@ -326,22 +232,10 @@ public:
                                     async_handle_t&       out_handle,
                                     const memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
                                     const unsigned int    flags  = IMCAS::FLAGS_NONE) = 0;
-  /**
-   * Read an object value
-   *
-   * @param pool Pool handle
-   * @param key Object key
-   * @param out_value Value data (if null, component will allocate memory)
-   * @param out_value_len Size of value in bytes
-   *
-   * @return S_OK or error code
-   */
-  virtual status_t get(const IMCAS::pool_t pool,
-                       const std::string&  key,
-                       void*&              out_value, /* release with free_memory() API */
-                       size_t&             out_value_len) = 0;
 
-  virtual status_t get(const IMCAS::pool_t pool,
+  using KVStore::get;
+
+  virtual status_t get(const pool_t pool,
                        const std::string& key,
                        std::string& out_value)
   {
@@ -356,26 +250,6 @@ public:
     }
     return s;
   }
-
-
-  /**
-   * Read an object value directly into client-provided memory.
-   *
-   * @param pool Pool handle
-   * @param key Object key
-   * @param out_value Client provided buffer for value
-   * @param out_value_len [in] size of value memory in bytes [out] size of value
-   * @param out_handle Async work handle
-   * @param handle Memory registration handle
-   *
-   * @return S_OK, S_MORE if only a portion of value is read, E_BAD_ALIGNMENT on
-   * invalid alignment, or other error code
-   */
-  virtual status_t get_direct(const IMCAS::pool_t          pool,
-                              const std::string&           key,
-                              void*                        out_value,
-                              size_t&                      out_value_len,
-                              const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE) = 0;
 
   /**
    * Asynchronously read an object value directly into client-provided memory.
@@ -474,16 +348,6 @@ public:
                         std::string&        out_matched_key) = 0;
 
   /**
-   * Erase an object
-   *
-   * @param pool Pool handle
-   * @param key Object key
-   *
-   * @return S_OK or error code
-   */
-  virtual status_t erase(const IMCAS::pool_t pool, const std::string& key) = 0;
-
-  /**
    * Erase an object asynchronously
    *
    * @param pool Pool handle
@@ -493,29 +357,6 @@ public:
    * @return S_OK or error code
    */
   virtual status_t async_erase(const IMCAS::pool_t pool, const std::string& key, async_handle_t& out_handle) = 0;
-  /**
-   * Return number of objects in the pool
-   *
-   * @param pool Pool handle
-   *
-   * @return Number of objects
-   */
-  virtual size_t count(const IMCAS::pool_t pool) = 0;
-
-  /**
-   * Get attribute for key or pool (see enum Attribute)
-   *
-   * @param pool Pool handle
-   * @param attr Attribute to retrieve
-   * @param out_attr Result
-   * @param key [optiona] Key
-   *
-   * @return S_OK on success
-   */
-  virtual status_t get_attribute(const IMCAS::pool_t    pool,
-                                 const IMCAS::Attribute attr,
-                                 std::vector<uint64_t>& out_attr,
-                                 const std::string*     key = nullptr) = 0;
 
   /**
    * Retrieve shard statistics
@@ -525,16 +366,6 @@ public:
    * @return S_OK on success
    */
   virtual status_t get_statistics(Shard_stats& out_stats) = 0;
-
-  /**
-   * Free API allocated memory
-   *
-   * @param p Pointer to memory allocated through a get call
-   *
-   * @return S_OK on success
-   */
-  virtual status_t free_memory(void* p) = 0;
-
 
   /**
    * ADO_response data structure manages response data sent back from the ADO

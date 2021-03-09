@@ -23,6 +23,7 @@
 #include <api/components.h>
 #include <api/fabric_itf.h>
 #include <api/kvstore_itf.h>
+#include <api/registrar_memory_direct.h> /* Opaque_memory_region */
 #include <sys/mman.h>
 
 #include "mcas_config.h"
@@ -83,7 +84,7 @@ public:
   /* Although client tried to hide it with a reinterpret_cast, buffer_base is
    used as a component::memory_region_t */
 
-  struct buffer_base : public component::IKVStore::Opaque_memory_region, private common::log_source
+  struct buffer_base : public component::Registrar_memory_direct::Opaque_memory_region, private common::log_source
   {
   private:
     static constexpr const char *_cname = "buffer_base";

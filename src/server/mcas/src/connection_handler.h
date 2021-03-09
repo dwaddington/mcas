@@ -283,7 +283,7 @@ public:
   template <typename MT>
   void msg_recv_log(const MT *m, const char *desc)
   {
-    msg_recv_log(1, m, desc);
+    msg_recv_log(2, m, desc);
   }
 
   template <typename MT>
@@ -295,7 +295,7 @@ public:
   template <typename MT>
   void msg_send_log(const MT *m, const char *desc)
   {
-    msg_send_log(1, m, desc);
+    msg_send_log(2, m, desc);
   }
 
   template <typename MT>
