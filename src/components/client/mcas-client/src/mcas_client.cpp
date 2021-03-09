@@ -235,7 +235,7 @@ status_t MCAS_client::put_direct(const pool_t           pool,
                                  IMCAS::memory_handle_t handle,
                                  uint32_t               flags)
 {
-  return _connection->put_direct(pool, key.data(), key.size(), value, value_len, this, handle, flags);
+  return _connection->put_direct(pool, key.data(), key.size(), value, value_len, registrar(), handle, flags);
 }
 
 status_t MCAS_client::async_put(IKVStore::pool_t   pool,
@@ -256,7 +256,7 @@ status_t MCAS_client::async_put_direct(const IKVStore::pool_t          pool,
                                        const IKVStore::memory_handle_t handle,
                                        const unsigned int              flags)
 {
-  return _connection->async_put_direct(pool, key.data(), key.size(), value, value_len, out_handle, this, handle, flags);
+  return _connection->async_put_direct(pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle, flags);
 }
 
 status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
@@ -266,7 +266,7 @@ status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
                                        async_handle_t &          out_handle,
                                        IKVStore::memory_handle_t handle)
 {
-  return _connection->async_get_direct(pool, key.data(), key.size(), value, value_len, out_handle, this, handle);
+  return _connection->async_get_direct(pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle);
 }
 
 status_t MCAS_client::check_async_completion(async_handle_t &handle)
@@ -288,7 +288,7 @@ status_t MCAS_client::get_direct(const pool_t           pool,
                                  size_t &               out_value_len,
                                  IMCAS::memory_handle_t handle)
 {
-  return _connection->get_direct(pool, key.data(), key.size(), out_value, out_value_len, this, handle);
+  return _connection->get_direct(pool, key.data(), key.size(), out_value, out_value_len, registrar(), handle);
 }
 
 status_t MCAS_client::get_direct_offset(const IMCAS::pool_t          pool,
@@ -297,7 +297,7 @@ status_t MCAS_client::get_direct_offset(const IMCAS::pool_t          pool,
                                         void *const                  out_buffer,
                                         const IMCAS::memory_handle_t handle)
 {
-  return _connection->get_direct_offset(pool, offset, length, out_buffer, this, handle);
+  return _connection->get_direct_offset(pool, offset, length, out_buffer, registrar(), handle);
 }
 
 status_t MCAS_client::async_get_direct_offset(const IMCAS::pool_t          pool,
@@ -307,7 +307,7 @@ status_t MCAS_client::async_get_direct_offset(const IMCAS::pool_t          pool,
                                               async_handle_t &             out_handle,
                                               const IMCAS::memory_handle_t handle)
 {
-  return _connection->async_get_direct_offset(pool, offset, length, out_buffer, out_handle, this, handle);
+  return _connection->async_get_direct_offset(pool, offset, length, out_buffer, out_handle, registrar(), handle);
 }
 
 status_t MCAS_client::put_direct_offset(const IMCAS::pool_t          pool,
@@ -316,7 +316,7 @@ status_t MCAS_client::put_direct_offset(const IMCAS::pool_t          pool,
                                         const void *const            out_buffer,
                                         const IMCAS::memory_handle_t handle)
 {
-  return _connection->put_direct_offset(pool, offset, length, out_buffer, this, handle);
+  return _connection->put_direct_offset(pool, offset, length, out_buffer, registrar(), handle);
 }
 
 status_t MCAS_client::async_put_direct_offset(const IMCAS::pool_t          pool,
@@ -326,7 +326,7 @@ status_t MCAS_client::async_put_direct_offset(const IMCAS::pool_t          pool,
                                               async_handle_t &             out_handle,
                                               const IMCAS::memory_handle_t handle)
 {
-  return _connection->async_put_direct_offset(pool, offset, length, out_buffer, out_handle, this, handle);
+  return _connection->async_put_direct_offset(pool, offset, length, out_buffer, out_handle, registrar(), handle);
 }
 
 component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(void *vaddr, const size_t len)

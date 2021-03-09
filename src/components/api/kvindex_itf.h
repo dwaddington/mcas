@@ -15,21 +15,16 @@
 #define __API_KVINDEX_ITF__
 
 #include <api/components.h>
-#include <api/kvstore_itf.h>
 #include <assert.h>
 #include <common/exceptions.h>
-#include <sys/uio.h> /* iovec */
 
 #include <string>
 #include <cstdlib>
-#include <functional>
-#include <vector>
 
 namespace component
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 
+class IKVStore;
 /**
  * Key-value index.  Index is ordered.
  */
@@ -149,12 +144,11 @@ class IKVIndex_factory : public component::IBase {
    */
   virtual IKVIndex* create_configured(IKVStore * primary_index)
   {
+    (void)primary_index;
     throw API_exception("factory::create_configure not implemented");
   }
 
 };
-
-#pragma GCC diagnostic pop
 
 }  // namespace component
 

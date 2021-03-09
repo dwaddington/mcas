@@ -153,19 +153,9 @@ private:
 
   static const Pool_handle *checked_pool(const Pool_handle * pool)
   {
-    /* For the constructor. Could have been done inline:
-     *    _pool(
-     *      (
-     *        (pool == nullptr) && (throw Logic_exception("bad iterator ctor param"), bool()),
-     *        pool
-     *      )
-     *    )
-     * Placed out-of-line for clarity
-     */
     if ( pool == nullptr )
-      {
-        throw Logic_exception("bad iterator ctor param");
-      }
+      throw Logic_exception("checked_pool bad param");
+
     return pool;
   }
 
@@ -190,7 +180,7 @@ private:
 public:
   Pool_handle(const std::string & name_, size_t nsize, unsigned flags_)
     : _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
-      _tmp({allocate_region_memory(MB(2) /* alignment */, _nsize), _nsize}),
+      _tmp({allocate_region_memory(MiB(2) /* alignment */, _nsize), _nsize}),
       _regions{_tmp},
       _name{name_},
       _lb(0U),
@@ -200,16 +190,19 @@ public:
       _iterators{},
       _writes{}
   {
-    CPLOG(1, PREFIX "added memory region (%p,%lu)",_tmp.iov_base, _tmp.iov_len);
+    CPLOG(1, PREFIX "new pool memory region (%p,%lu)",_tmp.iov_base, _tmp.iov_len);
   }
 
   ~Pool_handle() {
-    // FIX DAWN-295
-    //    for(auto r : _regions)
-    //      release_region_memory(r.iov_base, r.iov_len);
+
+    /* release memory */
+    for(auto r : _regions) {
+      free_pool_memory(r.iov_base, r.iov_len);
+    }
   }
 
   const std::string & name() const { return _name; }
+  
 private:
   size_t               _nsize; /*< order important */
   ::iovec              _tmp;
@@ -433,14 +426,14 @@ status_t Pool_handle::get(const std::string &key,
 
   out_value_len = i->second._length;
 
-  /* we are supposed to use plain malloc for return result
-     or change free_memory ? */
-  //  out_value = _lb.alloc(out_value_len, NUMA_ZONE, choose_alignment(out_value_len));
+  /* result memory allocated with ::malloc */
   out_value = malloc(out_value_len);
 
   if ( out_value == nullptr )  {
+    PWRN("Map_store: malloc failed");
     return IKVStore::E_TOO_LARGE;
   }
+  
   memcpy(out_value, i->second._ptr, i->second._length);  
   return S_OK;
 }
@@ -1010,7 +1003,8 @@ IKVStore::pool_t Map_store::open_pool(const std::string &name,
     }
   }
 
-  if (ph == nullptr) return component::IKVStore::POOL_ERROR;
+  if (ph == nullptr)
+    return component::IKVStore::POOL_ERROR;
 
   auto new_session = new Pool_session(ph);
   CPLOG(1, PREFIX "opened pool(%p)", common::p_fmt(new_session));
@@ -1056,8 +1050,7 @@ status_t Map_store::delete_pool(const std::string &poolname) {
 
   for (auto &s : _pool_sessions) {
     if (s->pool->name() == poolname) {
-      PWRN(
-           PREFIX "delete_pool (%s) pool delete failed because pool still "
+      PWRN(PREFIX "delete_pool (%s) pool delete failed because pool still "
            "open (%p)",
            poolname.c_str(), common::p_fmt(s));
       return E_ALREADY_OPEN;

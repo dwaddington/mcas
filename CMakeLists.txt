@@ -7,6 +7,7 @@ option(BOOTSTRAP_DEPS "bootstrap to build deps" ON)
 option(BUILD_RUST "enabled Rust-based dependencies" ON)
 option(BUILD_KERNEL_SUPPORT "build kernel module dependencies" OFF)
 option(BUILD_EXAMPLES_PMDK "build PMDK-based ADO examples (requires PMDK installed)" OFF)
+option(BUILD_MPI_APPS "build mcas-mpi-bench and any other MPI dependent applications" OFF)
 
 # features
 option(FEATURE_TIMESTAMPS "feature: enable timestamps in hstore map" ON)
