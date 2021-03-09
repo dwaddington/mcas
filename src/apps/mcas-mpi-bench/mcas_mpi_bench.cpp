@@ -72,8 +72,8 @@ int main(int argc, char** argv)
       ("test", po::value<std::string>()->default_value("read"), "Test 'read','write','rw50'")
       ("repeats", po::value<unsigned>()->default_value(1), "Number of experiment repeats")
       ("cps", po::value<unsigned>()->default_value(5), "Number of clients per shard (port)")
+      ("numazone", po::value<unsigned>()->default_value(999), "NUMA zone for threads (999=no affinity)")
       ("direct","Use put_direct and get_direct APIs")
-      ("numazone", po::value<int>()->default_value(-1), "NUMA zone for threads")
       ;
 
     po::variables_map vm;
@@ -102,8 +102,8 @@ int main(int argc, char** argv)
     Options.direct      = vm.count("direct");
 
     /* configure NUMA zone */
-    int numa_zone = vm["zone"].as<int>();
-    if(numa_zone > 0) {
+    int numa_zone = vm["numazone"].as<unsigned>();
+    if(numa_zone < 999) {
       PLOG("Using NUMA zone (%d)", numa_zone);
       if(numa_run_on_node(numa_zone) != 0)
         throw std::invalid_argument("invalid NUMA zone");
