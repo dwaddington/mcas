@@ -73,7 +73,7 @@ int main(int argc, char** argv)
       ("repeats", po::value<unsigned>()->default_value(1), "Number of experiment repeats")
       ("cps", po::value<unsigned>()->default_value(5), "Number of clients per shard (port)")
       ("direct","Use put_direct and get_direct APIs")
-      ("zone", po::value<int>()->default_value(-1), "NUMA zone for threads")
+      ("numazone", po::value<int>()->default_value(-1), "NUMA zone for threads")
       ;
 
     po::variables_map vm;
