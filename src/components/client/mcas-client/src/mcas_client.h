@@ -58,6 +58,9 @@ class MCAS_client
 
  private:
   //  static constexpr bool option_DEBUG = true;
+#if 0
+  using IKVStore = component::IKVStore;
+#endif
 
  protected:
   /**
@@ -110,6 +113,10 @@ class MCAS_client
 
   void unload() override { delete this; }
 
+  /* IMCAS and IKVStore both derive from Registrar_memory_direct.
+   * Pick one and use it for registrations.
+   */
+  Registrar_memory_direct *registrar() { return static_cast<component::IKVStore *>(this); }
  public:
   /* IKVStore (as remote proxy) */
   virtual int thread_safety() const override;

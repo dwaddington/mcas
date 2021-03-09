@@ -153,18 +153,35 @@ template <typename Table>
 			auto mod_ctl = &*(_persist->mod_ctl);
 			for ( auto i = mod_ctl; i != &mod_ctl[_persist->mod_size]; ++i )
 			{
-				std::size_t o_s = i->offset_src;
-				auto src_first = &src[o_s];
-				std::size_t sz = i->size;
-				auto src_last = src_first + sz;
 				std::size_t o_d = i->offset_dst;
 				auto dst_first = &dst[o_d];
-				/* NOTE: could be replaced with a pmem persistent memcpy */
-				persist_range(
-					dst_first
-					, std::copy(src_first, src_last, dst_first)
-					, "atomic ctl"
-				);
+				switch(i->op)
+				{
+				case component::IKVStore::Op_type::WRITE:
+					{
+						std::size_t o_s = i->offset_src;
+						auto src_first = &src[o_s];
+						std::size_t sz = i->size;
+						auto src_last = src_first + sz;
+						/* NOTE: could be replaced with a pmem persistent memcpy */
+						persist_range(
+							dst_first
+							, std::copy(src_first, src_last, dst_first)
+							, "atomic_update write"
+						);
+					}
+					break;
+				case component::IKVStore::Op_type::ZERO:
+					/* NOTE: could be replaced with a pmem persistent memcpy */
+					persist_range(
+						dst_first
+						, std::fill_n(dst_first, 0, i->size)
+						, "atomic_update zero"
+					);
+					break;
+				default:
+					throw std::logic_error("Unsupported update code " + std::to_string(int(persistent_load(i->op))));
+				}
 			}
 			/* Unclear whether timestamps should be updated. The only guidance we have is the
 			 * mapstore implementation, which does update timestamps on a replace.
@@ -291,11 +308,12 @@ template <typename Table>
 			std::vector<mod_control> mods;
 			for ( ; first != last ; ++first )
 			{
-				switch ( (*first)->type() )
+				auto op = (*first)->type();
+				switch ( op )
 				{
 				case component::IKVStore::Op_type::WRITE:
 					{
-						const component::IKVStore::Operation_write &wr =
+						const auto &wr =
 							*static_cast<component::IKVStore::Operation_write *>(
 								*first
 							);
@@ -304,11 +322,20 @@ template <typename Table>
 						auto size = wr.size();
 						auto op_src = static_cast<const char *>(wr.data());
 						std::copy(op_src, op_src + size, std::back_inserter(src));
-						mods.emplace_back(src_offset, dst_offset, size);
+						mods.emplace_back(op, src_offset, dst_offset, size);
+					}
+					break;
+				case component::IKVStore::Op_type::ZERO:
+					{
+						const auto &zr =
+							*static_cast<component::IKVStore::Operation_zero *>(
+								*first
+							);
+						mods.emplace_back(op, 0, zr.offset(), zr.size());
 					}
 					break;
 				default:
-					throw std::invalid_argument("Unknown update code " + std::to_string(int((*first)->type())));
+					throw std::invalid_argument("Unsupported update code " + std::to_string(int(op)));
 				};
 			}
 

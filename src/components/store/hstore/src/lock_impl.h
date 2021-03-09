@@ -20,7 +20,7 @@
 #include <string>
 
 struct lock_impl
-	: public component::IKVStore::Opaque_key
+	: public component::KVStore::Opaque_key
 {
 	using string_view = common::string_view;
 private:

@@ -1,6 +1,8 @@
 #ifndef __TASKS_H__
 #define __TASKS_H__
 
+#include <sys/mman.h>
+
 //#define MEMORY_TRANSFER_SANITY_CHECK
 
 struct {
@@ -87,13 +89,16 @@ public:
     PINF("Setting up data a priori: rank %u", rank);
 
     /* set up value and key space */
-    _value = static_cast<char*>(aligned_alloc(64, Options.value_size));
+    _value = static_cast<char*>(aligned_alloc(KiB(4), Options.value_size));
+
     auto svalue = common::random_string(Options.value_size);
     memcpy(_value, svalue.data(), Options.value_size);
 
     if(Options.direct) {
       _memhandle = _store->register_direct_memory(_value, Options.value_size);
-      assert(_memhandle != component::IMCAS::MEMORY_HANDLE_NONE);
+      if(_memhandle == component::IMCAS::MEMORY_HANDLE_NONE)
+        throw General_exception("memory registration failed");
+      
     }
         
     for (unsigned long i = 0; i < Options.pairs; i++) {
@@ -127,7 +132,7 @@ public:
       _start_time = std::chrono::high_resolution_clock::now();     
     }
 
-    status_t rc;
+    status_t rc = S_OK;
 
     if(Options.direct) {
       rc = _store->put_direct(_pool,
