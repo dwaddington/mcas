@@ -95,11 +95,12 @@ make install
 
 ### Additional build options
 
-| Option               | Description             |
-|----------------------|-------------------------|
-| BUILD_KERNEL_SUPPORT | Build kernel support    |
-| BUILD_EXAMPLES_PMDK  | PMDK in ADO example     |
-| BUILD_RUST           | Rust-based dependencies |
+| Option               | Description              |
+|----------------------|--------------------------|
+| BUILD_KERNEL_SUPPORT | Build kernel support     |
+| BUILD_EXAMPLES_PMDK  | PMDK in ADO example      |
+| BUILD_RUST           | Rust-based dependencies  |
+| BUILD_MPI_APPS       | Build mcas-mpi-benchmark |
 
 ### Build all for development
 
