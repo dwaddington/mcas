@@ -242,9 +242,9 @@ void Shard::thread_entry(const std::string &backend,
 void Shard::initialize_components(const std::string &backend,
                                   const std::string &,  // index
                                   const std::string &dax_config,
-                                  unsigned,  // debug_level
+                                  unsigned debug_level,
                                   const std::string ado_cores,
-                                  float             ado_core_num)
+                                  float ado_core_num)
 {
   using namespace component;
 
@@ -271,16 +271,15 @@ void Shard::initialize_components(const std::string &backend,
     if (backend == "hstore" || backend == "hstore-cc") {
       if (dax_config.empty()) throw General_exception("hstore backend requires dax configuration");
 
-      _i_kvstore.reset(fact->create(0
-                                    , {
-                                       {+component::IKVStore_factory::k_debug, std::to_string(debug_level())}
-                                       , {+component::IKVStore_factory::k_dax_config, dax_config}
+      _i_kvstore.reset(fact->create(debug_level,
+                                    {
+                                     {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
+                                     {+component::IKVStore_factory::k_dax_config, dax_config}
                                     }
-                                    )
-                       );
+                                    ));
     }
     else {
-      _i_kvstore.reset(fact->create(0, {}));
+      _i_kvstore.reset(fact->create(debug_level, {}));
     }
   }
 
@@ -288,10 +287,11 @@ void Shard::initialize_components(const std::string &backend,
   {
     IBase *comp = load_component("libcomponent-adomgrproxy.so", ado_manager_proxy_factory);
     if (comp) {
-      auto fact = make_itf_ref(static_cast<IADO_manager_proxy_factory *>(comp->query_interface(IADO_manager_proxy_factory::iid())));
+      auto fact = make_itf_ref(static_cast<IADO_manager_proxy_factory *>
+                               (comp->query_interface(IADO_manager_proxy_factory::iid())));
       assert(fact);
 
-      _i_ado_mgr.reset(fact->create(debug_level(), _core, ado_cores, ado_core_num));
+      _i_ado_mgr.reset(fact->create(debug_level, _core, ado_cores, ado_core_num));
 
       if (_i_ado_mgr == nullptr)
         throw General_exception("Instantiation of ADO manager failed unexpectedly.");
