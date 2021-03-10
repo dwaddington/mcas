@@ -16,6 +16,7 @@
 #include <api/components.h>
 #include <api/kvindex_itf.h>
 #include <common/dump_utils.h>
+#include <common/env.h>
 #include <common/profiler.h>
 #include <common/utils.h>
 #include <common/str_utils.h>
@@ -891,7 +892,8 @@ void Shard::release_locked_value_shared(const void *target)
     throw Logic_exception("%s: bad target; value never locked? (%p)", __func__, target);
 
   if (i->second.count == 1) {
-    _i_kvstore->unlock(i->second.pool, i->second.key, IKVStore::UNLOCK_FLAGS_FLUSH);
+    static bool do_flush = common::env_value<bool>(flush_enable_key, true);
+    _i_kvstore->unlock(i->second.pool, i->second.key, do_flush ? IKVStore::UNLOCK_FLAGS_FLUSH : 0);
     _locked_values_shared.erase(i);
   }
   else {
@@ -906,7 +908,8 @@ void Shard::release_locked_value_exclusive(const void *target)
     throw Logic_exception("%s bad target; value never locked? (%p)", __func__, target);
 
   if (i->second.count == 1) {
-    _i_kvstore->unlock(i->second.pool, i->second.key, IKVStore::UNLOCK_FLAGS_FLUSH);
+    static bool do_flush = common::env_value<bool>(flush_enable_key, true);
+    _i_kvstore->unlock(i->second.pool, i->second.key, do_flush ? IKVStore::UNLOCK_FLAGS_FLUSH : 0);
     _locked_values_exclusive.erase(i);
   }
   else {
