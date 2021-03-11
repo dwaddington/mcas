@@ -7,7 +7,7 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
 STORETYPE=hstore-cc
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
-VALUE_LENGTH=8
+VALUE_LENGTH=${VALUE_LENGTH:-8}
 DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
 
 # parameters for MCAS server and client
@@ -23,9 +23,11 @@ SERVER_PID=$!
 sleep 3
 
 # launch client
-ELEMENT_COUNT=$(scale_by_transport 2000000)
-STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*120/10)) # too small
-STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*128/10)) # sufficient
+RECOMMENDED_ELEMENT_COUNT=$(scale_by_transport 2000000)
+ELEMENT_COUNT=${ELEMENT_COUNT:-$RECOMMENDED_ELEMENT_COUNT}
+RECOMMENDED_STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*120/10)) # too small
+RECOMMENDED_STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*128/10)) # sufficient
+STORE_SIZE=${STORE_SIZE:-$RECOMMENDED_STORE_SIZE}
 CLIENT_LOG="test$TESTID-client.log"
 
 [ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --cores "$(clamp_cpu 3)" --src_addr $NODE_IP --server $NODE_IP --port 11911 \

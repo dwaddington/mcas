@@ -10,7 +10,7 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
 STORETYPE=hstore
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
-VALUE_LENGTH=8
+VALUE_LENGTH=${VALUE_LENGTH:-8}
 # kvstore-keylength-valuelength-store-netprovider
 DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
 

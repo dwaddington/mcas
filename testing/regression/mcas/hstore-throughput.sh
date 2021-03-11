@@ -31,10 +31,11 @@ EXPANSION=20 # usually sufficient, but not for 4K --read_pct 0 or 50 location 48
 EXPANSION=24 # usually sufficient, but not for 4K --read_pct 0 location 9873
 EXPANSION=26 # sufficient
 
-ELEMENT_COUNT=$((USABLE_STORE_SIZE / ( (KEY_LENGTH+VALUE_LENGTH)*EXPANSION/10 ) ))
-if [ 100000 -lt $ELEMENT_COUNT ]
-then ELEMENT_COUNT=100000
+RECOMMENDED_ELEMENT_COUNT=$((USABLE_STORE_SIZE / ( (KEY_LENGTH+VALUE_LENGTH)*EXPANSION/10 ) ))
+if [ 100000 -lt $RECOMMENDED_ELEMENT_COUNT ]
+then RECOMMENDED_ELEMENT_COUNT=100000
 fi
+ELEMENT_COUNT=${ELEMENT_COUNT:-$RECOMMENDED_ELEMENT_COUNT}
 
 # adjust elements so that USABLE_STORE_SIZE * elements is not more than available storage
 CLIENT_LOG="test$TESTID-client.log"

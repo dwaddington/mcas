@@ -6,7 +6,7 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 DAXTYPE="$(choose_dax_type)"
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
-VALUE_LENGTH=8
+VALUE_LENGTH=${VALUE_LENGTH:-8}
 # kvstore-keylength-valuelength-store-netprovider
 DESC=hstore-8-8-$DAXTYPE-sock
 
@@ -28,8 +28,10 @@ sleep 3
 SOCKET_SCALE=1000
 
 # launch client
-ELEMENT_COUNT=$(scale_by_transport 2000000 $SOCKET_SCALE)
-STORE_SIZE=$((ELEMENT_COUNT*VALUE_LENGTH*24/10))
+RECOMMENDED_ELEMENT_COUNT=$(scale_by_transport 2000000 $SOCKET_SCALE)
+ELEMENT_COUNT=${ELEMENT_COUNT:-$RECOMMENDED_ELEMENT_COUNT}
+RECOMMENDED_STORE_SIZE=$((ELEMENT_COUNT*VALUE_LENGTH*24/10))
+STORE_SIZE=${STORE_SIZE:-$RECOMMENDED_STORE_SIZE}
 CLIENT_LOG="test$TESTID-client.log"
 [ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --provider sockets --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
                         --test put --component mcas --elements $ELEMENT_COUNT \

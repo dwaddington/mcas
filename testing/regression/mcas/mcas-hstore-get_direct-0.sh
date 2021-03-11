@@ -7,7 +7,7 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
 STORETYPE=hstore
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
-VALUE_LENGTH=3000000
+VALUE_LENGTH=${VALUE_LENGTH:-3000000}
 # kvstore-keylength-valuelength-store-netprovider
 DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
 
@@ -24,9 +24,11 @@ SERVER_PID=$!
 sleep 3
 
 # launch client
-ELEMENT_COUNT=$(scale_by_transport 6000)
-STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*10/10)) # too small
-STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*13/10)) # sufficient
+RECOMMENDED_ELEMENT_COUNT=$(scale_by_transport 6000)
+ELEMENT_COUNT=${ELEMENT_COUNT:-$RECOMMENDED_ELEMENT_COUNT}
+RECOMMENDED_STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*10/10)) # too small
+RECOMMENDED_STORE_SIZE=$((ELEMENT_COUNT*(8+VALUE_LENGTH)*13/10)) # sufficient
+STORE_SIZE=${STORE_SIZE:-$RECOMMENDED_STORE_SIZE}
 CLIENT_LOG="test$TESTID-client.log"
 [ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP --test get_direct --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG
 ./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP --test get_direct --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting --key_length 8 --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
