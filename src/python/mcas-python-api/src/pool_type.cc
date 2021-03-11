@@ -379,11 +379,11 @@ static PyObject * pool_get_direct(Pool* self, PyObject *args, PyObject *kwds)
   /* now we have the buffer size, we can allocate accordingly */
   size_t p_len = v[0];
   char * ptr = static_cast<char*>(::aligned_alloc(PAGE_SIZE, p_len));
-  //  memset(ptr, 0xcc, p_len);
+
+  if(global::debug_level > 0)
+    PLOG("%s allocated %lu at %p", __func__, p_len, ptr);
 
   PyObject * result = PyMemoryView_FromMemory(ptr, p_len, PyBUF_WRITE); //PyBytes_FromStringAndSize(NULL, p_len);
-
-  //  void * p = (void *) PyBytes_AsString(result);
 
   /* register memory */
   component::IKVStore::memory_handle_t handle = self->_mcas->register_direct_memory(ptr, round_up_page(p_len));
