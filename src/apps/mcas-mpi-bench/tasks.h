@@ -37,7 +37,7 @@ component::IMCAS_factory * factory = nullptr;
 class IOPS_base {
 public:
 
-  IOPS_base() {
+  IOPS_base() : _elapsed() {
     PINF("Value size:%lu", Options.value_size);
     PINF("Endpoint: %s", Options.addr.c_str());
 
