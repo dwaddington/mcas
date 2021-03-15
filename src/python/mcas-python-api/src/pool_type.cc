@@ -35,6 +35,7 @@ static PyObject * pool_configure(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_find_key(Pool* self, PyObject *args, PyObject *kwds);
 static PyObject * pool_get_attribute(Pool* self, PyObject* args, PyObject* kwds);
 static PyObject * pool_type(Pool* self);
+static PyObject * pool_free_direct_memory(Pool *self, PyObject* args, PyObject* kwds);
 
 
 static PyObject *
@@ -49,7 +50,6 @@ Pool_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 Pool * Pool_new()
 {
   auto pool = (Pool *) PyType_GenericAlloc(&PoolType,1);
-  PLOG("Pool_new (%p)", pool);
   return pool;
 }
 
@@ -75,7 +75,7 @@ Pool_dealloc(Pool *self)
 }
 
 static PyMemberDef Pool_members[] = {
-  {NULL}
+                                     {NULL}
 };
 
 PyDoc_STRVAR(type_doc,"Pool.type() -> Return type object.");
@@ -92,67 +92,69 @@ PyDoc_STRVAR(erase_doc,"Pool.erase(key) -> Erase object from the pool.");
 PyDoc_STRVAR(configure_doc,"Pool.configure(jsoncmd) -> Configure pool.");
 PyDoc_STRVAR(find_key_doc,"Pool.find(expr, [limit]) -> Find keys using expression.");
 PyDoc_STRVAR(get_attribute_doc,"Pool.get_attribute(key, attribute_name) -> Attribute value(s).");
+PyDoc_STRVAR(free_direct_memory_doc,"Pool.free_direct_memory(val_from_get_direct) -> Release memory allocated by get_direct call.");
 
 static PyMethodDef Pool_methods[] = {
-  {"type",(PyCFunction) pool_type, METH_NOARGS, type_doc},
-  {"close",(PyCFunction) pool_close, METH_NOARGS, close_doc},
-  {"count",(PyCFunction) pool_count, METH_NOARGS, count_doc},
-  {"put",(PyCFunction) pool_put, METH_VARARGS | METH_KEYWORDS, put_doc},
-  {"put_direct",(PyCFunction) pool_put_direct, METH_VARARGS | METH_KEYWORDS, put_direct_doc},
-  {"get",(PyCFunction) pool_get, METH_VARARGS | METH_KEYWORDS, get_doc},
-  {"get_direct",(PyCFunction) pool_get_direct, METH_VARARGS | METH_KEYWORDS, get_direct_doc},
-  {"invoke_ado",(PyCFunction) pool_invoke_ado, METH_VARARGS | METH_KEYWORDS, invoke_ado_doc},
-  {"invoke_put_ado",(PyCFunction) pool_invoke_put_ado, METH_VARARGS | METH_KEYWORDS, invoke_put_ado_doc},
-  {"get_size",(PyCFunction) pool_get_size, METH_VARARGS | METH_KEYWORDS, get_size_doc},
-  {"erase",(PyCFunction) pool_erase, METH_VARARGS | METH_KEYWORDS, erase_doc},
-  {"configure",(PyCFunction) pool_configure, METH_VARARGS | METH_KEYWORDS, configure_doc},
-  {"find_key",(PyCFunction) pool_find_key, METH_VARARGS | METH_KEYWORDS, find_key_doc},
-  {"get_attribute",(PyCFunction) pool_get_attribute, METH_VARARGS | METH_KEYWORDS, get_attribute_doc},
-  {NULL}
+                                     {"type",(PyCFunction) pool_type, METH_NOARGS, type_doc},
+                                     {"close",(PyCFunction) pool_close, METH_NOARGS, close_doc},
+                                     {"count",(PyCFunction) pool_count, METH_NOARGS, count_doc},
+                                     {"put",(PyCFunction) pool_put, METH_VARARGS | METH_KEYWORDS, put_doc},
+                                     {"put_direct",(PyCFunction) pool_put_direct, METH_VARARGS | METH_KEYWORDS, put_direct_doc},
+                                     {"get",(PyCFunction) pool_get, METH_VARARGS | METH_KEYWORDS, get_doc},
+                                     {"get_direct",(PyCFunction) pool_get_direct, METH_VARARGS | METH_KEYWORDS, get_direct_doc},
+                                     {"invoke_ado",(PyCFunction) pool_invoke_ado, METH_VARARGS | METH_KEYWORDS, invoke_ado_doc},
+                                     {"invoke_put_ado",(PyCFunction) pool_invoke_put_ado, METH_VARARGS | METH_KEYWORDS, invoke_put_ado_doc},
+                                     {"get_size",(PyCFunction) pool_get_size, METH_VARARGS | METH_KEYWORDS, get_size_doc},
+                                     {"erase",(PyCFunction) pool_erase, METH_VARARGS | METH_KEYWORDS, erase_doc},
+                                     {"configure",(PyCFunction) pool_configure, METH_VARARGS | METH_KEYWORDS, configure_doc},
+                                     {"find_key",(PyCFunction) pool_find_key, METH_VARARGS | METH_KEYWORDS, find_key_doc},
+                                     {"get_attribute",(PyCFunction) pool_get_attribute, METH_VARARGS | METH_KEYWORDS, get_attribute_doc},
+                                     {"free_direct_memory", (PyCFunction) pool_free_direct_memory, METH_VARARGS | METH_KEYWORDS, free_direct_memory_doc},
+                                     {NULL}
 };
 
 
 
 PyTypeObject PoolType = {
-  PyVarObject_HEAD_INIT(NULL, 0)
-  "mcas.Pool",           /* tp_name */
-  sizeof(Pool)   ,      /* tp_basicsize */
-  0,                       /* tp_itemsize */
-  (destructor) Pool_dealloc,      /* tp_dealloc */
-  0,                       /* tp_print */
-  0,                       /* tp_getattr */
-  0,                       /* tp_setattr */
-  0,                       /* tp_reserved */
-  0,                       /* tp_repr */
-  0,                       /* tp_as_number */
-  0,                       /* tp_as_sequence */
-  0,                       /* tp_as_mapping */
-  0,                       /* tp_hash */
-  0,                       /* tp_call */
-  0,                       /* tp_str */
-  0,                       /* tp_getattro */
-  0,                       /* tp_setattro */
-  0,                       /* tp_as_buffer */
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
-  "Pool",              /* tp_doc */
-  0,                       /* tp_traverse */
-  0,                       /* tp_clear */
-  0,                       /* tp_richcompare */
-  0,                       /* tp_weaklistoffset */
-  0,                       /* tp_iter */
-  0,                       /* tp_iternext */
-  Pool_methods,         /* tp_methods */
-  Pool_members,         /* tp_members */
-  0,                       /* tp_getset */
-  0,                       /* tp_base */
-  0,                       /* tp_dict */
-  0,                       /* tp_descr_get */
-  0,                       /* tp_descr_set */
-  0,                       /* tp_dictoffset */
-  0, //(initproc)Pool_init,  /* tp_init */
-  0,            /* tp_alloc */
-  Pool_new,             /* tp_new */
-  0, /* tp_free */
+                         PyVarObject_HEAD_INIT(NULL, 0)
+                         "mcas.Pool",           /* tp_name */
+                         sizeof(Pool)   ,      /* tp_basicsize */
+                         0,                       /* tp_itemsize */
+                         (destructor) Pool_dealloc,      /* tp_dealloc */
+                         0,                       /* tp_print */
+                         0,                       /* tp_getattr */
+                         0,                       /* tp_setattr */
+                         0,                       /* tp_reserved */
+                         0,                       /* tp_repr */
+                         0,                       /* tp_as_number */
+                         0,                       /* tp_as_sequence */
+                         0,                       /* tp_as_mapping */
+                         0,                       /* tp_hash */
+                         0,                       /* tp_call */
+                         0,                       /* tp_str */
+                         0,                       /* tp_getattro */
+                         0,                       /* tp_setattro */
+                         0,                       /* tp_as_buffer */
+                         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+                         "Pool",              /* tp_doc */
+                         0,                       /* tp_traverse */
+                         0,                       /* tp_clear */
+                         0,                       /* tp_richcompare */
+                         0,                       /* tp_weaklistoffset */
+                         0,                       /* tp_iter */
+                         0,                       /* tp_iternext */
+                         Pool_methods,         /* tp_methods */
+                         Pool_members,         /* tp_members */
+                         0,                       /* tp_getset */
+                         0,                       /* tp_base */
+                         0,                       /* tp_dict */
+                         0,                       /* tp_descr_get */
+                         0,                       /* tp_descr_set */
+                         0,                       /* tp_dictoffset */
+                         0, //(initproc)Pool_init,  /* tp_init */
+                         0,            /* tp_alloc */
+                         Pool_new,             /* tp_new */
+                         0, /* tp_free */
 };
 
   
@@ -826,3 +828,35 @@ static PyObject * pool_get_attribute(Pool* self, PyObject *args, PyObject *kwds)
   }
 }
 
+
+static PyObject * pool_free_direct_memory(Pool* self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"data",
+                                 NULL};
+
+  PyObject * memory_view = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &memory_view)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  if (! PyMemoryView_Check(memory_view)) {
+    PyErr_SetString(PyExc_RuntimeError,"argument should be <memoryview> type");
+    return NULL;
+  }
+
+  Py_buffer * buffer = PyMemoryView_GET_BUFFER(memory_view);
+
+  /* release memory */
+  ::free(buffer->buf);
+
+  if(global::debug_level > 0)
+    PLOG("released memory (%p)", buffer->buf);
+  
+  Py_RETURN_TRUE;
+}
