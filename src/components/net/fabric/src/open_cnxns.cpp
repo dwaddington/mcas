@@ -35,7 +35,7 @@ void Open_cnxns::add(cnxn_t c_)
   _s.insert(c_);
 }
 
-void Open_cnxns::remove(Fabric_memory_control *c_)
+void Open_cnxns::remove(cnxn_t::element_type *c_)
 {
   guard g{_m};
   auto it =
@@ -43,7 +43,7 @@ void Open_cnxns::remove(Fabric_memory_control *c_)
       _s.begin()
       , _s.end()
       , c_
-      , [] (const cnxn_t &e, Fabric_memory_control *c) { return e.get() < c; }
+      , [] (const cnxn_t &e, cnxn_t::element_type *c) { return e.get() < c; }
     );
   if ( it != _s.end() && it->get() == c_ )
   {
@@ -51,10 +51,10 @@ void Open_cnxns::remove(Fabric_memory_control *c_)
   }
 }
 
-std::vector<Fabric_memory_control *> Open_cnxns::enumerate()
+auto Open_cnxns::enumerate() -> std::vector<cnxn_t::element_type *>
 {
   guard g{_m};
-  std::vector<Fabric_memory_control *> v;
+  std::vector<cnxn_t::element_type *> v;
 
   std::transform(
     _s.begin()

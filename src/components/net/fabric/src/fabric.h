@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 
 #include <api/fabric_itf.h> /* component::IFabric */
 #include <common/moveable_value.h>
+#include <common/string_view.h>
 #include "event_producer.h"
 
 #include "rdma-fabric.h" /* fid_t */
@@ -25,7 +26,7 @@
 #include <map>
 #include <memory> /* shared_ptr */
 #include <mutex>
-#include <cstdlib> // getenv
+#include <cstdlib> /* getenv */
 #include <iosfwd> // ostream
 #include <stdlib.h> // setenv, unsetenv
 
@@ -56,8 +57,8 @@ public:
 			::unsetenv(_key.c_str());
 		}
 	}
-	const std::string key() const { return _key; }
-	const char *value() const { return std::getenv(key().c_str()); }
+	const common::string_view key() const { return _key; }
+	const char *value() const { return std::getenv(key().data()); }
 };
 
 std::ostream &operator<<(std::ostream &o, const env_replace &e);
@@ -67,7 +68,7 @@ std::ostream &operator<<(std::ostream &o, const env_replace &e);
  */
 class Fabric
   : public component::IFabric
-  , private event_producer
+  , public event_producer
 {
   env_replace _env_mr_cache_monitor;
   env_replace _env_use_odp;
@@ -104,7 +105,7 @@ class Fabric
    * @throw fabric_runtime_error : std::runtime_error : ::fi_pep_bind fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_listen fail
    */
-  component::IFabric_server_factory * open_server_factory(const std::string& json_configuration, std::uint16_t control_port) override;
+  component::IFabric_server_factory * open_server_factory(common::string_view json_configuration, std::uint16_t control_port) override;
   /**
    * @throw std::domain_error : json file parse-detected error
    * @throw bad_dest_addr_alloc : std::bad_alloc
@@ -131,41 +132,16 @@ class Fabric
    * @throw std::system_error - writing event pipe (readerr_eq)
    * @throw std::system_error - receiving data on socket
    */
-  component::IFabric_client * open_client(const std::string& json_configuration, const std::string & remote, std::uint16_t control_port) override;
+  component::IFabric_endpoint_unconnected * make_endpoint(common::string_view json_configuration, common::string_view remove_endpoint, std::uint16_t port) override;
+
   /**
    * @throw std::domain_error : json file parse-detected error
    * @throw fabric_runtime_error : std::runtime_error : ::fi_passive_ep fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_pep_bind fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_listen fail
    */
-  component::IFabric_server_grouped_factory * open_server_grouped_factory(const std::string& json_configuration, std::uint16_t control_port) override;
-  /**
-   * @throw std::domain_error : json file parse-detected error
-   * @throw bad_dest_addr_alloc : std::bad_alloc
-   * @throw fabric_runtime_error : std::runtime_error : ::fi_domain fail
-   * @throw fabric_bad_alloc : std::bad_alloc - fabric allocation out of memory
-   * @throw fabric_runtime_error : std::runtime_error : ::fi_connect fail
-   *
-   * @throw fabric_bad_alloc : std::bad_alloc - out of memory
-   * @throw fabric_runtime_error : std::runtime_error : ::fi_ep_bind fail
-   * @throw fabric_runtime_error : std::runtime_error : ::fi_enable fail
-   * @throw fabric_runtime_error : std::runtime_error : ::fi_ep_bind fail (event registration)
-   *
-   * @throw std::logic_error : socket initialized with a negative value (from ::socket) in Fd_control
-   * @throw std::logic_error : unexpected event
-   * @throw std::system_error (receiving fabric server name)
-   * @throw std::system_error : pselect fail (expecting event)
-   * @throw std::system_error : resolving address
-   *
-   * @throw std::system_error : read error on event pipe
-   * @throw std::system_error : pselect fail
-   * @throw std::system_error : read error on event pipe
-   * @throw fabric_bad_alloc : std::bad_alloc - libfabric out of memory (creating a new server)
-   * @throw std::system_error - writing event pipe (normal callback)
-   * @throw std::system_error - writing event pipe (readerr_eq)
-   * @throw std::system_error - receiving data on socket
-   */
-  component::IFabric_client_grouped * open_client_grouped(const std::string& json_configuration, const std::string& remote_endpoint, std::uint16_t port) override;
+  component::IFabric_server_grouped_factory * open_server_grouped_factory(common::string_view json_configuration, std::uint16_t control_port) override;
+
   /* END component::IFabric */
 
   /* BEGIN event_producer */
@@ -210,7 +186,7 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_eq_open fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    */
-  explicit Fabric(const std::string& json_configuration);
+  explicit Fabric(common::string_view json_configuration);
   int trywait(::fid **fids, std::size_t count) const;
   /**
    * @throw fabric_runtime_error : std::runtime_error : ::fi_domain fail

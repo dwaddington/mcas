@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -26,14 +26,12 @@
 
 /* Note: the info is owned by the caller, and must be copied if it is to be saved. */
 Fabric_client_grouped::Fabric_client_grouped(
-    Fabric &fabric_
+    component::IFabric_endpoint_unconnected *aep_
     , event_producer &ep_
-    , ::fi_info & info_
-    , const std::string & remote_
-    , std::uint16_t control_port_
+	, fabric_types::addr_ep_t peer_addr_
 )
-  : Fabric_connection_client(fabric_, ep_, info_, remote_, control_port_)
-  , _g(*this, this->rxcq(), this->txcq())
+  : Fabric_connection_client(aep_, ep_, peer_addr_)
+  , _g(this, aep()->rxcq(), aep()->txcq())
 {
 }
 

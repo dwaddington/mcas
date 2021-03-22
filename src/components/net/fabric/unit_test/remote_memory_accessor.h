@@ -17,7 +17,7 @@
 
 namespace component
 {
-  class IFabric_communicator;
+  class IFabric_endpoint_connected;
 }
 
 struct registered_memory;
@@ -25,10 +25,10 @@ struct registered_memory;
 struct remote_memory_accessor
 {
 protected:
-  void send_memory_info(component::IFabric_communicator &cnxn, registered_memory &rm);
+  void send_memory_info(component::IFabric_endpoint_connected &cnxn, registered_memory &rm);
 public:
   /* using rm as a buffer, send message */
-  void send_msg(component::IFabric_communicator &cnxn, registered_memory &rm, const void *msg, std::size_t len);
+  void send_msg(component::IFabric_endpoint_connected &cnxn, registered_memory &rm, const void *msg, std::size_t len);
 };
 
 #endif

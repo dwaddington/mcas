@@ -43,7 +43,7 @@ server_grouped_connection::~server_grouped_connection()
   }
 }
 
-component::IFabric_communicator *server_grouped_connection::allocate_group() const
+component::IFabric_endpoint_connected *server_grouped_connection::allocate_group() const
 {
   return cnxn().allocate_group();
 }

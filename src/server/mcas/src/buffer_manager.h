@@ -48,7 +48,7 @@ namespace
 
 namespace mcas
 {
-template <class Transport>
+template <class Memory>
 class Buffer_manager : private common::log_source {
 
   static constexpr const char *_cname       = "Buffer_manager";
@@ -56,9 +56,9 @@ class Buffer_manager : private common::log_source {
 public:
   static constexpr size_t DEFAULT_BUFFER_COUNT = NUM_SHARD_BUFFERS;
   static constexpr size_t BUFFER_LEN           = MiB(2); /* corresponds to huge page see below */
-  using memory_registered_t                    = memory_registered<Transport>;
+  using memory_registered_t                    = memory_registered<Memory>;
 
-  using memory_region_t = typename Transport::memory_region_t;
+  using memory_region_t = typename Memory::memory_region_t;
 
   struct iov_mem_lock
   {
@@ -95,7 +95,7 @@ public:
 
   public:
     buffer_base(unsigned    debug_level_,
-             Transport * transport_,
+             Memory * transport_,
              void *      base_,
              size_t      length_
     )
@@ -128,7 +128,7 @@ public:
     size_t original_length() const { return _original_length; }
     inline gsl::not_null<void *> base() const { return _base; }
     auto region() const { return _region.mr(); }
-    Transport * transport() const { return _region.transport(); }
+    Memory * transport() const { return _region.transport(); }
 
 #if 0
     /* unused */
@@ -159,7 +159,7 @@ public:
       value_adjunct = value_adjunct_;
     }
     buffer_internal(unsigned debug_level_,
-             Transport *         transport_,
+             Memory *         transport_,
              size_t              length_
     )
       : std::unique_ptr<void, free_deleter>(alloc_base(length_))
@@ -192,7 +192,7 @@ public:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"  // missing initializers
   Buffer_manager(unsigned debug_level_,
-                 Transport *transport,
+                 Memory *transport,
                  size_t buffer_count = DEFAULT_BUFFER_COUNT)
     : common::log_source(debug_level_),
       _buffer_count(buffer_count),
@@ -241,7 +241,7 @@ private:
   using key_t  = std::uint64_t;
 
   const size_t                           _buffer_count;
-  gsl::not_null<Transport *>             _transport;
+  gsl::not_null<Memory *>             _transport;
   std::vector<std::unique_ptr<buffer_internal>> _buffers;
   std::vector<buffer_internal *>        _free;
 };

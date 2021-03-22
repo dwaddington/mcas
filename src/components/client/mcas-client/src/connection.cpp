@@ -853,9 +853,10 @@ public:
 
 Connection_handler::Connection_handler(const unsigned              debug_level,
                                        Connection_base::Transport *connection,
+                                       Connection_base::buffer_manager &bm_,
                                        const unsigned              patience,
-                                       const std::string           other)
-  : Connection_base(debug_level, connection, patience),
+                                       const common::string_view   other)
+  : Connection_base(debug_level, connection, bm_, patience),
 #ifdef THREAD_SAFE_CLIENT
     _api_lock{},
 #endif
@@ -876,10 +877,10 @@ Connection_handler::Connection_handler(const unsigned              debug_level,
   if(::getenv(ENVIRONMENT_VARIABLE_FORCE_DIRECT))
     _force_direct = true;
 
-  if(!other.empty()) {
+  if(other.data()) {
     try {
       rapidjson::Document doc;
-      doc.Parse(other.c_str());
+      doc.Parse(other.data());
       auto security = doc.FindMember("security");
 
       /* set security options */

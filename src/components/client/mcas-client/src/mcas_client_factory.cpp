@@ -14,16 +14,16 @@
 
 #include <regex>
 
-component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
+component::IMCAS * MCAS_client_factory::mcas_create_nsd(const unsigned debug_level,
                                                     const unsigned patience,
-                                                    const std::string &,  // owner
-                                                    const boost::optional<std::string> & src_device,
-                                                    const boost::optional<std::string> & src_addr,
-                                                    const std::string & dest_addr_port_str,
-                                                    const std::string other)
+                                                    const string_view,  // owner
+                                                    const string_view src_device,
+                                                    const string_view src_addr,
+                                                    const string_view dest_addr_port_str,
+                                                    const string_view other)
 {
   try {
-    std::smatch m;
+    std::match_results<string_view::const_iterator> m;
 
     try {
       /*
@@ -35,7 +35,7 @@ component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
        */
       std::regex r("([[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+)[:]([[:"
                    "digit:]]+)(?:[:]([[:alnum:]]+))?");
-      std::regex_search(dest_addr_port_str, m, r);
+      std::regex_search(dest_addr_port_str.begin(), dest_addr_port_str.end(), m, r);
     }
     catch (...) {
       throw API_exception("invalid parameter");
@@ -44,14 +44,12 @@ component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
     const std::string                  dst_addr = m[1].str();
     char *                             end;
     const auto                         port = std::uint16_t(strtoul(m[2].str().c_str(), &end, 10));
-    const boost::optional<std::string> provider = m[3].matched ?
-      boost::optional<std::string>(m[3].str()) : boost::optional<std::string>();
 
     component::IMCAS *obj =
       static_cast<component::IMCAS *>(new MCAS_client(debug_level,
                                                       src_device,
                                                       src_addr,
-                                                      provider,
+                                                      m[3].matched ? string_view(m[3].str()) : string_view(),
                                                       dst_addr,
                                                       port,
                                                       patience,  // seconds to wait for single fabric completion
@@ -68,11 +66,11 @@ component::IMCAS * MCAS_client_factory::mcas_create(const unsigned debug_level,
 }
 
 component::IKVStore *MCAS_client_factory::create(unsigned debug_level,
-                                                 const std::string &,  // owner
-                                                 const std::string &addr,
-                                                 const std::string &device)
+                                                 const string_view,  // owner
+                                                 const string_view addr,
+                                                 const string_view device)
 {
-  std::smatch m;
+  std::match_results<string_view::const_iterator> m;
 
   try {
     /*
@@ -84,7 +82,7 @@ component::IKVStore *MCAS_client_factory::create(unsigned debug_level,
      */
     std::regex r("([[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+[.][[:digit:]]+)[:]([[:"
                  "digit:]]+)(?:[:]([[:alnum:]]+))?");
-    std::regex_search(addr, m, r);
+    std::regex_search(addr.begin(), addr.end(), m, r);
   }
   catch (...) {
     throw API_exception("invalid parameter");
@@ -96,7 +94,7 @@ component::IKVStore *MCAS_client_factory::create(unsigned debug_level,
   const std::string    provider = m[3].matched ? m[3].str() : "verbs"; /* default provider */
   component::IKVStore *obj      = static_cast<component::IKVStore *>(new MCAS_client(debug_level,
                                                                                      device,
-                                                                                     boost::optional<std::string>(),
+                                                                                     std::string(),
                                                                                      provider,
                                                                                      ip_addr,
                                                                                      port,
@@ -109,7 +107,7 @@ component::IKVStore *MCAS_client_factory::create(unsigned debug_level,
 
 component::IKVStore *MCAS_client_factory::create(unsigned debug_level, const IKVStore_factory::map_create &p)
 {
-  using opt_str          = boost::optional<std::string>;
+  using opt_str          = common::string_view;
   auto src_addr_it       = p.find(k_src_addr);
   auto src_addr          = opt_str(src_addr_it == p.end() ? opt_str() : opt_str(src_addr_it->second));
   auto src_nic_device_it = p.find(k_interface);

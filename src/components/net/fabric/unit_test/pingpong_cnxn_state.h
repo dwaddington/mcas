@@ -19,7 +19,7 @@
 
 namespace component
 {
-  class IFabric_active_endpoint_comm;
+  class IFabric_endpoint_comm;
 }
 
 struct buffer_state;
@@ -27,20 +27,20 @@ struct buffer_state;
 struct cnxn_state
 {
 private:
-  common::moveable_ptr<component::IFabric_active_endpoint_comm> _comm;
+  common::moveable_ptr<component::IFabric_endpoint_comm> _comm;
   std::size_t _max_inject_size;
 public:
   std::size_t msg_size;
   unsigned iterations_left;
   bool done;
   explicit cnxn_state(
-    component::IFabric_active_endpoint_comm &comm_
+    component::IFabric_endpoint_comm &comm_
     , unsigned iteration_count_
     , std::size_t msg_size_
   );
   cnxn_state(cnxn_state &&) noexcept = default;
   cnxn_state& operator=(cnxn_state &&) noexcept = default;
-  component::IFabric_active_endpoint_comm &comm() const noexcept { return *_comm; }
+  component::IFabric_endpoint_comm &comm() const noexcept { return *_comm; }
   void send(buffer_state &bt, cb_ctxt *tx_ctxt);
 };
 

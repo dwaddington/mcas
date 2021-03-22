@@ -16,6 +16,7 @@
 
 #include <api/components.h>
 #include <api/kvstore.h>
+#include <common/string_view.h>
 
 namespace component
 {
@@ -39,6 +40,7 @@ class IKVStore : public IBase
 
 
 class IKVStore_factory : public component::IBase {
+  using string_view = common::string_view;
  public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xface829f,0x0405,0x4c19,0x9898,0xa3,0xae,0x21,0x5a,0x3e,0xe8);
@@ -57,9 +59,9 @@ class IKVStore_factory : public component::IBase {
   }
 
   virtual IKVStore* create(unsigned           debug_level,
-                           const std::string& owner,
-                           const std::string& ,
-                           const std::string& )
+                           string_view owner,
+                           string_view,
+                           string_view)
   {
     (void)debug_level;
     (void)owner;

@@ -51,7 +51,7 @@ public:
    * @throw std::domain_error : json file parse-detected error
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    */
-  component::IFabric * make_fabric(const std::string& json_configuration) override;
+  component::IFabric * make_fabric(common::string_view json_configuration) override;
 };
 
 #endif

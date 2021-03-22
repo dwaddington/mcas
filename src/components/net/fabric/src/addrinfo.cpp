@@ -26,7 +26,7 @@
 
 #include <string> /* to_string */
 
-std::shared_ptr<addrinfo> getaddrinfo_ptr(std::string dst_addr, uint16_t port)
+std::shared_ptr<addrinfo> getaddrinfo_ptr(common::string_view dst_addr, uint16_t port)
 {
   addrinfo hints{};
 
@@ -36,17 +36,17 @@ std::shared_ptr<addrinfo> getaddrinfo_ptr(std::string dst_addr, uint16_t port)
   hints.ai_flags = AI_NUMERICSERV;
 
   addrinfo *presults;
-  auto r = ::getaddrinfo(dst_addr.c_str(), std::to_string(port).c_str(), &hints, &presults);
+  auto r = ::getaddrinfo(dst_addr.data(), std::to_string(port).c_str(), &hints, &presults);
   if ( r )
   {
     if ( r < 0 )
     {
       /* special ::getaddrinfo error, see /usr/include/netdb.h for a list. */
-      gai_fail(r, __func__ + std::string(" name/addr \"") + dst_addr + "\", service/port " + std::to_string(port));
+      gai_fail(r, __func__ + std::string(" name/addr \"") + std::string(dst_addr) + "\", service/port " + std::to_string(port));
     }
     else
     {
-      system_fail(r, __func__ + std::string(" name/addr \"") + dst_addr + "\", service/port " + std::to_string(port));
+      system_fail(r, __func__ + std::string(" name/addr \"") + std::string(dst_addr) + "\", service/port " + std::to_string(port));
     }
   }
   return std::shared_ptr<addrinfo>(presults, ::freeaddrinfo);

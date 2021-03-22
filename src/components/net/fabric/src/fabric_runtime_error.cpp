@@ -23,8 +23,8 @@
 
 #include <string>
 
-component::IFabric_runtime_error::IFabric_runtime_error(const std::string &what_)
-  : std::runtime_error(what_)
+component::IFabric_runtime_error::IFabric_runtime_error(const common::string_view what_)
+  : std::runtime_error(what_.data())
 {
 }
 
@@ -39,14 +39,14 @@ fabric_runtime_error::fabric_runtime_error(unsigned i_, const char *file_, int l
   , _line(line_)
 {}
 
-fabric_runtime_error::fabric_runtime_error(unsigned i_, const char *file_, int line_, const std::string &desc_)
-  : component::IFabric_runtime_error{std::string{"fabric_runtime_error ("} + std::to_string(i_) + ") \"" + ::fi_strerror(int(i_)) + "\" at " + file_ + ":" + std::to_string(line_) + " " + desc_}
+fabric_runtime_error::fabric_runtime_error(unsigned i_, const char *file_, int line_, const common::string_view desc_)
+  : component::IFabric_runtime_error{std::string{"fabric_runtime_error ("} + std::to_string(i_) + ") \"" + ::fi_strerror(int(i_)) + "\" at " + file_ + ":" + std::to_string(line_) + " " + std::string(desc_)}
   , _i(i_)
   , _file(file_)
   , _line(line_)
 {}
 
-fabric_runtime_error fabric_runtime_error::add(const std::string &added_) const
+fabric_runtime_error fabric_runtime_error::add(const common::string_view added_) const
 {
   return fabric_runtime_error(_i, _file, _line, added_);
 }

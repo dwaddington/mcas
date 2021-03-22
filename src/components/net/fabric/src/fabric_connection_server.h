@@ -15,9 +15,14 @@
 #ifndef _FABRIC_CONNECTION_SERVER_H_
 #define _FABRIC_CONNECTION_SERVER_H_
 
+#if 0
 #include <api/fabric_itf.h> /* component::IFabric_server */
-#include "fabric_op_control.h"
+#endif
+#include "fabric_connection.h"
+#include "fabric_types.h"
 
+struct fabric_endpoint;
+struct event_producer;
 struct fi_info;
 
 #pragma GCC diagnostic push
@@ -26,7 +31,7 @@ struct fi_info;
 #endif
 
 class Fabric_connection_server
-  : public Fabric_op_control
+  : public fabric_connection
 {
   /* BEGIN Fabric_op_control */
   void solicit_event() const override;
@@ -43,79 +48,69 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_enable fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_ep_bind fail (event registration)
    */
-  explicit Fabric_connection_server(Fabric &fabric, event_producer &ep, ::fi_info & info);
+  explicit Fabric_connection_server(
+    component::IFabric_endpoint_unconnected *aep
+  );
+  Fabric_connection_server(const Fabric_connection_server &) = delete;
+  Fabric_connection_server &operator=(const Fabric_connection_server &) = delete;
   ~Fabric_connection_server();
+#if 0
   /* BEGIN IFabric_op_control */
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override
-  {
-    return Fabric_op_control::poll_completions(completion_callback);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
-  {
-    return Fabric_op_control::poll_completions(completion_callback, callback_param);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
-  {
-    return Fabric_op_control::poll_completions_tentative(completion_callback, callback_param);
-  }
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override
-  {
-    return Fabric_op_control::poll_completions(completion_callback);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override
-  {
-    return Fabric_op_control::poll_completions_tentative(completion_callback);
-  }
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override;
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
-  {
-    return Fabric_op_control::poll_completions(completion_callback, callback_param);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override;
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
-  {
-    return Fabric_op_control::poll_completions_tentative(completion_callback, callback_param);
-  }
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override;
 
-  std::size_t stalled_completion_count() override { return Fabric_op_control::stalled_completion_count(); }
+  std::size_t stalled_completion_count() override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    * @throw std::system_error : pselect fail
    */
-  void wait_for_next_completion(unsigned polls_limit) override { return Fabric_op_control::wait_for_next_completion(polls_limit); };
+  void wait_for_next_completion(unsigned polls_limit) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    * @throw std::system_error : pselect fail
    */
-  void wait_for_next_completion(std::chrono::milliseconds timeout) override { return Fabric_op_control::wait_for_next_completion(timeout); };
-  void unblock_completions() override { return Fabric_op_control::unblock_completions(); };
+  void wait_for_next_completion(std::chrono::milliseconds timeout) override;
+  void unblock_completions() override;
   /* END IFabric_op_control */
+#endif
+
+#if 0
+  using memory_region_t = component::IFabric_endpoint_unconnected::memory_region_t;
+  using const_byte_span = component::IFabric_endpoint_unconnected::const_byte_span;
+
   /**
    * @throw std::range_error - address already registered
    * @throw std::logic_error - inconsistent memory address tables
@@ -124,22 +119,29 @@ public:
     const_byte_span contig
     , std::uint64_t key
     , std::uint64_t flags
-  ) override { return Fabric_memory_control::register_memory(contig, key, flags); }
+  ) override;
   /**
    * @throw std::range_error - address not registered
    * @throw std::logic_error - inconsistent memory address tables
    */
   void deregister_memory(
     const memory_region_t memory_region
-  ) override { return Fabric_memory_control::deregister_memory(memory_region); }
+  ) override;
   std::uint64_t get_memory_remote_key(
     const memory_region_t memory_region
-  ) const noexcept override { return Fabric_memory_control::get_memory_remote_key(memory_region); }
+  ) const noexcept override;
   void *get_memory_descriptor(
     const memory_region_t memory_region
-  ) const noexcept override { return Fabric_memory_control::get_memory_descriptor(memory_region); }
-  std::string get_peer_addr() override { return Fabric_op_control::get_peer_addr(); }
-  std::string get_local_addr() override { return Fabric_op_control::get_local_addr(); }
+  ) const noexcept override;
+#endif
+#if 0
+  std::string get_peer_addr() override;
+  std::string get_local_addr() override;
+#endif
+  /* TODO: Function shared with fabric_connection_client - combine */
+  std::size_t max_message_size() const noexcept override;
+  std::size_t max_inject_size() const noexcept override;
+  /* END Function shared with fabric_connection_client */
 };
 
 #pragma GCC diagnostic pop

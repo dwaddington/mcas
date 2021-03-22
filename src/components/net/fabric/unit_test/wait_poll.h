@@ -13,7 +13,7 @@
 #ifndef _TEST_WAIT_POLL_H_
 #define _TEST_WAIT_POLL_H_
 
-#include <api/fabric_itf.h> /* IFabric_communicator */
+#include <api/fabric_itf.h> /* IFabric_endpoint_connected */
 #include <common/types.h> /* status_t */
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */
@@ -29,7 +29,7 @@ enum class test_type
  * returns: number of polls (including the successful poll)
  */
 unsigned wait_poll(
-  component::IFabric_communicator &comm
+  component::IFabric_endpoint_connected &comm
   , std::function<void(
     void *context
     , ::status_t

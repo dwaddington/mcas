@@ -19,12 +19,19 @@
 #include <mutex>
 #include <queue>
 
-class Fabric_memory_control;
+/*
+ * A new connection may be either an Fabric_server or an Fabric_server_grouped.
+ * They have in common: IFabric_connection, IFabric_memory_control. But generic 
+ * code needs the ability to expect a "FI_CONNECT" event, which is not provided
+ * by either. So we keep the pending connections as "event_expecter" interfaces.
+ */
+
+struct event_expecter;
 
 class Pending_cnxns
 {
 public:
-  using cnxn_t = std::shared_ptr<Fabric_memory_control>;
+  using cnxn_t = std::shared_ptr<event_expecter>;
 private:
   std::mutex _m; /* protects _q */
   using guard = std::lock_guard<std::mutex>;

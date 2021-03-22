@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,7 +15,10 @@
 #ifndef _FABRIC_CONNECTION_CLIENT_H_
 #define _FABRIC_CONNECTION_CLIENT_H_
 
-#include "fabric_op_control.h"
+#include "fabric_connection.h"
+
+#include "fabric_types.h"
+#include <common/string_view.h>
 
 #include <cstdint> /* uint16_t */
 #include <string>
@@ -23,13 +26,14 @@
 struct fi_info;
 
 struct event_producer;
-class Fabric;
+struct fabric_endpoint;
 
 class Fabric_connection_client
-  : public Fabric_op_control
+  : public fabric_connection
 {
   event_producer &_ev;
-  /* BEGIN Fabric_op_control */
+
+  /* BEGIN fabric_connection */
   /**
    * @throw fabric_bad_alloc : std::bad_alloc - libfabric out of memory (creating a new server)
    * @throw std::system_error - writing event pipe (normal callback)
@@ -40,7 +44,8 @@ class Fabric_connection_client
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control(FI_GETWAIT) fail
    */
   void wait_event() const override;
-  /* END Fabric_op_control */
+  /* END fabric_connection */
+
   /*
    * @throw std::system_error : pselect fail
    * @throw std::system_error : read error on event pipe
@@ -49,6 +54,7 @@ class Fabric_connection_client
    * @throw std::system_error - writing event pipe (readerr_eq)
    */
   void expect_event_sync(std::uint32_t event_exp) const;
+
 public:
   /*
    * @throw bad_dest_addr_alloc : std::bad_alloc
@@ -76,12 +82,12 @@ public:
    * @throw std::system_error - receiving data on socket
    */
   explicit Fabric_connection_client(
-    Fabric &fabric
+    component::IFabric_endpoint_unconnected *aep
     , event_producer &ep
-    , ::fi_info & info
-    , const std::string & remote
-    , std::uint16_t control_port
+	, fabric_types::addr_ep_t _peer_addr
   );
+  Fabric_connection_client(const Fabric_connection_client &) = delete;
+  Fabric_connection_client &operator=(const Fabric_connection_client &) = delete;
   ~Fabric_connection_client();
 };
 

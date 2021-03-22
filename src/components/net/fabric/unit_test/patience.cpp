@@ -21,7 +21,7 @@
 #include <api/fabric_itf.h> /* IFabric, IFabric_client, IFabric_client_grouped */
 #include <system_error>
 
-component::IFabric_client *open_connection_patiently(component::IFabric &fabric_, const std::string &fabric_spec_, const std::string ip_address_, std::uint16_t port_)
+component::IFabric_client * open_connection_patiently(component::IFabric_endpoint_unconnected *aep_)
 {
   component::IFabric_client *cnxn = nullptr;
   int try_count = 0;
@@ -29,7 +29,7 @@ component::IFabric_client *open_connection_patiently(component::IFabric &fabric_
   {
     try
     {
-      cnxn = fabric_.open_client(fabric_spec_, ip_address_, port_);
+      cnxn = aep_->make_open_client();
     }
     catch ( std::system_error &e )
     {
@@ -44,7 +44,7 @@ component::IFabric_client *open_connection_patiently(component::IFabric &fabric_
   return cnxn;
 }
 
-component::IFabric_client_grouped *open_connection_grouped_patiently(component::IFabric &fabric_, const std::string &fabric_spec_, const std::string ip_address_, std::uint16_t port_)
+component::IFabric_client_grouped *open_connection_grouped_patiently(component::IFabric_endpoint_unconnected *aep_)
 {
   component::IFabric_client_grouped *cnxn = nullptr;
   int try_count = 0;
@@ -52,7 +52,7 @@ component::IFabric_client_grouped *open_connection_grouped_patiently(component::
   {
     try
     {
-      cnxn = fabric_.open_client_grouped(fabric_spec_, ip_address_, port_);
+      cnxn = aep_->make_open_client_grouped();
     }
     catch ( std::system_error &e )
     {

@@ -22,6 +22,7 @@
 
 #include <api/fabric_itf.h>
 
+#include <common/string_view.h>
 #include <stdexcept>
 
 #include <string>
@@ -39,10 +40,10 @@ private:
   int _line;
 public:
   explicit fabric_runtime_error(unsigned i, const char *file, int line);
-  explicit fabric_runtime_error(unsigned i, const char *file, int line, const std::string &desc);
+  explicit fabric_runtime_error(unsigned i, const char *file, int line, const common::string_view desc);
   fabric_runtime_error(const fabric_runtime_error &) = default;
   fabric_runtime_error& operator=(const fabric_runtime_error &) = default;
-  fabric_runtime_error add(const std::string &added) const;
+  fabric_runtime_error add(common::string_view added) const;
   unsigned id() const noexcept { return _i; }
 };
 

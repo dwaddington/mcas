@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,11 +14,10 @@
 
 #include "fabric_server_generic_factory.h"
 
+#include "event_expecter.h"
 #include "event_producer.h"
 #include "fabric.h"
 #include "fabric_check.h"
-#include "fabric_memory_control.h"
-#include "fabric_op_control.h"
 #include "fabric_util.h" /* get_name */
 #include "fd_control.h"
 #include "system_fail.h"
@@ -286,9 +285,8 @@ void Fabric_server_generic_factory::listen_loop(
   }
 }
 
-Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
+event_expecter * Fabric_server_generic_factory::get_new_connection()
 {
-#if 1
   /* clumsy way to limit the scope of a lock_guard: immediate call of a lambda */
   auto c = [this] () {
     std::lock_guard<std::mutex> g{_m_pending};
@@ -297,26 +295,11 @@ Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
 
   if ( c )
   {
-    std::static_pointer_cast<Fabric_op_control>(
-      std::static_pointer_cast<Fabric_memory_control>(c)
-    )->expect_event(FI_CONNECTED);
+    c->expect_event(FI_CONNECTED);
 
     _open.add(c);
     return &*c;
   }
-#else
-  static int count = 1;
-  {
-    std::lock_guard<std::mutex> g{_m_pending};
-    auto f = _pending.remove();
-    if(f) {
-      _open.add(f);
-      PNOTICE("** removed pending added to _open %d", count);
-      count++;
-      return f.get();
-    }
-  }
-#endif
 
   if ( _listen_exception )
   {
@@ -327,12 +310,12 @@ Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
   return nullptr;
 }
 
-std::vector<Fabric_memory_control *> Fabric_server_generic_factory::connections()
+std::vector<event_expecter *> Fabric_server_generic_factory::connections()
 {
   return _open.enumerate();
 }
 
-void Fabric_server_generic_factory::close_connection(Fabric_memory_control * cnxn_)
+void Fabric_server_generic_factory::close_connection(event_expecter * cnxn_)
 {
   _open.remove(cnxn_);
 }

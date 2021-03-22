@@ -107,8 +107,9 @@ public:
    */
   Connection_handler(const unsigned debug_level,
                      Connection_base::Transport *connection,
+                     Connection_base::buffer_manager &bm,
                      const unsigned patience,
-                     const std::string other);
+                     common::string_view other);
 
   ~Connection_handler();
 

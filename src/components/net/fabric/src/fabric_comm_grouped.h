@@ -29,7 +29,7 @@ class Fabric_generic_grouped;
 struct async_req_record;
 
 class Fabric_comm_grouped
-  : public component::IFabric_communicator
+  : public component::IFabric_group
 {
   Fabric_generic_grouped &_conn;
   Fabric_cq_grouped _rx;
@@ -47,28 +47,27 @@ public:
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_sendv fail
    */
-  void post_send(const ::iovec *first, const ::iovec *last, void **desc, void *context) override;
-  void post_send(const std::vector<::iovec>& buffers, void *context) override;
+  void post_send(gsl::span<const ::iovec> buffers, void **desc, void *context) override;
+  void post_send(gsl::span<const ::iovec> buffers, void *context) override;
 
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_recvv fail
    */
-  void post_recv(const ::iovec *first, const ::iovec *last, void **desc, void *context) override;
-  void post_recv(const std::vector<::iovec>& buffers, void *context) override;
+  void post_recv(gsl::span<const ::iovec> buffers, void **desc, void *context) override;
+  void post_recv(gsl::span<const ::iovec> buffers, void *context) override;
 
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_readv fail
    */
   void post_read(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
   ) override;
   void post_read(
-    const std::vector<::iovec>& buffers
+    gsl::span<const ::iovec> buffers
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
@@ -78,15 +77,14 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_writev fail
    */
   void post_write(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
   ) override;
   void post_write(
-    const std::vector<::iovec>& buffers
+    gsl::span<const ::iovec> buffers
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
@@ -126,12 +124,12 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override;
+  std::size_t poll_completions(component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override;
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override;
+  std::size_t poll_completions_tentative(component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override;
 
   std::size_t stalled_completion_count() override;
 
@@ -147,6 +145,13 @@ public:
   void wait_for_next_completion(std::chrono::milliseconds timeout) override;
 
   void unblock_completions() override;
+
+  memory_region_t register_memory(const_byte_span contig_,
+                                          std::uint64_t key,
+                                          std::uint64_t flags) override;
+  void deregister_memory(memory_region_t memory_region) override;
+  std::uint64_t get_memory_remote_key(memory_region_t) const noexcept override;
+  void *        get_memory_descriptor(memory_region_t) const noexcept override;
   /* END component::IFabric_communicator */
 
   fabric_types::addr_ep_t get_name() const;

@@ -750,14 +750,10 @@ void instantiate_server_and_client(const std::string &fabric_spec_, std::uint16_
         )
       );
     EXPECT_LT(0U, server->max_message_size());
+    auto client_ep = fabric1->make_endpoint(fabric_spec_, "127.0.0.1", control_port);
     auto client =
       std::shared_ptr<component::IFabric_client>(
-        open_connection_patiently(
-          *fabric1
-          , fabric_spec_
-          , "127.0.0.1"
-          , control_port
-        )
+        open_connection_patiently(client_ep)
       );
     EXPECT_LT(0U, client->max_message_size());
     EXPECT_EQ(server->max_message_size(), client->max_message_size());

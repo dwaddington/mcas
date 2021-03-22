@@ -15,10 +15,10 @@
 #ifndef _FABRIC_CQ_GENERIC_GROUPED_H_
 #define _FABRIC_CQ_GENERIC_GROUPED_H_
 
-#include <api/fabric_itf.h> /* component::IFabric_active_endpoint_grouped */
+#include <api/fabric_itf.h> /* component::IFabric_endpoint_grouped */
 
 #include "fabric_types.h" /* addr_ep_t */
-#include "fabric_op_control.h" /* fi_cq_entry_t */
+#include "fabric_endpoint.h" /* fi_cq_entry_t */
 
 #include "rdma-fi_domain.h" /* f1_cq_err_entry */
 
@@ -56,7 +56,7 @@ public:
 
   ~Fabric_cq_generic_grouped();
 
-  /* BEGIN IFabric_active_endpoint_grouped (IFabric_op_completer) */
+  /* BEGIN IFabric_endpoint_grouped (IFabric_op_completer) */
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection

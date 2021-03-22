@@ -15,6 +15,7 @@
 #define _MCAS_JSON_H_
 
 #include <common/common.h>
+#include <common/string_view.h>
 #include <cstdint>
 #include <deque>
 #include <string>
@@ -72,7 +73,7 @@ namespace common
     struct dummy_writer
     {
       bool String(const char *, std::size_t) { return false; }
-      bool String(const std::string &) { return false; }
+      bool String(common::string_view) { return false; }
       bool Bool(const bool) { return false; }
       bool StartObject() { return false; }
       bool EndObject() { return false; }
@@ -105,7 +106,10 @@ namespace common
         private:
           std::string _s;
         public:
-          string(std::string s_)
+          string(common::string_view s_)
+            : _s(s_)
+          {}
+          string(const std::string &s_)
             : _s(s_)
           {}
           string(const char *s_)
@@ -133,7 +137,7 @@ namespace common
           std::string _f; // digits
           std::string _e; // sign and digits
         public:
-          number(std::string i_, std::string f_, std::string e_ = "")
+          number(common::string_view i_, common::string_view f_, common::string_view e_ = "")
             : _i(i_)
             , _f(f_)
             , _e(e_)

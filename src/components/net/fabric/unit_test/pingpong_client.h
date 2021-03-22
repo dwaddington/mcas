@@ -22,6 +22,7 @@
 namespace component
 {
   class IFabric;
+  class IFabric_endpoint_unconnected;
   class IFabric_client;
 }
 
@@ -32,6 +33,7 @@ struct pingpong_client
 private:
   void check_complete(::status_t stat);
 
+  std::unique_ptr<component::IFabric_endpoint_unconnected> _ep;
   std::shared_ptr<component::IFabric_client> _cnxn;
   pingpong_stat _stat;
   std::uint8_t _id;

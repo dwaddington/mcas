@@ -33,8 +33,12 @@ struct fi_info;
 struct fid_pep;
 
 class Fabric;
+#if 0
 class Fabric_memory_control;
+#endif
+struct event_expecter;
 struct event_producer;
+struct fabric_endpoint;
 
 class Fabric_server_generic_factory
   : public event_consumer
@@ -74,7 +78,7 @@ class Fabric_server_generic_factory
   /**
    * @throw fabric_bad_alloc : std::bad_alloc - libfabric out of memory
    */
-  virtual std::shared_ptr<Fabric_memory_control> new_server(Fabric &fabric, event_producer &eq, ::fi_info &info) = 0;
+  virtual std::shared_ptr<event_expecter> new_server(Fabric &fabric, event_producer &eq, ::fi_info &info) = 0;
 protected:
   ~Fabric_server_generic_factory();
 public:
@@ -104,11 +108,11 @@ public:
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : read error on event pipe
    */
-  Fabric_memory_control* get_new_connection();
+  event_expecter * get_new_connection();
 
-  void close_connection(Fabric_memory_control* connection);
+  void close_connection(event_expecter* connection);
 
-  std::vector<Fabric_memory_control*> connections();
+  std::vector<event_expecter *> connections();
 
   std::size_t max_message_size() const noexcept;
 

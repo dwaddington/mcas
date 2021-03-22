@@ -30,8 +30,9 @@ Fabric_server_grouped::Fabric_server_grouped(
     , event_producer &ep_
     , ::fi_info & info_
 )
-  : Fabric_connection_server(fabric_, ep_, info_)
-  , _g(*this, this->rxcq(), this->txcq())
+  : _aep(fabric_, ep_, info_)
+  , _srv(aep())
+  , _g(&_srv, aep()->rxcq(), aep()->txcq())
 {
 }
 

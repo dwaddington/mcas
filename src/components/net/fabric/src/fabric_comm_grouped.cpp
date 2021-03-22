@@ -21,7 +21,7 @@
 
 #include "async_req_record.h"
 #include "fabric_generic_grouped.h"
-#include "fabric_op_control.h" /* fi_cq_entry_t */
+#include "fabric_endpoint.h" /* fi_cq_entry_t */
 #include "fabric_runtime_error.h"
 
 #include <sys/uio.h> /* struct iovec */
@@ -54,24 +54,23 @@ Fabric_comm_grouped::~Fabric_comm_grouped()
  * @return Work (context) identifier
  */
 void Fabric_comm_grouped::post_send(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , void *context_
 )
 {
   std::unique_ptr<async_req_record> gc{new async_req_record(&_tx, context_)};
-  _conn.post_send(first_, last_, desc_, &*gc);
+  _conn.post_send(buffers_, desc_, &*gc);
   gc.release();
 }
 
 void Fabric_comm_grouped::post_send(
-  const std::vector<::iovec>& buffers_
+  gsl::span<const ::iovec> buffers_
   , void *context_
 )
 {
   std::unique_ptr<async_req_record> gc{new async_req_record(&_tx, context_)};
-  _conn.post_send(&*buffers_.begin(), &*buffers_.end(), &*gc);
+  _conn.post_send(buffers_, &*gc);
   gc.release();
 }
 
@@ -84,24 +83,23 @@ void Fabric_comm_grouped::post_send(
  * @return Work (context) identifier
  */
 void Fabric_comm_grouped::post_recv(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , void *context_
 )
 {
   std::unique_ptr<async_req_record> gc{new async_req_record(&_rx, context_)};
-  _conn.post_send(first_, last_, desc_, &*gc);
+  _conn.post_send(buffers_, desc_, &*gc);
   gc.release();
 }
 
 void Fabric_comm_grouped::post_recv(
-  const std::vector<::iovec>& buffers_
+  gsl::span<const ::iovec> buffers_
   , void *context_
 )
 {
   std::unique_ptr<async_req_record> gc{new async_req_record(&_rx, context_)};
-  _conn.post_recv(&*buffers_.begin(), &*buffers_.end(), &*gc);
+  _conn.post_recv(buffers_, &*gc);
   gc.release();
 }
 
@@ -116,8 +114,7 @@ void Fabric_comm_grouped::post_recv(
    *
    */
 void Fabric_comm_grouped::post_read(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , uint64_t remote_addr_
   , uint64_t key_
@@ -126,12 +123,12 @@ void Fabric_comm_grouped::post_read(
 {
   /* ask for a read to buffer */
   std::unique_ptr<async_req_record> gc{new async_req_record(&_tx, context_)};
-  _conn.post_read(first_, last_, desc_, remote_addr_, key_, &*gc);
+  _conn.post_read(buffers_, desc_, remote_addr_, key_, &*gc);
   gc.release();
 }
 
 void Fabric_comm_grouped::post_read(
-  const std::vector<::iovec>& buffers_,
+  gsl::span<const ::iovec> buffers_,
   uint64_t remote_addr_,
   uint64_t key_,
   void *context_
@@ -139,7 +136,7 @@ void Fabric_comm_grouped::post_read(
 {
   /* ask for a read to buffer */
   std::unique_ptr<async_req_record> gc{new async_req_record(&_tx, context_)};
-  _conn.post_read(&*buffers_.begin(), &*buffers_.end(), remote_addr_, key_, &*gc);
+  _conn.post_read(buffers_, remote_addr_, key_, &*gc);
   gc.release();
 }
 
@@ -154,8 +151,7 @@ void Fabric_comm_grouped::post_read(
    *
    */
 void Fabric_comm_grouped::post_write(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , uint64_t remote_addr_
   , uint64_t key_
@@ -163,19 +159,19 @@ void Fabric_comm_grouped::post_write(
 )
 {
   std::unique_ptr<async_req_record> gc{new async_req_record(&_tx, context_)};
-  _conn.post_write(first_, last_, desc_, remote_addr_, key_, &*gc);
+  _conn.post_write(buffers_, desc_, remote_addr_, key_, &*gc);
   gc.release();
 }
 
 void Fabric_comm_grouped::post_write(
-  const std::vector<::iovec>& buffers_,
+  gsl::span<const ::iovec> buffers_,
   uint64_t remote_addr_,
   uint64_t key_,
   void *context_
 )
 {
   std::unique_ptr<async_req_record> gc{new async_req_record(&_tx, context_)};
-  _conn.post_write(&*buffers_.begin(), &*buffers_.end(), remote_addr_, key_, &*gc);
+  _conn.post_write(buffers_, remote_addr_, key_, &*gc);
   gc.release();
 }
 
@@ -261,4 +257,23 @@ void Fabric_comm_grouped::wait_for_next_completion(unsigned polls_limit)
 void Fabric_comm_grouped::unblock_completions()
 {
   return _conn.unblock_completions();
+}
+
+auto Fabric_comm_grouped::register_memory(const_byte_span contig_,
+                                        std::uint64_t key,
+                                        std::uint64_t flags) -> memory_region_t
+{
+  return _conn.register_memory(contig_, key, flags);
+}
+void Fabric_comm_grouped::deregister_memory(memory_region_t memory_region)
+{
+  return _conn.deregister_memory(memory_region);
+}
+std::uint64_t Fabric_comm_grouped::get_memory_remote_key(memory_region_t m) const noexcept
+{
+  return _conn.get_memory_remote_key(m);
+}
+void * Fabric_comm_grouped::get_memory_descriptor(memory_region_t m) const noexcept
+{
+  return _conn.get_memory_descriptor(m);
 }

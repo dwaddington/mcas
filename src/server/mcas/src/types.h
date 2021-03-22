@@ -15,7 +15,7 @@
 
 #include <api/fabric_itf.h>
 
-using memory_region_t = component::IFabric_connection::memory_region_t;
+using memory_region_t = component::IFabric_memory_control::memory_region_t;
 using Connection      = component::IFabric_server;
 
 #endif

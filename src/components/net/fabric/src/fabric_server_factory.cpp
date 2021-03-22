@@ -14,8 +14,10 @@
 
 #include "fabric_server_factory.h"
 
+#if 0
 #include "fabric_memory_control.h"
 #include "fabric_op_control.h"
+#endif
 #include "fabric_server.h"
 
 #include <algorithm> /* transform */
@@ -29,37 +31,57 @@ Fabric_server_factory::Fabric_server_factory(Fabric &fabric_, event_producer &eq
 Fabric_server_factory::~Fabric_server_factory()
 {}
 
-std::shared_ptr<Fabric_memory_control> Fabric_server_factory::new_server(Fabric &fabric_, event_producer &eq_, ::fi_info &info_)
+std::shared_ptr<event_expecter> Fabric_server_factory::new_server(Fabric &fabric_, event_producer &eq_, ::fi_info &info_)
 {
-  auto conn = std::make_shared<Fabric_server>(fabric_, eq_, info_);
+	auto conn = std::make_shared<Fabric_server>(fabric_, eq_, info_);
+	return std::static_pointer_cast<event_expecter>(conn);
+#if 0
   return
-    std::static_pointer_cast<Fabric_memory_control>(
+    std::static_pointer_cast<fabric_endpoint>(
       std::static_pointer_cast<Fabric_op_control>(conn)
     );
+#endif
 }
 
 component::IFabric_server * Fabric_server_factory::get_new_connection()
 {
+#if 0
+  return static_cast<component::IFabric_server *>(Fabric_server_generic_factory::get_new_connection());
+#else
   return static_cast<Fabric_server *>(Fabric_server_generic_factory::get_new_connection());
+#endif
 }
 
 std::vector<component::IFabric_server *> Fabric_server_factory::connections()
 {
+#if 1
+  // std::vector<event_expecter *>
   auto g = Fabric_server_generic_factory::connections();
   std::vector<component::IFabric_server *> v;
   std::transform(
     g.begin()
     , g.end()
     , std::back_inserter(v)
-    , [] (Fabric_memory_control *v_)
+    , [] (event_expecter *v_)
       {
-        return static_cast<Fabric_server *>(static_cast<Fabric_op_control *>(&*v_));
+#if 0
+        return static_cast<Fabric_server *>(static_cast<Fabric_connection_server *>(&*v_));
+#else
+        return static_cast<Fabric_server *>(&*v_);
+#endif
       }
   );
   return v;
+#else
+	return Fabric_server_generic_factory::connections();
+#endif
 }
 
 void Fabric_server_factory::close_connection(component::IFabric_server * cnxn_)
 {
+#if 0
+  return Fabric_server_generic_factory::close_connection(static_cast<Fabric_connection_server *>(static_cast<Fabric_server *>(cnxn_)));
+#else
   return Fabric_server_generic_factory::close_connection(static_cast<Fabric_server *>(cnxn_));
+#endif
 }

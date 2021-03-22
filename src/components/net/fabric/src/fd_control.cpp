@@ -40,14 +40,14 @@ Fd_control::Fd_control(int fd_)
 
 namespace
 {
-  Fd_socket socket_from_address(std::string dst_addr, uint16_t port)
+  Fd_socket socket_from_address(common::string_view dst_addr, uint16_t port)
   {
     auto results = getaddrinfo_ptr(dst_addr, port);
     auto e = ENOENT;
 
     Fd_socket fd{};
     bool ok = false;
-    std::string e_why = ": " + dst_addr + ":" + std::to_string(port);
+    std::string e_why = ": " + std::string(dst_addr) + ":" + std::to_string(port);
     for ( auto rp = results.get(); rp && ! ok; rp = rp->ai_next)
     {
       fd = Fd_socket(::socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol));
@@ -75,7 +75,7 @@ namespace
   }
 }
 
-Fd_control::Fd_control(std::string dst_addr, std::uint16_t port)
+Fd_control::Fd_control(common::string_view dst_addr, std::uint16_t port)
   : Fd_socket(socket_from_address(dst_addr, port))
 {
 }
@@ -90,9 +90,9 @@ void Fd_control::send_name(const fabric_types::addr_ep_t &name_) const
 
 namespace
 {
-  std::string while_in(const std::string &where)
+  std::string while_in(common::string_view where)
   {
-    return " (while in " + where + ")";
+    return " (while in " + std::string(where) + ")";
   }
 }
 

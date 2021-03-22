@@ -23,6 +23,7 @@
 struct fi_info;
 
 class Fabric;
+struct event_expecter;
 struct event_producer;
 
 class Fabric_server_factory
@@ -58,7 +59,7 @@ public:
   /*
    * @throw fabric_bad_alloc : std::bad_alloc - out of memory
    */
-  std::shared_ptr<Fabric_memory_control> new_server(Fabric &fabric, event_producer &eq, ::fi_info &info) override;
+  std::shared_ptr<event_expecter> new_server(Fabric &fabric, event_producer &eq, ::fi_info &info) override;
 
   std::size_t max_message_size() const noexcept override { return Fabric_server_generic_factory::max_message_size(); }
   std::string get_provider_name() const override { return Fabric_server_generic_factory::get_provider_name(); }

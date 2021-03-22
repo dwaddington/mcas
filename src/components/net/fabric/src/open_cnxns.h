@@ -20,12 +20,16 @@
 #include <set>
 #include <vector>
 
-class Fabric_memory_control;
+/* The generic factory code keeps the list of open connections.
+ * The specific factory will cast the list elements to IFabric_server *
+ * or IFabric_server_grouped * as it requires.
+ */
+class event_expecter;
 
 class Open_cnxns
 {
 public:
-  using cnxn_t = std::shared_ptr<Fabric_memory_control>;
+  using cnxn_t = std::shared_ptr<event_expecter>;
   using open_t = std::set<cnxn_t>;
 private:
   std::mutex _m; /* protects _s */
@@ -33,8 +37,8 @@ private:
 public:
   Open_cnxns();
   void add(cnxn_t c);
-  void remove(Fabric_memory_control *);
-  std::vector<Fabric_memory_control *> enumerate();
+  void remove(cnxn_t::element_type *);
+  std::vector<cnxn_t::element_type *> enumerate();
 };
 
 #endif

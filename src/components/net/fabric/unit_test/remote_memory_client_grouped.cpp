@@ -37,7 +37,8 @@ remote_memory_client_grouped::remote_memory_client_grouped(
   , std::uint64_t remote_key_base_
 )
 try
-  : _cnxn(open_connection_grouped_patiently(fabric_, fabric_spec_, ip_address_, port_))
+  : _ep(fabric_.make_endpoint(fabric_spec_, ip_address_, port_))
+  , _cnxn(open_connection_grouped_patiently(_ep.get()))
   , _memory_size(memory_size_)
   , _rm_out{std::make_shared<registered_memory>(*_cnxn, memory_size_, remote_key_base_ * 2U)}
   , _vaddr{}
@@ -89,14 +90,14 @@ remote_memory_client_grouped::~remote_memory_client_grouped()
   }
 }
 
-void remote_memory_client_grouped::send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)
+void remote_memory_client_grouped::send_disconnect(component::IFabric_endpoint_connected &cnxn_, registered_memory &rm_, char quit_flag_)
 {
   send_msg(cnxn_, rm_, &quit_flag_, sizeof quit_flag_);
 }
 
-std::unique_ptr<component::IFabric_communicator> remote_memory_client_grouped::allocate_group() const
+std::unique_ptr<component::IFabric_endpoint_connected> remote_memory_client_grouped::allocate_group() const
 {
-  return std::unique_ptr<component::IFabric_communicator>(_cnxn->allocate_group());
+  return std::unique_ptr<component::IFabric_endpoint_connected>(_cnxn->allocate_group());
 }
 
 std::size_t remote_memory_client_grouped::max_message_size() const

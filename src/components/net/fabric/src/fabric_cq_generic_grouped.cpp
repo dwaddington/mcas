@@ -22,7 +22,7 @@
 #include "async_req_record.h"
 #include "fabric_comm_grouped.h"
 #include "fabric_cq.h"
-#include "fabric_op_control.h"
+#include "fabric_endpoint.h"
 #include "fabric_runtime_error.h"
 #include <boost/io/ios_state.hpp>
 #include <stdexcept> /* logic_error */
