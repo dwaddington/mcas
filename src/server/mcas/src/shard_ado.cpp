@@ -954,7 +954,8 @@ void Shard::process_messages_from_ado()
               /* auto-unlock means we add a deferred unlock that happens after
                  the ado invocation (identified by work_id) has completed. */
               if (align_or_flags & IADO_plugin::FLAGS_NO_IMPLICIT_UNLOCK) {
-                CPLOG(2, "Shard_ado: locked (%s) without implicit unlock", key.c_str());
+                CPLOG(2, "Shard_ado: locked (%s) without implicit unlock, unlocking now..", key.c_str());
+                _i_kvstore->unlock(ado->pool_id(), key_handle);
               }
               else if (invoke_completion_unlock) { /* unlock on ADO invoke completion */
                 if (work_id == 0) {
@@ -1046,11 +1047,12 @@ void Shard::process_messages_from_ado()
               /* update key handle */
               wr->key_handle = new_key_handle;
             }
+            assert(new_value_len > 0);
 
             if (ado->send_table_op_response(rc, new_value, new_value_len, nullptr) != S_OK)
               throw General_exception("send_table_op_response failed");
 
-            CPLOG(1, "Shard_ado: resize_value response (%d)", rc);
+            CPLOG(1, "Shard_ado: resize_value response (%d) new_value_len=%lu", rc, new_value_len);
 
             break;
           }

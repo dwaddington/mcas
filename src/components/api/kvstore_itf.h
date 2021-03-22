@@ -28,8 +28,8 @@ namespace component
 /**
  * Key-value interface for pluggable backend (e.g. mapstore, hstore, hstore-cc)
  */
-class IKVStore : public IBase
-  , public KVStore
+class IKVStore : public IBase,
+                 public KVStore
 {
  public:
   // clang-format off
