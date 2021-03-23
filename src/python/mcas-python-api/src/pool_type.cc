@@ -8,7 +8,6 @@
 #include <common/utils.h>
 #include <Python.h>
 #include <structmember.h>
-#include <numpy/arrayobject.h>
 #include "pool_type.h"
 
 namespace global
