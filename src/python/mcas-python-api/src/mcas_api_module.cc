@@ -3,7 +3,6 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
 
-#include <numpy/arrayobject.h>
 #include <Python.h>
 #include <structmember.h>
 #include <objimpl.h>
@@ -79,8 +78,6 @@ PyInit_mcas(void)
 
   PLOG("Init mcas Python extension");
 
-  import_array();
-  
   SessionType.tp_base = 0; // no inheritance
   if(PyType_Ready(&SessionType) < 0) {
     assert(0);
