@@ -1,10 +1,19 @@
-# mcas-extra-personalities
+# Experiment Python Personality
 
-Python Personality (PP) support python and NumPy integration.
+** This feature is still in testing. **
+
+The Python Personality (PP) provides i.) a client API to loading and
+saving Python objects from the MCAS store.  In the case of Numpy
+arrays, zero-copy is possible (through the direct APIs).  For other
+data structures, the standard pickling function is used.
+
+In addition, PP allows Python code to be sent from the client to the MCAS server to
+allow Python-based near-data compute.
 
 ## Running basic test
 
-Code for test is in api.py:
+This test will produce an X-window and thus cannot be run from a text
+only console.  Code for test is in api.py:
 
 ```
 python3
