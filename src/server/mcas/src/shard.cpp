@@ -1974,7 +1974,7 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
       response->set_value(v[0]);
     }
     else {
-      PWRN("_i_kvstore->get_attribute failed");
+      PWRN("_i_kvstore->get_attribute failed for value_len (key=%s)", key.c_str());
       response->set_value(0);
     }
     CPLOG(1, "Shard: INFO reqeust INFO_TYPE_VALUE_LEN rc=%d val=%lu", hr, response->value_numeric());

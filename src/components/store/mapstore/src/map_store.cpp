@@ -775,8 +775,9 @@ status_t Pool_instance::map_keys(std::function<int(const std::string &key)> func
 }
 
 status_t Pool_instance::resize_value(const std::string &key,
-                                   const size_t new_size,
-                                   const size_t alignment) {
+                                     const size_t new_size,
+                                     const size_t alignment)
+{
 
   CPLOG(1, PREFIX "resize_value (key=%s, new_size=%lu, align=%lu",
         key.c_str(), new_size, alignment);
@@ -790,7 +791,10 @@ status_t Pool_instance::resize_value(const std::string &key,
   auto i = _map->find(string_t(key.c_str(), aac));
 
   if (i == _map->end()) return IKVStore::E_KEY_NOT_FOUND;
-  if (i->second._length == new_size) return E_INVAL;
+  if (i->second._length == new_size) {
+    CPLOG(2, PREFIX "resize_value request for same size!");
+    return E_INVAL;
+  }
 
   write_touch();
 
@@ -808,7 +812,10 @@ status_t Pool_instance::resize_value(const std::string &key,
                     out_key_handle,
                     nullptr);
 
-  if (out_key_handle == IKVStore::KEY_NONE) return E_INVAL;
+  if (out_key_handle == IKVStore::KEY_NONE) {
+    CPLOG(2, PREFIX "bad lock result");
+    return E_INVAL;
+  }
 
   CPLOG(2, PREFIX "resize_value locked key-value pair");
 
