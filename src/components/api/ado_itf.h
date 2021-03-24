@@ -383,8 +383,9 @@ public:
 
   /* note:     FLAGS_CREATE_ONLY = 0x4, */
   enum : int {
-    FLAGS_ADO_LIFETIME_UNLOCK = 0x21,
-    FLAGS_NO_IMPLICIT_UNLOCK  = 0x22,
+              FLAGS_CREATE_ONLY = IKVStore::FLAGS_CREATE_ONLY,
+              FLAGS_ADO_LIFETIME_UNLOCK = 0x21,
+              FLAGS_NO_IMPLICIT_UNLOCK  = 0x22,
   };
 
   enum : uint64_t {

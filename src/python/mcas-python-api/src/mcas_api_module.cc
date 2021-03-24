@@ -3,7 +3,6 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define PY_ARRAY_UNIQUE_SYMBOL mcas_ARRAY_API
 
-#include <numpy/arrayobject.h>
 #include <Python.h>
 #include <structmember.h>
 #include <objimpl.h>
@@ -19,10 +18,13 @@
 #include <list>
 #include <common/logging.h>
 
+namespace global
+{
+unsigned debug_level = 0;
+}
 
 // forward declaration of custom types
 //
-extern PyTypeObject ZcStringType;
 extern PyTypeObject SessionType;
 extern PyTypeObject PoolType;
 
@@ -76,14 +78,6 @@ PyInit_mcas(void)
 
   PLOG("Init mcas Python extension");
 
-  import_array();
-  
-  ZcStringType.tp_base = 0; // no inheritance
-  if(PyType_Ready(&ZcStringType) < 0) {
-    assert(0);
-    return NULL;
-  }
-
   SessionType.tp_base = 0; // no inheritance
   if(PyType_Ready(&SessionType) < 0) {
     assert(0);
@@ -109,10 +103,6 @@ PyInit_mcas(void)
 
   /* add types */
   int rc;
-
-  Py_INCREF(&ZcStringType);
-  rc = PyModule_AddObject(m, "ZcString", (PyObject *) &ZcStringType);
-  if(rc) return NULL;
 
   Py_INCREF(&SessionType);
   rc = PyModule_AddObject(m, "Session", (PyObject *) &SessionType);
@@ -167,6 +157,7 @@ static PyObject * mcas_allocate_direct_memory(PyObject * self,
     PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
     return NULL;
   }
+  
   //  PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
   return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
 }

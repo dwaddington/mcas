@@ -670,7 +670,8 @@ int main(int argc, char* argv[])
               if(debug_level > 2)
                 PLOG("ADO process: bootstrap_request: (%s, %lu, %u, %u, %lu)",
                      pool_name.c_str(), boot_req->pool_size,
-                     boot_req->pool_flags, boot_req->memory_type, boot_req->expected_obj_count);
+                     boot_req->pool_flags, boot_req->memory_type,
+                     boot_req->expected_obj_count);
 
               memory_type = boot_req->memory_type;
 

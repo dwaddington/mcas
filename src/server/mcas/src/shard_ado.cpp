@@ -1046,11 +1046,12 @@ void Shard::process_messages_from_ado()
               /* update key handle */
               wr->key_handle = new_key_handle;
             }
+            assert(new_value_len > 0);
 
             if (ado->send_table_op_response(rc, new_value, new_value_len, nullptr) != S_OK)
               throw General_exception("send_table_op_response failed");
 
-            CPLOG(1, "Shard_ado: resize_value response (%d)", rc);
+            CPLOG(1, "Shard_ado: resize_value response (%d) new_value_len=%lu", rc, new_value_len);
 
             break;
           }

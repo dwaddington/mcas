@@ -15,7 +15,7 @@ using namespace component;
 
 namespace global
 {
-unsigned debug_level;
+extern unsigned debug_level;
 }
 
 typedef struct {
