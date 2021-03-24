@@ -35,4 +35,4 @@ trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 wait $CLIENT_PID; CLIENT_RC=$?
 wait $SERVER_PID; SERVER_RC=$?
 
-pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_fail $CLIENT_LOG $TESTID $TESTID
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_fail $CLIENT_LOG $TESTID

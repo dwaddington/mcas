@@ -9,9 +9,8 @@ STORETYPE=hstore
 VALUE_LENGTH=${VALUE_LENGTH:-4096}
 KEY_LENGTH=${KEY_LENGTH:-8}
 READ_PCT=${READ_PCT:-0}
-TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE-L$VALUE_LENGTH-R${READ_PCT}"
+TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE-K$KEY_LENGTH-V$VALUE_LENGTH-R${READ_PCT}"
 # kvstore-keylength-valuelength-store-netprovider
-DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
@@ -58,4 +57,4 @@ else
     GOAL=10
 fi
 
-pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $DESC $GOAL
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $GOAL

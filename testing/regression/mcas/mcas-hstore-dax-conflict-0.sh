@@ -10,9 +10,6 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
 STORETYPE=hstore
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
-VALUE_LENGTH=${VALUE_LENGTH:-8}
-# kvstore-keylength-valuelength-store-netprovider
-DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
@@ -42,8 +39,8 @@ wait $SERVER_PID
 wait $SERVER2_PID
 
 if cat test$TESTID-server2.log | grep -q 'Resource temporarily unavailable' ; then
-    echo "Test $TESTID ($DESC): $(color_pass passed)"
+    echo "Test $TESTID: $(color_pass passed)"
 else
-    echo "Test $TESTID ($DESC): $(color_fail fail)"
+    echo "Test $TESTID: $(color_fail fail)"
 fi
 

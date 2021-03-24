@@ -5,7 +5,6 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
 TESTID=$(basename --suffix .sh -- $0)
-DESC=$TESTID
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
@@ -30,4 +29,4 @@ trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 wait $CLIENT_PID; CLIENT_RC=$?
 wait $SERVER_PID; SERVER_RC=$?
 
-pass_fail_by_code client $CLIENT_RC && pass_fail $CLIENT_LOG $TESTID $DESC
+pass_fail_by_code client $CLIENT_RC && pass_fail $CLIENT_LOG $TESTID
