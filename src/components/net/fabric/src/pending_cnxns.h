@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,30 +15,30 @@
 #ifndef _PENDING_CONNECTIONS_H_
 #define _PENDING_CONNECTIONS_H_
 
-#include <memory> /* shared_ptr */
+#include <memory>
 #include <mutex>
 #include <queue>
 
 /*
- * A new connection may be either an Fabric_server or an Fabric_server_grouped.
- * They have in common: IFabric_connection, IFabric_memory_control. But generic 
- * code needs the ability to expect a "FI_CONNECT" event, which is not provided
- * by either. So we keep the pending connections as "event_expecter" interfaces.
+ * Server side: a new endpoint which aspires to be connection.
  */
 
-struct event_expecter;
+namespace component
+{
+	struct IFabric_endpoint_unconnected_server;
+}
 
 class Pending_cnxns
 {
 public:
-  using cnxn_t = std::shared_ptr<event_expecter>;
+  using cnxn_t = std::unique_ptr<component::IFabric_endpoint_unconnected_server>;
 private:
   std::mutex _m; /* protects _q */
   using guard = std::lock_guard<std::mutex>;
   std::queue<cnxn_t> _q;
 public:
   Pending_cnxns();
-  void push(cnxn_t c);
+  void push(cnxn_t && c);
   cnxn_t remove();
 };
 

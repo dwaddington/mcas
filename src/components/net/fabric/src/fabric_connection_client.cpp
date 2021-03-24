@@ -49,7 +49,7 @@ namespace
 }
 
 Fabric_connection_client::Fabric_connection_client(
-  component::IFabric_endpoint_unconnected *aep_
+  component::IFabric_endpoint_unconnected_client *aep_
   , event_producer &ev_
   , fabric_types::addr_ep_t peer_addr_
 )

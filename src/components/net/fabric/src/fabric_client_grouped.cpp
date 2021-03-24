@@ -26,7 +26,7 @@
 
 /* Note: the info is owned by the caller, and must be copied if it is to be saved. */
 Fabric_client_grouped::Fabric_client_grouped(
-    component::IFabric_endpoint_unconnected *aep_
+    component::IFabric_endpoint_unconnected_client *aep_
     , event_producer &ep_
 	, fabric_types::addr_ep_t peer_addr_
 )

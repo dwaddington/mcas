@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -61,15 +61,15 @@ public:
 #endif
 
 struct fabric_endpoint
-  : public component::IFabric_endpoint_unconnected
-  , public component::IFabric_endpoint_connected
-  , public event_consumer
+	: public component::IFabric_endpoint_unconnected_client
+	, public component::IFabric_endpoint_unconnected_server
+	, public component::IFabric_endpoint_connected
+	, public event_consumer
 {
 private:
   using byte_span = common::byte_span;
   Fabric &_fabric;
   std::shared_ptr<::fi_info> _domain_info;
-	std::uint16_t _port;
 	fabric_types::addr_ep_t _peer_addr;
   std::shared_ptr<::fid_domain> _domain;
   std::mutex _m; /* protects _mr_addr_to_desc, _mr_desc_to_addr */
@@ -229,9 +229,7 @@ public:
    */
   void wait_for_next_completion(std::chrono::milliseconds timeout) override;
   void unblock_completions() override;
-#if 0
-  std::string get_local_addr() override;
-#endif
+
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_sendv fail
    */
@@ -338,10 +336,6 @@ public:
    */
   void expect_event(std::uint32_t) const;
   bool is_shut_down() const { return _shut_down; }
-#if 0
-  std::size_t max_message_size() const noexcept override;
-  std::size_t max_inject_size() const noexcept override;
-#endif
 
   Fabric &fabric() const { return _fabric; }
   ::fi_info &domain_info() const { return *_domain_info; }

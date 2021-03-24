@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -29,16 +29,21 @@ class event_expecter;
 class Open_cnxns
 {
 public:
-  using cnxn_t = std::shared_ptr<event_expecter>;
-  using open_t = std::set<cnxn_t>;
+	/* the external type */
+  using cnxn_type = event_expecter;
 private:
+	/* the internal type */
+	using owned_type = std::unique_ptr<cnxn_type>;
+#if 0
+  using open_type = std::set<owned_type>;
+#endif
   std::mutex _m; /* protects _s */
-  std::set<cnxn_t> _s;
+  std::set<owned_type> _s;
 public:
   Open_cnxns();
-  void add(cnxn_t c);
-  void remove(cnxn_t::element_type *);
-  std::vector<cnxn_t::element_type *> enumerate();
+  void add(cnxn_type *c);
+  void remove(cnxn_type *c);
+  std::vector<cnxn_type *> enumerate();
 };
 
 #endif

@@ -20,9 +20,8 @@
 /* interface for expecting a connect event */
 struct event_expecter
 {
-protected:
-	~event_expecter() {}
 public:
+	virtual ~event_expecter() {}
 	virtual void expect_event(std::uint32_t event_exp) = 0;
 };
 

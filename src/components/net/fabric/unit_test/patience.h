@@ -15,13 +15,13 @@
 
 namespace component
 {
-  class IFabric_endpoint_unconnected;
+  class IFabric_endpoint_unconnected_client;
   class IFabric_client;
   class IFabric_client_grouped;
 }
 
-component::IFabric_client * open_connection_patiently(component::IFabric_endpoint_unconnected *aep);
+component::IFabric_client * open_connection_patiently(component::IFabric_endpoint_unconnected_client *aep);
 
-component::IFabric_client_grouped * open_connection_grouped_patiently(component::IFabric_endpoint_unconnected *aep);
+component::IFabric_client_grouped * open_connection_grouped_patiently(component::IFabric_endpoint_unconnected_client *aep);
 
 #endif

@@ -410,11 +410,16 @@ class IFabric_endpoint_connected
   */
 };
 
+class IFabric_endpoint_unconnected
+	: public IFabric_memory_control
+{
+};
+
 /**
  * Fabric/RDMA-based network component
  *  an acrive bit not connected endpoint
  */
-class IFabric_endpoint_unconnected : public IFabric_memory_control {
+class IFabric_endpoint_unconnected_client : public IFabric_endpoint_unconnected {
  public:
 
   /**
@@ -496,7 +501,12 @@ class IFabric_connection {
 
   /**
    * Get address of connected peer (taken from fi_getpeer during
-   * connection instantiation).
+   * connection instantiation). The fi_getpeer documentation says
+   * "The address  must  be  in the same format as that specified using
+   * fi_info: addr_format when the endpoint was created". Presumably
+   * this means that the address returned by fi_getpeer *will* be in
+   * that same form, and is thus dependent on the implementation of
+   * endpoint creation.
    *
    *
    * @return Peer endpoint address
@@ -630,6 +640,11 @@ class IFabric_passive_endpoint {
   virtual std::string get_provider_name() const = 0;
 };
 
+class IFabric_endpoint_unconnected_server
+	: public IFabric_endpoint_unconnected
+{
+};
+
 /**
  * Fabric passive endpoint providing servers with ordinary (not grouped)
  * communicators.
@@ -639,7 +654,7 @@ class IFabric_server_factory : public IFabric_passive_endpoint {
   /**
    * Server/accept side handling of new connections (handled by the
    * active thread) are queued so that they can be taken by a polling
-   * thread an integrated into the processing loop.  This method is
+   * thread and integrated into the processing loop.  This method is
    * normally invoked until NULL is returned.
    *
    * @return New connection, or NULL if no new connection.
@@ -649,7 +664,8 @@ class IFabric_server_factory : public IFabric_passive_endpoint {
    * @throw std::system_error : read error on event pipe
    * @throw std::system_error : failure to listen for connections
    */
-  virtual IFabric_server *get_new_connection() = 0;
+	virtual IFabric_endpoint_unconnected_server *get_new_endpoint_unconnected() = 0;
+	virtual IFabric_server *open_connection(IFabric_endpoint_unconnected_server *) = 0;
 
   /**
    * Close connection and release any associated resources
@@ -698,7 +714,8 @@ class IFabric_server_grouped_factory : public IFabric_passive_endpoint {
    * @throw std::system_error, e.g. for locking
    * @throw std::system_error : read error on event pipe
    */
-  virtual IFabric_server_grouped *get_new_connection() = 0;
+	virtual IFabric_endpoint_unconnected_server *get_new_endpoint_unconnected() = 0;
+	virtual IFabric_server_grouped *open_connection(IFabric_endpoint_unconnected_server *) = 0;
 
   /**
    * Close connection and release any associated resources
@@ -721,6 +738,7 @@ class IFabric_server_grouped_factory : public IFabric_passive_endpoint {
 
 class IFabric {
  public:
+  using memory_region_t = IFabric_memory_region *;
 
   DECLARE_INTERFACE_UUID(0xc373d083, 0xe629, 0x46c9, 0x86fa, 0x6f, 0x96, 0x40, 0x61, 0x10, 0xdf);
   virtual ~IFabric() {}
@@ -758,7 +776,7 @@ class IFabric {
   virtual IFabric_server_grouped_factory *open_server_grouped_factory(const common::string_view json_configuration,
                                                                       std::uint16_t      port) = 0;
 
-  virtual IFabric_endpoint_unconnected *make_endpoint(const common::string_view json_configuration, common::string_view remote_endpoint, std::uint16_t port) = 0;
+  virtual IFabric_endpoint_unconnected_client *make_endpoint(const common::string_view json_configuration, common::string_view remote_endpoint, std::uint16_t port) = 0;
 
   /*
    * provider name in the fabric.

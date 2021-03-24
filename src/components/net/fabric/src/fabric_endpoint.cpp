@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -108,9 +108,8 @@ fabric_endpoint::fabric_endpoint(
   )
   : _fabric(fabric_)
   , _domain_info(make_fi_infodup(info_, "domain"))
-	, _port(_fabric.choose_port(port_))
-	/* Ask the server (over TCP) what address shoudl be used for the fabric. Remember that address */ 
-	, _peer_addr(set_peer(std::make_unique<Fd_control>(remote_address_, _port), *_domain_info))
+	/* Ask the server (over TCP) what address shoudl be used for the fabric. Remember that address */
+	, _peer_addr(set_peer(std::make_unique<Fd_control>(remote_address_, _fabric.choose_port(port_)), *_domain_info))
   /* NOTE: "this" is returned for context when domain-level events appear in the event queue bound to the domain
    * and not bound to a more specific entity (an endpoint, mr, av, pr scalable_ep).
    */
@@ -168,7 +167,6 @@ fabric_endpoint::fabric_endpoint(
   )
   : _fabric(fabric_)
   , _domain_info(make_fi_infodup(info_, "domain"))
-	, _port(0)
 	, _peer_addr(fabric_types::addr_ep_t())
   /* NOTE: "this" is returned for context when domain-level events appear in the event queue bound to the domain
    * and not bound to a more specific entity (an endpoint, mr, av, pr scalable_ep).

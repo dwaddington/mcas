@@ -11,28 +11,26 @@
    limitations under the License.
 */
 
-
 /*
  * Authors:
  *
  */
 
-#include "fabric_server_grouped.h"
+#include "fabric_endpoint_server.h"
 
-/**
- * Fabric/RDMA-based network component
- *
- */
+#include "fabric_server_factory.h"
+#include "fabric_types.h" /* addr_ep_t */
+#include "fd_control.h"
 
-/* Note: the info is owned by the caller, and must be copied if it is to be saved. */
-Fabric_server_grouped::Fabric_server_grouped(
-	component::IFabric_endpoint_unconnected_server *aep_
+fabric_endpoint_server::fabric_endpoint_server(
+	Fabric &fabric
+    , event_producer &ev
+    , ::fi_info &info
 )
-	: Fabric_connection_server(aep_)
-	, _g(this, aep()->rxcq(), aep()->txcq())
+	: fabric_endpoint(fabric, ev, info)
 {
 }
 
-Fabric_server_grouped::~Fabric_server_grouped()
+fabric_endpoint_server::~fabric_endpoint_server()
 {
 }

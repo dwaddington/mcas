@@ -18,6 +18,7 @@
 #include "event_producer.h"
 #include "fabric.h"
 #include "fabric_check.h"
+#include "fabric_endpoint_server.h"
 #include "fabric_util.h" /* get_name */
 #include "fd_control.h"
 #include "system_fail.h"
@@ -102,10 +103,10 @@ try
   {
   case FI_CONNREQ:
     {
-      auto conn = new_server(_fabric, _eq, *entry_.info);
+      auto aep = std::unique_ptr<component::IFabric_endpoint_unconnected_server>(new fabric_endpoint_server(_fabric, _eq, *entry_.info));
       std::lock_guard<std::mutex> g{_m_pending};
       pending_count++;
-      _pending.push(conn);
+      _pending.push(std::move(aep));
     }
     break;
   default:
@@ -285,29 +286,22 @@ void Fabric_server_generic_factory::listen_loop(
   }
 }
 
-event_expecter * Fabric_server_generic_factory::get_new_connection()
+auto Fabric_server_generic_factory::get_new_endpoint_unconnected() -> component::IFabric_endpoint_unconnected_server *
 {
-  /* clumsy way to limit the scope of a lock_guard: immediate call of a lambda */
-  auto c = [this] () {
-    std::lock_guard<std::mutex> g{_m_pending};
-    return _pending.remove();
-  }();
-
-  if ( c )
-  {
-    c->expect_event(FI_CONNECTED);
-
-    _open.add(c);
-    return &*c;
-  }
-
   if ( _listen_exception )
   {
     std::cerr << __func__ << ": _listen_exception present, rethrowing\n";
     std::rethrow_exception(_listen_exception);
   }
 
-  return nullptr;
+  std::lock_guard<std::mutex> g{_m_pending};
+  return _pending.remove().release();
+}
+
+void Fabric_server_generic_factory::open_connection_generic(event_expecter *c)
+{
+	c->expect_event(FI_CONNECTED);
+	_open.add(c);
 }
 
 std::vector<event_expecter *> Fabric_server_generic_factory::connections()

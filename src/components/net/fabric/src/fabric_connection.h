@@ -31,9 +31,14 @@ private:
 	fabric_types::addr_ep_t _peer_addr;
 protected:
 	explicit fabric_connection(
-		component::IFabric_endpoint_unconnected *aep
-		, fabric_types::addr_ep_t 
+		component::IFabric_endpoint_unconnected_client *aep
+		, fabric_types::addr_ep_t
 	);
+	explicit fabric_connection(
+		component::IFabric_endpoint_unconnected_server *aep
+		, fabric_types::addr_ep_t
+	);
+
 	fabric_connection(const fabric_connection &) = delete;
 	fabric_connection &operator=(const fabric_connection &) = delete;
 	auto get_name() const -> fabric_types::addr_ep_t;

@@ -281,7 +281,7 @@ class MCAS_client
 
   component::Itf_ref<component::IFabric_factory>    _factory;
   std::unique_ptr<component::IFabric>               _fabric;
-  std::unique_ptr<component::IFabric_endpoint_unconnected> _ep;
+  std::unique_ptr<component::IFabric_endpoint_unconnected_client> _ep;
   mcas::Buffer_manager<component::IFabric_memory_control> _bm; /* IO buffer manager: must precede opening of connection, which occurs in component::IFabric_client */
   std::unique_ptr<component::IFabric_client>        _transport;
   std::unique_ptr<mcas::client::Connection_handler> _connection;

@@ -26,7 +26,7 @@ namespace component
 {
   class IFabric;
   class IFabric_client_grouped;
-  class IFabric_endpoint_unconnected;
+  class IFabric_endpoint_unconnected_client;
   class IFabric_endpoint_connected;
 }
 
@@ -34,7 +34,7 @@ struct remote_memory_client_grouped
   : public remote_memory_accessor
 {
 private:
-  std::unique_ptr<component::IFabric_endpoint_unconnected> _ep;
+  std::unique_ptr<component::IFabric_endpoint_unconnected_client> _ep;
   std::shared_ptr<component::IFabric_client_grouped> _cnxn;
   std::size_t _memory_size;
   std::shared_ptr<registered_memory> _rm_out;

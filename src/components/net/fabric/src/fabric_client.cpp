@@ -17,7 +17,7 @@
 #include "fabric_endpoint.h"
 
 Fabric_client::Fabric_client(
-    component::IFabric_endpoint_unconnected *aep_
+    component::IFabric_endpoint_unconnected_client *aep_
 	, event_producer &ep_
 	, fabric_types::addr_ep_t peer_addr_
 )

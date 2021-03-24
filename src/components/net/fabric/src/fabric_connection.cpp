@@ -17,7 +17,16 @@
 #include "fabric_endpoint.h"
 
 fabric_connection::fabric_connection(
-	component::IFabric_endpoint_unconnected *aep_
+	component::IFabric_endpoint_unconnected_client *aep_
+		, fabric_types::addr_ep_t peer_addr_
+)
+	: _aep(static_cast<fabric_endpoint *>(aep_))
+	, _peer_addr(peer_addr_)
+{
+}
+
+fabric_connection::fabric_connection(
+	component::IFabric_endpoint_unconnected_server *aep_
 		, fabric_types::addr_ep_t peer_addr_
 )
 	: _aep(static_cast<fabric_endpoint *>(aep_))

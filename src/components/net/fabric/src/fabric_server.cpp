@@ -16,9 +16,10 @@
 
 #include "fabric_endpoint.h"
 
-Fabric_server::Fabric_server(Fabric &fabric_, event_producer &ep_, ::fi_info & info_)
-	: _aep(fabric_, ep_, info_)
-	, _srv(aep())
+Fabric_server::Fabric_server(
+	component::IFabric_endpoint_unconnected_server *aep_
+)
+	: Fabric_connection_server(aep_)
 {}
 
 Fabric_server::~Fabric_server()

@@ -442,7 +442,7 @@ namespace
   }
 }
 
-component::IFabric_endpoint_unconnected * Fabric::make_endpoint(const common::string_view json_configuration_, common::string_view remote_endpoint_, std::uint16_t port_)
+component::IFabric_endpoint_unconnected_client * Fabric::make_endpoint(const common::string_view json_configuration_, common::string_view remote_endpoint_, std::uint16_t port_)
 try
 {
   _info = parse_info(json_configuration_, _info);
@@ -450,11 +450,11 @@ try
 }
 catch ( const fabric_runtime_error &e )
 {
-  throw e.add(while_in(__func__));
+  throw e.add(" remote " + std::string(remote_endpoint_) + ":" + std::to_string(port_) + while_in(__func__));
 }
 catch ( const std::system_error &e )
 {
-  throw std::system_error(e.code(), e.what() + while_in(__func__));
+  throw std::system_error(e.code(), e.what() + std::string(" remote ") + std::string(remote_endpoint_) + ":" + std::to_string(port_) + while_in(__func__));
 }
 
 void Fabric::bind(::fid_ep &ep_)

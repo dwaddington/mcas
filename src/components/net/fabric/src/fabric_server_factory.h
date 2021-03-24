@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -16,6 +16,7 @@
 #define _FABRIC_SERVER_FACTORY_H_
 
 #include <api/fabric_itf.h> /* component::IFabric_server_factory */
+#include "fabric_server.h" /* for covariant return */
 #include "fabric_server_generic_factory.h"
 
 #include <cstdint> /* uint16_t */
@@ -31,6 +32,8 @@ class Fabric_server_factory
   , public Fabric_server_generic_factory
 {
 public:
+	component::IFabric_endpoint_unconnected_server * get_new_endpoint_unconnected() override { return Fabric_server_generic_factory::get_new_endpoint_unconnected(); }
+	Fabric_server *open_connection(component::IFabric_endpoint_unconnected_server *) override;
   /**
    * Note: fi_info is not const because we reuse it when constructing the passize endpoint
    *
@@ -44,22 +47,11 @@ public:
    */
   explicit Fabric_server_factory(Fabric &fabric, event_producer &ev_pr, ::fi_info &info, std::uint32_t ip_addr, std::uint16_t control_port);
   Fabric_server_factory(Fabric_server_factory &&) noexcept;
-  ~Fabric_server_factory();
-
-  /*
-   * @throw std::logic_error : unexpected event
-   * @throw std::system_error : read error on event pipe
-   */
-  component::IFabric_server* get_new_connection() override;
+  virtual ~Fabric_server_factory();
 
   void close_connection(component::IFabric_server* connection) override;
 
   std::vector<component::IFabric_server*> connections() override;
-
-  /*
-   * @throw fabric_bad_alloc : std::bad_alloc - out of memory
-   */
-  std::shared_ptr<event_expecter> new_server(Fabric &fabric, event_producer &eq, ::fi_info &info) override;
 
   std::size_t max_message_size() const noexcept override { return Fabric_server_generic_factory::max_message_size(); }
   std::string get_provider_name() const override { return Fabric_server_generic_factory::get_provider_name(); }

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -26,7 +26,7 @@
 #include <memory> /* unique_ptr */
 
 Fabric_connection_server::Fabric_connection_server(
-  component::IFabric_endpoint_unconnected *aep_
+  component::IFabric_endpoint_unconnected_server *aep_
 )
   : fabric_connection(aep_, fabric_types::addr_ep_t{})
 {
@@ -63,106 +63,6 @@ void Fabric_connection_server::solicit_event() const
 void Fabric_connection_server::wait_event() const
 {
 }
-
-#if 0
-std::size_t Fabric_connection_server::poll_completions(const component::IFabric_op_completer::complete_old &completion_callback)
-{
-	return _aep->poll_completions(completion_callback);
-}
-
-std::size_t Fabric_connection_server::poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param)
-{
-	return _aep->poll_completions(completion_callback, callback_param);
-}
-
-std::size_t Fabric_connection_server::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param)
-{
-	return _aep->poll_completions_tentative(completion_callback, callback_param);
-}
-
-std::size_t Fabric_connection_server::poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback)
-{
-	return _aep->poll_completions(completion_callback);
-}
-
-std::size_t Fabric_connection_server::poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback)
-{
-	return _aep->poll_completions_tentative(completion_callback);
-}
-
-std::size_t Fabric_connection_server::poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param)
-{
-	return _aep->poll_completions(completion_callback, callback_param);
-}
-
-std::size_t Fabric_connection_server::poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param)
-{
-	return _aep->poll_completions_tentative(completion_callback, callback_param);
-}
-
-std::size_t Fabric_connection_server::stalled_completion_count()
-{
-	return _aep->stalled_completion_count();
-}
-
-void Fabric_connection_server::wait_for_next_completion(unsigned polls_limit)
-{
-	return _aep->wait_for_next_completion(polls_limit);
-}
-
-void Fabric_connection_server::wait_for_next_completion(std::chrono::milliseconds timeout)
-{
-	return _aep->wait_for_next_completion(timeout);
-}
-
-void Fabric_connection_server::unblock_completions()
-{
-	return _aep->unblock_completions();
-}
-#endif
-#if 0
-memory_region_t Fabric_connection_server::register_memory(
-	const_byte_span contig
-	, std::uint64_t key
-	, std::uint64_t flags
-)
-{
-	return _aep->register_memory(contig, key, flags);
-}
-
-void Fabric_connection_server::deregister_memory(
-	const memory_region_t memory_region
-)
-{
-	return _aep->deregister_memory(memory_region);
-}
-
-std::uint64_t Fabric_connection_server::get_memory_remote_key(
-	const memory_region_t memory_region
-) const noexcept
-{
-	return _aep->get_memory_remote_key(memory_region);
-}
-
- void *Fabric_connection_server::get_memory_descriptor(
-	const memory_region_t memory_region
-) const noexceptcw
-{
-	return _aep->get_memory_descriptor(memory_region);
-}
-#endif
-#if 0
-std::string Fabric_connection_server::get_peer_addr()
-{
-	return fabric_connection::get_peer_addr();
-}
-#endif
-#if 0
-std::string Fabric_connection_server::get_local_addr()
-{
-	return fabric_connection::get_local_addr();
-}
-#endif
 
 std::size_t Fabric_connection_server::max_message_size() const noexcept
 {

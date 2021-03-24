@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _FABRIC_CLIENT_GROUPED_H_
-#define _FABRIC_CLIENT_GROUPED_H_
+#ifndef _FABRIC_SERVER_GROUPED_H_
+#define _FABRIC_SERVER_GROUPED_H_
 
 #include <api/fabric_itf.h> /* component::IFabric_server_grouped */
 #include "event_expecter.h"
@@ -39,17 +39,11 @@ class Fabric_comm_grouped;
 
 class Fabric_server_grouped
 	: public component::IFabric_server_grouped
-	, public component::IFabric_initiator /* for internal use */
+	, Fabric_connection_server
 	, public event_expecter
+	, public component::IFabric_initiator /* for internal use */
 {
-	fabric_endpoint _aep;
-	Fabric_connection_server _srv;
-	const fabric_endpoint *aep() const { return &_aep; }
-	fabric_endpoint *aep() { return &_aep; }
-#if 0
-  Fabric_op_control &c() { return *this; }
-#endif
-  Fabric_generic_grouped _g;
+	Fabric_generic_grouped _g;
 
   /* BEGIN component::IFabric_server_grouped (IFabric_connection) */
   /**
@@ -86,12 +80,12 @@ class Fabric_server_grouped
   {
     return aep()->get_memory_descriptor(memory_region);
   };
-  std::string get_peer_addr() override { return _srv.get_peer_addr(); }
-  std::string get_local_addr() override { return _srv.get_local_addr(); }
+  std::string get_peer_addr() override { return Fabric_connection_server::get_peer_addr(); }
+  std::string get_local_addr() override { return Fabric_connection_server::get_local_addr(); }
 public:
 	void expect_event(std::uint32_t ev) { aep()->expect_event(ev); }
-  std::size_t max_message_size() const noexcept override { return _srv.max_message_size(); }
-  std::size_t max_inject_size() const noexcept override { return _srv.max_inject_size(); }
+  std::size_t max_message_size() const noexcept override { return Fabric_connection_server::max_message_size(); }
+  std::size_t max_inject_size() const noexcept override { return Fabric_connection_server::max_inject_size(); }
   /* END component::IFabric_server_grouped (IFabric_connection) */
 private:
   component::IFabric_group *allocate_group() override { return _g.allocate_group(); }
@@ -106,10 +100,8 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_enable fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_ep_bind fail (event registration)
    */
-  explicit Fabric_server_grouped(
-    Fabric &fabric
-    , event_producer &ep
-    , ::fi_info & info
+	explicit Fabric_server_grouped(
+		component::IFabric_endpoint_unconnected_server *aep
   );
 
   ~Fabric_server_grouped();

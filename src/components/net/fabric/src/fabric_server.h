@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -29,12 +29,9 @@ struct fi_info;
 
 class Fabric_server
 	: public component::IFabric_server
+	, Fabric_connection_server
 	, public event_expecter
 {
-	fabric_endpoint _aep;
-	Fabric_connection_server _srv;
-	const fabric_endpoint *aep() const { return &_aep; }
-	fabric_endpoint *aep() { return &_aep; }
 public:
 	void expect_event(std::uint32_t ev) { aep()->expect_event(ev); }
   /*
@@ -47,7 +44,10 @@ public:
    * allocate receive buffers, then begin the message protocol with an send to
    * the client.
    */
-  explicit Fabric_server(Fabric &fabric, event_producer &ep, ::fi_info & info);
+
+	explicit Fabric_server(
+		component::IFabric_endpoint_unconnected_server *aep
+	);
   ~Fabric_server();
 
   /* BEGIN IFabric_op_completer */
@@ -193,10 +193,10 @@ public:
     const void *buf, std::size_t len
   ) override;
 
-  std::string get_peer_addr() override { return _srv.get_peer_addr(); }
-  std::string get_local_addr() override { return _srv.get_local_addr(); }
-  std::size_t max_message_size() const noexcept override { return _srv.max_message_size(); }
-  std::size_t max_inject_size() const noexcept override { return _srv.max_inject_size(); }
+	std::string get_peer_addr() override { return Fabric_connection_server::get_peer_addr(); }
+	std::string get_local_addr() override { return Fabric_connection_server::get_local_addr(); }
+	std::size_t max_message_size() const noexcept override { return Fabric_connection_server::max_message_size(); }
+	std::size_t max_inject_size() const noexcept override { return Fabric_connection_server::max_inject_size(); }
 };
 
 #pragma GCC diagnostic pop

@@ -132,7 +132,7 @@ class Fabric
    * @throw std::system_error - writing event pipe (readerr_eq)
    * @throw std::system_error - receiving data on socket
    */
-  component::IFabric_endpoint_unconnected * make_endpoint(common::string_view json_configuration, common::string_view remove_endpoint, std::uint16_t port) override;
+  component::IFabric_endpoint_unconnected_client * make_endpoint(common::string_view json_configuration, common::string_view remove_endpoint, std::uint16_t port) override;
 
   /**
    * @throw std::domain_error : json file parse-detected error

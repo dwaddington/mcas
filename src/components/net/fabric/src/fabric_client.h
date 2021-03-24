@@ -64,7 +64,7 @@ public:
    * @throw std::system_error - receiving data on socket
    */
   explicit Fabric_client(
-    component::IFabric_endpoint_unconnected *aep_
+    component::IFabric_endpoint_unconnected_client *aep_
     , event_producer &ep
 	, fabric_types::addr_ep_t peer_addr
   );
