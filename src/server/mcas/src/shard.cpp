@@ -32,18 +32,6 @@
 
 #include "resource_unavailable.h"
 
-#ifdef HAS_PROFILER
-#include <gperftools/profiler.h>
-#else
-int ProfilerStart(const char *)
-{
-  PLOG("%s", "profile requested but profiler not linked");
-  return false;
-}
-void ProfilerStop() {}
-void ProfilerFlush() {}
-#endif
-
 #include <sys/types.h> /* getpid */
 #include <unistd.h>
 
