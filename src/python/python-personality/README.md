@@ -16,7 +16,7 @@ This test will produce an X-window and thus cannot be run from a text
 only console.  Code for test is in api.py:
 
 ```
-python3
+SERVER_IP=<your server IP address> python3
 ```
 
 Type interactively:

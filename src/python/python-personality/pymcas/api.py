@@ -22,6 +22,7 @@ import sys
 import numpy as np
 import inspect
 import pickle
+import os
 
 from flatbuffers import util
 
@@ -322,7 +323,7 @@ class Pool():
 # -----------------------------------------------------------------------------------------
 
 def test_0():
-    session = pymcas.create_session("10.0.0.101", 11911, debug=3)
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
     pool = session.create_pool("myPool")
@@ -350,7 +351,7 @@ def test_dict():
     """
     Test for non-NdArray types, e.g., dictionary
     """
-    session = pymcas.create_session("10.0.0.101", 11911, debug=3)
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
     pool = session.create_pool("myPool")
@@ -374,7 +375,7 @@ def test_skimage_0():
     """
     Test load and save for NdArray handling in Scikit-Image processing
     """
-    session = pymcas.create_session("10.0.0.101", 11911, debug=3)
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
     pool = session.create_pool("myPool")
@@ -402,7 +403,7 @@ def test_skimage_0():
     """
     Test using NdArray data and Scikit-Image to perform Sobel filter in ADO
     """
-    session = pymcas.create_session("10.0.0.101", 11911, debug=3)
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
     pool = session.create_pool("myPool")
@@ -429,7 +430,7 @@ def test_ref_cnt():
     """
     Test reference counting
     """
-    session = mcas.Session("10.0.0.101", 11911)
+    session = mcas.Session(os.getenv('SERVER_IP'), 11911)
     pool = session.create_pool('fooPool', 100)
     session = 0
     pool = 0
