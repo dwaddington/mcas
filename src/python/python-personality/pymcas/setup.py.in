@@ -1,0 +1,67 @@
+# Python setup.py file
+
+import setuptools
+import os
+from distutils.core import setup, Extension
+import distutils.sysconfig
+
+# remove the pesky -Wstrict-prototypes flag!
+#
+cfg_vars = distutils.sysconfig.get_config_vars()
+include_dir = '/usr/include/${PYTHON_FILENAME}'
+
+
+for key, value in cfg_vars.items():
+    if(key == 'OPT'):
+        cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
+        cfg_vars[key] = value.replace("-O0", "-O2")
+        cfg_vars[key] += " -Wno-write-strings"  # add option to disable write strings warning
+    elif(key == 'Py_DEBUG'):
+        if(value == 1):
+            include_dir = '/usr/include/${PYTHON_FILENAME}'
+
+pymcas_module_core = Extension('pymcascore',
+                        define_macros = [('MAJOR_VERSION', '1'),
+                                         ('CXX',''),
+                                         ('MINOR_VERSION', '0')],
+                        include_dirs = [include_dir,
+                                        '${CMAKE_SOURCE_DIR}/src/python/mcas-python-api/src',
+                                        '${CMAKE_INSTALL_PREFIX}/include',
+                                        '${PYTHON_SITE_NUMPY_INCLUDES}',
+                        ],
+                        library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
+                                        '${CMAKE_INSTALL_PREFIX}/lib',
+                                        '${CMAKE_INSTALL_PREFIX}/lib64',
+                                        '/usr/local/lib',
+                        ],
+                        libraries = ['common','numa','pthread','z','rt','dl'],
+                        sources = ['${CMAKE_CURRENT_SOURCE_DIR}/src/pymcas_core_module.cc',
+                        ],
+                        extra_compile_args = ['-fPIC','-std=c++17','-DCONFIG_DEBUG','-g','-O2'],
+                        runtime_library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
+                                                '${CMAKE_INSTALL_PREFIX}/lib',
+                                                '${CMAKE_INSTALL_PREFIX}/lib64',
+                                                '-Wl,--rpath=${CMAKE_INSTALL_PREFIX}/lib'
+                        ]
+)
+
+
+setuptools.setup(
+    name = 'McasPpApiPackage',
+    version='0.1',
+    author='Daniel Waddington',
+    author_email='daniel.waddington@ibm.com',
+    description='MCAS API library for Python Personality',
+    package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+    ext_modules=[pymcas_module_core],
+    packages=['pymcas','pymcas.Proto'], #setuptools.find_packages(),
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: Apache 2.0 License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires='>=3.5',
+)
+
+
+

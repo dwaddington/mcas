@@ -1,0 +1,56 @@
+// Python personality
+namespace Proto;
+
+//--- DATA ------------------
+enum DataType : uint {
+  Unknown = 0,
+  Opaque = 1,
+  NumPyArray = 2,
+  Pickled = 3,
+}
+
+table DataDescriptor {
+  type : DataType;
+  global_name : string;
+  header_length : uint64;
+  data_length : uint64;  
+}
+
+
+//--- CODE ------------------
+enum CodeType : uint {
+  Unknown = 0,
+  CPython = 1,
+}
+
+table Operation {
+  code_type : CodeType;
+  function : string;
+  additional_params : string;
+  code : string;
+}
+
+//--- INVOKE----------------
+table InvokeRequest {
+  op : Operation;
+}
+
+table InvokeReply {
+  status : uint32;
+}
+
+union Element
+{
+  InvokeRequest,
+  InvokeReply,
+  DataDescriptor,
+}
+
+table Message
+{
+  magic   : uint32 = 0x0c0ffee0;
+  version : short = 1;
+  element : Element;  // message is an array of elements (vector of union not supported by Python)
+}
+
+root_type Message;
