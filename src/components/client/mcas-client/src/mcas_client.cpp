@@ -270,11 +270,13 @@ status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
                                        async_handle_t &          out_handle,
                                        IKVStore::memory_handle_t handle)
 {
-  return _connection->async_get_direct(pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle);
+  TM_ROOT();
+  return _connection->async_get_direct(TM_REF pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle);
 }
 
 status_t MCAS_client::check_async_completion(async_handle_t &handle)
 {
+  TM_ROOT();
   return _connection->check_async_completion(handle);
 }
 

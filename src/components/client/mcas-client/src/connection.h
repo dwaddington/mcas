@@ -27,6 +27,7 @@
 #include <common/exceptions.h>
 #include <common/utils.h>
 #include <common/byte_buffer.h>
+#include <common/perf/tm.h>
 #include <common/string_view.h>
 #include <gsl/pointers>
 #include <sys/mman.h>
@@ -207,7 +208,7 @@ public:
                             component::IKVStore::memory_handle_t handle = component::IMCAS::MEMORY_HANDLE_NONE,
                             unsigned int                         flags  = component::IMCAS::FLAGS_NONE);
 
-  status_t async_get_direct(const component::IMCAS::pool_t       pool,
+  status_t async_get_direct(TM_FORMAL const component::IMCAS::pool_t       pool,
                             const void *                         key,
                             size_t                               key_len,
                             void *                               value,
@@ -481,7 +482,7 @@ private:
                                             const size_t   value_len,
                                             const unsigned flags);
 
-  component::IMCAS::async_handle_t put_locate_async(pool_t                              pool,
+  component::IMCAS::async_handle_t put_locate_async(TM_FORMAL pool_t                    pool,
                                                     const void *                        key,
                                                     size_t                              key_len,
                                                     const void *                        value,
@@ -495,7 +496,7 @@ private:
                                                          const size_t   key_len,
                                                          const unsigned flags);
 
-  component::IMCAS::async_handle_t get_locate_async(pool_t                              pool,
+  component::IMCAS::async_handle_t get_locate_async(TM_FORMAL pool_t                     pool,
                                                     const void *                        key,
                                                     size_t                              key_len,
                                                     void *                              value,
