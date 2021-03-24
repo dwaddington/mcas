@@ -1,4 +1,4 @@
-# Experiment Python Personality
+# Experimental Python Personality
 
 ** This feature is still in testing. **
 
