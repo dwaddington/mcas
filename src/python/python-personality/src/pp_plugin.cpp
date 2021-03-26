@@ -20,6 +20,8 @@
 #include <string.h>
 #include <flatbuffers/flatbuffers.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
 
 #include <Python.h>
 
@@ -62,34 +64,116 @@ inline void * copy_flat_buffer(FlatBufferBuilder& fbb)
 /*------------------------------------------------------------*/
 /* extension for ADO-local python access to ADO callback etc. */
 /*------------------------------------------------------------*/
-// We might need this to support ADO callbacks from python code
-// static PyObject* ado_ext_foo(PyObject *self, PyObject *args)
-// {
-//   PNOTICE("ado_ext_foo!!!!");
-//   return PyLong_FromLong(99);
-// }
 
-// static PyMethodDef AdoExtMethods[] = {
-//   {"foo", ado_ext_foo, METH_VARARGS, "Do something."},
-//   {NULL, NULL, 0, NULL}
-// };
+static PyObject * ado_ext_save(PyObject *self, PyObject * args, PyObject * kwds)
+{
+  static const char *kwlist[] = {"key",
+                                 "value",
+                                 NULL};
 
-// static PyModuleDef AdoExtModule = {
-//   PyModuleDef_HEAD_INIT, "ado", NULL, -1, AdoExtMethods,
-//   NULL, NULL, NULL, NULL
-// };
+  const char * key = nullptr;
+  PyObject * value = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "sO",
+                                    const_cast<char**>(kwlist),
+                                    &key,
+                                    &value))  {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments to ado.save");
+    return NULL;
+  }
 
-// static PyObject*
-// PyInit_ado(void)
-// {
-//   return PyModule_Create(&AdoExtModule);
-// }
+  assert(PyModule_Check(self));
+  PyObject * mod_ado_dict = PyModule_GetDict(self);
 
+  /* get hold of plugin instance ptr and work_id */
+  auto plugin = reinterpret_cast<Pp_plugin*>
+    (PyLong_AsVoidPtr(PyDict_GetItemString(mod_ado_dict,
+                                           "__plugin_instance__")));
+
+  const uint64_t work_id = PyLong_AsUnsignedLong(PyDict_GetItemString(mod_ado_dict,
+                                                                      "__work_id__"));
+  size_t value_size = plugin->write_to_store(work_id, key, value);
+
+  return PyLong_FromUnsignedLong(value_size);
+}
+
+
+static PyObject * ado_ext_load(PyObject *self, PyObject * args, PyObject * kwds)
+{
+  static const char *kwlist[] = {"key",
+                                 NULL};
+
+  const char * key = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "s",
+                                    const_cast<char**>(kwlist),
+                                    &key)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments to ado.load");
+    return NULL;
+  }
+
+  assert(PyModule_Check(self));
+
+  /* get hold of plugin instance ptr and work_id */
+  PyObject * mod_ado_dict = PyModule_GetDict(self);
+  auto plugin = reinterpret_cast<Pp_plugin*>
+    (PyLong_AsVoidPtr(PyDict_GetItemString(mod_ado_dict,
+                                           "__plugin_instance__")));
+
+  const uint64_t work_id = PyLong_AsUnsignedLong(PyDict_GetItemString(mod_ado_dict,
+                                                                      "__work_id__"));
+  void * value = nullptr;
+  size_t value_len = 0;
+  status_t rc = plugin->cb_open_key(work_id,
+                                    key,
+                                    value,
+                                    value_len);
+  if(rc != S_OK)
+    Py_RETURN_NONE;
+
+  auto local_dict = PyDict_New();
+  auto global_dict = PyDict_New();
+  PyDict_SetItemString(global_dict, "__builtins__", PyEval_GetBuiltins());
+
+  return plugin->create_object_from_store_memory(key,
+                                                 strlen(key),
+                                                 value,
+                                                 value_len,
+                                                 global_dict,
+                                                 local_dict);
+}
+
+
+static PyMethodDef AdoExtMethods[] =
+  {
+   {"save", (PyCFunction) ado_ext_save, METH_VARARGS | METH_KEYWORDS, "Save object in store."},
+   {"load", (PyCFunction) ado_ext_load, METH_VARARGS | METH_KEYWORDS, "Load object from store."},
+   {NULL, NULL, 0, NULL}
+  };
+
+static PyModuleDef AdoExtModule =
+  {
+   PyModuleDef_HEAD_INIT, "ado", NULL, -1, AdoExtMethods,
+   NULL, NULL, NULL, NULL
+  };
+
+static PyObject*
+PyInit_ado(void)
+{
+  return PyModule_Create(&AdoExtModule);
+}
+
+
+/*------------------------------------------------------------*/
 
 
 status_t Pp_plugin::register_mapped_memory(void * shard_vaddr,
-                                                  void * local_vaddr,
-                                                  size_t len)
+                                           void * local_vaddr,
+                                           size_t len)
 {
   CPLOG(2, PREFIX "register_mapped_memory (%p, %p, %lu)",
        shard_vaddr, local_vaddr, len);
@@ -115,7 +199,7 @@ Pp_plugin::Pp_plugin() : common::log_source(DEBUG_LEVEL)
   dlopen("/usr/lib64/libpython3.so", RTLD_LAZY | RTLD_GLOBAL);
 
   /* add methods to module ado */
-  //  PyImport_AppendInittab("ado", &PyInit_ado);
+  PyImport_AppendInittab("ado", &PyInit_ado);
   
   Py_Initialize();
   //  PyRun_SimpleString("import ado; ado.foo()"); // import local extension
@@ -169,19 +253,10 @@ status_t Pp_plugin::do_work(const uint64_t work_key,
                            function,
                            response_buffers);
 
-  /* create flatbuffer response */
-  {
-    using namespace Proto;
-    
-    FlatBufferBuilder fbb;
+  if(rc != S_OK)
+    PWRN(PREFIX "excution of ADO Python function failed");
 
-    auto req = CreateInvokeReply(fbb, rc);
-    fbb.Finish(CreateMessage(fbb, MAGIC, VERSION, Element_InvokeReply, req.Union()));
-    response_buffers.emplace_back(copy_flat_buffer(fbb),
-                                  fbb.GetSize(),
-                                  response_buffer_t::alloc_type_malloc{});
-  }
-  return S_OK;
+  return rc;
 }
 
 /** 
@@ -262,14 +337,16 @@ status_t Pp_plugin::unwrap_pickle_from_data_descriptor(const char * key,
 }
 
 
-void Pp_plugin::write_to_store(const uint64_t work_id,
-                               const char *   varname,
-                               PyObject *     object)
+size_t Pp_plugin::write_to_store(const uint64_t work_id,
+                                 const char *   varname,
+                                 PyObject *     object)
 {
   CPLOG(2, PREFIX "Writing to store object (%s)", varname);
 
   std::string key(varname);
-
+  component::IKVStore::key_t key_handle;
+  size_t value_size = 0;
+  
   if(PyArray_Check(object)) {
 
     auto array_object = reinterpret_cast<PyArrayObject*>(object);
@@ -301,14 +378,13 @@ void Pp_plugin::write_to_store(const uint64_t work_id,
       auto fb_header_size = fbb.GetSize();
       auto fb_header_ptr = fbb.GetBufferPointer();
       CPLOG(2, PREFIX "write_to_store: fb msg size: %u", fb_header_size);
-      size_t value_size = fb_header_size + nd_header.size() + array_size;
+      value_size = fb_header_size + nd_header.size() + array_size;
       CPLOG(2, PREFIX "write_to_store: value_size: %lu", value_size);
       
       /* for the moment copy */
       const size_t requested_value_size = value_size;
       void * out_value_addr = nullptr;
       
-      component::IKVStore::key_t key_handle;
       status_t rc = cb_create_key(work_id,
                                   key,
                                   value_size,
@@ -380,7 +456,7 @@ void Pp_plugin::write_to_store(const uint64_t work_id,
       FlatBufferBuilder fbb;
 
       auto pickled_bytes_len = PyBytes_Size(pickled_bytes);
-      PNOTICE("pickled_bytes_len %lu", pickled_bytes_len);
+
       auto global_name = fbb.CreateString(varname);
       auto dd = CreateDataDescriptor(fbb,
                                      DataType_Pickled,
@@ -399,7 +475,7 @@ void Pp_plugin::write_to_store(const uint64_t work_id,
       CPLOG(2, PREFIX "write_to_store: fb msg size=%u pickled_bytes_len=%lu",
             fb_header_size, pickled_bytes_len);
       
-      size_t value_size = fb_header_size + pickled_bytes_len;
+      value_size = fb_header_size + pickled_bytes_len;
       const size_t requested_value_size = value_size;
       
       CPLOG(2, PREFIX "write_to_store: creating (key=%s) value of value_size=%lu",
@@ -415,7 +491,6 @@ void Pp_plugin::write_to_store(const uint64_t work_id,
       //               FLAGS_NO_IMPLICIT_UNLOCK, // flags
       //               out_value_addr);
 
-      component::IKVStore::key_t key_handle;
       status_t rc = cb_create_key(work_id,
                                   key,
                                   value_size,
@@ -455,41 +530,21 @@ void Pp_plugin::write_to_store(const uint64_t work_id,
       memcpy(ptr, fb_header_ptr, fb_header_size);
       ptr+=fb_header_size;
       memcpy(ptr, PyBytes_AS_STRING(pickled_bytes), pickled_bytes_len);
-      /* flush for PMEM? */
-      cb_unlock(work_id, key_handle);  /* explicitly unlock */
     }
-
   }
 
+  /* flush for PMEM? */
+  cb_unlock(work_id, key_handle);  /* explicitly unlock */
+  return value_size;
 }
 
-status_t Pp_plugin::execute_python(const uint64_t              work_key,
-                                   const char *                key,
-                                   const size_t                key_len,
-                                   void *                      value,
-                                   const size_t                value_len,
-                                   const char *                code_string,
-                                   const char *                function_name,
-                                   response_buffer_vector_t&   response_buffers)
+PyObject * Pp_plugin::create_object_from_store_memory(const char * key,
+                                                      const size_t key_len,
+                                                      void * value,
+                                                      const size_t value_len,
+                                                      PyObject * global_dict,
+                                                      PyObject * local_dict)
 {
-  
-  // PLOG("Importing pickle..");
-  // PyObject *mod_pickle = PyImport_ImportModule("pickle");
-  // if(mod_pickle == nullptr)
-  //   throw General_exception("unable to import pickle");
-
-  PyObject *mod_numpy = PyImport_ImportModule("numpy");
-  if(mod_numpy == nullptr)
-    throw General_exception("unable to import numpy");
-
-
-  std::string code(code_string);
-
-  /* set up environment */
-  auto local_dict = PyDict_New();
-  auto global_dict = PyDict_New();
-  PyDict_SetItemString(global_dict, "__builtins__", PyEval_GetBuiltins());
-
   PyObject * target_object = nullptr;
   status_t rc = unwrap_nparray_from_data_descriptor(key, key_len, value, value_len, target_object);
 
@@ -500,7 +555,7 @@ status_t Pp_plugin::execute_python(const uint64_t              work_key,
     rc = unwrap_pickle_from_data_descriptor(key, key_len, value, value_len, pickle_bytes);
     
     if(rc != S_OK)
-      throw General_exception("not ndarray or pickle; what to do?");
+      throw General_exception("ADO python target not ndarray or pickle; what to do?");
 
     PyDict_SetItemString(global_dict, "pickle_bytes", pickle_bytes);
 
@@ -516,13 +571,57 @@ status_t Pp_plugin::execute_python(const uint64_t              work_key,
   }
 
   assert(target_object);
+  return target_object;
+}
+
+status_t Pp_plugin::execute_python(const uint64_t              work_key,
+                                   const char *                key,
+                                   const size_t                key_len,
+                                   void *                      value,
+                                   const size_t                value_len,
+                                   const char *                code_string,
+                                   const char *                function_name,
+                                   response_buffer_vector_t&   response_buffers)
+{
+  /* set up environment */
+  auto local_dict = PyDict_New();
+  auto global_dict = PyDict_New();
+  PyDict_SetItemString(global_dict, "__builtins__", PyEval_GetBuiltins());
+
+  PyObject * target_object = create_object_from_store_memory(key, key_len, value, value_len,
+                                                             global_dict, local_dict);  
+  
   PyDict_SetItemString(global_dict, "target", target_object);
 
+  /* import extension modules */
+  {
+    PyObject *mod_ado = PyImport_ImportModule("ado");
+    if(mod_ado == nullptr)
+      throw General_exception("unable to import ado");
+    PyDict_SetItemString(global_dict, "ado", mod_ado);
+
+    PyObject *mod_numpy = PyImport_ImportModule("numpy");
+    if(mod_numpy == nullptr)
+      throw General_exception("unable to import numpy");
+    PyDict_SetItemString(global_dict, "numpy", mod_numpy);
+
+    PyObject *mod_pickle = PyImport_ImportModule("pickle");
+    if(mod_pickle == nullptr)
+      throw General_exception("unable to import pickle");
+    PyDict_SetItemString(global_dict, "pickle", mod_pickle);
+
+    PyObject* mod_ado_dict = PyModule_GetDict(mod_ado);
+    PyDict_SetItemString(mod_ado_dict, "__plugin_instance__", PyLong_FromVoidPtr(this));
+    PyDict_SetItemString(mod_ado_dict, "__work_id__", PyLong_FromUnsignedLong(work_key));
+  }
+    
+
+  std::string code(code_string);
 
   /* add execution hook, i.e. call target function with params */
-  code += "\nresults = ";
+  code += "\nresult = pickle.dumps(";
   code += function_name;
-  code += "(target)\n";
+  code += "(target))\n";
 
   CPLOG(2, PREFIX "JIT compiling code..\n%s",code.c_str());
     
@@ -532,9 +631,11 @@ status_t Pp_plugin::execute_python(const uint64_t              work_key,
     throw General_exception("unable to JIT compile python code");
   
   /* execute code */
-  PyObject* result = PyEval_EvalCode(cc, global_dict, local_dict);
-  if(!result)
-    throw General_exception("PyEval_EvalCode failed unexpectedly");
+  PyObject* eval_status = PyEval_EvalCode(cc, global_dict, local_dict);
+  if(!eval_status) {
+    PyErr_Print();
+    return E_FAIL;
+  }
 
   CPLOG(2, PREFIX "Python execution OK");
 
@@ -552,24 +653,24 @@ status_t Pp_plugin::execute_python(const uint64_t              work_key,
       PINF("global variable: %ls", PyUnicode_AsWideCharString(k, NULL));
   }
   
-  PyObject * results = PyDict_GetItemString(local_dict, "results");
-  if(! PyDict_Check(results))
-    throw General_exception("results expected to be a dictionary");
+  PyObject * pickled_result = PyDict_GetItemString(local_dict, "result");
 
+  if(! PyBytes_Check(pickled_result))
+    throw General_exception("result expected to be pickled data");
 
-  /* write results back into store */
-  Py_ssize_t pos = 0;
-  PyObject *varname, *var;
-  while (PyDict_Next(results, &pos, &varname, &var)) {
+  /* return result pickled */
+  size_t return_buffer_size = PyBytes_Size(pickled_result);
+  assert(return_buffer_size > 0);
+  void * return_buffer = ::malloc(return_buffer_size);
+  memcpy(return_buffer, PyBytes_AsString(pickled_result), return_buffer_size);
+  response_buffers.emplace_back(return_buffer,
+                                return_buffer_size,
+                                response_buffer_t::alloc_type_malloc{});
 
-    char * utf8_varname = PyUnicode_AsUTF8(varname);
-    write_to_store(work_key, utf8_varname, var);
+  Py_DECREF(pickled_result);
+  Py_DECREF(eval_status);
 
-    PyMem_Free(utf8_varname);
-  }
-  
-  
-  return rc;
+  return S_OK;
 }
 
 
@@ -606,3 +707,4 @@ extern "C" void * factory_createInstance(component::uuid_t interface_iid)
   else return NULL;
 }
 
+#pragma GCC diagnostic pop

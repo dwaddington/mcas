@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# api.py
+# Client side API for Python Personality
 
 #from mcas import *
 import mcas
@@ -314,7 +314,7 @@ class Pool():
         data = builder.Output()      # flatbuffer info
     
         print('invoke: total len = {0}'.format(len(data)))
-        self.__pool.invoke_ado(key, data)
+        return pickle.loads(self.__pool.invoke_ado(key, data))
         
         
 
@@ -322,7 +322,7 @@ class Pool():
 # TESTING AREA
 # -----------------------------------------------------------------------------------------
 
-def test_0():
+def basic_test_0():
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
@@ -344,7 +344,8 @@ def test_0():
 
 def test_dict_work(target_dict):
     target_dict['plant'] = ["triffid"]
-    return {'newhousehold': target_dict}
+    # this is sent back to client as invoke result
+    return {'newhousehold': target_dict} 
 
 
 def test_dict():
@@ -363,41 +364,18 @@ def test_dict():
     mydict['dog'] = ["violet"]
     mydict['chickens'] = ["bob", "ferdy", "rosemary"]
 
-    pool.save('household', mydict)
+    pool.save('household', mydict);
 
-    pool.invoke('household', test_dict_work)
-
-    recalled = pool.load('newhousehold')
-    print("New household->",recalled)
+    result = pool.invoke('household', test_dict_work)
+    print("New household->", result)
     
-
-def test_skimage_0():
-    """
-    Test load and save for NdArray handling in Scikit-Image processing
-    """
-    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
-    if sys.getrefcount(session) != 2:
-        raise ValueError("session ref count should be 2")
-    pool = session.create_pool("myPool")
-    if sys.getrefcount(pool) != 2:
-        raise ValueError("pool ref count should be 2")
-
-    # save image
-    from skimage import data, io, filters
-    image = data.coins()
-    pool.save('image0', image)
-
-    # recall and display image
-    recalled = pool.load('image0')
-    print(type(recalled))
-    io.imshow(recalled)
-    io.show()
-
 
 def sobel_filter(image):
     from skimage import data, io, filters
     edges = filters.sobel(image)
-    return {'image0-edges': edges}
+    ado.save('image0-edges', edges) # save image
+    # this is sent back to client as invoke result
+    return edges.shape
 
 def test_skimage_0():
     """
@@ -416,7 +394,8 @@ def test_skimage_0():
     pool.save('image0', image)
 
     # perform ADO invocation
-    pool.invoke('image0', sobel_filter)
+    shape = pool.invoke('image0', sobel_filter)
+    print("shape:{0}".format(shape))
 
     # recall and display image
     edges = pool.load('image0-edges')
@@ -424,8 +403,40 @@ def test_skimage_0():
     io.imshow(edges)
     io.show()
 
-    
 
+def blend_ado_function(target_image):
+    brick = ado.load('brick')
+    blended = target_image+(0.001*brick)
+    ado.save('blended', blended)
+    return blended.shape
+
+def test_skimage_1():
+    """
+    Push two images, perform ADO function to combine and return image
+    """
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
+    if sys.getrefcount(session) != 2:
+        raise ValueError("session ref count should be 2")
+    pool = session.create_pool("myPool2") #,int(1e8),100)
+    if sys.getrefcount(pool) != 2:
+        raise ValueError("pool ref count should be 2")
+
+    # save image
+    from skimage import data, io, filters
+
+    pool.save('camera', data.camera())
+    pool.save('brick', data.brick())
+
+    # perform ADO invocation
+    shape = pool.invoke('camera', blend_ado_function )
+    print("shape:{0}".format(shape))
+
+    blend = pool.load('blended')
+    
+    io.imshow(blend)
+    io.show()
+
+    
 def test_ref_cnt():
     """
     Test reference counting

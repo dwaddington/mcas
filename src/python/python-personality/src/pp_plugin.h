@@ -86,6 +86,38 @@ public:
   
   status_t shutdown() override;
 
+  /** 
+   * Write a Python object into the MCAS store wrapped with metadata
+   * 
+   * @param work_key Work key
+   * @param varname Key name
+   * @param object Object to save
+   * 
+   * @return Size of store in bytes
+   */
+  size_t write_to_store(const uint64_t work_key,
+                        const char *   varname,
+                        PyObject *     object);
+
+  /** 
+   * Create object from store memory
+   * 
+   * @param key Object name (key)
+   * @param key_len Length of name
+   * @param value Location of object data
+   * @param value_len Length of object data in bytes
+   * @param Global dictionary
+   * @param Local dictionary
+   * 
+   * @return 
+   */
+  PyObject * create_object_from_store_memory(const char * key,
+                                             const size_t key_len,
+                                             void * value,
+                                             const size_t value_len,
+                                             PyObject * global_dict,
+                                             PyObject * local_dict);
+  
 private:
 
   status_t execute_python(const uint64_t              work_key,
@@ -96,10 +128,6 @@ private:
                           const char *                code_string,
                           const char *                function_name,
                           response_buffer_vector_t&   response_buffers);
-
-  void write_to_store(const uint64_t work_key,
-                      const char *   varname,
-                      PyObject *     object);
 
   status_t unwrap_nparray_from_data_descriptor(const char * key,
                                                const size_t key_len,

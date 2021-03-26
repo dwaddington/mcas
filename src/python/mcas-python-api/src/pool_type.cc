@@ -474,7 +474,8 @@ static PyObject * pool_invoke_ado(Pool* self, PyObject *args, PyObject *kwds)
   if((response.size() > 0) &&
      (response[0].data_len() > 0) &&
      (response[0].data())) {
-    //    hexdump(response[0].data(),response[0].data_len());    
+
+    //hexdump(response[0].data(),response[0].data_len());    
     return PyByteArray_FromStringAndSize((const char *) response[0].data(), response[0].data_len());
   }
   else {
