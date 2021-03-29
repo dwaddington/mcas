@@ -406,7 +406,7 @@ def test_skimage_0():
 
 def blend_ado_function(target_image):
     brick = ado.load('brick')
-    blended = target_image+(0.001*brick)
+    blended = target_image+(0.5*brick)
     ado.save('blended', blended)
     return blended.shape
 
@@ -417,7 +417,7 @@ def test_skimage_1():
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
         raise ValueError("session ref count should be 2")
-    pool = session.create_pool("myPool2") #,int(1e8),100)
+    pool = session.create_pool("myPool2",int(1e9),100)
     if sys.getrefcount(pool) != 2:
         raise ValueError("pool ref count should be 2")
 
@@ -427,7 +427,7 @@ def test_skimage_1():
     pool.save('camera', data.camera())
     pool.save('brick', data.brick())
 
-    # perform ADO invocation
+    # # perform ADO invocation
     shape = pool.invoke('camera', blend_ado_function )
     print("shape:{0}".format(shape))
 
