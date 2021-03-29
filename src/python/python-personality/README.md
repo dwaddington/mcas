@@ -2,6 +2,8 @@
 
 **This feature is still in testing.**
 
+Tested with Python 3.6 and beyond.
+
 The Python Personality (PP) provides: i.) a client API to load and
 save Python objects from the MCAS store, ii.) support for Python execution
 in the ADO.  In the case of Numpy
@@ -17,9 +19,49 @@ only console.  Code for test is in api.py:
 SERVER_IP=<your server IP address> python3
 ```
 
-Type interactively:
+Then type interactively:
 
-```python
+```python3
 > import pymcas
 > pymcas.test_image_0()
+```
+
+
+## Example
+
+This example (from api.py) shows how to load and save python objects
+both from the client and from the ADO plugin.
+
+```python3
+def blend_ado_function(target_image):
+    brick = ado.load('brick')
+    blended = target_image+(0.5*brick) # merge target image with brick
+    ado.save('blended', blended)
+    return blended.shape    
+
+def test_skimage_1():
+    """
+    Push two images, perform ADO function to combine and return image
+    """
+    session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
+    if sys.getrefcount(session) != 2:
+        raise ValueError("session ref count should be 2")
+    pool = session.create_pool("myPool2",int(1e9),100)
+    if sys.getrefcount(pool) != 2:
+        raise ValueError("pool ref count should be 2")
+
+    # save image
+    from skimage import data, io, filters
+
+    pool.save('camera', data.camera())
+    pool.save('brick', data.brick())
+
+    # # perform ADO invocation
+    shape = pool.invoke('camera', blend_ado_function )
+    print("shape:{0}".format(shape))
+
+    blend = pool.load('blended')
+    
+    io.imshow(blend)
+    io.show()
 ```
