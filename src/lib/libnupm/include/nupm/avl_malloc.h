@@ -37,7 +37,7 @@
 #include <vector>
 #include <cstdlib> // exit
 
-#define DEBUG_AVL_ALLOCATOR
+//#define DEBUG_AVL_ALLOCATOR
 
 namespace core
 {
