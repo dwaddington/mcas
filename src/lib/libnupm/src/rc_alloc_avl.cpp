@@ -86,7 +86,7 @@ class Rca_AVL_internal : private common::log_source {
       return mr->paddr();
     }
     catch(...) {
-      PWRN("%s:%d region allocation out-of-space (requested %lu MiB)", __FILE__, __LINE__, REDUCE_MiB(size));
+      PWRN("%s:%d region allocation out-of-space (requested %lu MiB, alignment=%lu)", __FILE__, __LINE__, REDUCE_MiB(size), alignment);
       throw std::bad_alloc();
     }
     return nullptr;
@@ -140,8 +140,11 @@ void Rca_AVL::inject_allocation(void *ptr, size_t size, int numa_node)
 
 void *Rca_AVL::alloc(size_t size, int numa_node, size_t alignment)
 {
-  if (size == 0) throw std::invalid_argument("invalid size");
-  if (alignment == 0) alignment = 1;
+  if (size == 0)
+    throw std::invalid_argument("invalid size");
+
+  if (alignment == 0)
+    alignment = 1;
 
   if (numa_node > rca::max_numa_node)
     throw std::invalid_argument("numa node out of range");

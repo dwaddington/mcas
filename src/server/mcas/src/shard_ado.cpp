@@ -157,7 +157,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
     /* exchange memory mapping information */
     {
       nupm::region_descriptor regions;
-      auto                 rc = _i_kvstore->get_pool_regions(pool_id, regions);
+      auto rc = _i_kvstore->get_pool_regions(pool_id, regions);
 
       if (rc != S_OK) {
         PWRN("cannot get pool regions; unable to map to ADO");
@@ -166,10 +166,11 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
 
       std::size_t offset = 0;
       for (auto& r : regions.address_map()) {
-#if 0
-        /* No longer writable (and always rounded to a page boundary) */
-        r.iov_len = round_up_page(r.iov_len);
-#endif
+        // //#if 0 // why was this disabled?
+        // /* requested regions must be rounded up to page boundary for XPMEM */
+        // r.iov_len = round_up_page(r.iov_len);
+        // //#endif
+        PLOG("size(r)=%lu round_up_page(size(r))=%lu",::size(r),round_up_page(::size(r)));
         assert(::size(r) == round_up_page(::size(r)));
 
         // Don't think we need this - DW

@@ -317,8 +317,7 @@ public:
   void *allocate(size_t size, int numa_node, size_t alignment) {
     if (alignment > 0) {
       if (alignment > size || size % alignment)
-        throw std::invalid_argument(
-            "alignment should be integral of size and less than size");
+        throw std::invalid_argument("alignment should be integral of size and less than size");
     }
 
     if (UNLIKELY(numa_node < 0 || numa_node >= MAX_NUMA_ZONES))
@@ -345,10 +344,8 @@ public:
 
     /* debugging */
     if (debug_level() > 2) {
-      if (size <=
-          nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
-        assert(reinterpret_cast<addr_t>(p) % _mapper.rounded_up_object_size(size) ==
-               0); /* small objects should be size-aligned */
+      if (size <= nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
+        assert(reinterpret_cast<addr_t>(p) % _mapper.rounded_up_object_size(size) == 0); /* small objects should be size-aligned */
       }
     }
 
@@ -495,11 +492,15 @@ private:
     return nullptr;
   }
 
-  void *allocate_from_new_region(size_t object_size, size_t object_alignment,
+  void *allocate_from_new_region(size_t object_size,
+                                 size_t object_alignment,
                                  int numa_node) {
+    
     auto bucket = _mapper.bucket(object_size);
+    
     if (bucket >= NUM_BUCKETS)
       throw std::out_of_range("object size beyond available buckets");
+    
     auto region_size = _mapper.region_size(object_size);
     assert(region_size > 0);
 
@@ -507,27 +508,19 @@ private:
     auto region_object_size = _mapper.rounded_up_object_size(object_size);
 
     /* If the object is to be allocated for a slab, the allocation alignment here must
-     * be for the whole slab, not just the object. (But why?)
+     * be for the whole slab, not just the object. This is so that the reconsistution can happen.
      */
-    auto region_object_alignment =
-      _mapper.could_exist_in_region(object_size)
-      ? region_size
-      : object_alignment
-      ;
-    auto region_base        = _arena_allocator.alloc(region_size, numa_node, region_object_alignment);
+    auto region_object_alignment = _mapper.could_exist_in_region(object_size) ? region_size : object_alignment;
+
+    auto region_base = _arena_allocator.alloc(region_size, numa_node, region_object_alignment);
 
     assert(region_base);
-    assert(region_object_alignment == 0 || check_aligned(region_base, region_object_alignment));
 
-    auto new_region =
-        std::make_unique<Region>(region_base, region_size, region_object_size);
+    auto new_region = std::make_unique<Region>(region_base, region_size, region_object_size);
     void *rp = new_region->allocate();
 
     assert(rp);
-    // PLOG("allocate from new (object_size=%lu, region_object_size=%lu,
-    // allocation=%p)",
-    //      object_size, region_object_size, rp);
-    /* add region to bucket */
+
     auto &node_buckets = _buckets[numa_node];
     node_buckets[bucket].push_front(std::move(new_region));
 

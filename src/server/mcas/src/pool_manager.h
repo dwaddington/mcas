@@ -35,7 +35,7 @@ namespace mcas
 /* attributes of metadata pools */
 static constexpr const char * METADATA_POOL_PREFIX = "__metadata_";
 static constexpr size_t METADATA_POOL_PREFIX_LEN = 10;
-static constexpr size_t METADATA_POOL_INITIAL_SIZE = 8000;
+static constexpr size_t METADATA_POOL_INITIAL_SIZE = 4096*2;
 static constexpr size_t METADATA_POOL_EXPECTED_OBJECTS = 100;
 #endif
 
@@ -168,7 +168,7 @@ public:
    * 
    * @param kvstore Handle to kvstore component interface
    * @param pool_name Pool name
-   * @param pool_size Size of pool in bytes
+   * @param pool_size Size of pool in bytes (will be rounded up to page alignment)
    * @param expected_object_count Expected object count (intial hash table size)
    * @param flags Creation flags
    * 
@@ -203,10 +203,12 @@ public:
 #endif
     
     IKVStore::pool_t pool = 0;
-
+    
+    size_t modified_pool_size = round_up_page(pool_size);
+    
     /* call backend to create pool */
     pool = kvstore->create_pool(pool_name,
-                                pool_size,
+                                modified_pool_size,
                                 flags,
                                 expected_object_count);
 
@@ -225,7 +227,7 @@ public:
 #ifdef FEATURE_POOL_ACL                           
                            metadata_pool,
 #endif
-                           expected_object_count, pool_size, flags };
+                           expected_object_count, modified_pool_size, flags };
 
     CPLOG(1, "(+) registered pool (%p) ref:%u pm=%p",
           to_ptr(pool), _open_pools[pool],
