@@ -446,6 +446,7 @@ public:
           
           right_remaining->_prev = aligned_region;
           right_remaining->_next = next_tmp;
+          next_tmp->_prev = aligned_region;
           right_remaining->_size = right_remaining_size;
           right_remaining->_free = true;
           _tree->insert_node(right_remaining);
