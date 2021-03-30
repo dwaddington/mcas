@@ -50,7 +50,7 @@ fi
 
 if has_fsdax
 then
-    rm -f /mnt/pmem1/*
+    rm -Rf /mnt/pmem1/*
     DAXTYPE=fsdax USE_ODP=1 run_hstore true $1
 fi
 
