@@ -706,12 +706,12 @@ public:
                         "nic_device) not implemented");
   }
 
-  IMCAS* mcas_create(const unsigned     debug_level,
-                     const unsigned     patience,
-                     const std::string& owner,
-                     const std::string& dest_addr_with_port,
-                     const std::string& nic_device,
-                     const std::string  other = "")
+  IMCAS* mcas_create(const unsigned    debug_level,
+                     const unsigned    patience,
+                     const string_view owner,
+                     const string_view dest_addr_with_port,
+                     const string_view nic_device,
+                     const string_view other = string_view())
   {
     return mcas_create_nsd(debug_level, patience, owner, nic_device, string_view(), dest_addr_with_port, other);
   }
