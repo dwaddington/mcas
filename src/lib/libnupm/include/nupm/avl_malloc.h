@@ -457,13 +457,14 @@ public:
       }
       else {
         
-        /* OK, maybe there still is space, but alignment isn't there.  Now we need
-           to three-way split a large enough block */
+        /* OK, maybe there still is space, but alignment isn't there.  Let's
+           look for a block without alignment then perform a three-way split a large enough block */
         assert(alignment > 0);
 
-        Memory_region* region = root->find_free_region(root, size, 8);
+        Memory_region* region = root->find_free_region(root, size);
         if (region == nullptr)
-          throw General_exception("AVL_range_allocator: failed to allocate (size=%ld alignment=%lu free=%lu)",
+          throw General_exception("AVL_range_allocator: failed to find_free_region unaligned"
+                                  " (size=%ld alignment=%lu free=%lu)",
                                   size, alignment, get_free());
 
         assert(region->_free == true);
