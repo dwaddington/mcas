@@ -436,7 +436,7 @@ public:
           size_t right_remaining_size = aligned_region->_size - size;
           Memory_region* right_remaining = new (_slab.alloc()) Memory_region(aligned_region->_addr + size, right_remaining_size);
 
-          auto next_tmp = aligned_region->_next;
+          auto r_adjacent = aligned_region->_next;
 
           // aligned_region->_addr remains same
           aligned_region->_size = size;
@@ -445,8 +445,8 @@ public:
           // aligned_region->_prev remains same
           
           right_remaining->_prev = aligned_region;
-          right_remaining->_next = next_tmp;
-          next_tmp->_prev = aligned_region;
+          right_remaining->_next = r_adjacent;
+          r_adjacent->_prev = right_remaining;
           right_remaining->_size = right_remaining_size;
           right_remaining->_free = true;
           _tree->insert_node(right_remaining);
