@@ -214,9 +214,16 @@ namespace
     void * src  = nullptr;
     void * dst  = nullptr;
     size_t size = KB(64);
+
+    PLOG("invokeAdoCreateOnDemand: entered");
     status_t rc = ap_->cb_allocate_pool_memory(size, 4096 /* alignment */, src);
-    rc |= ap_->cb_allocate_pool_memory(size, 4096 /* alignment */, dst);
-    ASSERT_TRUE(rc == S_OK, "InvokeAdoCreateOnDemand: failed");
+    ASSERT_TRUE(rc == S_OK, "first cb_allocate_pool_memory (64K) failed");
+    PLOG("invokeAdoCreateOnDemand: first cb_allocate_pool_memory OK");
+    
+    rc = ap_->cb_allocate_pool_memory(size, 4096 /* alignment */, dst);
+    ASSERT_TRUE(rc == S_OK, "second cb_allocate_pool_memory (64K) failed");
+    PLOG("invokeAdoCreateOnDemand: first cb_allocate_pool_memory OK");
+
     std::memset(src, 0, size);
     std::memset(dst, 0xA, size);
     auto start = rdtsc();
