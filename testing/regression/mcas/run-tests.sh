@@ -24,10 +24,13 @@ run_hstore() {
   $DIR/mcas-hstore-cc-get_direct-0.sh $1
   sleep $DELAY
   $DIR/mcas-hstore-cc-put_direct-0.sh $1
+
   if $ado_prereq
   then sleep $DELAY
     $DIR/mcas-hstore-ado-0.sh $1
   fi
+  sleep $DELAY
+  $DIR/mcas-hstore-ado-0.sh $1
 }
 
 $DIR/mcas-mapstore-basic-0.sh $1
@@ -46,6 +49,8 @@ then DAXTYPE=devdax run_hstore has_module_mcasmod $1
 fi
 
 if has_fsdax
-then DAXTYPE=fsdax USE_ODP=1 run_hstore true $1
+then
+    rm -Rf /mnt/pmem1/*
+    DAXTYPE=fsdax USE_ODP=1 run_hstore true $1
 fi
 
