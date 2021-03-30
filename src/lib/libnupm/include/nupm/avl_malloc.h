@@ -393,7 +393,8 @@ public:
     _tree->apply_topdown([=](void* p, size_t) {
                            Memory_region* mr = static_cast<Memory_region*>(p);
                            if ( option_DEBUG )  {
-                             PLOG("%s: region %p, 0x%zx, %s", __func__, mr->paddr(), mr->size(), mr->is_free() ? "free" : "used");
+                             PLOG("%s: region %p, 0x%zx, %s", __func__, mr->paddr(),
+                                  mr->size(), mr->is_free() ? "free" : "used");
                            }
                            _slab.free(mr);
                          });
@@ -432,26 +433,22 @@ public:
         }
         else {
           /* alignment is OK but its not an exact fit, so we'll create a left over region  */          
-          void* p = _slab.alloc();
-          if (!p)
-            throw General_exception("AVL_range_allocator: failed to allocate %ld units", size);
+          size_t right_remaining_size = aligned_region->_size - size;
+          Memory_region* right_remaining = new (_slab.alloc()) Memory_region(aligned_region->_addr + size, right_remaining_size);
 
-          size_t left_remaining_size = aligned_region->_size - size;
-          Memory_region* left_remaining = new (p) Memory_region(aligned_region->_addr, left_remaining_size);
+          auto next_tmp = aligned_region->_next;
 
-          auto prev_tmp = aligned_region->_prev;
-
-          aligned_region->_addr = aligned_region->_addr + left_remaining_size;
+          // aligned_region->_addr remains same
           aligned_region->_size = size;
           aligned_region->_free = false;
-          // aligned_region->_next remains same
-          aligned_region->_prev = left_remaining;
+          aligned_region->_next = right_remaining;
+          // aligned_region->_prev remains same
           
-          left_remaining->_prev = prev_tmp;
-          left_remaining->_next = aligned_region;
-          left_remaining->_size = left_remaining_size;
-          left_remaining->_free = true;
-          _tree->insert_node(left_remaining);
+          right_remaining->_prev = aligned_region;
+          right_remaining->_next = next_tmp;
+          right_remaining->_size = right_remaining_size;
+          right_remaining->_free = true;
+          _tree->insert_node(right_remaining);
         }
       }
       else {

@@ -92,9 +92,8 @@ public:
         _reclaim_when_empty(false),
         _use_count(0)
   {
-    CPLOG(1,
-        "new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
-        region_ptr, region_size, object_size, _capacity);
+    CPLOG(1,"new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
+          region_ptr, region_size, object_size, _capacity);
 
     if (region_size % object_size)
       throw std::invalid_argument(

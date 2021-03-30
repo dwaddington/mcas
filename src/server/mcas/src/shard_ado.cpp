@@ -166,11 +166,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
 
       std::size_t offset = 0;
       for (auto& r : regions.address_map()) {
-        // //#if 0 // why was this disabled?
-        // /* requested regions must be rounded up to page boundary for XPMEM */
-        // r.iov_len = round_up_page(r.iov_len);
-        // //#endif
-        PLOG("size(r)=%lu round_up_page(size(r))=%lu",::size(r),round_up_page(::size(r)));
+
         assert(::size(r) == round_up_page(::size(r)));
 
         // Don't think we need this - DW
