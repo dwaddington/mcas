@@ -432,7 +432,7 @@ public:
           aligned_region->_free = false;
         }
         else {
-          /* alignment is OK but its not an exact fit, so we'll create a leftover region on the right  */          
+          /* alignment is OK but its not an exact fit, so we'll create a remaining region on the right  */          
           size_t right_remaining_size = aligned_region->_size - size;
           Memory_region* right_remaining = new (_slab.alloc()) Memory_region(aligned_region->_addr + size, right_remaining_size);
 
@@ -446,11 +446,14 @@ public:
           
           right_remaining->_prev = aligned_region;
           right_remaining->_next = r_adjacent;
-          r_adjacent->_prev = right_remaining;
+          if(r_adjacent)
+            r_adjacent->_prev = right_remaining;
           right_remaining->_size = right_remaining_size;
           right_remaining->_free = true;
           _tree->insert_node(right_remaining);
         }
+
+        return aligned_region;
       }
       else {
         
