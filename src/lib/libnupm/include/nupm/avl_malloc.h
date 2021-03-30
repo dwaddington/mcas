@@ -461,10 +461,10 @@ public:
            to three-way split a large enough block */
         assert(alignment > 0);
 
-        Memory_region* region = root->find_free_region(root, size, 8);
+        Memory_region* region = root->find_free_region(root, size);
         if (region == nullptr)
-          throw General_exception("AVL_range_allocator: failed to allocate (size=%ld alignment=%lu free=%lu)",
-                                  size, alignment, get_free());
+          throw General_exception("AVL_range_allocator: failed to find free unaligned region (size=%ld free=%lu)",
+                                  size, get_free());
 
         assert(region->_free == true);
         if (option_DEBUG) {
