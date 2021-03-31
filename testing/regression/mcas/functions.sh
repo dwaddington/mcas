@@ -134,7 +134,7 @@ clamp_cpu () {
 
 # scale the first input by percentages represented by subsequent inputs
 scale() {
-  typeset -1 sf=900 # (2*3*5)^2, an attempt to lessen rounding effects
+  typeset -i sf=900 # (2*3*5)^2, an attempt to lessen rounding effects
   base=$(($1*sf))
   shift
   for i in $@

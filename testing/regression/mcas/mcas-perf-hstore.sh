@@ -22,7 +22,8 @@ sleep 3
 
 # launch client
 CLIENT_LOG="test$TESTID-client.log"
-ELEMENT_COUNT=$(scale_by_transport ELEMENT_COUNT)
+ELEMENT_COUNT=$(scale_by_transport $ELEMENT_COUNT)
+ELEMENT_COUNT=$(scale $ELEMENT_COUNT $SCALE)
 
 [ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
                         --test $PERFTEST --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting \
@@ -42,5 +43,5 @@ wait $SERVER_PID; SERVER_RC=$?
 
 # check result
 
-if [ "$1" != "release" ]; then GOAL=$((GOAL/4)); fi
-pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $GOAL
+REVISED_GOAL=$(scale $GOAL $SCALE)
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $REVISED_GOAL

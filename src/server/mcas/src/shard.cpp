@@ -1749,8 +1749,8 @@ auto Shard::offset_to_sg_list(range<std::uint64_t> t,
   CPLOG(2, "initial begin_off 0x%" PRIx64 " end_off 0x%" PRIx64 " mr_low 0x%" PRIx64 " mr_high 0x%" PRIx64, begin_off,
         end_off, mr_low, mr_high);
 
-  /* The range from t_begin to t_end may be contained in discontigous memory.
-   * Build a scatter-gather list.
+  /* the range from t_begin to t_end may be contained in discontigous memory.
+   * build a scatter-gather list.
    */
   std::vector<protocol::Message_IO_response::locate_element> sg_list;
 
@@ -1811,7 +1811,11 @@ void Shard::io_response_locate(Connection_handler *handler, const protocol::Mess
     std::uint64_t key = 0;
     try
       {
-        memory_registered<Connection_base> mr(debug_level(), handler, reinterpret_cast<void *>(sgr.mr_low), sgr.mr_high - sgr.mr_low, 0,
+        memory_registered<Connection_base> mr(debug_level(),
+                                              handler,
+                                              reinterpret_cast<void *>(sgr.mr_low),
+                                              sgr.mr_high - sgr.mr_low,
+                                              0,
                                               0);
         key = mr.key();
         /* register deregister task for space */

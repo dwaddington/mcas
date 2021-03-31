@@ -102,8 +102,7 @@ public:
 	}
 
 	/* Rca_LB expectation (non-standard) */
-	auto allocate(
-		size_type s, size_type alignment) -> pointer
+	auto allocate(size_type s, size_type alignment) -> pointer
 	{
 		int numa_node = 0;
 		auto ptr = this->pmr()->alloc(s * sizeof(T), numa_node, alignment);
