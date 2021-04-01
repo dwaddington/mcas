@@ -33,11 +33,11 @@ private:
 public:
 	arena_none(const common::log_source &ls, path dir_) : arena(ls), _dir{dir_} {}
 	region_descriptor region_get(
-		const string_view & // id
+		const string_view // id
 	) override
 	{ return region_descriptor{}; }
 	region_descriptor region_create(
-		const string_view & // id
+		const string_view // id
 		, gsl::not_null<registry_memory_mapped *> // mh
 		, std::size_t // size
 	) override
@@ -47,12 +47,13 @@ public:
       , std::size_t // size
     ) override { }
 	void region_erase(
-		const string_view & // id
+		const string_view // id
 		, gsl::not_null<registry_memory_mapped *> // mh
 	) override {};
 	std::size_t get_max_available() override { return 0; }
 	bool is_file_backed() const override { return false; }
 	void debug_dump() const override {}
+	std::string describe() const override { return "<none>"; }
 };
 
 #endif

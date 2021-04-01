@@ -326,10 +326,11 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 		{
 			throw std::runtime_error("multiple instances of path " + p.string() + " in configuration");
 		}
-		CPLOG(1, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
+		CPLOG(0, "%s: region %s at %p", __func__, itb.first->first.c_str(), ::base(itb.first->second._or.range()[0]));
 		return
 			std::make_unique<arena_dev>(
 				static_cast<log_source &>(*this)
+				, id
 				, recover_metadata(
 					itb.first->second._or.range()[0],
 					force_reset

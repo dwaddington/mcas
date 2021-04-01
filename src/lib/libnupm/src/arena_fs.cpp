@@ -142,7 +142,7 @@ void arena_fs::debug_dump() const
 /* used only inside region_create */
 void *arena_fs::region_create_inner(
 	common::fd_locked &&fd
-	, const string_view &id_
+	, const string_view id_
 	, gsl::not_null<registry_memory_mapped *> const mh_
 	, const std::vector<byte_span> &mapping_
 )
@@ -157,13 +157,13 @@ catch ( const std::runtime_error &e )
 	return nullptr;
 }
 
-auto arena_fs::region_get(const string_view &id_) -> region_descriptor
+auto arena_fs::region_get(const string_view id_) -> region_descriptor
 {
   return region_descriptor(id_, path_data(id_).string(), get_mapping(path_map(id_)).first);
 }
 
 auto arena_fs::region_create(
-	const string_view &id_
+	const string_view id_
 	, gsl::not_null<registry_memory_mapped *> const mh_
 	, std::size_t size
 ) -> region_descriptor
@@ -333,7 +333,7 @@ void arena_fs::region_resize(
 	}
 }
 
-void arena_fs::region_erase(const string_view &id_, gsl::not_null<registry_memory_mapped *> mh_)
+void arena_fs::region_erase(const string_view id_, gsl::not_null<registry_memory_mapped *> mh_)
 {
 	auto path_data_local = path_data(id_);
 	CPLOG(1, "%s remove %s", __func__, path_data_local.c_str());
