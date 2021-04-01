@@ -11,6 +11,7 @@ TESTID="mcas-$STORE-$PERFTEST-$KEY_LENGTH-$VALUE_LENGTH-$DAXTYPE"
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
+PERF_OPTS=${PERF_OPTS:-"--skip_json_reporting"}
 
 CONFIG_STR="$("./dist/testing/hstore-0.py" "$STORE" "$DAXTYPE" "$NODE_IP")"
 # launch MCAS server
@@ -26,10 +27,10 @@ ELEMENT_COUNT=$(scale_by_transport $ELEMENT_COUNT)
 ELEMENT_COUNT=$(scale $ELEMENT_COUNT $SCALE)
 
 [ 0 -lt $DEBUG ] && echo ./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
-                        --test $PERFTEST --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting \
+                        --test $PERFTEST --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE ${PERF_OPTS} \
                         --key_length $KEY_LENGTH --value_length $VALUE_LENGTH --debug_level $DEBUG
 ./dist/bin/kvstore-perf --cores "$(clamp_cpu 14)" --src_addr $NODE_IP --server $NODE_IP \
-                        --test $PERFTEST --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE --skip_json_reporting \
+                        --test $PERFTEST --component mcas --elements $ELEMENT_COUNT --size $STORE_SIZE ${PERF_OPTS} \
                         --key_length $KEY_LENGTH --value_length $VALUE_LENGTH --debug_level $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 
@@ -43,5 +44,5 @@ wait $SERVER_PID; SERVER_RC=$?
 
 # check result
 
-REVISED_GOAL=$(scale $GOAL $SCALE)
-pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $REVISED_GOAL
+GOAL=$(scale $GOAL $SCALE)
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $GOAL
