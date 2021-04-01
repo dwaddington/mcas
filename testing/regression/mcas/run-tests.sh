@@ -52,10 +52,19 @@ run_hstore() {
   fi
 }
 
+# default: goal is 25% speed
+BUILD_SCALE=25
+# if parameter say release or the directory name includes release, expect full speed
+if [[ "$1" == release || "$DIR" == */release/* ]]
+then :
+  BUILD_SCALE=100
+fi
+
 prefix
-$DIR/mcas-mapstore-put-0.sh $1
+SCALE="$BUILD_SCALE" $DIR/mcas-mapstore-put-0.sh $1
 prefix
-$DIR/mcas-mapstore-get-0.sh $1
+SCALE="$BUILD_SCALE" $DIR/mcas-mapstore-get-0.sh $1
+
 if has_module_xpmem
 then :
   prefix
@@ -70,13 +79,6 @@ then :
   FSDAX_SCALE=100
 fi
 
-# default: goal is 25% speed
-BUILD_SCALE=25
-# if parameter say release or the directory name includes release, expect full speed
-if [[ "$1" == release || "$DIR" == */release/* ]]
-then :
-  BUILD_SCALE=100
-fi
 
 if has_devdax
 then :
