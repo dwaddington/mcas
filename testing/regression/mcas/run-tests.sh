@@ -73,10 +73,18 @@ fi
 
 # default assumption: $FSDAX is not mounted. Expect disk performance (15%)
 FSDAX_SCALE=15
+
 if findmnt "$FSDAX_DIR" > /dev/null
 then :
   # found a mount. Probably pmem
-  FSDAX_SCALE=100
+  # default: goal is 25% speed
+  FSDAX_SCALE=25
+  
+  # if parameter say release or the directory name includes release, expect full speed
+  if [[ "$1" == release || "$DIR" == */release/* ]]
+  then :
+       FSDAX_SCALE=100
+  fi
 fi
 
 
