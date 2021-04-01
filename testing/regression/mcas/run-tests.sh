@@ -62,23 +62,24 @@ then :
   $DIR/mcas-mapstore-ado-0.sh $1
 fi
 
-# ribbit1 uses disk for fsdax
-# Cut the performance goal to 15%
-FSDAX_SCALE=100
-if [ "$(hostname)" = ribbit1 ]
+# default assumption: $FSDAX is not mounted. Expect disk performance (15%)
+FSDAX_SCALE=15
+if findmnt "$FSDAX_DIR" > /dev/null
 then :
-  FSDAX_SCALE=15
+  # found a mount. Probably pmem
+  FSDAX_SCALE=100
 fi
 
-BUILD_SCALE=100
-if [ "$1" != release ]
+# default: goal is 25% speed
+BUILD_SCALE=25
+# if parameter say release or the directory name includes release, expect full speed
+if [[ "$1" == release || "$DIR" == */release/* ]]
 then :
-  BUILD_SCALE=25
+  BUILD_SCALE=100
 fi
 
 if has_devdax
 then :
-  echo DAXTYPE=devdax SCALE="$BUILD_SCALE" USE_ODP=0 run_hstore has_module_mcasmod $1
   DAXTYPE=devdax SCALE="$BUILD_SCALE" USE_ODP=0 run_hstore has_module_mcasmod $1
   # Conflict test, as coded, works only for devdax, not fsdax
   # Conflict in fsdax occurs when data files exist, not when only arenas exist
@@ -90,15 +91,9 @@ if has_fsdax
 then :
   if test -d "$FSDAX_DIR"
   then :
-    if df "$FSDAX_DIR" > /dev/null
-    then :
-      rm -Rf "$FSDAX_DIR/*"
-      echo DAXTYPE=fsdax SCALE="$BUILD_SCALE $FSDAX_SCALE 100" USE_ODP=1 run_hstore true $1
-      # scale goal by buid expectation (relaase vs debug),host expectation (ribbit1 vs real memory), and fsdax expectation (currently 100%)
-      DAXTYPE=fsdax SCALE="$BUILD_SCALE $FSDAX_SCALE 100" USE_ODP=1 run_hstore true $1
-    else :
-      echo "No filesystem mounted on $FSDAX_DIR. Skipping fsdax"
-    fi
+    rm -Rf "$FSDAX_DIR/*"
+    # scale goal by build expectation (relaase vs debug), backing file expectation (disk vs pmem), and fsdax expectation (currently 100%)
+    DAXTYPE=fsdax SCALE="$BUILD_SCALE $FSDAX_SCALE 100" USE_ODP=1 run_hstore true $1
   else :
     echo "$FSDAX_DIR not present. Skipping fsdax"
   fi
