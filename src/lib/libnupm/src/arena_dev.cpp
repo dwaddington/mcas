@@ -55,8 +55,6 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
   CPLOG(2, "%s::%s: rounding up to %" PRIu32 " grains (%" PRIu64 " MiB)", _cname, __func__,
        size_in_grains, REDUCE_MiB((1UL << DM_REGION_LOG_GRAIN_SIZE)*size_in_grains));
 
-  try
-  {
   return
     region_descriptor(
       region_descriptor::address_map_t(
@@ -67,17 +65,6 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
           )
       )
     ); /* allocates n grains */
-  }
-  catch ( const General_exception &e )
-  {
-    PLOG("%s: create %p path %s failed: %s", __func__, id_.begin(), _path.data(), e.cause());
-    return region_descriptor();
-  }
-  catch ( const std::exception &e )
-  {
-    PLOG("%s: create %p path %s failed: %s", __func__, id_.begin(), _path.data(), e.what());
-    return region_descriptor();
-  }
 }
 
 void arena_dev::region_erase(const string_view id_, gsl::not_null<registry_memory_mapped *>)

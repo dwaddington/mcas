@@ -486,16 +486,22 @@ auto dax_manager::create_region(
   guard_t           g(_reentrant_lock);
   auto arena = lookup_arena(arena_id_);
   CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name_.begin(), size_, arena_id_);
-  auto r = arena->region_create(name_, this, size_);
-  if ( r.address_map().empty() )
+  try
   {
-    CPLOG(0, "%s: %.*s size req 0x%zx create failed", __func__, int(name_.size()), name_.begin(), size_);
+    auto r = arena->region_create(name_, this, size_);
+    CPLOG(0, "%s: path %s id  %.*s size req 0x%zx created at %p:%zx", __func__, arena->describe().data(), int(name_.size()), name_.begin(),  size_, ::base(r.address_map()[0]), ::size(r.address_map()[0]));
+    return r;
   }
-  else
+  catch ( const General_exception &e )
   {
-    CPLOG(1, "%s: %.*s size req 0x%zx created at %p:%zx", __func__, int(name_.size()), name_.begin(), size_, ::base(r.address_map()[0]), ::size(r.address_map()[0]));
+    PLOG("%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
+    return region_descriptor();
   }
-  return r;
+  catch ( const std::exception &e )
+  {
+    PLOG("%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
+    return region_descriptor();
+  }
 }
 
 auto dax_manager::resize_region(

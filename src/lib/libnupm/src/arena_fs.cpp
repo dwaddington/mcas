@@ -174,78 +174,70 @@ auto arena_fs::region_create(
 
 	fs::create_directories(path_data(id_).remove_filename());
 
-	try
+	common::fd_locked fd(::open(path_data(id_).c_str(), O_CREAT|O_EXCL|O_RDWR, 0666));
+
+	if ( fd < 0 )
 	{
-		common::fd_locked fd(::open(path_data(id_).c_str(), O_CREAT|O_EXCL|O_RDWR, 0666));
-
-		if ( fd < 0 )
-		{
-			auto e = errno;
-			PLOG("%s %i = open %s failed: %s", __func__, fd.fd(), path_data(id_).c_str(), ::strerror(e));
-			return region_descriptor();
-		}
-		CPLOG(1, "%s %i = open %s", __func__, fd.fd(), path_data(id_).c_str());
-
-		auto path_data_local = path_data(id_);
-		auto path_map_local = path_map(id_);
-
-		/* file is created and opened */
-		bool commit = false;
-
-		BOOST_SCOPE_EXIT(&commit, &path_data_local) {
-			if ( ! commit ) { ::unlink(path_data_local.c_str()); }
-		} BOOST_SCOPE_EXIT_END
-
-		/* Every region segment needs a unique address range. locate_free_address_range provides one.
-		 */
-
-		size = round_up_t(size, 1U<<21U);
-		auto base_addr = mh_->locate_free_address_range(size);
-
-		/* Extend the file to the specified size */
-		auto e = ::posix_fallocate(fd.fd(), 0, ::off_t(size));
-		if ( e != 0 )
-		{
-			PLOG("%s::%s posix_fallocate: %zu: %s", _cname, __func__, size, strerror(e));
-			return region_descriptor();
-		}
-		CPLOG(1, "%s posix_fallocate %i to %zu", __func__, fd.fd(), size);
-
-		{
-			std::ofstream f(path_map_local.c_str(), std::ofstream::trunc);
-			CPLOG(1, "%s: write %s", __func__, path_map_local.c_str());
-			f << std::showbase << std::hex << base_addr << " " << size << std::endl;
-		}
-
-		path map_path_local = path_map(id_);
-
-		BOOST_SCOPE_EXIT(&commit, &map_path_local) {
-			if ( ! commit )
-			{
-				std::error_code ec;
-				fs::remove(map_path_local, ec);
-			}
-		} BOOST_SCOPE_EXIT_END;
-
-		using namespace nupm;
-
-		auto v = region_create_inner(std::move(fd), id_, mh_, std::vector<byte_span>({common::make_byte_span(base_addr, size)}));
-		if ( v )
-		{
-			commit = true;
-		}
-		return
-			region_descriptor(
-				id_
-				, path_data_local.string()
-				, region_descriptor::address_map_t(1, common::make_byte_span(v, size))
-			);
-	}
-	catch (const std::exception & e)
-	{
-		PLOG("%s: create %p path %s failed: %s", __func__, id_.begin(), path_data(id_).c_str(), e.what());
+		auto e = errno;
+		PLOG("%s %i = open %s failed: %s", __func__, fd.fd(), path_data(id_).c_str(), ::strerror(e));
 		return region_descriptor();
 	}
+	CPLOG(1, "%s %i = open %s", __func__, fd.fd(), path_data(id_).c_str());
+
+	auto path_data_local = path_data(id_);
+	auto path_map_local = path_map(id_);
+
+	/* file is created and opened */
+	bool commit = false;
+
+	BOOST_SCOPE_EXIT(&commit, &path_data_local) {
+		if ( ! commit ) { ::unlink(path_data_local.c_str()); }
+	} BOOST_SCOPE_EXIT_END
+
+	/* Every region segment needs a unique address range. locate_free_address_range provides one.
+	 */
+
+	size = round_up_t(size, 1U<<21U);
+	auto base_addr = mh_->locate_free_address_range(size);
+
+	/* Extend the file to the specified size */
+	auto e = ::posix_fallocate(fd.fd(), 0, ::off_t(size));
+	if ( e != 0 )
+	{
+		PLOG("%s::%s posix_fallocate: %zu: %s", _cname, __func__, size, strerror(e));
+		return region_descriptor();
+	}
+	CPLOG(1, "%s posix_fallocate %i to %zu", __func__, fd.fd(), size);
+
+	{
+		std::ofstream f(path_map_local.c_str(), std::ofstream::trunc);
+		CPLOG(1, "%s: write %s", __func__, path_map_local.c_str());
+		f << std::showbase << std::hex << base_addr << " " << size << std::endl;
+	}
+
+	path map_path_local = path_map(id_);
+
+	BOOST_SCOPE_EXIT(&commit, &map_path_local) {
+		if ( ! commit )
+		{
+			std::error_code ec;
+			fs::remove(map_path_local, ec);
+		}
+	} BOOST_SCOPE_EXIT_END;
+
+	using namespace nupm;
+
+	auto v = region_create_inner(std::move(fd), id_, mh_, std::vector<byte_span>({common::make_byte_span(base_addr, size)}));
+	if ( v )
+	{
+		commit = true;
+	}
+	return
+		region_descriptor(
+			id_
+			, path_data_local.string()
+			, region_descriptor::address_map_t(1, common::make_byte_span(v, size))
+		);
 }
 
 void arena_fs::region_resize(
