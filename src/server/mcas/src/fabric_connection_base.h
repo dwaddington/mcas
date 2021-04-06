@@ -63,7 +63,7 @@ class Fabric_connection_base : protected common::log_source {
   using memory_region_t = component::IFabric_memory_region *;
 
  protected:
-  using buffer_t = Buffer_manager<component::IFabric_server>::buffer_internal;
+  using buffer_t = Buffer_manager<component::IFabric_memory_control>::buffer_internal;
   using pool_t   = component::IKVStore::pool_t;
 
   enum class action_type {
@@ -88,8 +88,26 @@ class Fabric_connection_base : protected common::log_source {
   };
 
  private:
+  std::unique_ptr<component::IFabric_endpoint_unconnected_server> _preconnection;
+  Buffer_manager<component::IFabric_memory_control> _bm;
+
+  /* xx_buffer_outstanding is the signal for completion,
+     xx_buffer is the buffer pointer that needs to be freed (and set to null)
+  */
+protected:
+  unsigned              _recv_buffer_posted_count;
+private:
+  unsigned              _send_buffer_posted_count;
+
+protected:
+  /* values for two-phase get
+   */
+  unsigned _send_value_posted_count;
+private:
+
+  std::list<buffer_t *> _completed_recv_buffers;
+
   open_connection _oc;
-  Buffer_manager<component::IFabric_server> _bm;
  protected:
   size_t                             _max_message_size;
 
@@ -97,17 +115,6 @@ class Fabric_connection_base : protected common::log_source {
    * Drained by derived class check_network_completions
    */
   std::queue<action_t> _deferred_unlock;
-
-  /* xx_buffer_outstanding is the signal for completion,
-     xx_buffer is the buffer pointer that needs to be freed (and set to null)
-  */
-  unsigned              _recv_buffer_posted_count;
-  std::list<buffer_t *> _completed_recv_buffers;
-  unsigned              _send_buffer_posted_count;
-
-  /* values for two-phase get
-   */
-  unsigned _send_value_posted_count;
 
   /**
    * Ctor
@@ -118,7 +125,7 @@ class Fabric_connection_base : protected common::log_source {
   explicit Fabric_connection_base( //
     unsigned                           debug_level_,
     gsl::not_null<component::IFabric_server_factory *>factory,
-    gsl::not_null<component::IFabric_server *>        fabric_connection);
+    std::unique_ptr<component::IFabric_endpoint_unconnected_server> && preconnection);
 
   Fabric_connection_base(const Fabric_connection_base &) = delete;
   Fabric_connection_base &operator=(const Fabric_connection_base &) = delete;
@@ -190,7 +197,7 @@ class Fabric_connection_base : protected common::log_source {
 
   void post_recv_buffer(buffer_t *buffer)
   {
-    transport()->post_recv(buffer->iov, buffer->iov + 1, buffer->desc, buffer);
+    _preconnection->post_recv(buffer->iov, buffer->iov + 1, buffer->desc, buffer);
     ++_recv_buffer_posted_count;
     posted_count_log();
     CPLOG(2, "Posted recv (%p) (complete %zu)", common::p_fmt(buffer), _completed_recv_buffers.size());
@@ -286,7 +293,7 @@ class Fabric_connection_base : protected common::log_source {
 
   inline void free_buffer(buffer_t *buffer) { _bm.free(buffer); }
 
-  inline size_t IO_buffer_size() const { return Buffer_manager<component::IFabric_server>::BUFFER_LEN; }
+  inline size_t IO_buffer_size() const { return Buffer_manager<component::IFabric_memory_control>::BUFFER_LEN; }
 
   gsl::not_null<component::IFabric_server *> transport() const { return _oc.transport(); }
 

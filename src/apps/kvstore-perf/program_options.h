@@ -28,6 +28,7 @@ class ProgramOptions {
   unsigned    get_attr_pct;
   unsigned    read_pct;
   unsigned    insert_erase_pct;
+  std::string profile_file_main;
   /* finalized later */
   std::string                                            devices;
   unsigned                                               time_secs;

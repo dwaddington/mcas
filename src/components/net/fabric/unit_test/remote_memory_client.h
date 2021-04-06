@@ -23,8 +23,9 @@
 namespace component
 {
   class IFabric;
+  class IFabric_endpoint_unconnected_client;
   class IFabric_client;
-  class IFabric_communicator;
+  class IFabric_endpoint_comm;
 }
 
 struct registered_memory;
@@ -36,6 +37,7 @@ private:
   static void check_complete_static(void *t, void *ctxt, ::status_t stat, std::size_t len);
   void check_complete(::status_t stat, std::size_t len);
 
+  std::unique_ptr<component::IFabric_endpoint_unconnected_client> _ep;
   std::shared_ptr<component::IFabric_client> _cnxn;
   std::shared_ptr<registered_memory> _rm_out;
   std::shared_ptr<registered_memory> _rm_in;
@@ -62,7 +64,7 @@ public:
 
   ~remote_memory_client();
 
-  void send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_);
+  void send_disconnect(component::IFabric_endpoint_comm &cnxn_, registered_memory &rm_, char quit_flag_);
 
   std::uint64_t vaddr() const { return _vaddr; }
   std::uint64_t key() const { return _key; }

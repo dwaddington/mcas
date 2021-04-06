@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -33,8 +33,13 @@ struct fi_info;
 struct fid_pep;
 
 class Fabric;
-class Fabric_memory_control;
+struct event_expecter;
 struct event_producer;
+struct fabric_endpoint;
+namespace component
+{
+	class IFabric_endpoint_unconnected;
+}
 
 class Fabric_server_generic_factory
   : public event_consumer
@@ -71,12 +76,9 @@ class Fabric_server_generic_factory
   void listen(std::uint32_t ip_addr, std::uint16_t port, int end_fd, ::fid_pep &pep);
   void listen_loop(int end_fd, const fabric_types::addr_ep_t &pep_name, const Fd_socket &listen_fd) noexcept;
 
-  /**
-   * @throw fabric_bad_alloc : std::bad_alloc - libfabric out of memory
-   */
-  virtual std::shared_ptr<Fabric_memory_control> new_server(Fabric &fabric, event_producer &eq, ::fi_info &info) = 0;
 protected:
   ~Fabric_server_generic_factory();
+	void open_connection_generic(event_expecter *);
 public:
   /**
    * Note: fi_info is not const because we reuse it when constructing the passize endpoint
@@ -101,14 +103,13 @@ public:
   Fabric_server_generic_factory(Fabric_server_generic_factory &&) noexcept;
 
   /*
-   * @throw std::logic_error : unexpected event
    * @throw std::system_error : read error on event pipe
    */
-  Fabric_memory_control* get_new_connection();
+  component::IFabric_endpoint_unconnected_server * get_new_endpoint_unconnected();
 
-  void close_connection(Fabric_memory_control* connection);
+  void close_connection(event_expecter* connection);
 
-  std::vector<Fabric_memory_control*> connections();
+  std::vector<event_expecter *> connections();
 
   std::size_t max_message_size() const noexcept;
 

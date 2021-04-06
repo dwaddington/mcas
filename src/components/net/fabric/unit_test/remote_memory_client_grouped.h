@@ -26,13 +26,15 @@ namespace component
 {
   class IFabric;
   class IFabric_client_grouped;
-  class IFabric_communicaator;
+  class IFabric_endpoint_unconnected_client;
+  class IFabric_endpoint_connected;
 }
 
 struct remote_memory_client_grouped
   : public remote_memory_accessor
 {
 private:
+  std::unique_ptr<component::IFabric_endpoint_unconnected_client> _ep;
   std::shared_ptr<component::IFabric_client_grouped> _cnxn;
   std::size_t _memory_size;
   std::shared_ptr<registered_memory> _rm_out;
@@ -55,13 +57,13 @@ public:
 
   ~remote_memory_client_grouped();
 
-  void send_disconnect(component::IFabric_communicator &cnxn, registered_memory &rm, char quit_flag);
+  void send_disconnect(component::IFabric_endpoint_connected &cnxn, registered_memory &rm, char quit_flag);
 
   std::uint64_t vaddr() const { return _vaddr; }
   std::uint64_t key() const { return _key; }
   component::IFabric_client_grouped &cnxn() { return *_cnxn; }
 
-  std::unique_ptr<component::IFabric_communicator> allocate_group() const;
+  std::unique_ptr<component::IFabric_endpoint_connected> allocate_group() const;
   std::size_t max_message_size() const;
 };
 

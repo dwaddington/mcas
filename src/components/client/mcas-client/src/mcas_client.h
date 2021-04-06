@@ -24,6 +24,8 @@
 #include "connection.h"
 #include "mcas_client_config.h"
 
+#include "buffer_manager.h" /* Buffer_manager */
+
 #include <api/components.h>
 #include <api/fabric_itf.h>
 #include <api/kvindex_itf.h>
@@ -75,13 +77,13 @@ class MCAS_client
    */
  public:
   MCAS_client(unsigned                            debug_level,
-              const boost::optional<std::string> &src_device,
-              const boost::optional<std::string> &src_addr,
-              const boost::optional<std::string> &provider,
-              const std::string &                 dest_addr,
+              const common::string_view           src_device,
+              const common::string_view           src_addr,
+              const common::string_view           provider,
+              const common::string_view           dest_addr,
               std::uint16_t                       port,
               unsigned                            patience,
-              const std::string                   other = "");
+              const common::string_view           other = common::string_view() );
 
   MCAS_client(const MCAS_client &) = delete;
   MCAS_client &operator=(const MCAS_client &) = delete;
@@ -279,6 +281,8 @@ class MCAS_client
 
   component::Itf_ref<component::IFabric_factory>    _factory;
   std::unique_ptr<component::IFabric>               _fabric;
+  std::unique_ptr<component::IFabric_endpoint_unconnected_client> _ep;
+  mcas::Buffer_manager<component::IFabric_memory_control> _bm; /* IO buffer manager: must precede opening of connection, which occurs in component::IFabric_client */
   std::unique_ptr<component::IFabric_client>        _transport;
   std::unique_ptr<mcas::client::Connection_handler> _connection;
   Open_connection                                   _open_connection;
@@ -286,14 +290,16 @@ class MCAS_client
  private:
   static void set_debug(unsigned debug_level, const void *ths, const std::string &ip_addr, std::uint16_t port);
   static auto load_factory() -> component::IFabric_factory *;
-  static auto make_fabric(component::IFabric_factory &,
-                          const std::string &ip_addr,
-                          const std::string &provider,
-                          const std::string &device) -> component::IFabric *;
-  static auto make_fabric(component::IFabric_factory &,
-                          const boost::optional<std::string> &src_addr,
-                          const boost::optional<std::string> &interface,
-                          const boost::optional<std::string> &provider) -> component::IFabric *;
+  /* make fabric: address/provider/device form */
+  static auto make_fabric_apd(component::IFabric_factory &,
+                          const common::string_view ip_addr,
+                          const common::string_view provider,
+                          const common::string_view device) -> component::IFabric *;
+  /* make fabric: source/ip_addr/provider */
+  static auto make_fabric_sip(component::IFabric_factory &,
+                          const common::string_view src_addr,
+                          const common::string_view interface,
+                          const common::string_view provider) -> component::IFabric *;
 
   void open_transport(const std::string &device,
                       const std::string &ip_addr,
@@ -302,6 +308,7 @@ class MCAS_client
 };
 
 class MCAS_client_factory : public component::IMCAS_factory {
+  using string_view = common::string_view;
  public:
   /**
    * Component/interface management
@@ -327,18 +334,19 @@ class MCAS_client_factory : public component::IMCAS_factory {
 
   void unload() override { delete this; }
 
-  component::IMCAS *mcas_create(unsigned                            debug_level,
-                                unsigned                            patience,
-                                const std::string &                 owner,
-                                const boost::optional<std::string> &src_nic_device,
-                                const boost::optional<std::string> &src_ip_addr,
-                                const std::string &                 dest_addr_with_port,
-                                const std::string                   other) override;
+  /* NIC/souuce/dest version of create */
+  component::IMCAS *mcas_create_nsd(unsigned          debug_level,
+                                unsigned          patience,
+                                const string_view owner,
+                                const string_view src_nic_device,
+                                const string_view src_ip_addr,
+                                const string_view dest_addr_with_port,
+                                const string_view other) override;
 
   component::IKVStore *create(unsigned           debug_level,
-                              const std::string &owner,
-                              const std::string &addr,
-                              const std::string &device) override;
+                              const string_view owner,
+                              const string_view addr,
+                              const string_view device) override;
 
   component::IKVStore *create(unsigned debug_level, const std::map<std::string, std::string> &) override;
 };

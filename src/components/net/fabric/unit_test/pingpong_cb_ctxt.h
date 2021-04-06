@@ -40,7 +40,7 @@ public:
     cnxn_state &
     , cb_t cb_call
     , cb_ctxt *response
-    , component::IFabric_connection &cnxn
+    , component::IFabric_memory_control &cnxn
     , std::size_t buffer_size
     , std::uint64_t remote_key
     , std::size_t msg_size

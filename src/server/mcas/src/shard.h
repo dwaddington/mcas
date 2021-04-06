@@ -77,6 +77,7 @@ class Shard : public Shard_transport, private common::log_source {
  private:
   static constexpr size_t TWO_STAGE_THRESHOLD = KiB(128); /* above this two stage protocol is used */
   static constexpr const char *const _cname = "Shard";
+  static constexpr const char *const flush_enable_key = "FLUSH_ENABLE";
 
   using byte_span = common::byte_span;
 

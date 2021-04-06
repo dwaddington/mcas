@@ -76,7 +76,8 @@ pingpong_client::pingpong_client(
   , std::uint8_t id_
 )
 try
-  : _cnxn(open_connection_patiently(fabric_, fabric_spec_, ip_address_, port_))
+  : _ep(fabric_.make_endpoint(fabric_spec_, ip_address_, port_))
+  , _cnxn(open_connection_patiently(_ep.get()))
   , _stat{}
   , _id{id_}
 {

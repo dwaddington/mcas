@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,8 +14,6 @@
 
 #include "fabric_server_factory.h"
 
-#include "fabric_memory_control.h"
-#include "fabric_op_control.h"
 #include "fabric_server.h"
 
 #include <algorithm> /* transform */
@@ -29,18 +27,12 @@ Fabric_server_factory::Fabric_server_factory(Fabric &fabric_, event_producer &eq
 Fabric_server_factory::~Fabric_server_factory()
 {}
 
-std::shared_ptr<Fabric_memory_control> Fabric_server_factory::new_server(Fabric &fabric_, event_producer &eq_, ::fi_info &info_)
+auto Fabric_server_factory::open_connection(component::IFabric_endpoint_unconnected_server *aep) -> Fabric_server *
 {
-  auto conn = std::make_shared<Fabric_server>(fabric_, eq_, info_);
-  return
-    std::static_pointer_cast<Fabric_memory_control>(
-      std::static_pointer_cast<Fabric_op_control>(conn)
-    );
-}
-
-component::IFabric_server * Fabric_server_factory::get_new_connection()
-{
-  return static_cast<Fabric_server *>(Fabric_server_generic_factory::get_new_connection());
+	auto conn = new Fabric_server(aep);
+	/* wait for an acnowledgment from the client, and add to open list */
+	open_connection_generic(conn);
+	return conn;
 }
 
 std::vector<component::IFabric_server *> Fabric_server_factory::connections()
@@ -51,9 +43,9 @@ std::vector<component::IFabric_server *> Fabric_server_factory::connections()
     g.begin()
     , g.end()
     , std::back_inserter(v)
-    , [] (Fabric_memory_control *v_)
+    , [] (event_expecter *v_)
       {
-        return static_cast<Fabric_server *>(static_cast<Fabric_op_control *>(&*v_));
+        return static_cast<Fabric_server *>(&*v_);
       }
   );
   return v;

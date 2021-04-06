@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -22,7 +22,7 @@
 #include "async_req_record.h"
 #include "fabric_comm_grouped.h"
 #include "fabric_cq.h"
-#include "fabric_op_control.h"
+#include "fabric_endpoint.h"
 #include "fabric_runtime_error.h"
 #include <boost/io/ios_state.hpp>
 #include <stdexcept> /* logic_error */

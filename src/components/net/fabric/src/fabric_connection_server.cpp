@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,6 +15,7 @@
 #include "fabric_connection_server.h"
 
 #include "fabric_check.h" /* CHECK_FI_ERR */
+#include "fabric_endpoint.h"
 #include "fd_control.h"
 
 #include "rdma-fi_cm.h" /* fi_accept, fi_shutdown */
@@ -24,29 +25,16 @@
 #include <iostream> /* cerr */
 #include <memory> /* unique_ptr */
 
-namespace
-{
-  /*
-   * Callback for verbs behavior on client side; a no-op on the server side;
-   */
-  fabric_types::addr_ep_t set_peer_early(std::unique_ptr<Fd_control>, ::fi_info &)
-  {
-    return fabric_types::addr_ep_t{};
-  }
-}
-
 Fabric_connection_server::Fabric_connection_server(
-  Fabric &fabric_
-  , event_producer &ev_
-  , ::fi_info &info_
+  component::IFabric_endpoint_unconnected_server *aep_
 )
-  : Fabric_op_control(fabric_, ev_, info_, std::unique_ptr<Fd_control>(), set_peer_early)
+  : fabric_connection(aep_, fabric_types::addr_ep_t{})
 {
-  if ( ep_info().ep_attr->type == FI_EP_MSG )
+  if ( aep()->ep_info().ep_attr->type == FI_EP_MSG )
   {
     std::size_t paramlen = 0;
     auto param = nullptr;
-    CHECK_FI_ERR(::fi_accept(&ep(), param, paramlen));
+    CHECK_FI_ERR(::fi_accept(&aep()->ep(), param, paramlen));
   }
 }
 
@@ -55,7 +43,7 @@ Fabric_connection_server::~Fabric_connection_server()
   try
   {
     /* "the flags parameter is reserved and must be 0" */
-    ::fi_shutdown(&ep(), 0);
+    ::fi_shutdown(&aep()->ep(), 0);
   /* The client may in turn call fi_shutdown, giving us an event. We do not need to see it.
    */
   }
@@ -74,4 +62,14 @@ void Fabric_connection_server::solicit_event() const
 
 void Fabric_connection_server::wait_event() const
 {
+}
+
+std::size_t Fabric_connection_server::max_message_size() const noexcept
+{
+	return aep()->ep_info().ep_attr->max_msg_size;
+}
+
+std::size_t Fabric_connection_server::max_inject_size() const noexcept
+{
+	return aep()->ep_info().tx_attr->inject_size;
 }

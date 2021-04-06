@@ -10,7 +10,6 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
 TESTID=$(basename --suffix .sh -- $0)
-DESC=$TESTID
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
@@ -34,7 +33,7 @@ trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 tail --pid=$CLIENT_PID -f /dev/null
 
 if < $CLIENT_LOG fgrep '[       OK ] Fabric_test.WriteReadSequentialSockets' > /dev/null; then
-    echo "Test $TESTID ($DESC): $(color_pass passed)"
+    echo "Test $TESTID: $(color_pass passed)"
 else
-    echo "Test $TESTID ($DESC): $(color_fail fail)"
+    echo "Test $TESTID: $(color_fail fail)"
 fi

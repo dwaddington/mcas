@@ -71,7 +71,8 @@ remote_memory_client::remote_memory_client(
   , std::uint64_t remote_key_base_
 )
 try
-  : _cnxn(open_connection_patiently(fabric_, fabric_spec_, ip_address_, port_))
+  : _ep(fabric_.make_endpoint(fabric_spec_, ip_address_, port_))
+  , _cnxn(open_connection_patiently(_ep.get()))
   , _rm_out{std::make_shared<registered_memory>(*_cnxn, memory_size_, remote_key_base_ * 2U)}
   , _rm_in{std::make_shared<registered_memory>(*_cnxn, memory_size_, remote_key_base_ * 2U + 1)}
   , _vaddr{}
@@ -105,7 +106,7 @@ catch ( std::exception &e )
   throw;
 }
 
-void remote_memory_client::send_disconnect(component::IFabric_communicator &cnxn_, registered_memory &rm_, char quit_flag_)
+void remote_memory_client::send_disconnect(component::IFabric_endpoint_comm &cnxn_, registered_memory &rm_, char quit_flag_)
 {
   send_msg(cnxn_, rm_, &quit_flag_, sizeof quit_flag_);
 }

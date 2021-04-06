@@ -23,6 +23,7 @@
 #include "persistent.h"
 #include "perishable_expiry.h"
 #include <common/pointer_cast.h>
+#include <common/perf/tm.h>
 
 #include <algorithm> /* fill_n, copy */
 #include <array>
@@ -742,13 +743,14 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		bool is_locked_exclusive() const { return lockable() && _outline.ptr()->is_locked_exclusive(); }
 		bool is_locked() const { return lockable() && _outline.ptr()->is_locked(); }
 		template <typename AL>
-			void flush_if_locked_exclusive(AL al_) const
+			void flush_if_locked_exclusive(TM_ACTUAL AL al_) const
 			{
 				if ( lockable() && _outline.ptr()->is_locked_exclusive() )
 				{
 #if 0
 					PLOG("FLUSH %p: %zu", _outline.ptr()->data(), _outline.size());
 #endif
+					TM_SCOPE()
 					_outline.ptr()->persist_this(al_);
 				}
 				else

@@ -17,16 +17,20 @@
 #include <exception>
 #include <iostream> /* cerr */
 
-component::IFabric_server_grouped *server_grouped_connection::get_connection(component::IFabric_server_grouped_factory &ep_)
+component::IFabric_server_grouped *server_grouped_connection::get_connection(
+	component::IFabric_server_grouped_factory *f_
+	, component::IFabric_endpoint_unconnected_server *ep_
+)
 {
   component::IFabric_server_grouped *cnxn = nullptr;
-  while ( ! ( cnxn = ep_.get_new_connection() ) ) {}
+  while ( ! ( cnxn = f_->open_connection(ep_) ) ) {}
   return cnxn;
 }
 
-server_grouped_connection::server_grouped_connection(component::IFabric_server_grouped_factory &ep_)
-  : _ep(ep_)
-  , _cnxn(get_connection(_ep))
+server_grouped_connection::server_grouped_connection(component::IFabric_server_grouped_factory &f_)
+  : _f(&f_)
+  , _ep(f_.get_new_endpoint_unconnected())
+  , _cnxn(get_connection(_f, _ep))
   , _comm(_cnxn->allocate_group())
 {
 }
@@ -35,7 +39,7 @@ server_grouped_connection::~server_grouped_connection()
   delete _comm;
   try
   {
-    _ep.close_connection(_cnxn);
+    _f->close_connection(_cnxn);
   }
   catch ( std::exception &e )
   {
@@ -43,7 +47,7 @@ server_grouped_connection::~server_grouped_connection()
   }
 }
 
-component::IFabric_communicator *server_grouped_connection::allocate_group() const
+component::IFabric_endpoint_connected *server_grouped_connection::allocate_group() const
 {
   return cnxn().allocate_group();
 }

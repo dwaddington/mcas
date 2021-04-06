@@ -19,6 +19,7 @@
 
 #include "fabric_types.h" /* addr_ep_t */
 
+#include <common/string_view.h>
 #include <cstdint>
 #include <string>
 
@@ -35,7 +36,7 @@ public:
    * @throw std::logic_error : socket initialized with a negative value (from ::socket)
    * @throw std::system_error : resolving address
    */
-  explicit Fd_control(std::string dst_addr, std::uint16_t port);
+  explicit Fd_control(common::string_view dst_addr, std::uint16_t port);
   Fd_control(Fd_control &&) noexcept = default;
   Fd_control &operator=(Fd_control &&) noexcept = default;
   /*

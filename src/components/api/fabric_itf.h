@@ -16,7 +16,9 @@
 
 #include <component/base.h> /* component::IBase, DECLARE_COMPONENT_UUID, DECLARE_INTERFACE_UUID */
 #include <common/byte_span.h>
+#include <common/string_view.h>
 
+#include <gsl/span>
 #include <chrono>
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint16_t, uint64_t */
@@ -70,7 +72,7 @@ namespace component
 
 class IFabric_runtime_error : public std::runtime_error {
  public:
-  explicit IFabric_runtime_error(const std::string &what_arg);
+  explicit IFabric_runtime_error(const common::string_view what_arg);
   /**
    * @return The libfabric error code (enumeration in <rdma/fi_errno.h>)
    */
@@ -85,6 +87,8 @@ class IFabric_runtime_error : public std::runtime_error {
 #if defined            __GNUC__ && 6 < __GNUC__
 #pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
+
+struct IFabric_memory_region;
 
 class IFabric_op_completer {
  public:
@@ -230,112 +234,13 @@ class IFabric_op_completer {
      - support for statistics collection
   */
 };
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic pop
 
-/**
- * Fabric/RDMA-based network component
- *
- */
-class IFabric_communicator : public IFabric_op_completer {
+class IFabric_memory_control {
  public:
-  /**
-   * Asynchronously post a buffer to the connection
-   *
-   * @param buffers Buffer vector (containing regions should be registered)
-   *
-   * @return Work (context) identifier
-   *
-   * @throw IFabric_runtime_error std::runtime_error - ::fi_sendv fail
-   */
-  virtual void post_send(const ::iovec *first, const ::iovec *last, void **descriptors, void *context) = 0;
-  virtual void post_send(const std::vector<::iovec> &buffers, void *context)                           = 0;
-
-  /**
-   * Asynchronously post a buffer to receive data
-   *
-   * @param buffers Buffer vector (containing regions should be registered)
-   *
-   * @return Work (context) identifier
-   *
-   * @throw IFabric_runtime_error - ::fi_recvv fail
-   */
-  virtual void post_recv(const ::iovec *first, const ::iovec *last, void **descriptors, void *context) = 0;
-  virtual void post_recv(const std::vector<::iovec> &buffers, void *context)                           = 0;
-
-  /**
-   * Post RDMA read operation
-   *
-   * @param buffers Destination buffer vector
-   * @param remote_addr Remote address
-   * @param key Key for remote address
-   * @param out_context
-   *
-   * @throw IFabric_runtime_error - ::fi_readv fail
-   *
-   */
-  virtual void post_read(const ::iovec *first,
-                         const ::iovec *last,
-                         void **        descriptors,
-                         std::uint64_t  remote_addr,
-                         std::uint64_t  key,
-                         void *         context) = 0;
-  virtual void post_read(const std::vector<::iovec> &buffers,
-                         std::uint64_t               remote_addr,
-                         std::uint64_t               key,
-                         void *                      context) = 0;
-
-  /**
-   * Post RDMA write operation
-   *
-   * @param buffers Source buffer vector
-   * @param remote_addr Remote address
-   * @param key Key for remote address
-   * @param out_context
-   *
-   * @throw IFabric_runtime_error - ::fi_writev fail
-   *
-   */
-  virtual void post_write(const ::iovec *first,
-                          const ::iovec *last,
-                          void **        descriptors,
-                          std::uint64_t  remote_addr,
-                          std::uint64_t  key,
-                          void *         context) = 0;
-  virtual void post_write(const std::vector<::iovec> &buffers,
-                          std::uint64_t               remote_addr,
-                          std::uint64_t               key,
-                          void *                      context) = 0;
-
-  /**
-   * Send message without completion
-   *
-   * @param connection Connection to inject on
-   * @param buf Data to send
-   * @param buf Length of data to send (must not exceed
-   * IFabric_connection::max_inject_size())
-   *
-   * @throw IFabric_runtime_error - ::fi_inject fail
-   */
-  virtual void inject_send(const void *buf, std::size_t len) = 0;
-
-  /* Additional TODO:
-     - support for atomic RMA operations
-     - support for statistics collection
-  */
-};
-
-struct IFabric_memory_region;
-
-class IFabric_connection {
-protected:
   using const_byte_span = common::const_byte_span;
- public:
-  virtual ~IFabric_connection() {}
+  virtual ~IFabric_memory_control() {}
 
   using memory_region_t = IFabric_memory_region *;
-
   /**
    * Register buffer for RDMA
    *
@@ -359,7 +264,7 @@ protected:
                                           std::size_t   size,
                                           std::uint64_t key,
                                           std::uint64_t flags)
-   { return register_memory(common::make_const_byte_span(contig_addr, size), key, flags); }
+  { return register_memory(common::make_const_byte_span(contig_addr, size), key, flags); }
   virtual memory_region_t register_memory(const_byte_span contig_,
                                           std::uint64_t key,
                                           std::uint64_t flags) = 0;
@@ -378,8 +283,230 @@ protected:
   virtual void *        get_memory_descriptor(memory_region_t) const noexcept = 0;
 
   /**
+   * Asynchronously post a buffer to receive data
+   *
+   * @param buffers Buffer span (containing regions should be registered)
+   *
+   * @return Work (context) identifier
+   *
+   * @throw IFabric_runtime_error - ::fi_recvv fail
+   */
+  virtual void post_recv(gsl::span<const ::iovec> buffers, void **descriptors, void *context) = 0;
+  void post_recv(const ::iovec *first, const ::iovec *last, void **descriptors, void *context) { return post_recv( {first, last}, descriptors, context); }
+  virtual void post_recv(gsl::span<const ::iovec> buffers, void *context)                           = 0;
+};
+
+class IFabric_client;
+class IFabric_client_grouped;
+
+/**
+ * IFabric_initiator
+ *  operations unique to a connected endpoint
+ */
+class IFabric_initiator
+{
+ public:
+	virtual ~IFabric_initiator() {}
+  /**
+   * Asynchronously post a buffer to the connection
+   *
+   * @param buffers Buffer span (containing regions should be registered)
+   *
+   * @return Work (context) identifier
+   *
+   * @throw IFabric_runtime_error std::runtime_error - ::fi_sendv fail
+   */
+  virtual void post_send(gsl::span<const ::iovec> buffers, void **descriptors, void *context) = 0;
+  void post_send(const ::iovec *first, const ::iovec *last, void **descriptors, void *context) { return post_send( {first, last}, descriptors, context); }
+  virtual void post_send(gsl::span<const ::iovec> buffers, void *context)                     = 0;
+
+  /**
+   * Post RDMA read operation
+   *
+   * @param buffers Destination buffer span
+   * @param remote_addr Remote address
+   * @param key Key for remote address
+   * @param out_context
+   *
+   * @throw IFabric_runtime_error - ::fi_readv fail
+   *
+   */
+  virtual void post_read(gsl::span<const ::iovec> buffers,
+                         void **        descriptors,
+                         std::uint64_t  remote_addr,
+                         std::uint64_t  key,
+                         void *         context) = 0;
+  void post_read(const ::iovec *first,
+                         const ::iovec *last,
+                         void **        descriptors,
+                         std::uint64_t  remote_addr,
+                         std::uint64_t  key,
+                         void *         context) { return post_read( { first, last }, descriptors, remote_addr, key, context); }
+
+  virtual void post_read(gsl::span<const ::iovec> buffers,
+                         std::uint64_t               remote_addr,
+                         std::uint64_t               key,
+                         void *                      context) = 0;
+
+  /**
+   * Post RDMA write operation
+   *
+   * @param buffers Source buffer span
+   * @param remote_addr Remote address
+   * @param key Key for remote address
+   * @param out_context
+   *
+   * @throw IFabric_runtime_error - ::fi_writev fail
+   *
+   */
+  virtual void post_write(const gsl::span<const ::iovec> buffers,
+                          void **        descriptors,
+                          std::uint64_t  remote_addr,
+                          std::uint64_t  key,
+                          void *         context) = 0;
+
+  void post_write(const ::iovec *first,
+                          const ::iovec *last,
+                          void **        descriptors,
+                          std::uint64_t  remote_addr,
+                          std::uint64_t  key,
+                          void *         context)
+  {
+    return post_write(
+      gsl::span<const ::iovec>(first, last), descriptors, remote_addr, key, context);
+  }
+
+  virtual void post_write(const gsl::span<const ::iovec> buffers,
+                          std::uint64_t               remote_addr,
+                          std::uint64_t               key,
+                          void *                      context) = 0;
+
+  /**
+   * Send message without completion
+   *
+   * @param connection Connection to inject on
+   * @param buf Data to send
+   * @param buf Length of data to send (must not exceed
+   * IFabric_connection::max_inject_size())
+   *
+   * @throw IFabric_runtime_error - ::fi_inject fail
+   */
+  virtual void inject_send(const void *buf, std::size_t len) = 0;
+
+  /* TODO: atomic RMA operations
+  */
+};
+
+/**
+ * IFabric_endpoint_connected
+ *  operations available to a connected endpoint
+ */
+class IFabric_endpoint_connected
+	: public IFabric_memory_control
+	, public IFabric_initiator
+	, public IFabric_op_completer
+{
+  /* TODO: statistics collection
+  */
+};
+
+class IFabric_endpoint_unconnected
+	: public IFabric_memory_control
+{
+};
+
+/**
+ * Fabric/RDMA-based network component
+ *  an acrive bit not connected endpoint
+ */
+class IFabric_endpoint_unconnected_client : public IFabric_endpoint_unconnected {
+ public:
+
+  /**
+   * Open a fabric client (active endpoint) connection to a server. Active
+   * endpoints usually correspond with hardware resources, e.g. verbs queue
+   * pair. Options may not conflict with those specified for the fabric.
+   *
+   * @param json_configuration Configuration string in JSON
+   * @param remote_endpoint The IP address (URL) of the server
+   * @param port The IP port on the server
+   *
+   * @return the endpoint
+   *
+   * @throw std::bad_alloc - destination address alloc failed
+   * @throw std::bad_alloc - libfabric out of memory
+   * @throw std::bad_alloc - libfabric out of memory (creating a new server)
+   * @throw std::bad_alloc - out of memory
+   * @throw std::domain_error : json file parse-detected error
+   * @throw std::logic_error : socket initialized with a negative value (from
+   * ::socket) in Fd_control
+   * @throw std::logic_error : unexpected event
+   * @throw std::system_error : error receiving fabric server name
+   * @throw std::system_error : pselect fail (expecting event)
+   * @throw std::system_error : resolving address
+   * @throw std::system_error : pselect fail
+   * @throw std::system_error : read error on event pipe
+   * @throw std::system_error - writing event pipe (normal callback)
+   * @throw std::system_error - writing event pipe (readerr_eq)
+   * @throw std::system_error - receiving data on socket
+   * @throw IFabric_runtime_error - ::fi_domain fail
+   * @throw IFabric_runtime_error - ::fi_connect fail
+   * @throw IFabric_runtime_error - ::fi_ep_bind fail
+   * @throw IFabric_runtime_error - ::fi_enable fail
+   * @throw IFabric_runtime_error - ::fi_ep_bind fail (event registration)
+   *
+   */
+  virtual IFabric_client *make_open_client() = 0;
+
+  /**
+   * Open a fabric endpoint for which communications are divided into smaller
+   * entities (groups). Options may not conflict with those specified for the
+   * fabric.
+   *
+   * @param json_configuration Configuration string in JSON
+   * @param remote_endpoint The IP address (URL) of the server
+   * @param port The IP port on the server
+   *
+   * @return the endpoint
+   *
+   * @throw std::bad_alloc - destination address alloc failed
+   * @throw std::bad_alloc - libfabric out of memory
+   * @throw std::bad_alloc - libfabric out of memory (creating a new server)
+   * @throw std::bad_alloc - out of memory
+   * @throw std::domain_error : json file parse-detected error
+   * @throw std::logic_error : socket initialized with a negative value (from
+   * ::socket) in Fd_control
+   * @throw std::logic_error : unexpected event
+   * @throw std::system_error : error receiving fabric server name
+   * @throw std::system_error : pselect fail (expecting event)
+   * @throw std::system_error : resolving address
+   * @throw std::system_error : pselect fail
+   * @throw std::system_error : read error on event pipe
+   * @throw std::system_error - writing event pipe (normal callback)
+   * @throw std::system_error - writing event pipe (readerr_eq)
+   * @throw std::system_error - receiving data on socket
+   * @throw IFabric_runtime_error - ::fi_domain fail
+   * @throw IFabric_runtime_error - ::fi_connect fail
+   * @throw IFabric_runtime_error - ::fi_ep_bind fail
+   * @throw IFabric_runtime_error - ::fi_enable fail
+   * @throw IFabric_runtime_error - ::fi_ep_bind fail (event registration)
+   *
+   */
+  virtual IFabric_client_grouped *make_open_client_grouped() = 0;
+};
+
+class IFabric_connection {
+ public:
+  virtual ~IFabric_connection() {}
+
+  /**
    * Get address of connected peer (taken from fi_getpeer during
-   * connection instantiation).
+   * connection instantiation). The fi_getpeer documentation says
+   * "The address  must  be  in the same format as that specified using
+   * fi_info: addr_format when the endpoint was created". Presumably
+   * this means that the address returned by fi_getpeer *will* be in
+   * that same form, and is thus dependent on the implementation of
+   * endpoint creation.
    *
    *
    * @return Peer endpoint address
@@ -424,34 +551,41 @@ protected:
  * provide communications.
  *
  */
-class IFabric_active_endpoint_comm
+class IFabric_endpoint_comm
     : public IFabric_connection
-    , public IFabric_communicator {
+    , public IFabric_endpoint_connected {
 };
 
 /**
  * An endpoint established as a server.
  *
  */
-class IFabric_server : public IFabric_active_endpoint_comm {
+class IFabric_server : public IFabric_endpoint_comm {
 };
 
 /**
  * An endpoint established as a client.
  *
  */
-class IFabric_client : public IFabric_active_endpoint_comm {
+class IFabric_client : public IFabric_endpoint_comm {
+};
+
+/* A group: memory control, commands, and completions */
+class IFabric_group
+	: public IFabric_endpoint_connected
+{
 };
 
 /**
  * An endpoint "grouped", without a communication channel.
- * Can provide grouped communications channels, but does not of itself
- * provide communications.
+ * Can provide communications channels, but does not initiate operations
  *
  */
-class IFabric_active_endpoint_grouped
+class IFabric_endpoint_grouped
     : public IFabric_connection
-    , public IFabric_op_completer {
+    , public IFabric_memory_control
+    , public IFabric_op_completer
+{
  public:
   /**
    * Allocate group (for partitioned completion handling)
@@ -459,7 +593,7 @@ class IFabric_active_endpoint_grouped
    * @throw std::system_error, e.g. for locking
    * @throw std::bad_alloc, e.g.
    */
-  virtual IFabric_communicator *allocate_group() = 0;
+  virtual IFabric_group *allocate_group() = 0;
 };
 
 /**
@@ -467,7 +601,7 @@ class IFabric_active_endpoint_grouped
  * can allocate "commuicators" which can initiate commands.
  *
  */
-class IFabric_client_grouped : public IFabric_active_endpoint_grouped {
+class IFabric_client_grouped : public IFabric_endpoint_grouped {
 };
 
 /**
@@ -475,7 +609,7 @@ class IFabric_client_grouped : public IFabric_active_endpoint_grouped {
  * can allocate "commuicators" which can initiate commands.
  *
  */
-class IFabric_server_grouped : public IFabric_active_endpoint_grouped {
+class IFabric_server_grouped : public IFabric_endpoint_grouped {
 };
 
 /**
@@ -506,6 +640,11 @@ class IFabric_passive_endpoint {
   virtual std::string get_provider_name() const = 0;
 };
 
+class IFabric_endpoint_unconnected_server
+	: public IFabric_endpoint_unconnected
+{
+};
+
 /**
  * Fabric passive endpoint providing servers with ordinary (not grouped)
  * communicators.
@@ -515,7 +654,7 @@ class IFabric_server_factory : public IFabric_passive_endpoint {
   /**
    * Server/accept side handling of new connections (handled by the
    * active thread) are queued so that they can be taken by a polling
-   * thread an integrated into the processing loop.  This method is
+   * thread and integrated into the processing loop.  This method is
    * normally invoked until NULL is returned.
    *
    * @return New connection, or NULL if no new connection.
@@ -525,7 +664,8 @@ class IFabric_server_factory : public IFabric_passive_endpoint {
    * @throw std::system_error : read error on event pipe
    * @throw std::system_error : failure to listen for connections
    */
-  virtual IFabric_server *get_new_connection() = 0;
+	virtual IFabric_endpoint_unconnected_server *get_new_endpoint_unconnected() = 0;
+	virtual IFabric_server *open_connection(IFabric_endpoint_unconnected_server *) = 0;
 
   /**
    * Close connection and release any associated resources
@@ -574,7 +714,8 @@ class IFabric_server_grouped_factory : public IFabric_passive_endpoint {
    * @throw std::system_error, e.g. for locking
    * @throw std::system_error : read error on event pipe
    */
-  virtual IFabric_server_grouped *get_new_connection() = 0;
+	virtual IFabric_endpoint_unconnected_server *get_new_endpoint_unconnected() = 0;
+	virtual IFabric_server_grouped *open_connection(IFabric_endpoint_unconnected_server *) = 0;
 
   /**
    * Close connection and release any associated resources
@@ -615,7 +756,7 @@ class IFabric {
    * @throw IFabric_runtime_error - ::fi_pep_bind fail
    * @throw IFabric_runtime_error - ::fi_listen fail
    */
-  virtual IFabric_server_factory *open_server_factory(const std::string &json_configuration, std::uint16_t port) = 0;
+  virtual IFabric_server_factory *open_server_factory(const common::string_view json_configuration, std::uint16_t port) = 0;
   /**
    * Open a fabric "server grouped" factory. Endpoints usually correspond with
    * hardware resources, e.g. verbs queue pair. Options may not conflict with
@@ -632,84 +773,13 @@ class IFabric {
    * @throw IFabric_runtime_error - ::fi_pep_bind fail
    * @throw IFabric_runtime_error - ::fi_listen fail
    */
-  virtual IFabric_server_grouped_factory *open_server_grouped_factory(const std::string &json_configuration,
+  virtual IFabric_server_grouped_factory *open_server_grouped_factory(const common::string_view json_configuration,
                                                                       std::uint16_t      port) = 0;
-  /**
-   * Open a fabric client (active endpoint) connection to a server. Active
-   * endpoints usually correspond with hardware resources, e.g. verbs queue
-   * pair. Options may not conflict with those specified for the fabric.
-   *
-   * @param json_configuration Configuration string in JSON
-   * @param remote_endpoint The IP address (URL) of the server
-   * @param port The IP port on the server
-   *
-   * @return the endpoint
-   *
-   * @throw std::bad_alloc - destination address alloc failed
-   * @throw std::bad_alloc - libfabric out of memory
-   * @throw std::bad_alloc - libfabric out of memory (creating a new server)
-   * @throw std::bad_alloc - out of memory
-   * @throw std::domain_error : json file parse-detected error
-   * @throw std::logic_error : socket initialized with a negative value (from
-   * ::socket) in Fd_control
-   * @throw std::logic_error : unexpected event
-   * @throw std::system_error : error receiving fabric server name
-   * @throw std::system_error : pselect fail (expecting event)
-   * @throw std::system_error : resolving address
-   * @throw std::system_error : pselect fail
-   * @throw std::system_error : read error on event pipe
-   * @throw std::system_error - writing event pipe (normal callback)
-   * @throw std::system_error - writing event pipe (readerr_eq)
-   * @throw std::system_error - receiving data on socket
-   * @throw IFabric_runtime_error - ::fi_domain fail
-   * @throw IFabric_runtime_error - ::fi_connect fail
-   * @throw IFabric_runtime_error - ::fi_ep_bind fail
-   * @throw IFabric_runtime_error - ::fi_enable fail
-   * @throw IFabric_runtime_error - ::fi_ep_bind fail (event registration)
-   *
-   */
-  virtual IFabric_client *open_client(const std::string &json_configuration,
-                                      const std::string &remote_endpoint,
-                                      std::uint16_t      port) = 0;
-  /**
-   * Open a fabric endpoint for which communications are divided into smaller
-   * entities (groups). Options may not conflict with those specified for the
-   * fabric.
-   *
-   * @param json_configuration Configuration string in JSON
-   * @param remote_endpoint The IP address (URL) of the server
-   * @param port The IP port on the server
-   *
-   * @return the endpoint
-   *
-   * @throw std::bad_alloc - destination address alloc failed
-   * @throw std::bad_alloc - libfabric out of memory
-   * @throw std::bad_alloc - libfabric out of memory (creating a new server)
-   * @throw std::bad_alloc - out of memory
-   * @throw std::domain_error : json file parse-detected error
-   * @throw std::logic_error : socket initialized with a negative value (from
-   * ::socket) in Fd_control
-   * @throw std::logic_error : unexpected event
-   * @throw std::system_error : error receiving fabric server name
-   * @throw std::system_error : pselect fail (expecting event)
-   * @throw std::system_error : resolving address
-   * @throw std::system_error : pselect fail
-   * @throw std::system_error : read error on event pipe
-   * @throw std::system_error - writing event pipe (normal callback)
-   * @throw std::system_error - writing event pipe (readerr_eq)
-   * @throw std::system_error - receiving data on socket
-   * @throw IFabric_runtime_error - ::fi_domain fail
-   * @throw IFabric_runtime_error - ::fi_connect fail
-   * @throw IFabric_runtime_error - ::fi_ep_bind fail
-   * @throw IFabric_runtime_error - ::fi_enable fail
-   * @throw IFabric_runtime_error - ::fi_ep_bind fail (event registration)
-   *
-   */
-  virtual IFabric_client_grouped *open_client_grouped(const std::string &json_configuration,
-                                                      const std::string &remote_endpoint,
-                                                      std::uint16_t      port) = 0;
+
+  virtual IFabric_endpoint_unconnected_client *make_endpoint(const common::string_view json_configuration, common::string_view remote_endpoint, std::uint16_t port) = 0;
+
   /*
-   * provideri name in the fabric.
+   * provider name in the fabric.
    */
   virtual const char *prov_name() const noexcept = 0;
 };
@@ -733,7 +803,7 @@ class IFabric_factory : public component::IBase {
    * @throw std::domain_error : json file parse-detected error
    * @throw IFabric_runtime_error - ::fi_control fail
    */
-  virtual IFabric *make_fabric(const std::string &json_configuration) = 0;
+  virtual IFabric *make_fabric(const common::string_view json_configuration) = 0;
 };
 
 }  // namespace component

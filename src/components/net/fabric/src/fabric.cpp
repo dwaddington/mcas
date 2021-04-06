@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -37,6 +37,7 @@
 
 #include <netdb.h> /* addrinfo */
 #include <netinet/in.h> /* sockaddr_in */
+#include <common/env.h> /* env_value */
 #include <common/pointer_cast.h>
 #include <sys/select.h> /* pselect */
 
@@ -128,7 +129,7 @@ namespace
     return make_fi_info(FI_VERSION(FI_MAJOR_VERSION,FI_MINOR_VERSION), nullptr, nullptr, &hints);
   }
 
-  std::shared_ptr<::fi_info> make_fi_info(const std::string& json_configuration)
+  std::shared_ptr<::fi_info> make_fi_info(const common::string_view json_configuration)
   {
     auto h0 = hints(parse_info(json_configuration));
     using p_to_mr = std::tuple<std::string, int>;
@@ -176,14 +177,14 @@ std::ostream &operator<<(std::ostream &o_, const env_replace &e_)
 	return o_ << e_.key() << "=" << e_.value();
 }
 
-Fabric::Fabric(const std::string& json_configuration_)
+Fabric::Fabric(const common::string_view json_configuration_)
 	/* libfabric 1.9.0 adds a "mr_cache_monitor" which hooks into various dl calls
 	 * concerning memory allocation, including dl_open. The hooking mechanism does
 	 * not seem to be thread-safe, meaning that dl_open calls in other threads may
 	 * fail/segfault. Disable the cache monitor.
 	 */
   : _env_mr_cache_monitor("FI_MR_CACHE_MONITOR", "disabled")
-  , _env_use_odp("FI_VERBS_USE_ODP", ( getenv("USE_ODP") && std::stoi(getenv("USE_ODP")) ) ? "true" : "false")
+  , _env_use_odp("FI_VERBS_USE_ODP", common::env_value<bool>("USE_ODP", true) ? "true" : "false")
   , _info(make_fi_info(json_configuration_))
   , _fabric(make_fid_fabric(*_info->fabric_attr, this))
   , _eq_attr{}
@@ -244,14 +245,14 @@ std::uint16_t Fabric::choose_port(std::uint16_t port_)
   return port_;
 }
 
-component::IFabric_server_factory * Fabric::open_server_factory(const std::string& json_configuration_, std::uint16_t control_port_)
+component::IFabric_server_factory * Fabric::open_server_factory(const common::string_view json_configuration_, std::uint16_t control_port_)
 {
   _info = parse_info(json_configuration_, _info);
   control_port_ = choose_port(control_port_);
   return new Fabric_server_factory(*this, *this, *_info, listen_addr(control_port_), control_port_);
 }
 
-component::IFabric_server_grouped_factory * Fabric::open_server_grouped_factory(const std::string& json_configuration_, std::uint16_t control_port_)
+component::IFabric_server_grouped_factory * Fabric::open_server_grouped_factory(const common::string_view json_configuration_, std::uint16_t control_port_)
 {
   _info = parse_info(json_configuration_, _info);
   return new Fabric_server_grouped_factory(*this, *this, *_info, listen_addr(control_port_), control_port_);
@@ -435,40 +436,25 @@ catch ( const std::exception &e )
 
 namespace
 {
-  std::string while_in(const std::string &where)
+  std::string while_in(const common::string_view where)
   {
-    return " (while in " + where + ")";
+    return " (while in " + std::string(where) + ")";
   }
 }
 
-component::IFabric_client * Fabric::open_client(const std::string& json_configuration_, const std::string &remote_, std::uint16_t control_port_)
+component::IFabric_endpoint_unconnected_client * Fabric::make_endpoint(const common::string_view json_configuration_, common::string_view remote_endpoint_, std::uint16_t port_)
 try
 {
   _info = parse_info(json_configuration_, _info);
-  return new Fabric_client(*this, *this, *_info, remote_, control_port_);
+  return new fabric_endpoint(*this, *this, *_info, remote_endpoint_, port_);
 }
 catch ( const fabric_runtime_error &e )
 {
-  throw e.add(while_in(__func__));
+  throw e.add(" remote " + std::string(remote_endpoint_) + ":" + std::to_string(port_) + while_in(__func__));
 }
 catch ( const std::system_error &e )
 {
-  throw std::system_error(e.code(), e.what() + while_in(__func__));
-}
-
-component::IFabric_client_grouped * Fabric::open_client_grouped(const std::string& json_configuration_, const std::string& remote_, std::uint16_t control_port_)
-try
-{
-  _info = parse_info(json_configuration_, _info);
-  return static_cast<component::IFabric_client_grouped *>(new Fabric_client_grouped(*this, *this, *_info, remote_, control_port_));
-}
-catch ( const fabric_runtime_error &e )
-{
-  throw e.add(while_in(__func__));
-}
-catch ( const std::system_error &e )
-{
-  throw std::system_error(e.code(), e.what() + while_in(__func__));
+  throw std::system_error(e.code(), e.what() + std::string(" remote ") + std::string(remote_endpoint_) + ":" + std::to_string(port_) + while_in(__func__));
 }
 
 void Fabric::bind(::fid_ep &ep_)

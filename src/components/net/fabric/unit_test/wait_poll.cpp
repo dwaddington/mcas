@@ -24,14 +24,14 @@
 namespace
 {
   /* A callback which simply rejects (for requeue) any callback it comes across */
-  component::IFabric_communicator::cb_acceptance reject(void *, ::status_t, std::uint64_t, std::size_t, void *)
+  component::IFabric_endpoint_connected::cb_acceptance reject(void *, ::status_t, std::uint64_t, std::size_t, void *)
   {
-    return component::IFabric_communicator::cb_acceptance::DEFER;
+    return component::IFabric_endpoint_connected::cb_acceptance::DEFER;
   }
 }
 
 unsigned wait_poll(
-  component::IFabric_communicator &comm_
+  component::IFabric_endpoint_connected &comm_
   , std::function<void(
     void *context
     , ::status_t

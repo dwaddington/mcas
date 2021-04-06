@@ -18,16 +18,17 @@
  */
 
 #include "pending_cnxns.h"
+#include <api/fabric_itf.h>
 
 Pending_cnxns::Pending_cnxns()
   : _m{}
   , _q{}
 {}
 
-void Pending_cnxns::push(cnxn_t c)
+void Pending_cnxns::push(cnxn_t && c)
 {
   guard g{_m};
-  _q.push(c);
+  _q.push(std::move(c));
 }
 
 auto Pending_cnxns::remove() -> cnxn_t
@@ -36,7 +37,7 @@ auto Pending_cnxns::remove() -> cnxn_t
   guard g{_m};
   if ( _q.size() != 0 )
   {
-    c = _q.front();
+    c = std::move(_q.front());
     _q.pop();
   }
   return c;

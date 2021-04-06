@@ -15,7 +15,7 @@
 
 #include <common/types.h> /* status_t */
 #include "registered_memory.h"
-#include <api/fabric_itf.h> /* IFabric_commuicator */
+#include <api/fabric_itf.h> /* IFabric_endpoint_connected */
 #include <memory> /* shared_ptr */
 
 struct server_grouped_connection;
@@ -24,7 +24,7 @@ struct remote_memory_subserver
 {
 private:
   server_grouped_connection &_parent;
-  std::shared_ptr<component::IFabric_communicator> _cnxn;
+  std::shared_ptr<component::IFabric_endpoint_connected> _cnxn;
   registered_memory _rm_out;
   registered_memory _rm_in;
 
@@ -37,7 +37,7 @@ public:
     , std::uint64_t remote_key_index
   );
 
-  component::IFabric_communicator &cnxn() { return *_cnxn; }
+  component::IFabric_endpoint_connected &cnxn() { return *_cnxn; }
 };
 
 #endif

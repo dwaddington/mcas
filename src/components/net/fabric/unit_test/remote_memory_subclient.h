@@ -21,7 +21,7 @@
 
 namespace component
 {
-  class IFabric_communicator;
+  class IFabric_endpoint_connected;
 }
 
 struct remote_memory_client_grouped;
@@ -30,7 +30,7 @@ struct remote_memory_subclient
 {
 private:
   remote_memory_client_grouped &_parent;
-  std::shared_ptr<component::IFabric_communicator> _cnxn;
+  std::shared_ptr<component::IFabric_endpoint_connected> _cnxn;
   registered_memory _rm_out;
   registered_memory _rm_in;
 
@@ -46,7 +46,7 @@ public:
     , std::uint64_t remote_key_index
   );
 
-  component::IFabric_communicator &cnxn() { return *_cnxn; }
+  component::IFabric_endpoint_connected &cnxn() { return *_cnxn; }
 
   void write(const std::string &msg);
   void read_verify(const std::string &msg);

@@ -10,16 +10,16 @@ run_minimal_hstore() {
   shift
  # run each test
   sleep $DELAY
-  $DIR/mcas-hstore-basic-0.sh $1
+  $DIR/mcas-hstore-put-0.sh $1
   sleep $DELAY
-  $DIR/mcas-hstore-cc-basic-0.sh $1
+  $DIR/mcas-hstore-cc-put-0.sh $1
   if $ado_prereq
   then sleep $DELAY
     $DIR/mcas-hstore-ado-0.sh $1
   fi
 }
 
-$DIR/mcas-mapstore-basic-0.sh $1
+$DIR/mcas-mapstore-put-0.sh $1
 if has_module_xpmem
 then sleep $DELAY
   $DIR/mcas-mapstore-ado-0.sh $1
