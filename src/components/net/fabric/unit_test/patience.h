@@ -13,18 +13,15 @@
 #ifndef _TEST_PATIENCE_H_
 #define _TEST_PATIENCE_H_
 
-#include <cstdint> /* uint16_t */
-#include <string>
-
 namespace component
 {
-  class IFabric;
+  class IFabric_endpoint_unconnected_client;
   class IFabric_client;
   class IFabric_client_grouped;
 }
 
-component::IFabric_client *open_connection_patiently(component::IFabric &fabric, const std::string &fabric_spec, const std::string ip_address, std::uint16_t port);
+component::IFabric_client * open_connection_patiently(component::IFabric_endpoint_unconnected_client *aep);
 
-component::IFabric_client_grouped *open_connection_grouped_patiently(component::IFabric &fabric, const std::string &fabric_spec, const std::string ip_address, std::uint16_t port);
+component::IFabric_client_grouped * open_connection_grouped_patiently(component::IFabric_endpoint_unconnected_client *aep);
 
 #endif

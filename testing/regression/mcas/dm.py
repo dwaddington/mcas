@@ -11,7 +11,7 @@ class dm(object):
        - the two values must be the same type
        - if the values are scalars, use the second value
        - if he values are dicts, depp-merge the dicts
-       - (not yet used anywhere) if the values are lists, extendsthe first list with the second
+       - (not yet used anywhere) if the values are lists, extends the first list with the second
     """
 
     def __init__(self, value_={}):

@@ -9,7 +9,6 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
 TESTID=$(basename --suffix .sh -- $0)
-DESC=$TESTID
 
 # launch hstore unit test 1
 TEST_LOG="test$TESTID-test.log"
@@ -22,4 +21,4 @@ trap "kill -9 $TEST_PID &> /dev/null" EXIT
 # wait for client to complete
 wait $TEST_PID
 
-pass_fail $CLIENT_LOG $TESTID $DESC
+pass_fail $CLIENT_LOG $TESTID

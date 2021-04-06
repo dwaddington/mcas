@@ -30,7 +30,7 @@ Fabric_factory::Fabric_factory()
 {
 }
 
-auto Fabric_factory::make_fabric(const std::string & json_configuration) -> component::IFabric *
+auto Fabric_factory::make_fabric(common::string_view json_configuration) -> component::IFabric *
 {
   return new Fabric(json_configuration);
 }

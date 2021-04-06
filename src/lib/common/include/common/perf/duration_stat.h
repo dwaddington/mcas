@@ -30,43 +30,48 @@ namespace common
 		struct duration_stat
 		{
 		private:
-			using clock_t = std::chrono::steady_clock;
+			using clock_type = std::chrono::steady_clock;
 		public:
-			using duration_t = clock_t::duration;
-			using time_point_t = clock_t::time_point;
-			using time_point = time_point_t; /* old */
-			using count_t = std::uint64_t;
+			using duration_type = clock_type::duration;
+			using time_point_type = clock_type::time_point;
+			using count_type = std::uint64_t;
 		private:
-			using rep_t = std::uint64_t;
-			std::atomic<duration_t::rep> _duration;
-			std::atomic<duration_t::rep> _delta; /* partial time incurret */
-			std::atomic<rep_t>           _dur_sq;
-			std::atomic<count_t>         _count;
+			using rep_type = std::uint64_t;
+			std::atomic<duration_type::rep> _duration;
+			std::atomic<duration_type::rep> _delta; /* partial time incurred */
+			std::atomic<rep_type>           _dur_sq;
+			std::atomic<count_type>         _count;
+			std::atomic<duration_type::rep> _min;
+			std::atomic<duration_type::rep> _max;
 		private:
 			double mean() const;
+			double variance() const;
 			double stddev() const;
+			double cv() const;
 
 			/* Absolute (or "active") versions */
-			static time_point_t a_now()
+			static time_point_type a_now()
 			{
-				return clock_t::now();
+				return clock_type::now();
 			}
 
-			void a_charge(const duration_t &d)
+			void a_charge(const duration_type &d)
 			{
 				_delta += d.count();
 			}
 
-			void a_record(const duration_t &d)
+			void a_record(const duration_type &d)
 			{
 				auto c = d.count() + _delta;
 				_delta = 0;
 				_duration += c;
-				_dur_sq += static_cast<count_t>(c * c);
+				_dur_sq += static_cast<count_type>(c * c);
+				if ( c < _min ) { _min = c; }
+				if ( _max < c ) { _max = c; }
 				++_count;
 			}
 
-			time_point_t a_record(const time_point_t &s)
+			time_point_type a_record(const time_point_type &s)
 			{
 				auto n = this->now();
 				auto d = n-s;
@@ -81,56 +86,60 @@ assert(0);
 			}
 
 			/* Inactive functions, for use when disabled */
-			static time_point_t i_now()
+			static time_point_type i_now()
 			{
-				return time_point_t{};
+				return time_point_type{};
 			}
 
-			void i_charge(const duration_t &)
-			{
-			}
-
-			void i_record(const duration_t &)
+			void i_charge(const duration_type &)
 			{
 			}
 
-			time_point_t i_record(const time_point_t &)
+			void i_record(const duration_type &)
 			{
-				return time_point_t{};
+			}
+
+			time_point_type i_record(const time_point_type &)
+			{
+				return time_point_type{};
 			}
 		public:
 			duration_stat();
 
 			static bool _clock_enabled;
 
-			static time_point_t now()
+			static time_point_type now()
 			{
 				return _clock_enabled ? a_now() : i_now();
 			}
 
-			void charge(const duration_t &d)
+			void charge(const duration_type &d)
 			{
 				return _clock_enabled ?  a_charge(d) : i_charge(d);
 			}
 
-			void record(const duration_t &d)
+			void record(const duration_type &d)
 			{
 				return _clock_enabled ?  a_record(d) : i_record(d);
 			}
 
-			time_point_t record(const time_point_t &s)
+			time_point_type record(const time_point_type &s)
 			{
 				return _clock_enabled ? a_record(s) : i_record(s);
 			}
 
-			count_t count() const;
+			count_type count() const;
 
-			double cv() const;
+			double mean_or_zero() const;
 
+			double stddev_or_zero() const;
 			double cv_or_zero() const;
 
 			std::chrono::nanoseconds::rep sum_durations_ns() const;
 			double sum_durations_sec() const;
+			double mean_durations_sec() const;
+			double durations_sec_min() const;
+			double durations_sec_max() const;
 
 			unsigned long long sum_durations_ns_squared() const;
 			operator bool() const { return _count != 0; }

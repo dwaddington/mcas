@@ -667,11 +667,11 @@ namespace
 }
 
 #include <cassert>
-std::shared_ptr<fi_info> parse_info(const std::string &s_, std::shared_ptr<fi_info> info_)
+std::shared_ptr<fi_info> parse_info(const common::string_view s_, std::shared_ptr<fi_info> info_)
 {
   assert(info_);
   rapidjson::Document jdoc;
-  jdoc.Parse(s_.c_str());
+  jdoc.Parse(s_.data());
   if ( jdoc.HasParseError() )
   {
     throw std::domain_error{std::string{"JSON parse error \""} + rapidjson::GetParseError_En(jdoc.GetParseError()) + "\" at " + std::to_string(jdoc.GetErrorOffset())};
@@ -686,7 +686,7 @@ std::shared_ptr<fi_info> parse_info(const std::string &s_, std::shared_ptr<fi_in
   }
 }
 
-std::shared_ptr<fi_info> parse_info(const std::string &s_)
+std::shared_ptr<fi_info> parse_info(const common::string_view s_)
 {
   return parse_info(s_, make_fi_info());
 }

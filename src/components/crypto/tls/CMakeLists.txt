@@ -21,7 +21,8 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libbase64/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 
 link_directories(${CMAKE_BINARY_DIR}/src/lib/libbase64)
-link_directories(/usr/lib/x86_64-linux-gnu)
+link_directories(${CMAKE_PREFIX_INSTALL}/lib)
+link_directories(${CMAKE_PREFIX_INSTALL}/lib64)
 
 include_directories(../../../server/mcas/src/)
 
@@ -34,7 +35,7 @@ target_link_libraries(${PROJECT_NAME} common pthread numa dl rt z gnutls base64)
 
 # set the linkage in the install/lib
 set_target_properties(${PROJECT_NAME} PROPERTIES
-  INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
+  INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/lib64)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 #install(FILES "mcas-privkey.pem" DESTINATION certs)

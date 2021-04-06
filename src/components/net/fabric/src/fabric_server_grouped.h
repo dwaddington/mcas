@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -12,10 +12,11 @@
 */
 
 
-#ifndef _FABRIC_CLIENT_GROUPED_H_
-#define _FABRIC_CLIENT_GROUPED_H_
+#ifndef _FABRIC_SERVER_GROUPED_H_
+#define _FABRIC_SERVER_GROUPED_H_
 
 #include <api/fabric_itf.h> /* component::IFabric_server_grouped */
+#include "event_expecter.h"
 #include "fabric_connection_server.h"
 
 #include "fabric_generic_grouped.h"
@@ -37,12 +38,12 @@ class Fabric_comm_grouped;
 #endif
 
 class Fabric_server_grouped
-  : public component::IFabric_server_grouped
-  , public Fabric_connection_server
-  , public component::IFabric_communicator /* for internal use */
+	: public component::IFabric_server_grouped
+	, Fabric_connection_server
+	, public event_expecter
+	, public component::IFabric_initiator /* for internal use */
 {
-  Fabric_op_control &c() { return *this; }
-  Fabric_generic_grouped _g;
+	Fabric_generic_grouped _g;
 
   /* BEGIN component::IFabric_server_grouped (IFabric_connection) */
   /**
@@ -55,7 +56,7 @@ class Fabric_server_grouped
     , std::uint64_t flags
   ) override
   {
-    return Fabric_op_control::register_memory(contig, key, flags);
+    return aep()->register_memory(contig, key, flags);
   }
   /**
    * @throw std::range_error - address not registered
@@ -65,28 +66,29 @@ class Fabric_server_grouped
     const memory_region_t memory_region
   ) override
   {
-    return Fabric_op_control::deregister_memory(memory_region);
+    return aep()->deregister_memory(memory_region);
   };
   std::uint64_t get_memory_remote_key(
     const memory_region_t memory_region
   ) const noexcept override
   {
-    return Fabric_op_control::get_memory_remote_key(memory_region);
+    return aep()->get_memory_remote_key(memory_region);
   };
   void *get_memory_descriptor(
     const memory_region_t memory_region
   ) const noexcept override
   {
-    return Fabric_op_control::get_memory_descriptor(memory_region);
+    return aep()->get_memory_descriptor(memory_region);
   };
-  std::string get_peer_addr() override { return Fabric_op_control::get_peer_addr(); }
-  std::string get_local_addr() override { return Fabric_op_control::get_local_addr(); }
+  std::string get_peer_addr() override { return Fabric_connection_server::get_peer_addr(); }
+  std::string get_local_addr() override { return Fabric_connection_server::get_local_addr(); }
 public:
-  std::size_t max_message_size() const noexcept override { return Fabric_op_control::max_message_size(); }
-  std::size_t max_inject_size() const noexcept override { return Fabric_op_control::max_inject_size(); }
+	void expect_event(std::uint32_t ev) { aep()->expect_event(ev); }
+  std::size_t max_message_size() const noexcept override { return Fabric_connection_server::max_message_size(); }
+  std::size_t max_inject_size() const noexcept override { return Fabric_connection_server::max_inject_size(); }
   /* END component::IFabric_server_grouped (IFabric_connection) */
 private:
-  component::IFabric_communicator *allocate_group() override { return _g.allocate_group(); }
+  component::IFabric_group *allocate_group() override { return _g.allocate_group(); }
 
 public:
   /*
@@ -98,10 +100,8 @@ public:
    * @throw fabric_runtime_error : std::runtime_error : ::fi_enable fail
    * @throw fabric_runtime_error : std::runtime_error : ::fi_ep_bind fail (event registration)
    */
-  explicit Fabric_server_grouped(
-    Fabric &fabric
-    , event_producer &ep
-    , ::fi_info & info
+	explicit Fabric_server_grouped(
+		component::IFabric_endpoint_unconnected_server *aep
   );
 
   ~Fabric_server_grouped();
@@ -113,7 +113,7 @@ public:
    */
   std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override
   {
-    return Fabric_connection_server::poll_completions(completion_callback);
+    return aep()->poll_completions(completion_callback);
   }
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
@@ -121,7 +121,7 @@ public:
    */
   std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override
   {
-    return Fabric_connection_server::poll_completions(completion_callback);
+    return aep()->poll_completions(completion_callback);
   }
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
@@ -129,7 +129,7 @@ public:
    */
   std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override
   {
-    return Fabric_connection_server::poll_completions_tentative(completion_callback);
+    return aep()->poll_completions_tentative(completion_callback);
   }
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
@@ -137,7 +137,7 @@ public:
    */
   std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
   {
-    return Fabric_connection_server::poll_completions(completion_callback, callback_param);
+    return aep()->poll_completions(completion_callback, callback_param);
   }
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
@@ -145,7 +145,7 @@ public:
    */
   std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
   {
-    return Fabric_connection_server::poll_completions_tentative(completion_callback, callback_param);
+    return aep()->poll_completions_tentative(completion_callback, callback_param);
   }
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
@@ -153,7 +153,7 @@ public:
    */
   std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
   {
-    return Fabric_connection_server::poll_completions(completion_callback, callback_param);
+    return aep()->poll_completions(completion_callback, callback_param);
   }
   /**
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
@@ -161,68 +161,70 @@ public:
    */
   std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
   {
-    return Fabric_connection_server::poll_completions_tentative(completion_callback, callback_param);
+    return aep()->poll_completions_tentative(completion_callback, callback_param);
   }
 
-  std::size_t stalled_completion_count() override { return Fabric_connection_server::stalled_completion_count(); }
+  std::size_t stalled_completion_count() override { return aep()->stalled_completion_count(); }
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    * @throw std::system_error : pselect fail
    */
-  void wait_for_next_completion(unsigned polls_limit) override { return Fabric_connection_server::wait_for_next_completion(polls_limit); }
+  void wait_for_next_completion(unsigned polls_limit) override { return aep()->wait_for_next_completion(polls_limit); }
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    * @throw std::system_error : pselect fail
    */
-  void wait_for_next_completion(std::chrono::milliseconds timeout) override { return Fabric_connection_server::wait_for_next_completion(timeout); }
-  void unblock_completions() override { return Fabric_connection_server::unblock_completions(); }
+  void wait_for_next_completion(std::chrono::milliseconds timeout) override { return aep()->wait_for_next_completion(timeout); }
+  void unblock_completions() override { return aep()->unblock_completions(); }
   /* END IFabric_server_grouped (IFabric_op_completer) */
 
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_sendv fail
    */
-  void post_send(const ::iovec *first, const ::iovec *last, void **desc, void *context) override { return _g.post_send(first, last, desc, context); }
-  void post_send(const std::vector<::iovec>& buffers, void *context) override { return _g.post_send(&*buffers.begin(), &*buffers.end(), context); }
+  void post_send(gsl::span<const ::iovec> buffers, void **desc, void *context) override { return _g.post_send(buffers, desc, context); }
+  void post_send(gsl::span<const ::iovec> buffers, void *context) override { return _g.post_send(buffers, context); }
+
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_recvv fail
    */
-  void post_recv(const ::iovec *first, const ::iovec *last, void **desc, void *context) override { return _g.post_recv(first, last, desc, context); }
-  void post_recv(const std::vector<::iovec>& buffers, void *context) override { return _g.post_recv(&*buffers.begin(), &*buffers.end(), context); }
+  void post_recv(gsl::span<const ::iovec> buffers, void **desc, void *context) override { return _g.post_recv(buffers, desc, context); }
+  void post_recv(gsl::span<const ::iovec> buffers, void *context) override { return _g.post_recv(buffers, context); }
+
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_readv fail
    */
   void post_read(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
-  ) override { return _g.post_read(first, last, desc, remote_addr, key, context); }
+  ) override { return _g.post_read(buffers, desc, remote_addr, key, context); }
   void post_read(
-    const std::vector<::iovec>& buffers,
+    gsl::span<const ::iovec> buffers,
     std::uint64_t remote_addr,
     std::uint64_t key,
     void *context
-  ) override { return _g.post_read(&*buffers.begin(), &*buffers.end(), remote_addr, key, context); }
+  ) override { return _g.post_read(buffers, remote_addr, key, context); }
+
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_writev fail
    */
   void post_write(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
-  ) override { return _g.post_write(first, last, desc, remote_addr, key, context); }
+  ) override { return _g.post_write(buffers, desc, remote_addr, key, context); }
   void post_write(
-    const std::vector<::iovec>& buffers,
+    gsl::span<const ::iovec> buffers,
     std::uint64_t remote_addr,
     std::uint64_t key,
     void *context
-  ) override { return _g.post_write(&*buffers.begin(), &*buffers.end(), remote_addr, key, context); }
+  ) override { return _g.post_write(buffers, remote_addr, key, context); }
   void inject_send(const void *buf, std::size_t len) override { return _g.inject_send(buf, len); }
+
   fabric_types::addr_ep_t get_name() const;
 
   void forget_group(Fabric_comm_grouped *);

@@ -20,11 +20,11 @@
  *
  */
 
+#include <common/string_view.h> /* string_view */
 #include <memory> /* shared_ptr */
-#include <string> /* string */
 
 struct addrinfo;
 
-std::shared_ptr<addrinfo> getaddrinfo_ptr(std::string dst_addr, uint16_t port);
+std::shared_ptr<addrinfo> getaddrinfo_ptr(common::string_view dst_addr, uint16_t port);
 
 #endif

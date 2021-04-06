@@ -17,16 +17,18 @@ namespace mcas
 {
 Fabric_connection_base::Fabric_connection_base(unsigned debug_level_,
                                                gsl::not_null<component::IFabric_server_factory *> factory,
-                                               gsl::not_null<component::IFabric_server *> fabric_connection)
+                                               std::unique_ptr<component::IFabric_endpoint_unconnected_server> && fabric_preconnection)
   : common::log_source(debug_level_),
-    _oc(factory, fabric_connection, open_connection_construct_key{}),
-    _bm(debug_level_, fabric_connection),
-    _max_message_size(transport()->max_message_size()),
-    _deferred_unlock{},
+    _preconnection(std::move(fabric_preconnection)),
+    _bm(debug_level_, _preconnection.get()),
     _recv_buffer_posted_count{},
-    _completed_recv_buffers{},
     _send_buffer_posted_count{},
-    _send_value_posted_count{}
+    _send_value_posted_count{},
+    _completed_recv_buffers{},
+    /* one receive buffer must be posted before connection is opened, to contain the first client message */
+    _oc(factory, (post_recv_buffer(allocate(static_recv_callback)), factory->open_connection(_preconnection.get())), open_connection_construct_key{}),
+    _max_message_size(transport()->max_message_size()),
+    _deferred_unlock{}
 {
 }
 

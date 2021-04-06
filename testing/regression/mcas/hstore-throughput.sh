@@ -9,9 +9,8 @@ STORETYPE=hstore
 VALUE_LENGTH=${VALUE_LENGTH:-4096}
 KEY_LENGTH=${KEY_LENGTH:-8}
 READ_PCT=${READ_PCT:-0}
-TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE-L$VALUE_LENGTH-R${READ_PCT}"
+TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE-K$KEY_LENGTH-V$VALUE_LENGTH-R${READ_PCT}"
 # kvstore-keylength-valuelength-store-netprovider
-DESC="hstore-8-$VALUE_LENGTH-$DAXTYPE"
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
@@ -31,10 +30,11 @@ EXPANSION=20 # usually sufficient, but not for 4K --read_pct 0 or 50 location 48
 EXPANSION=24 # usually sufficient, but not for 4K --read_pct 0 location 9873
 EXPANSION=26 # sufficient
 
-ELEMENT_COUNT=$((USABLE_STORE_SIZE / ( (KEY_LENGTH+VALUE_LENGTH)*EXPANSION/10 ) ))
-if [ 100000 -lt $ELEMENT_COUNT ]
-then ELEMENT_COUNT=100000
+RECOMMENDED_ELEMENT_COUNT=$((USABLE_STORE_SIZE / ( (KEY_LENGTH+VALUE_LENGTH)*EXPANSION/10 ) ))
+if [ 100000 -lt $RECOMMENDED_ELEMENT_COUNT ]
+then RECOMMENDED_ELEMENT_COUNT=100000
 fi
+ELEMENT_COUNT=${ELEMENT_COUNT:-$RECOMMENDED_ELEMENT_COUNT}
 
 # adjust elements so that USABLE_STORE_SIZE * elements is not more than available storage
 CLIENT_LOG="test$TESTID-client.log"
@@ -57,4 +57,4 @@ else
     GOAL=10
 fi
 
-pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $DESC $GOAL
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_by_iops $CLIENT_LOG $TESTID $GOAL

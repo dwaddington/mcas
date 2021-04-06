@@ -49,13 +49,12 @@ pass_fail_by_code () {
 pass_fail () {
     typeset LOG=$1
     typeset TESTID=$2
-    typeset DESC=$3
     if cat $LOG | grep -q 'FAILED TEST' ; then
-        echo "Test $TESTID ($DESC): $(color_fail fail)"
+        echo "Test $TESTID: $(color_fail fail)"
     elif cat $LOG | grep -q 'PASSED' ; then
-        echo "Test $TESTID ($DESC): $(color_pass passed)"
+        echo "Test $TESTID: $(color_pass passed)"
     else
-        echo "Test $TESTID ($DESC): $(color_fail fail) (no results)"
+        echo "Test $TESTID: $(color_fail fail) (no results)"
     fi
 }
 
@@ -64,14 +63,11 @@ pass_by_iops () {
     shift
     typeset TESTID=$1
     shift
-    typeset DESC=$1
-    shift
     typeset -i GOAL=$(scale_by_transport "$@")
 
     iops=$(cat $LOG | grep -Po 'IOPS: \K[0-9]*')
-    echo "Test $TESTID: $DESC IOPS ($iops)"
 
-	exception=$(cat $LOG | grep 'exception' | head -1)
+    exception=$(cat $LOG | grep 'exception' | head -1)
 
     if [ -n "$exception" ]; then
         echo "Test $TESTID: $(color_fail fail) ($exception)"
@@ -134,4 +130,15 @@ clamp_cpu () {
  typeset -i CPU_DESIRED=$1
  typeset -i CPU_MAX=$(($(/bin/grep ^processor /proc/cpuinfo | wc -l) - 1))
  echo $((CPU_DESIRED < CPU_MAX ? CPU_DESIRED : CPU_MAX))
+}
+
+# scale the first input by percentages represented by subsequent inputs
+scale() {
+  typeset -i sf=900 # (2*3*5)^2, an attempt to lessen rounding effects
+  base=$(($1*sf))
+  shift
+  for i in $@
+  do base=$((base*i/100))
+  done
+  echo $((base/sf))
 }

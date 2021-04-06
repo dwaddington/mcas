@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -21,8 +21,9 @@
 
 #include "async_req_record.h"
 #include "fabric_comm_grouped.h"
+#include "fabric_connection.h"
 #include "fabric_cq.h"
-#include "fabric_op_control.h"
+#include "fabric_endpoint.h"
 #include "fabric_runtime_error.h"
 
 #include <stdexcept> /* logic_error */
@@ -38,7 +39,7 @@ struct event_producer;
 
 /* Note: the info is owned by the caller, and must be copied if it is to be saved. */
 Fabric_generic_grouped::Fabric_generic_grouped(
-  Fabric_op_control &cnxn_
+  fabric_connection *cnxn_
   , Fabric_cq &rxcq_
   , Fabric_cq &txcq_
 )
@@ -64,7 +65,7 @@ auto Fabric_generic_grouped::register_memory(
 ) -> memory_region_t
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.register_memory(contig, key, flags);
+  return aep()->register_memory(contig, key, flags);
 }
 
 void Fabric_generic_grouped::deregister_memory(
@@ -72,98 +73,95 @@ void Fabric_generic_grouped::deregister_memory(
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.deregister_memory(memory_region);
+  return aep()->deregister_memory(memory_region);
 }
 
 std::uint64_t Fabric_generic_grouped::get_memory_remote_key(
   const memory_region_t memory_region
 ) const noexcept
 {
-  return _cnxn.get_memory_remote_key(memory_region);
+  return aep()->get_memory_remote_key(memory_region);
 }
 
 void *Fabric_generic_grouped::get_memory_descriptor(
   const memory_region_t memory_region
 ) const noexcept
 {
-  return _cnxn.get_memory_descriptor(memory_region);
+  return aep()->get_memory_descriptor(memory_region);
 }
 
 std::string Fabric_generic_grouped::get_peer_addr()
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.get_peer_addr();
+  return _cnxn->get_peer_addr();
 }
+
 std::string Fabric_generic_grouped::get_local_addr()
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.get_local_addr();
+  return _cnxn->get_local_addr();
 }
 
 void Fabric_generic_grouped::post_send(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , void *context_
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_send(first_, last_, desc_, context_);
+  return aep()->post_send(buffers_, desc_, context_);
 }
 
 void Fabric_generic_grouped::post_send(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void *context_
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_send(first_, last_, context_);
+  return aep()->post_send(buffers_, context_);
 }
 
 std::size_t Fabric_generic_grouped::stalled_completion_count()
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.stalled_completion_count();
+  return aep()->stalled_completion_count();
 }
 
 void Fabric_generic_grouped::wait_for_next_completion(unsigned polls_limit)
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.wait_for_next_completion(polls_limit);
+  return aep()->wait_for_next_completion(polls_limit);
 }
 
 void Fabric_generic_grouped::wait_for_next_completion(std::chrono::milliseconds timeout)
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.wait_for_next_completion(timeout);
+  return aep()->wait_for_next_completion(timeout);
 }
 
 void Fabric_generic_grouped::unblock_completions()
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.unblock_completions();
+  return aep()->unblock_completions();
 }
 
 void Fabric_generic_grouped::post_recv(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , void *context_
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_recv(first_, last_, desc_, context_);
+  return aep()->post_recv(buffers_, desc_, context_);
 }
 
 void Fabric_generic_grouped::post_recv(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void *context_
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_recv(first_, last_, context_);
+  return aep()->post_recv(buffers_, context_);
 }
 
   /**
@@ -177,8 +175,7 @@ void Fabric_generic_grouped::post_recv(
    *
    */
 void Fabric_generic_grouped::post_read(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , uint64_t remote_addr_
   , uint64_t key_
@@ -186,19 +183,18 @@ void Fabric_generic_grouped::post_read(
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_read(first_, last_, desc_, remote_addr_, key_, context_);
+  return aep()->post_read(buffers_, desc_, remote_addr_, key_, context_);
 }
 
 void Fabric_generic_grouped::post_read(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , uint64_t remote_addr_
   , uint64_t key_
   , void *context_
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_read(first_, last_, remote_addr_, key_, context_);
+  return aep()->post_read(buffers_, remote_addr_, key_, context_);
 }
 
   /**
@@ -212,8 +208,7 @@ void Fabric_generic_grouped::post_read(
    *
    */
 void Fabric_generic_grouped::post_write(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , void **desc_
   , uint64_t remote_addr_
   , uint64_t key_
@@ -221,19 +216,18 @@ void Fabric_generic_grouped::post_write(
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_write(first_, last_, desc_, remote_addr_, key_, context_);
+  return aep()->post_write(buffers_, desc_, remote_addr_, key_, context_);
 }
 
 void Fabric_generic_grouped::post_write(
-  const ::iovec *first_
-  , const ::iovec *last_
+  gsl::span<const ::iovec> buffers_
   , uint64_t remote_addr_
   , uint64_t key_
   , void *context_
 )
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.post_write(first_, last_, remote_addr_, key_, context_);
+  return aep()->post_write(buffers_, remote_addr_, key_, context_);
 }
 
   /**
@@ -245,7 +239,7 @@ void Fabric_generic_grouped::post_write(
 void Fabric_generic_grouped::inject_send(const void *buf_, std::size_t len_)
 {
   std::lock_guard<std::mutex> k{_m_cnxn};
-  return _cnxn.inject_send(buf_, len_);
+  return aep()->inject_send(buf_, len_);
 }
 
 /**
@@ -270,7 +264,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -292,7 +286,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -314,7 +308,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -336,7 +330,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -358,7 +352,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -380,7 +374,7 @@ std::size_t Fabric_generic_grouped::poll_completions(const component::IFabric_op
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -402,7 +396,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::
   }
 
   std::lock_guard<std::mutex> k{_m_cnxn};
-  if ( _cnxn.is_shut_down() && ct_total == 0 )
+  if ( aep()->is_shut_down() && ct_total == 0 )
   {
     throw std::logic_error(std::string("Fabric_generic_grouped") + __func__ + ": Connection closed");
   }
@@ -410,7 +404,7 @@ std::size_t Fabric_generic_grouped::poll_completions_tentative(const component::
   return ct_total;
 }
 
-auto Fabric_generic_grouped::allocate_group() -> component::IFabric_communicator *
+auto Fabric_generic_grouped::allocate_group() -> component::IFabric_group *
 {
   auto comm = new Fabric_comm_grouped(*this, this->_rxcq, this->_txcq);
   {
@@ -437,10 +431,15 @@ void Fabric_generic_grouped::forget_group(Fabric_comm_grouped *comm_)
 
 std::size_t Fabric_generic_grouped::max_message_size() const noexcept
 {
-  return _cnxn.max_message_size();
+  return _cnxn->max_message_size();
 }
 
 std::size_t Fabric_generic_grouped::max_inject_size() const noexcept
 {
-  return _cnxn.max_inject_size();
+  return _cnxn->max_inject_size();
+}
+
+fabric_endpoint *Fabric_generic_grouped::aep() const
+{
+	return _cnxn->aep();
 }

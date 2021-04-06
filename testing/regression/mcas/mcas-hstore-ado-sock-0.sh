@@ -7,7 +7,6 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
 STORETYPE=hstore
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
-DESC=$TESTID-$DAXTYPE
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
@@ -36,4 +35,4 @@ trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 wait $CLIENT_PID; CLIENT_RC=$?
 wait $SERVER_PID; SERVER_RC=$?
 
-pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_fail $CLIENT_LOG $TESTID $DESC
+pass_fail_by_code client $CLIENT_RC server $SERVER_RC && pass_fail $CLIENT_LOG $TESTID

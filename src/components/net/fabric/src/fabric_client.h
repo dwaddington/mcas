@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -16,8 +16,10 @@
 #define _FABRIC_CLIENT_H_
 
 #include <api/fabric_itf.h> /* component::IFabric_client */
+#include <common/string_view.h>
 #include "fabric_connection_client.h"
 
+#include <gsl/span>
 #include <cstdint> /* uint{16,64}_t */
 #include <string>
 
@@ -61,7 +63,11 @@ public:
    * @throw std::system_error - writing event pipe (readerr_eq)
    * @throw std::system_error - receiving data on socket
    */
-  explicit Fabric_client(Fabric &fabric, event_producer &ep, ::fi_info & info, const std::string & remote, std::uint16_t control_port);
+  explicit Fabric_client(
+    component::IFabric_endpoint_unconnected_client *aep_
+    , event_producer &ep
+	, fabric_types::addr_ep_t peer_addr
+  );
   ~Fabric_client();
 
   /* BEGIN IFabric_op_completer */
@@ -69,71 +75,50 @@ public:
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override
-  {
-    return Fabric_connection_client::poll_completions(completion_callback);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_old &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override
-  {
-    return Fabric_connection_client::poll_completions(completion_callback);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_definite &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override
-  {
-    return Fabric_connection_client::poll_completions_tentative(completion_callback);
-  }
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_tentative &completion_callback) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override
-  {
-    return Fabric_connection_client::poll_completions(completion_callback, callback_param);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite &completion_callback, void *callback_param) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override
-  {
-    return Fabric_connection_client::poll_completions_tentative(completion_callback, callback_param);
-  }
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative &completion_callback, void *callback_param) override;
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override
-  {
-    return Fabric_connection_client::poll_completions(completion_callback, callback_param);
-  }
+  std::size_t poll_completions(const component::IFabric_op_completer::complete_param_definite_ptr_noexcept completion_callback, void *callback_param) override;
   /**
    * @throw IFabric_runtime_error - cq_read unhandled error
    * @throw std::logic_error - called on closed connection
    */
-  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override
-  {
-    return Fabric_connection_client::poll_completions_tentative(completion_callback, callback_param);
-  }
+  std::size_t poll_completions_tentative(const component::IFabric_op_completer::complete_param_tentative_ptr_noexcept completion_callback, void *callback_param) override;
 
-  std::size_t stalled_completion_count() override { return Fabric_op_control::stalled_completion_count(); }
+  std::size_t stalled_completion_count() override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    * @throw std::system_error : pselect fail
    */
-  void wait_for_next_completion(unsigned polls_limit) override { return Fabric_op_control::wait_for_next_completion(polls_limit); };
+  void wait_for_next_completion(unsigned polls_limit) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_control fail
    * @throw std::system_error : pselect fail
    */
-  void wait_for_next_completion(std::chrono::milliseconds timeout) override { return Fabric_op_control::wait_for_next_completion(timeout); };
-  void unblock_completions() override { return Fabric_op_control::unblock_completions(); };
+  void wait_for_next_completion(std::chrono::milliseconds timeout) override;
+  void unblock_completions() override;
   /* END IFabric_op_completer */
 
   /**
@@ -144,7 +129,7 @@ public:
     const_byte_span contig
     , std::uint64_t key
     , std::uint64_t flags
-  ) override { return Fabric_memory_control::register_memory(contig, key, flags); }
+  ) override;
 
   /**
    * @throw std::range_error - address not registered
@@ -152,91 +137,87 @@ public:
    */
   void deregister_memory(
     const memory_region_t memory_region
-  ) override { return Fabric_memory_control::deregister_memory(memory_region); }
+  ) override;
 
   std::uint64_t get_memory_remote_key(
     const memory_region_t memory_region
-  ) const noexcept override { return Fabric_memory_control::get_memory_remote_key(memory_region); }
+  ) const noexcept override;
 
   void *get_memory_descriptor(
     const memory_region_t memory_region
-  ) const noexcept override { return Fabric_memory_control::get_memory_descriptor(memory_region); }
+  ) const noexcept override;
 
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_sendv fail
    */
   void post_send(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , void *context
-  ) override { return Fabric_connection_client::post_send(first, last, desc, context); }
+  ) override;
 
   void post_send(
-    const std::vector<::iovec>& buffers
+    gsl::span<const ::iovec> buffers
     , void *context
-  ) override { return Fabric_connection_client::post_send(&*buffers.begin(), &*buffers.end(), context); }
+  ) override;
 
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_recvv fail
    */
   void post_recv(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , void *context
-  ) override { return Fabric_connection_client::post_recv(first, last, desc, context); }
+  ) override;
 
   void post_recv(
-    const std::vector<::iovec>& buffers
+    gsl::span<const ::iovec> buffers
     , void *context
-  ) override { return Fabric_op_control::post_recv(&*buffers.begin(), &*buffers.end(), context); }
+  ) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_readv fail
    */
   void post_read(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
-  ) override { return Fabric_op_control::post_read(first, last, desc, remote_addr, key, context); }
+  ) override;
   void post_read(
-    const std::vector<::iovec>& buffers,
+    gsl::span<const ::iovec> buffers,
     std::uint64_t remote_addr,
     std::uint64_t key,
     void *context
-  ) override { return Fabric_op_control::post_read(&*buffers.begin(), &*buffers.end(), remote_addr, key, context); }
+  ) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_writev fail
    */
   void post_write(
-    const ::iovec *first
-    , const ::iovec *last
+    gsl::span<const ::iovec> buffers
     , void **desc
     , std::uint64_t remote_addr
     , std::uint64_t key
     , void *context
-  ) override { return Fabric_op_control::post_write(first, last, desc, remote_addr, key, context); }
+  ) override;
   void post_write(
-    const std::vector<::iovec>& buffers,
+    gsl::span<const ::iovec> buffers,
     std::uint64_t remote_addr,
     std::uint64_t key,
     void *context
-  ) override { return Fabric_op_control::post_write(&*buffers.begin(), &*buffers.end(), remote_addr, key, context); }
+  ) override;
   /*
    * @throw fabric_runtime_error : std::runtime_error : ::fi_inject fail
    */
   void inject_send(
     const void *buf
     , const std::size_t len
-  ) override { return Fabric_op_control::inject_send(buf, len); }
+  ) override;
 
-  std::string get_peer_addr() override { return Fabric_op_control::get_peer_addr(); }
-  std::string get_local_addr() override { return Fabric_op_control::get_local_addr(); }
-  std::size_t max_message_size() const noexcept override { return Fabric_op_control::max_message_size(); }
-  std::size_t max_inject_size() const noexcept override { return Fabric_op_control::max_inject_size(); }
+  std::string get_peer_addr() override { return Fabric_connection_client::get_peer_addr(); }
+  std::string get_local_addr() override { return Fabric_connection_client::get_local_addr(); }
+  std::size_t max_message_size() const noexcept override { return Fabric_connection_client::max_message_size(); }
+  std::size_t max_inject_size() const noexcept override { return Fabric_connection_client::max_inject_size(); }
 };
 #pragma GCC diagnostic pop
 

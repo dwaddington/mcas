@@ -22,7 +22,6 @@ else()
   set(GTEST_LIB gtestd)
 endif()
 
-
 add_executable(tls-test1 test1.cpp)
 target_link_libraries(tls-test1 ${ASAN_LIB} common numa ${GTEST_LIB} pthread dl boost_system boost_program_options)
 
