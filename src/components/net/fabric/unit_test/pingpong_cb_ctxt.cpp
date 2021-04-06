@@ -10,11 +10,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
+#include <api/fabric_itf.h>
 #include "pingpong_cb_ctxt.h"
 
 #include "pingpong_cnxn_state.h"
 
-buffer_state::buffer_state(component::IFabric_connection &cnxn_, std::size_t buffer_size_, std::uint64_t remote_key_, std::size_t msg_size_)
+buffer_state::buffer_state(component::IFabric_memory_control &cnxn_, std::size_t buffer_size_, std::uint64_t remote_key_, std::size_t msg_size_)
   : _rm{cnxn_, buffer_size_, remote_key_}
   , v{{&_rm[0], msg_size_}}
   , d{_rm.desc()}
@@ -33,7 +35,7 @@ cb_ctxt::cb_ctxt(
   cnxn_state &state_
   , cb_t cb_call_
   , cb_ctxt *response_
-  , component::IFabric_connection &cnxn_
+  , component::IFabric_memory_control &cnxn_
   , std::size_t buffer_size_
   , std::uint64_t remote_key_
   , std::size_t msg_size_

@@ -677,6 +677,7 @@ public:
 
 
 class IMCAS_factory : public IKVStore_factory {
+  using string_view = common::string_view;
 public:
   // clang-format off
   DECLARE_INTERFACE_UUID(0xfacf1b99,0xbc51,0x49ff,0xa27b,0xd4,0xe8,0x19,0x03,0xbb,0x02);
@@ -693,26 +694,26 @@ public:
    *
    * @return Pointer to IMCAS instance. Use release_ref() to close.
    */
-  virtual IMCAS* mcas_create(const unsigned, // debug_level
+  virtual IMCAS* mcas_create_nsd(const unsigned, // debug_level
                              const unsigned, // patience with server (in seconds)
-                             const std::string&, // owner
-                             const boost::optional<std::string>&, // src_nic_device
-                             const boost::optional<std::string>&, // src_ip_addr
-                             const std::string&, // dest_addr_with_port
-                             const std::string = "") // other
+                             const string_view, // owner
+                             const string_view, // src_nic_device
+                             const string_view, // source: src_ip_addr
+                             const string_view, // destination: dest_addr_with_port
+                             const string_view = string_view()) // other
   {
     throw API_exception("IMCAS_factory::mcas_create(debug_level,patience,owner,addr_with_port,"
                         "nic_device) not implemented");
   }
 
-  IMCAS* mcas_create(const unsigned     debug_level,
-                     const unsigned     patience,
-                     const std::string& owner,
-                     const std::string& dest_addr_with_port,
-                     const std::string& nic_device,
-                     const std::string  other = "")
+  IMCAS* mcas_create(const unsigned    debug_level,
+                     const unsigned    patience,
+                     const string_view owner,
+                     const string_view dest_addr_with_port,
+                     const string_view nic_device,
+                     const string_view other = string_view())
   {
-    return mcas_create(debug_level, patience, owner, nic_device, boost::optional<std::string>(), dest_addr_with_port, other);
+    return mcas_create_nsd(debug_level, patience, owner, nic_device, string_view(), dest_addr_with_port, other);
   }
 };
 

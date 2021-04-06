@@ -29,7 +29,7 @@ struct buffer_state
   registered_memory _rm;
   std::vector<::iovec> v;
   std::vector<void *> d;
-  explicit buffer_state(component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key, std::size_t msg_size);
+  explicit buffer_state(component::IFabric_memory_control &cnxn, std::size_t size, std::uint64_t remote_key, std::size_t msg_size);
   buffer_state(buffer_state &&) noexcept = default;
 };
 

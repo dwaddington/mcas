@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -26,12 +26,10 @@
 
 /* Note: the info is owned by the caller, and must be copied if it is to be saved. */
 Fabric_server_grouped::Fabric_server_grouped(
-    Fabric &fabric_
-    , event_producer &ep_
-    , ::fi_info & info_
+	component::IFabric_endpoint_unconnected_server *aep_
 )
-  : Fabric_connection_server(fabric_, ep_, info_)
-  , _g(*this, this->rxcq(), this->txcq())
+	: Fabric_connection_server(aep_)
+	, _g(this, aep()->rxcq(), aep()->txcq())
 {
 }
 

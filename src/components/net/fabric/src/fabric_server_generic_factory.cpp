@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,11 +14,11 @@
 
 #include "fabric_server_generic_factory.h"
 
+#include "event_expecter.h"
 #include "event_producer.h"
 #include "fabric.h"
 #include "fabric_check.h"
-#include "fabric_memory_control.h"
-#include "fabric_op_control.h"
+#include "fabric_endpoint_server.h"
 #include "fabric_util.h" /* get_name */
 #include "fd_control.h"
 #include "system_fail.h"
@@ -103,10 +103,10 @@ try
   {
   case FI_CONNREQ:
     {
-      auto conn = new_server(_fabric, _eq, *entry_.info);
+      auto aep = std::unique_ptr<component::IFabric_endpoint_unconnected_server>(new fabric_endpoint_server(_fabric, _eq, *entry_.info));
       std::lock_guard<std::mutex> g{_m_pending};
       pending_count++;
-      _pending.push(conn);
+      _pending.push(std::move(aep));
     }
     break;
   default:
@@ -286,53 +286,30 @@ void Fabric_server_generic_factory::listen_loop(
   }
 }
 
-Fabric_memory_control * Fabric_server_generic_factory::get_new_connection()
+auto Fabric_server_generic_factory::get_new_endpoint_unconnected() -> component::IFabric_endpoint_unconnected_server *
 {
-#if 1
-  /* clumsy way to limit the scope of a lock_guard: immediate call of a lambda */
-  auto c = [this] () {
-    std::lock_guard<std::mutex> g{_m_pending};
-    return _pending.remove();
-  }();
-
-  if ( c )
-  {
-    std::static_pointer_cast<Fabric_op_control>(
-      std::static_pointer_cast<Fabric_memory_control>(c)
-    )->expect_event(FI_CONNECTED);
-
-    _open.add(c);
-    return &*c;
-  }
-#else
-  static int count = 1;
-  {
-    std::lock_guard<std::mutex> g{_m_pending};
-    auto f = _pending.remove();
-    if(f) {
-      _open.add(f);
-      PNOTICE("** removed pending added to _open %d", count);
-      count++;
-      return f.get();
-    }
-  }
-#endif
-
   if ( _listen_exception )
   {
     std::cerr << __func__ << ": _listen_exception present, rethrowing\n";
     std::rethrow_exception(_listen_exception);
   }
 
-  return nullptr;
+  std::lock_guard<std::mutex> g{_m_pending};
+  return _pending.remove().release();
 }
 
-std::vector<Fabric_memory_control *> Fabric_server_generic_factory::connections()
+void Fabric_server_generic_factory::open_connection_generic(event_expecter *c)
+{
+	c->expect_event(FI_CONNECTED);
+	_open.add(c);
+}
+
+std::vector<event_expecter *> Fabric_server_generic_factory::connections()
 {
   return _open.enumerate();
 }
 
-void Fabric_server_generic_factory::close_connection(Fabric_memory_control * cnxn_)
+void Fabric_server_generic_factory::close_connection(event_expecter * cnxn_)
 {
   _open.remove(cnxn_);
 }

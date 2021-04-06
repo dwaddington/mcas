@@ -37,11 +37,16 @@ private:
 public:
   Data(size_t num_elements, size_t key_len, size_t val_len
     , bool random
-  )
+  ) try
     : _num_elements(num_elements), _key_len(key_len), _val_len(val_len), _random(random)
     , _data(nullptr), value_space_size(), value_space(nullptr)
   {
     initialize_data(new KV_pair[_num_elements]);
+  }
+  catch ( std::bad_alloc &e )
+  {
+    using namespace std::string_literals;
+    throw std::runtime_error("Data initialization error: "s + e.what());
   }
 public:
   Data(const Data &) = delete;

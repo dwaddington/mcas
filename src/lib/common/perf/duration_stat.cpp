@@ -15,10 +15,11 @@
 
 #include <common/env.h>
 
+#include <cmath> /* sqrt */
+#include <limits> /* numeric_limits */
+#include <ostream>
 #include <stdexcept> /* domain_error */
 
-#include <cassert>
-#include <iostream>
 using namespace common;
 using namespace perf;
 
@@ -29,6 +30,8 @@ duration_stat::duration_stat()
 	, _delta{}
 	, _dur_sq{}
 	, _count{}
+	, _min(std::numeric_limits<duration_type::rep>::max())
+	, _max(0)
 {}
 
 double duration_stat::mean() const
@@ -36,27 +39,31 @@ double duration_stat::mean() const
 	return static_cast<double>(_duration)/static_cast<double>(_count);
 }
 
+double duration_stat::variance() const
+{
+	auto m = mean();
+	return static_cast<double>(_dur_sq)/static_cast<double>(_count) - m*m;
+}
+
 double duration_stat::stddev() const
 {
-	auto dc = _duration.load();
-	return static_cast<double>(_dur_sq) - static_cast<double>(dc*dc)/static_cast<double>(_count);
+	return std::sqrt(variance());
 }
 
 auto duration_stat::count() const
-	-> count_t
+	-> count_type
 {
 	return _count;
 }
 
 double duration_stat::cv() const
 {
-	if ( _count == 0 )
-	{
-std::cerr << "duration_state::cv called for statistic with no samples\n";
-assert(0);
-		throw std::domain_error{"duration_state::cv called for statistic with no samples"};
-	}
 	return stddev()/mean();
+}
+
+double duration_stat::stddev_or_zero() const
+{
+	return _count == 0 ? 0.0 : stddev();
 }
 
 double duration_stat::cv_or_zero() const
@@ -64,15 +71,38 @@ double duration_stat::cv_or_zero() const
 	return _count == 0 ? 0.0 : cv();
 }
 
+double duration_stat::mean_or_zero() const
+{
+	return _count == 0 ? 0.0 : mean();
+}
+
 std::chrono::nanoseconds::rep duration_stat::sum_durations_ns() const
 {
-	return std::chrono::duration_cast<std::chrono::nanoseconds>(clock_t::duration(_duration)).count();
+	return std::chrono::duration_cast<std::chrono::nanoseconds>(clock_type::duration(_duration)).count();
 }
 
 double duration_stat::sum_durations_sec() const
 {
-	using period = clock_t::duration::period;
+	using period = clock_type::duration::period;
 	return double(this->_duration)*period::num/period::den;
+}
+
+double duration_stat::mean_durations_sec() const
+{
+	using period = clock_type::duration::period;
+	return double(this->mean_or_zero())*period::num/period::den;
+}
+
+double duration_stat::durations_sec_min() const
+{
+	using period = clock_type::duration::period;
+	return double(this->_min)*period::num/period::den;
+}
+
+double duration_stat::durations_sec_max() const
+{
+	using period = clock_type::duration::period;
+	return double(this->_max)*period::num/period::den;
 }
 
 unsigned long long duration_stat::sum_durations_ns_squared() const
@@ -83,7 +113,7 @@ unsigned long long duration_stat::sum_durations_ns_squared() const
 	 * nanoseconds::rep, but we could use the square of the ratios of the periods to
 	 * avoid the trip through sqrt and square.
 	 */
-	using dpd = duration_t::period;
+	using dpd = duration_type::period;
 	using npd = std::chrono::nanoseconds::period;
 	auto ns2 = static_cast<double>(_dur_sq) * static_cast<double>(dpd::num * dpd::num * npd::den * npd::den) / static_cast<double>(dpd::den * dpd::den * npd::num * npd::num);
 	return static_cast<unsigned long long>(ns2);
@@ -91,5 +121,5 @@ unsigned long long duration_stat::sum_durations_ns_squared() const
 
 std::ostream &common::perf::operator<<(std::ostream &o, const duration_stat &d)
 {
-	return o << d.sum_durations_sec() << " " << d.count();
+	return o << "total " << d.sum_durations_sec() << " min " << d.durations_sec_min() << " mean " << d.mean_durations_sec() << " max " << d.durations_sec_max() << " cv " << d.cv_or_zero() << " ct " << d.count();
 }

@@ -116,14 +116,13 @@ Fabric_transport::Fabric_transport(const boost::optional<std::string> &fabric,
 
 auto Fabric_transport::get_new_connection() -> Connection_handler *
 {
-  auto connection = _server_factory->get_new_connection();
+  auto connection = _server_factory->get_new_endpoint_unconnected();
   return
     connection
     ? new Connection_handler(mcas::global::debug_level,
                              _server_factory.get(),
-                             connection)
+                             std::unique_ptr<component::IFabric_endpoint_unconnected_server>(connection))
     : nullptr;
 }
 
-  
 }  // namespace mcas

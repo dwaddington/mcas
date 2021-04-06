@@ -21,9 +21,9 @@ namespace mcas
 {
 Connection_handler::Connection_handler(unsigned debug_level,
                                        gsl::not_null<Factory *> factory,
-                                       gsl::not_null<Connection *> connection)
-  : Connection_base(debug_level, factory, connection),
-    Region_manager(debug_level, connection),
+                                       std::unique_ptr<Preconnection> && preconnection)
+  : Connection_base(debug_level, factory, std::move(preconnection)),
+    Region_manager(debug_level, transport()),
     Connection_TLS_session(debug_level, this),
     _mr_vector{},
     _tick_count(0),
@@ -100,12 +100,10 @@ int Connection_handler::tick()
         case MSG_TYPE::ADO_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: ADO_REQUEST");
           _pending_msgs.push(iob);
-          assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           break;
 
         case MSG_TYPE::CLOSE_SESSION:
-          assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           if (option_DEBUG > 2) PMAJOR("Shard: CLOSE_SESSION");
           free_recv_buffer();
@@ -115,14 +113,12 @@ int Connection_handler::tick()
         case MSG_TYPE::POOL_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: POOL_REQUEST");
           _pending_msgs.push(iob);
-          assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           break;
 
         case MSG_TYPE::INFO_REQUEST:
           if (option_DEBUG > 2) PMAJOR("Shard: INFO_REQUEST");
           _pending_msgs.push(iob);
-          assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
           post_recv_buffer(allocate_recv());
           break;
 
@@ -147,12 +143,10 @@ int Connection_handler::tick()
     if (option_DEBUG > 2)
       PMAJOR("Shard State: %lu %p POST_HANDSHAKE (%d)", _tick_count, common::p_fmt(this), handshakes);
 
-    assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
-    post_recv_buffer(allocate_recv());
+	/* fabric connection has allocated the first receive buffer */
 
     /* allocating an extra buffer or three makes the hstore benchmark run about 10% faster */
     for (auto i = EXTRA_BISCUITS; i != 0; --i) {
-      assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
       post_recv_buffer(allocate_recv());
     }
 
@@ -251,12 +245,9 @@ void Connection_handler::respond_to_handshake(bool start_tls)
                                                                              max_message_size(),
                                                                              reinterpret_cast<uint64_t>(this),
                                                                              start_tls);
-      
-  
 
   /* post response */
   reply_iob->set_length(reply_msg->msg_len());
-  assert(_recv_buffer_posted_count <= EXTRA_BISCUITS); /* no extra biscuits */
   post_recv_buffer(allocate_recv());
   post_send_buffer(reply_iob, reply_msg, __func__);
   set_state(Connection_state::WAIT_NEW_MSG_RECV);

@@ -27,7 +27,7 @@ struct cb_pack
   cb_ctxt _rx1_ctxt;
   explicit cb_pack(
     cnxn_state &state_
-    , component::IFabric_connection &cnxn_
+    , component::IFabric_memory_control &cnxn_
     , cb_ctxt::cb_t send_cb
     , cb_ctxt::cb_t recv_cb
     , std::uint64_t buffer_size_

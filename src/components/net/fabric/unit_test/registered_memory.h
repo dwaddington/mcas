@@ -35,7 +35,7 @@ public:
    * NOTE: if the memory remote key is used (that is, if the mr attributes do not include FI_PROV_KEY),
    * the key must the unique among registered memories.
    */
-  explicit registered_memory(component::IFabric_connection &cnxn, std::size_t size, std::uint64_t remote_key);
+  explicit registered_memory(component::IFabric_memory_control &cnxn, std::size_t size, std::uint64_t remote_key);
   registered_memory(registered_memory &&rm) noexcept = default;
   registered_memory& operator=(registered_memory &&rm) noexcept = default;
 

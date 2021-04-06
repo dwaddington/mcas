@@ -23,13 +23,13 @@
 struct registration
 {
 private:
-  component::IFabric_connection &_cnxn;
-  component::IFabric_connection::memory_region_t _region;
+  component::IFabric_memory_control &_cnxn;
+  component::IFabric_memory_control::memory_region_t _region;
   std::uint64_t _key;
   common::moveable_ptr<void> _desc;
   DELETE_COPY(registration); /* due to _region */
 public:
-  explicit registration(component::IFabric_connection &cnxn_, const void *contig_addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_);
+  explicit registration(component::IFabric_memory_control &cnxn_, const void *contig_addr_, std::size_t size_, std::uint64_t key_, std::uint64_t flags_);
   registration(registration &&);
   registration &operator=(registration &&);
   ~registration();

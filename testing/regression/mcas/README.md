@@ -15,7 +15,7 @@ To run tests with release build do:
 
 They can also be run individually. For example,
 
-./dist/testing/mcas-hstore-basic-0.sh
+./dist/testing/mcas-hstore-put-0.sh
 
 
 NOTE: Be careful not to interept tests and leave processes hanging.

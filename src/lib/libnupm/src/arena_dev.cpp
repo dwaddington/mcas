@@ -19,14 +19,15 @@
 
 namespace
 {
-	std::uint64_t make_uuid(const arena_dev::string_view &id_)
+	std::uint64_t make_uuid(const arena_dev::string_view id_)
 	{
 		return ::CityHash64(id_.begin(), id_.size());
 	}
 }
 
-arena_dev::arena_dev(const common::log_source &ls_, gsl::not_null<nupm::DM_region_header *> hdr)
+arena_dev::arena_dev(const common::log_source &ls_, string_view path_, gsl::not_null<nupm::DM_region_header *> hdr)
   : arena(ls_)
+  , _path(path_)
   , _hdr(hdr)
 {}
 
@@ -35,7 +36,7 @@ void arena_dev::debug_dump() const
   _hdr->debug_dump();
 }
 
-auto arena_dev::region_get(const string_view &id_) -> region_descriptor
+auto arena_dev::region_get(const string_view id_) -> region_descriptor
 {
   std::size_t len = 0;
   auto base = _hdr->get_region(make_uuid(id_), &len);
@@ -47,7 +48,7 @@ auto arena_dev::region_get(const string_view &id_) -> region_descriptor
   return region_descriptor(v);
 }
 
-auto arena_dev::region_create(const string_view &id_, gsl::not_null<registry_memory_mapped *>, const std::size_t size) -> region_descriptor
+auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memory_mapped *>, const std::size_t size) -> region_descriptor
 {
   auto size_in_grains = boost::numeric_cast<nupm::DM_region::grain_offset_t>(div_round_up(size, _hdr->grain_size()));
 
@@ -66,7 +67,7 @@ auto arena_dev::region_create(const string_view &id_, gsl::not_null<registry_mem
     ); /* allocates n grains */
 }
 
-void arena_dev::region_erase(const string_view &id_, gsl::not_null<registry_memory_mapped *>)
+void arena_dev::region_erase(const string_view id_, gsl::not_null<registry_memory_mapped *>)
 {
   _hdr->erase_region(make_uuid(id_));
 }

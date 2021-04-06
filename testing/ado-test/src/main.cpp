@@ -50,11 +50,12 @@ Itf_ref<IMCAS> init(const std::string &server_hostname, int port)
   std::stringstream url;
   url << g_options.server << ":" << g_options.port;
 
-  auto mcas = make_itf_ref(fact->mcas_create(g_options.debug_level,
+  using common::string_view;
+  auto mcas = make_itf_ref(fact->mcas_create_nsd(g_options.debug_level,
                                              g_options.patience,
                                              "None",
-                                             g_options.device,
-                                             g_options.src_addr,
+                                             g_options.device ? string_view(*g_options.device) : string_view(),
+                                             g_options.src_addr ? string_view(*g_options.src_addr) : string_view(),
                                              url.str()));
 
   if (!mcas) throw Logic_exception("unable to create MCAS client instance");

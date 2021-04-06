@@ -33,21 +33,23 @@ unsigned debug_level = 0;
 }  // namespace mcas
 
 MCAS_client::MCAS_client(const unsigned                      debug_level,
-                         const boost::optional<std::string> &src_device,
-                         const boost::optional<std::string> &src_addr,
-                         const boost::optional<std::string> &provider,
-                         const std::string &                 dest_addr,
+                         const common::string_view           src_device,
+                         const common::string_view           src_addr,
+                         const common::string_view           provider,
+                         const common::string_view           dest_addr,
                          std::uint16_t                       port,
                          const unsigned                      patience_,
-                         const std::string                   other_)
+                         const common::string_view           other_)
 : common::log_source(debug_level),
   _factory(load_factory()),
-  _fabric(make_fabric(*_factory, src_addr, src_device, provider)),
-  _transport(_fabric->open_client(common::json::serializer<common::json::dummy_writer>::object{}.str(), dest_addr, port)),
-  _connection(std::make_unique<mcas::client::Connection_handler>(debug_level, _transport.get(), patience_, other_)),
+  _fabric(make_fabric_sip(*_factory, src_addr, src_device, provider)),
+  _ep(_fabric->make_endpoint(common::json::serializer<common::json::dummy_writer>::object{}.str(), dest_addr, port)),
+  _bm(debug_level, _ep.get()),
+  _transport(_ep->make_open_client()),
+  _connection(std::make_unique<mcas::client::Connection_handler>(debug_level, _transport.get(), _bm, patience_, other_)),
   _open_connection(*_connection)
 {
-  CPLOG(3, "Extra config: %s", other_.c_str());
+  CPLOG(3, "Extra config: %s", other_.data());
 }
 
 Open_connection::Open_connection(mcas::client::Connection_handler &_connection)
@@ -74,10 +76,11 @@ auto MCAS_client::load_factory() -> IFabric_factory *
   return factory;
 }
 
-auto MCAS_client::make_fabric(component::IFabric_factory &        factory_,
-                              const boost::optional<std::string> &src_addr_,
-                              const boost::optional<std::string> &domain_name_,
-                              const boost::optional<std::string> &fabric_prov_name_) -> IFabric *
+/* make_fabric: source/IP/provider form */
+auto MCAS_client::make_fabric_sip(component::IFabric_factory &        factory_,
+                              const common::string_view src_addr_,
+                              const common::string_view domain_name_,
+                              const common::string_view fabric_prov_name_) -> IFabric *
 {
   namespace c_json = common::json;
   using json = c_json::serializer<c_json::dummy_writer>;
@@ -86,35 +89,35 @@ auto MCAS_client::make_fabric(component::IFabric_factory &        factory_,
       json::member("ep_attr", json::object(json::member("type", "FI_EP_MSG")))
     );
 
-    if ( fabric_prov_name_ )
+    if ( fabric_prov_name_.data() )
     {
       fabric_spec
         .append(
-          json::member("fabric_attr", json::object(json::member("prov_name", *fabric_prov_name_)))
+          json::member("fabric_attr", json::object(json::member("prov_name", fabric_prov_name_)))
         )
         ;
     }
 
-    if ( src_addr_ )
+    if ( src_addr_.data() )
     {
       fabric_spec
         .append(
           json::member("addr_format", "FI_ADDR_STR")
         )
         .append(
-          json::member("src_addr", "fi_sockaddr_in://" + *src_addr_ + ":0")
+          json::member("src_addr", "fi_sockaddr_in://" + std::string(src_addr_) + ":0")
         )
         ;
     }
 
-    if ( domain_name_ )
+    if ( domain_name_.data() )
     {
       fabric_spec
         .append(
           json::member(
             "domain_attr"
             , json::object(
-                json::member("name", *domain_name_)
+                json::member("name", domain_name_)
                 , json::member("threading", "FI_THREAD_SAFE")
             )
           )
@@ -125,11 +128,12 @@ auto MCAS_client::make_fabric(component::IFabric_factory &        factory_,
   return factory_.make_fabric(fabric_spec.str());
 }
 
-auto MCAS_client::make_fabric(component::IFabric_factory &factory_,
-                              const std::string &  // ip_addr
+/* make_fabric: address/prover/device form */
+auto MCAS_client::make_fabric_apd(component::IFabric_factory &factory_,
+                              const common::string_view  // ip_addr
                               ,
-                              const std::string &provider,
-                              const std::string &device) -> IFabric *
+                              const common::string_view provider,
+                              const common::string_view device) -> IFabric *
 {
   namespace c_json = common::json;
   using json = c_json::serializer<c_json::dummy_writer>;
@@ -266,11 +270,13 @@ status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
                                        async_handle_t &          out_handle,
                                        IKVStore::memory_handle_t handle)
 {
-  return _connection->async_get_direct(pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle);
+  TM_ROOT();
+  return _connection->async_get_direct(TM_REF pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle);
 }
 
 status_t MCAS_client::check_async_completion(async_handle_t &handle)
 {
+  TM_ROOT();
   return _connection->check_async_completion(handle);
 }
 

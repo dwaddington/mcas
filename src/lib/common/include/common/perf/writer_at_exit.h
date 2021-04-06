@@ -68,7 +68,11 @@ namespace common
 				{
 					if ( true || bool_or_true(*this, 0) )
 					{
+#if 0
 						_o << _tag << " " << *this << "\n";
+#else
+						_o << *this << " " << _tag << "\n";
+#endif
 					}
 				}
 			};

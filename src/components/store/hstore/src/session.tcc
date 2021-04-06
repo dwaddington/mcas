@@ -568,7 +568,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 					auto &d = std::get<0>(v);
 					if ( flags_ & component::IKVStore::UNLOCK_FLAGS_FLUSH )
 					{
-						d.flush_if_locked_exclusive(this->allocator());
+						d.flush_if_locked_exclusive(TM_REF this->allocator());
 					}
 					d.unlock_indefinite();
 				}

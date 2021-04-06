@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -14,8 +14,7 @@
 
 #include "fabric_server_grouped_factory.h"
 
-#include "fabric_memory_control.h"
-#include "fabric_op_control.h"
+#include "fabric_endpoint.h"
 #include "fabric_server_grouped.h"
 
 #include <algorithm> /* transform */
@@ -30,20 +29,28 @@ Fabric_server_grouped_factory::Fabric_server_grouped_factory(Fabric &fabric_, ev
 Fabric_server_grouped_factory::~Fabric_server_grouped_factory()
 {}
 
-std::shared_ptr<Fabric_memory_control> Fabric_server_grouped_factory::new_server(Fabric &fabric_, event_producer &eq_, ::fi_info &info_)
+#if 0
+std::shared_ptr<event_expecter> Fabric_server_grouped_factory::new_server(Fabric &fabric_, event_producer &eq_, ::fi_info &info_)
 {
   auto conn = std::make_shared<Fabric_server_grouped>(fabric_, eq_, info_);
-  return
-    std::static_pointer_cast<Fabric_memory_control>(
-      std::static_pointer_cast<Fabric_op_control>(conn)
-    );
+  return std::static_pointer_cast<event_expecter>(conn);
 }
+#endif
 
+/* Note: shared_ptr may be overkill */
+auto Fabric_server_grouped_factory::open_connection(component::IFabric_endpoint_unconnected_server * aep) -> Fabric_server_grouped *
+{
+	auto conn = new Fabric_server_grouped(&*aep);
+	/* wait for an acnowledgment from the client, and add to open list */
+	open_connection_generic(conn);
+	return conn;
+}
+#if 0
 component::IFabric_server_grouped * Fabric_server_grouped_factory::get_new_connection()
 {
   return static_cast<Fabric_server_grouped *>(Fabric_server_generic_factory::get_new_connection());
 }
-
+#endif
 std::vector<component::IFabric_server_grouped *> Fabric_server_grouped_factory::connections()
 {
   auto g = Fabric_server_generic_factory::connections();
@@ -52,9 +59,9 @@ std::vector<component::IFabric_server_grouped *> Fabric_server_grouped_factory::
     g.begin()
     , g.end()
     , std::back_inserter(v)
-    , [] (Fabric_memory_control *v_)
+    , [] (event_expecter *v_)
       {
-        return static_cast<Fabric_server_grouped *>(static_cast<Fabric_op_control *>(&*v_));
+        return static_cast<Fabric_server_grouped *>(&*v_);
       }
   );
   return v;
