@@ -1,9 +1,14 @@
-# Release v0.6 (upcoming)
+# Release v0.6
 
 ## Key new features
+
+* Performance fixes
+* Bug fixes to mapstore memory management
 * GPU-direct example
 * Script for building configuration files (tools/gen-config.py)
 * Rust programming language bindings (client and ADO)
+
+
 
 # Release v0.5.1
 
