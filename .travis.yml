@@ -56,6 +56,7 @@ script:
   - docker exec -t ${CONTAINER_NAME} bash -c "
     cd /travis &&    
     ./tools/check_contents.sh ./src &&
+    ./src/python/install-python-deps.sh &&
     mkdir build &&
     cd build &&
     cmake -DBUILD_KERNEL_SUPPORT=OFF -DFLATBUFFERS_BUILD_TESTS=0 -DTBB_BUILD_TESTS=0 -DBUILD_PYTHON_SUPPORT=1 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/dist -DTBB_CI_BUILD=ON .. &&

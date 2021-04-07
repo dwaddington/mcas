@@ -7,6 +7,7 @@ pipeline {
 				timeout(time: 60, unit: 'MINUTES') 
 				{
 					sh "git submodule update --init -f"
+          sh "./src/python/install-python-deps.sh"
 					sh "mkdir -p debug-build ; cd debug-build ; cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
 
 					dir('debug-build') {
