@@ -23,6 +23,7 @@ import numpy as np
 import inspect
 import pickle
 import os
+import binascii
 
 from flatbuffers import util
 
@@ -274,7 +275,7 @@ class Pool():
 
 
     @methodcheck(types=[str])            
-    def invoke(self, key, function):
+    def invoke(self, key, function, parameters=None):
 
         if inspect.isfunction(function) == False:
             raise TypeError("invoke requires (key, function); detected not function type")
@@ -286,14 +287,20 @@ class Pool():
         function_name_fb = builder.CreateString(function.__name__)
         code_str =  builder.CreateString(code)
 
-        print('---------------------------------->')
+        # additional parameters; convert to UU-encoded string
+        params = binascii.b2a_base64(pickle.dumps(parameters)).rstrip()
+        params_str = builder.CreateString(params)
+
+        print('-ADO params + function------------>')
+        print('params:', pickle.loads(binascii.a2b_base64(params)))
         print(code)
         print('---------------------------------->')
-
+        
         OperationStart(builder)
         OperationAddCodeType(builder, CodeType().CPython)
         OperationAddFunction(builder, function_name_fb)
         OperationAddCode(builder, code_str)
+        OperationAddAdditionalParams(builder, params_str)
         op = OperationEnd(builder)
         
         InvokeRequestStart(builder)
@@ -322,6 +329,15 @@ class Pool():
 # TESTING AREA
 # -----------------------------------------------------------------------------------------
 
+# Notes:
+#
+# The API firstly provides load and save operations for python
+# objects. The implementation will try to user zero-copy but will
+# revert to pickle if needed.  To perform near-data operations
+# (i.e. execution of python code in the ADO), the user calls the
+# invoke function, passing target, function and params. If no params
+# are given, None is passed.  Parameters are pickled and base64 encoded.
+#
 def basic_test_0():
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
@@ -342,15 +358,17 @@ def basic_test_0():
     return b
 
 
-def test_dict_work(target_dict):
+def test_dict_work(target_dict, params):
     target_dict['plant'] = ["triffid"]
+    for k,v in params.items():
+        target_dict[k] = v
     # this is sent back to client as invoke result
     return {'newhousehold': target_dict} 
 
 
 def test_dict():
     """
-    Test for non-NdArray types, e.g., dictionary
+    Test for non-NdArray types, e.g., dictionary. Tests parameter passing also.
     """
     session = pymcas.create_session(os.getenv('SERVER_IP'), 11911, debug=3)
     if sys.getrefcount(session) != 2:
@@ -360,17 +378,17 @@ def test_dict():
         raise ValueError("pool ref count should be 2")
 
     mydict = {}
-    mydict['cat'] = ["jenny","jazmine"]
+    mydict['cat'] = ["jenny", "jazmine"]
     mydict['dog'] = ["violet"]
     mydict['chickens'] = ["bob", "ferdy", "rosemary"]
 
     pool.save('household', mydict);
 
-    result = pool.invoke('household', test_dict_work)
+    result = pool.invoke('household', test_dict_work, {"children" : ["ben", "molly"]})
     print("New household->", result)
     
 
-def sobel_filter(image):
+def sobel_filter(image, params):
     from skimage import data, io, filters
     edges = filters.sobel(image)
     ado.save('image0-edges', edges) # save image
@@ -404,9 +422,9 @@ def test_skimage_0():
     io.show()
 
 
-def blend_ado_function(target_image):
+def blend_ado_function(target_image, delta):
     brick = ado.load('brick')
-    blended = target_image+(0.5*brick)
+    blended = target_image+(delta*brick)
     ado.save('blended', blended)
     return blended.shape
 
@@ -428,7 +446,7 @@ def test_skimage_1():
     pool.save('brick', data.brick())
 
     # # perform ADO invocation
-    shape = pool.invoke('camera', blend_ado_function )
+    shape = pool.invoke('camera', blend_ado_function, 0.5) # param is delta
     print("shape:{0}".format(shape))
 
     blend = pool.load('blended')
