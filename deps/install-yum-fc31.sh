@@ -17,6 +17,7 @@ dnf -y --nodocs --setopt=install_weak_deps=False install automake cmake3 git mak
     libuuid-devel \
     numactl-devel \
     python-devel \
+    python3-pip \
     rapidjson-devel \
     openssl-devel golang gnutls gnutls-devel \
     lcov zeromq-devel czmq-devel 
