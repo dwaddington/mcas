@@ -1,0 +1,10 @@
+#!/bin/bash
+if [[ $# -eq 0 ]]
+then
+    echo "tabulator_ccpm_test.sh <server-ip-addr>"
+    exit
+fi
+# debugging enable
+#PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}/build/${LIBDIR}:${CMAKE_INSTALL_PREFIX}/lib64/python gdb --ex r --args "${PYTHON}" -i ${CMAKE_INSTALL_PREFIX}/lib/tabulator_test.py
+
+PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}/build/${LIBDIR}:${CMAKE_INSTALL_PREFIX}/lib64/python "${PYTHON}" -i ${CMAKE_INSTALL_PREFIX}/lib/tabulator_ccpm_test.py $1

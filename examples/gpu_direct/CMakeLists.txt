@@ -22,7 +22,10 @@ cuda_include_directories(${CMAKE_INSTALL_PREFIX}/include)
 # build cuda code into static library
 
 cuda_add_library(gpu-direct-demo-kernel src/kernel.cu)
+
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/components)
+
 link_directories(/usr/local/cuda/lib64/)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
