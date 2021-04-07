@@ -65,8 +65,8 @@ def methodcheck(types, ranges=None):
     return __f
 
 
-@paramcheck(types=[str,int,str,str,int], ranges=[None, None, None, None, None])
-def create_session(ip, port, device="mlx5_0", extra="", debug=0):
+@paramcheck(types=[str,int,str,(str,type(None)),int], ranges=[None, None, None, None, None])
+def create_session(ip, port, device="mlx5_0", extra=None, debug=0):
     return Session(ip, port, device, extra, debug)
 
 
@@ -76,8 +76,8 @@ class Session():
     """       
     __session = None
 
-    @methodcheck(types=[str, int, str, str, int], ranges=[None, None, None, None, None])
-    def __init__(self, ip, port, device="mlx5_0", extra="", debug=0):
+    @methodcheck(types=[str, int, str, (str, type(None)), int], ranges=[None, None, None, None, None])
+    def __init__(self, ip, port, device="mlx5_0", extra=None, debug=0):
         self.__session = mcas.Session(ip, port, device, extra, debug)
 
     @methodcheck(types=[str, int, int, bool])
