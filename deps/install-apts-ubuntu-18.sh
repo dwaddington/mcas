@@ -30,7 +30,7 @@ apt-get install -y --no-install-recommends \
         linux-headers-generic \
         uuid-dev golang gnutls-dev libgnutls30 \
         lcov libzmq5-dev libczmq-dev \
-        python3-setuptools
+        python3-setuptools python3-pip
 
 # special handling of googletest
 #

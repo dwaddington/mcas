@@ -127,6 +127,7 @@ private:
                           const size_t                value_len,
                           const char *                code_string,
                           const char *                function_name,
+                          const std::string&          params,
                           response_buffer_vector_t&   response_buffers);
 
   status_t unwrap_nparray_from_data_descriptor(const char * key,

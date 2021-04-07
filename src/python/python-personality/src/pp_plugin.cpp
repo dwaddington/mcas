@@ -228,6 +228,10 @@ status_t Pp_plugin::do_work(const uint64_t work_key,
   /* protocol interpretation */
   const char * code = nullptr;
   const char * function = nullptr;
+  std::string params;
+
+  status_t rc = E_INVAL;
+  
   {
     using namespace Proto;
     auto msg = GetSizePrefixedMessage(in_work_request);
@@ -241,18 +245,22 @@ status_t Pp_plugin::do_work(const uint64_t work_key,
       auto op = ir->op();
       code = op->code()->c_str();
       function = op->function()->c_str();
+      params = op->additional_params()->str();
+
+      rc = execute_python(work_key,
+                          key,
+                          key_len,
+                          value,
+                          value_len,
+                          code,
+                          function,
+                          params,
+                          response_buffers);
+      
     }
   }
 
-  auto rc = execute_python(work_key,
-                           key,
-                           key_len,
-                           value,
-                           value_len,
-                           code,
-                           function,
-                           response_buffers);
-
+  
   if(rc != S_OK)
     PWRN(PREFIX "excution of ADO Python function failed");
 
@@ -581,6 +589,7 @@ status_t Pp_plugin::execute_python(const uint64_t              work_key,
                                    const size_t                value_len,
                                    const char *                code_string,
                                    const char *                function_name,
+                                   const std::string&          params_string,
                                    response_buffer_vector_t&   response_buffers)
 {
   /* set up environment */
@@ -610,18 +619,23 @@ status_t Pp_plugin::execute_python(const uint64_t              work_key,
       throw General_exception("unable to import pickle");
     PyDict_SetItemString(global_dict, "pickle", mod_pickle);
 
+    PyObject *mod_binascii = PyImport_ImportModule("binascii");
+    if(mod_binascii == nullptr)
+      throw General_exception("unable to import binascii");
+    PyDict_SetItemString(global_dict, "binascii", mod_binascii);
+
+
     PyObject* mod_ado_dict = PyModule_GetDict(mod_ado);
     PyDict_SetItemString(mod_ado_dict, "__plugin_instance__", PyLong_FromVoidPtr(this));
     PyDict_SetItemString(mod_ado_dict, "__work_id__", PyLong_FromUnsignedLong(work_key));
   }
     
-
   std::string code(code_string);
 
   /* add execution hook, i.e. call target function with params */
   code += "\nresult = pickle.dumps(";
   code += function_name;
-  code += "(target))\n";
+  code += "(target, pickle.loads(binascii.a2b_base64('" + params_string + "'))))\n";
 
   CPLOG(2, PREFIX "JIT compiling code..\n%s",code.c_str());
     
