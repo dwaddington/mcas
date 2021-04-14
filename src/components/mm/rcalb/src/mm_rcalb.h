@@ -1,14 +1,14 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+  Copyright [2017-2019] [IBM Corporation]
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 
@@ -20,12 +20,14 @@
 #include <memory>
 #include <common/logging.h>
 #include <api/mm_itf.h>
-
+#include <nupm/rc_alloc_lb.h>
 
 class Rca_LB_memory_manager : public component::IMemory_manager_volatile_reconstituting
 {
- public:
-  Rca_LB_memory_manager(const unsigned debug_level) {
+  static constexpr int DEFAULT_NUMA_NODE = 0;
+  
+public:
+  Rca_LB_memory_manager(const unsigned debug_level) : _rca_lb(debug_level) {
     if(debug_level > 0)
       PLOG("Rca_LB_memory_manager: ctor");
   }
@@ -46,13 +48,38 @@ class Rca_LB_memory_manager : public component::IMemory_manager_volatile_reconst
 
   void unload() override { delete this; }
 
- public:
+public:
   virtual void print_info() override {
     PINF("MM: RCA LB");
   }
 
-  
+  virtual void * allocate(std::size_t n) override {
+    PINF("MM: RCA LB - ALLOC(%lu)", n);
+    auto result = _rca_lb.alloc(n, DEFAULT_NUMA_NODE);
+    PINF("MM: RCA LB - ALLOC(%lu) -> %p", n, result);
+    return result;
+  }
 
+  virtual void deallocate(void * ptr, std::size_t size = 0) override {
+    PINF("MM: RCA LB - FREE(%p, %lu)", ptr, size);
+    if(size > 0)
+      return _rca_lb.free(ptr, DEFAULT_NUMA_NODE, size);
+    else
+      return _rca_lb.free(ptr, DEFAULT_NUMA_NODE);
+                          
+  }
+
+  virtual status_t add_managed_region(void * region_base,
+                                      size_t region_length,
+                                      int    numa_node) override {
+    _rca_lb.add_managed_region(region_base, region_length, numa_node);
+    return S_OK;
+  }
+
+  
+  
+private:
+  nupm::Rca_LB _rca_lb;
 };
 
 
@@ -61,7 +88,7 @@ class Rca_LB_memory_manager : public component::IMemory_manager_volatile_reconst
  * 
  */
 class Rca_LB_memory_manager_factory : public component::IMemory_manager_factory {
- public:
+public:
   DECLARE_VERSION(0.1f);
 
   /* index_factory - see components.h */

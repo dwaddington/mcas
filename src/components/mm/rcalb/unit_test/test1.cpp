@@ -70,6 +70,9 @@ TEST_F(MM_test, UseAsStdAllocator)
   using aac_t =  mm::allocator_adaptor<char>;
   aac_t aac(_mm);
 
+  auto aac_size = MiB(4);
+  aac.add_managed_region(::aligned_alloc(PAGE_SIZE, aac_size), aac_size, 0);
+
   using string_t = std::basic_string<char, std::char_traits<char>, aac_t>;
 
   string_t s("hello", aac);
