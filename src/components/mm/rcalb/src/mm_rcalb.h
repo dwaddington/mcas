@@ -22,6 +22,8 @@
 #include <api/mm_itf.h>
 #include <nupm/rc_alloc_lb.h>
 
+#define PREFIX "Rca_LB_memory_manager:"
+
 class Rca_LB_memory_manager : public component::IMemory_manager_volatile_reconstituting
 {
   static constexpr int DEFAULT_NUMA_NODE = 0;
@@ -49,33 +51,54 @@ public:
   void unload() override { delete this; }
 
 public:
-  virtual void print_info() override {
+  virtual void debug_dump() override {
     PINF("MM: RCA LB");
   }
 
-  virtual void * allocate(std::size_t n) override {
+  virtual status_t allocate(std::size_t n, void **out_ptr) override {
+    assert(out_ptr);
     PINF("MM: RCA LB - ALLOC(%lu)", n);
-    auto result = _rca_lb.alloc(n, DEFAULT_NUMA_NODE);
-    PINF("MM: RCA LB - ALLOC(%lu) -> %p", n, result);
-    return result;
-  }
-
-  virtual void deallocate(void * ptr, std::size_t size = 0) override {
-    PINF("MM: RCA LB - FREE(%p, %lu)", ptr, size);
-    if(size > 0)
-      return _rca_lb.free(ptr, DEFAULT_NUMA_NODE, size);
-    else
-      return _rca_lb.free(ptr, DEFAULT_NUMA_NODE);
-                          
-  }
-
-  virtual status_t add_managed_region(void * region_base,
-                                      size_t region_length,
-                                      int    numa_node) override {
-    _rca_lb.add_managed_region(region_base, region_length, numa_node);
+    *out_ptr = _rca_lb.alloc(n, DEFAULT_NUMA_NODE);
+    PINF("MM: RCA LB - ALLOC(%lu) -> %p", n, *out_ptr);
     return S_OK;
   }
 
+  virtual status_t aligned_allocate(size_t n, size_t alignment, void **out_ptr) override {
+    assert(n);
+    assert(out_ptr);
+    if(alignment == 0) return allocate(n, out_ptr);
+    *out_ptr = _rca_lb.alloc(n, DEFAULT_NUMA_NODE, alignment);
+    return S_OK;
+  }
+
+  virtual status_t deallocate(void * ptr, std::size_t size = 0) override {
+    PINF("MM: RCA LB - FREE(%p, %lu)", ptr, size);
+    size > 0 ?
+      _rca_lb.free(ptr, DEFAULT_NUMA_NODE, size) :
+      _rca_lb.free(ptr, DEFAULT_NUMA_NODE);
+    return S_OK;
+  }
+  
+  virtual status_t callocate(size_t n, void ** out_ptr) override  {
+    if(out_ptr == nullptr) return E_INVAL;
+    auto status = allocate(n, out_ptr);
+    if(status == S_OK)
+      ::memset(*out_ptr, 0, n);
+    return status;
+  }
+
+
+  virtual status_t add_managed_region(void * region_base,
+                                      size_t region_length) override {
+    _rca_lb.add_managed_region(region_base, region_length, 0 /* numa node */);
+    return S_OK;
+  }
+
+  virtual status_t inject_allocation(void * ptr, size_t size) override {
+    _rca_lb.inject_allocation(ptr, size, 0);
+    return S_OK;
+  }
+    
   
   
 private:

@@ -71,18 +71,18 @@ TEST_F(MM_test, UseAsStdAllocator)
   aac_t aac(_mm);
 
   auto aac_size = MiB(4);
-  aac.add_managed_region(::aligned_alloc(PAGE_SIZE, aac_size), aac_size, 0);
+  aac.add_managed_region(::aligned_alloc(PAGE_SIZE, aac_size), aac_size);
 
   using string_t = std::basic_string<char, std::char_traits<char>, aac_t>;
 
   string_t s("hello", aac);
   s.append(" there, can you help me?");
 
-  //  std::vector<int, allocator_type> x(aai);
-  
-  // for(unsigned i=0;i<1000000;i++)
-  //   x.push_back(i);
+  auto ptr = aac.aligned_allocate(MiB(1), 256);
+  ASSERT_FALSE(reinterpret_cast<uint64_t>(ptr) & 0xFFUL);
+  ASSERT_FALSE(ptr == nullptr);
 
+  aac.deallocate(ptr, MiB(1));
 }
 
 

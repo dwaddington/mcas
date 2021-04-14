@@ -25,8 +25,11 @@
 #include <common/types.h>
 
 /** 
- * Please keep these interfaces based around C types so that they can be easily wrapped
- * in a pure C interface.
+ * Please keep these interfaces based around C types so that they can
+ * be easily wrapped in a pure C interface.  Error handling should be
+ * status_t return codes.  Pointers only, no references.  This
+ * approach makes it easier to implement allocators in other languages
+ * such as Rust.
  */
 
 namespace component
@@ -35,14 +38,118 @@ namespace component
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Weffc++"
 
+
+/** 
+ * Base interface. Methods that all allocators should support.
+ */
+class IMemory_manager_base : public component::IBase {
+public:
+  
+  /** 
+   * Add (slab) region of memory to fuel the allocator
+   * 
+   * @param region_base Pointer to beginning of region
+   * @param region_length Region length in bytes
+   * 
+   * @return S_OK or E_FAIL
+   */
+  virtual status_t add_managed_region(void * region_base,
+                                      size_t region_length) = 0;
+
+  /** 
+   * Allocate a region of memory without alignment or hint
+   * 
+   * @param Length in bytes
+   * @param [out] Pointer to allocated region
+   *
+   * @return S_OK or E_FAIL
+   */
+  virtual status_t allocate(size_t n, void **out_ptr) = 0;
+
+  /** 
+   * Allocation region of memory that is aligned
+   * 
+   * @param n Size of region in bytes
+   * @param alignment Alignment in bytes
+   * @param out_ptr [out] Pointer to allocated region
+   * 
+   * @return S_OK or E_FAIL
+   */
+  virtual status_t aligned_allocate(size_t n, size_t alignment, void **out_ptr) = 0;
+
+  /** 
+   * Special case for EASTL
+   * 
+   * @param n Size of region in bytes
+   * @param alignment Alignment in bytes
+   * @param offset Unknown
+   * 
+   * @return 
+   */
+  virtual status_t aligned_allocate(size_t n, size_t alignment, size_t offset, void **out_ptr) {
+    return E_NOT_IMPL;
+  }
+
+  /** 
+   * Free a previously allocated region of memory with length known
+   * 
+   * @param ptr Pointer to previously allocated region
+   * @param size Length of region in bytes
+   *
+   * @return S_OK or E_INVAL;
+   */
+  virtual status_t deallocate(void * ptr, size_t size) = 0;
+
+  /** 
+   * Free previously allocated region without known length
+   * 
+   * @param ptr Pointer to region
+   * 
+   * @return S_OK
+   */
+  virtual status_t deallocate_without_size(void * ptr) {
+    return E_NOT_IMPL;
+  }
+
+  /** 
+   * Allocate region and zero memory
+   * 
+   * @param size Size of region in bytes
+   * @param ptr [out] Pointer to allocated region
+   * 
+   * @return S_OK
+   */
+  virtual status_t callocate(size_t n, void ** out_ptr)  {
+    return E_NOT_IMPL;
+  }
+
+  /** 
+   * Resize an existing allocation
+   * 
+   * @param ptr Pointer to existing allocated region
+   * @param size New size in bytes
+   * 
+   * @return S_OK
+   */
+  virtual status_t reallocate(void * ptr, size_t size) {
+    return E_NOT_IMPL;
+  }
+  
+  /** 
+   * Get debugging information
+   * 
+   */
+  virtual void debug_dump() = 0;
+
+};
+
 /**
  * IMemory_manager_volatile - memory manager for volatile memory
  */
-class IMemory_manager_volatile : public component::IBase {
+class IMemory_manager_volatile : public IMemory_manager_base {
  public:
   DECLARE_INTERFACE_UUID(0x69bcb3bb, 0xf4d9, 0x4437, 0x9fc7, 0x9f, 0xc7, 0xf0, 0x7d, 0x39, 0xe9);
 
-  virtual void print_info() = 0;
   // TODO
 };
 
@@ -50,43 +157,22 @@ class IMemory_manager_volatile : public component::IBase {
 /**
  * IMemory_manager_volatile_reconstituting - memory manager that
  * resides in volatile memory but is reconstituted from persistent
- * memory
+ * memory. NUMA properties are managed as a different concern.
  */
-class IMemory_manager_volatile_reconstituting : public component::IBase {
+class IMemory_manager_volatile_reconstituting : public IMemory_manager_base {
  public:
   DECLARE_INTERFACE_UUID(0xe9ec587f, 0x1328, 0x480e, 0xa92a, 0x7b, 0xa5, 0xdf, 0xa5, 0x3d, 0xd6);
 
-  virtual void print_info() = 0;
+  /** 
+   * Re-inject state of a block (used on recovery from persistent state)
+   * 
+   * @param ptr Allocation base
+   * @param size Size of allocation in bytes
+   *
+   * @return S_OK or E_INVAL
+   */
+  virtual status_t inject_allocation(void * ptr, size_t size) = 0;
 
-  /** 
-   * Add (slab) region of memory to fuel the allocator
-   * 
-   * @param region_base 
-   * @param region_length 
-   * @param numa_node 
-   * 
-   * @return S_OK or E_FAIL
-   */
-  virtual status_t add_managed_region(void * region_base,
-                                      size_t region_length,
-                                      int    numa_node) = 0;    
-  
-  /** 
-   * Allocate a region of memory of 'n' contiguous bytes without alignment of hint
-   * 
-   * @param Length in bytes
-   * 
-   * @return Pointer to allocated region
-   */
-  virtual void * allocate(size_t n) = 0;
-
-  /** 
-   * Free a previously allocated region of memory with length known
-   * 
-   * @param ptr Pointer to previously allocated region
-   * @param size Length of region in bytes
-   */
-  virtual void deallocate(void * ptr, size_t size) = 0;
 };
 
 
@@ -94,11 +180,10 @@ class IMemory_manager_volatile_reconstituting : public component::IBase {
  * IMemory_manager_persistent - memory manager that
  * resides in persistent memory and is crash-consistent
  */
-class IMemory_manager_persistent : public component::IBase {
+class IMemory_manager_persistent : public IMemory_manager_base {
  public:
   DECLARE_INTERFACE_UUID(0x740e5b5c, 0x6f2b, 0x478b, 0x90ac, 0x28, 0x7e, 0x83, 0x88, 0x91, 0x05);
 
-  virtual void print_info() = 0;
   // TODO
 };
 
@@ -115,9 +200,14 @@ class IMemory_manager_factory : public component::IBase {
   DECLARE_INTERFACE_UUID(0xfaccb3bb, 0xf4d9, 0x4437, 0x9fc7, 0x9f, 0xc7, 0xf0, 0x7d, 0x39, 0xe9);
 
   /* factories */
-  virtual IMemory_manager_volatile * create_mm_volatile(const unsigned debug_level) = 0;
-  virtual IMemory_manager_volatile_reconstituting * create_mm_volatile_reconstituting(const unsigned debug_level) = 0;
-  virtual IMemory_manager_persistent * create_mm_persistent(const unsigned debug_level) = 0;
+  virtual IMemory_manager_volatile *
+  create_mm_volatile(const unsigned debug_level) = 0;
+
+  virtual IMemory_manager_volatile_reconstituting *
+  create_mm_volatile_reconstituting(const unsigned debug_level) = 0;
+  
+  virtual IMemory_manager_persistent *
+  create_mm_persistent(const unsigned debug_level) = 0;
 };
 
 }  // namespace component
@@ -176,17 +266,23 @@ public:
   }
 
   value_type * allocate(std::size_t n)  {
-    return static_cast<value_type*>(_mm->allocate(n));
+    void * ptr = nullptr;
+    return (_mm->allocate(n, &ptr) == S_OK) ? static_cast<value_type*>(ptr) : nullptr;
   }
 
-  void deallocate(value_type * ptr, size_t size) {
+  value_type * aligned_allocate(std::size_t n, std::size_t alignment) {
+    void * ptr = nullptr;
+    return (_mm->aligned_allocate(n, alignment, &ptr) == S_OK) ?
+      static_cast<value_type*>(ptr) : nullptr;
+  }
+
+  void deallocate(value_type * ptr, std::size_t size) {
     _mm->deallocate(ptr, size);
   }
 
   status_t add_managed_region(void * region_base,
-                              size_t region_length,
-                              int    numa_node) {
-    return _mm->add_managed_region(region_base, region_length, numa_node);
+                              size_t region_length) {
+    return _mm->add_managed_region(region_base, region_length);
   }
 
   template<typename U>
