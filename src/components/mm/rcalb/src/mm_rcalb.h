@@ -57,7 +57,7 @@ public:
 
   virtual status_t allocate(std::size_t n, void **out_ptr) override {
     assert(out_ptr);
-    PINF("MM: RCA LB - ALLOC(%lu)", n);
+    PINF("MM: RCA LB - about to ALLOC(%lu)", n);
     *out_ptr = _rca_lb.alloc(n, DEFAULT_NUMA_NODE);
     PINF("MM: RCA LB - ALLOC(%lu) -> %p", n, *out_ptr);
     return S_OK;
@@ -90,6 +90,7 @@ public:
 
   virtual status_t add_managed_region(void * region_base,
                                       size_t region_length) override {
+    PINF("MM: RCA LB - ADD MANAGED REGION(%p, %lu)", region_base, region_length);
     _rca_lb.add_managed_region(region_base, region_length, 0 /* numa node */);
     return S_OK;
   }
