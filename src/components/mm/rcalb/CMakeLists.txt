@@ -20,8 +20,8 @@ file(GLOB SOURCES src/*)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 
-set(CMAKE_SHARED_LINKER_FLAGS
-  "-Wl,--wrap=malloc -Wl,--wrap=free -Wl,--no-undefined")
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--wrap=malloc -Wl,--wrap=free") # leave undefined
+  # -Wl,--no-undefined")
 
 target_link_libraries(${PROJECT_NAME} -static-libgcc -static-libstdc++ common-static dl)
 

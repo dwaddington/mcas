@@ -2,4 +2,4 @@
 cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 add_subdirectory (rcalb)
-add_subdirectory (dummy)
+#add_subdirectory (dummy)

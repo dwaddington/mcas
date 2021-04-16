@@ -18,6 +18,8 @@
 
 //#define PASS_THROUGH_TO_GLIBC
 
+static void __copy_real_functions(void);
+
 using malloc_function_t = void* (*)(size_t);
 using free_function_t = void (*)(void *ptr);
 using aligned_alloc_function_t =  void* (*)(size_t alignment, size_t size);
@@ -56,6 +58,8 @@ static __attribute__((constructor)) void __init_components(void)
   // don't close until your done with it!
   //  dlclose(module);
 
+  __copy_real_functions();
+
   /* load MM component ; could use environment variable */
   IBase *comp = load_component("libcomponent-mm-rcalb.so",
                                component::mm_rca_lb_factory);
@@ -79,16 +83,32 @@ static __attribute__((constructor)) void __init_components(void)
   globals::intercept_active = true;
 }
 
-static void __init_real_functions(void)
+/* safe version of malloc */
+extern "C" void * __wrap_malloc(size_t size)
 {
-  PLOG(PREFIX "__init_real_functions");
-   real::malloc = reinterpret_cast<malloc_function_t>(dlsym(RTLD_NEXT, "malloc"));
-  real::free = reinterpret_cast<free_function_t>(dlsym(RTLD_NEXT, "free"));
-  real::aligned_alloc = reinterpret_cast<aligned_alloc_function_t>(dlsym(RTLD_NEXT, "aligned_alloc"));
-  if (!real::malloc || !real::free | !real::aligned_alloc) {
-    fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-  }
+  if(!real::malloc) __copy_real_functions();
+  return real::malloc(size);
 }
+
+extern "C" void __wrap_free(void * ptr)
+{
+  if(!real::free) __copy_real_functions();
+  return real::free(ptr);
+}
+
+static void __copy_real_functions(void)
+{
+  real::malloc = reinterpret_cast<malloc_function_t>(dlsym(RTLD_NEXT, "malloc"));
+  assert(real::malloc && (real::malloc != __wrap_malloc));
+  
+  real::free = reinterpret_cast<free_function_t>(dlsym(RTLD_NEXT, "free"));
+  assert(real::free && (real::free != __wrap_free));
+  
+  real::aligned_alloc = reinterpret_cast<aligned_alloc_function_t>(dlsym(RTLD_NEXT, "aligned_alloc"));
+  assert(real::aligned_alloc);
+}
+
+
 
 
 
@@ -114,7 +134,7 @@ EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept;
 EXPORT_C void mm_free(void* p) noexcept
 {
   PLOG("mm_free(%p)", p);
-  if(!real::malloc) __init_real_functions();
+  if(!real::malloc) __copy_real_functions();
   
 #ifdef PASS_THROUGH_TO_GLIBC
   //  real::free(p);
@@ -136,7 +156,7 @@ EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
 
 EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
 {
-  if(!real::malloc) __init_real_functions();
+  if(!real::malloc) __copy_real_functions();
   PLOG("mm_calloc(%lu, %lu)", count, size);
 
 #ifdef PASS_THROUGH_TO_GLIBC
@@ -166,7 +186,7 @@ EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
 
 EXPORT_C void* mm_malloc(size_t size) noexcept
 {
-  if(!real::malloc) __init_real_functions();
+  if(!real::malloc) __copy_real_functions();
   PLOG("mm_alloc(%lu)", size);
 
 #ifdef PASS_THROUGH_TO_GLIBC
@@ -252,7 +272,7 @@ EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept
 // extern "C"
 // void * malloc(size_t size) {
 //   if(!real::malloc)
-//     __init_real_functions();
+//     __copy_real_functions();
 
 //   //  if(!globals::intercept_active)
 //   return real::malloc(size);
@@ -271,7 +291,7 @@ EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept
 // extern "C"
 // void free(void * ptr) {
 //   if(!real::free)
-//     __init_real_functions();
+//     __copy_real_functions();
 
 //   //  if(!globals::intercept_active || globals::alloc_count == 0)
 //   return real::free(ptr);

@@ -3,22 +3,6 @@
 #include "mm_rcalb.h"
 
 
-/* safe version of malloc */
-extern "C" void * __wrap_malloc(size_t size)
-{
-  PNOTICE("__wrap_malloc");
-  //  return ::mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-  return sbrk(size);
-}
-
-
-extern "C" void __wrap_free(void *)
-{
-  PNOTICE("__wrap_free");
-}
-
-
-
 /**
  * Factory entry point
  *
