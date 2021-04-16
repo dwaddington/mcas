@@ -15,21 +15,30 @@
 #ifndef __MM_RCALB_COMPONENT_H__
 #define __MM_RCALB_COMPONENT_H__
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+#define PREFIX "Rca_LB_memory_manager:"
+
+#include <string.h>
 #include <string>
 #include <set>
 #include <memory>
 #include <common/logging.h>
 #include <api/mm_itf.h>
-#include <nupm/rc_alloc_lb.h>
 
-#define PREFIX "Rca_LB_memory_manager:"
+#include "rc_alloc_lb.h"
+
 
 class Rca_LB_memory_manager : public component::IMemory_manager_volatile_reconstituting
 {
   static constexpr int DEFAULT_NUMA_NODE = 0;
   
 public:
-  Rca_LB_memory_manager(const unsigned debug_level) : _rca_lb(debug_level) {
+  Rca_LB_memory_manager(const unsigned debug_level)
+    : _rca_lb(debug_level)
+  {
     if(debug_level > 0)
       PLOG("Rca_LB_memory_manager: ctor");
   }
@@ -52,14 +61,16 @@ public:
 
 public:
   virtual void debug_dump() override {
-    PINF("MM: RCA LB");
+
+    PINF("MM: RCA LB (mmap)");
   }
 
   virtual status_t allocate(std::size_t n, void **out_ptr) override {
     assert(out_ptr);
-    PINF("MM: RCA LB - about to ALLOC(%lu)", n);
-    *out_ptr = _rca_lb.alloc(n, DEFAULT_NUMA_NODE);
-    PINF("MM: RCA LB - ALLOC(%lu) -> %p", n, *out_ptr);
+
+    PNOTICE("allocating with RcaLB...");
+    *out_ptr = _rca_lb.alloc(n, 0);
+    PNOTICE("allocated with RcaLB %p", *out_ptr);
     return S_OK;
   }
 
@@ -67,7 +78,9 @@ public:
     assert(n);
     assert(out_ptr);
     if(alignment == 0) return allocate(n, out_ptr);
-    *out_ptr = _rca_lb.alloc(n, DEFAULT_NUMA_NODE, alignment);
+
+    PNOTICE("allocating with mmap...(pretending to be aligned)");
+    *out_ptr = _rca_lb.alloc(n, 0, alignment);
     return S_OK;
   }
 
@@ -80,6 +93,7 @@ public:
   }
   
   virtual status_t callocate(size_t n, void ** out_ptr) override  {
+    asm("int3");
     if(out_ptr == nullptr) return E_INVAL;
     auto status = allocate(n, out_ptr);
     if(status == S_OK)
@@ -90,6 +104,7 @@ public:
 
   virtual status_t add_managed_region(void * region_base,
                                       size_t region_length) override {
+
     PINF("MM: RCA LB - ADD MANAGED REGION(%p, %lu)", region_base, region_length);
     _rca_lb.add_managed_region(region_base, region_length, 0 /* numa node */);
     return S_OK;
@@ -103,7 +118,10 @@ public:
   
   
 private:
-  nupm::Rca_LB _rca_lb;
+
+  /* The actual Allocator! */
+  Rca_LB _rca_lb;
+
 };
 
 
@@ -149,6 +167,6 @@ public:
 };
 
 
-
+#pragma GCC diagnostic pop
 
 #endif // __MM_RCALB_COMPONENT_H__

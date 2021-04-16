@@ -15,5 +15,5 @@ link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
 add_executable(mm-rcalb-test1 test1.cpp)
-target_link_libraries(mm-rcalb-test1 ${ASAN_LIB} common numa ${GTEST_LIB} pthread dl)
+target_link_libraries(mm-rcalb-test1 common numa ${GTEST_LIB} pthread dl)
 

@@ -3,7 +3,6 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 project(mm CXX)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS_DEBUG  "-g")
 
 add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
 add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
@@ -25,14 +24,15 @@ file(GLOB SOURCES src/mm_wrapper.cpp)
 
 add_library(mm SHARED ${SOURCES})
 
-target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
-target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
-target_link_libraries(${PROJECT_NAME} common pthread dl)
+#target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
+
+# dl has its own version of malloc
+target_link_libraries(${PROJECT_NAME} dl -static libc.a common)
 
 
 # plain executable, we use LD_PRELOAD
 add_executable(mmwrapper-test-prog src/test_prog.cpp)
-target_compile_options(mmwrapper-test-prog PUBLIC $<$<CONFIG:Debug>:-O0>)
+#target_compile_options(mmwrapper-test-prog PUBLIC $<$<CONFIG:Debug>:-O0>)
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast> -fpermissive)
 
 
