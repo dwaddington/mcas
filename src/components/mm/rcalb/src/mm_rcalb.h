@@ -67,10 +67,8 @@ public:
 
   virtual status_t allocate(std::size_t n, void **out_ptr) override {
     assert(out_ptr);
-
-    PNOTICE("allocating with RcaLB...");
     *out_ptr = _rca_lb.alloc(n, 0);
-    PNOTICE("allocated with RcaLB %p", *out_ptr);
+    PINF("MM: RCA LB - ALLOC(%lu) --> %p", n, *out_ptr);
     return S_OK;
   }
 
@@ -79,8 +77,8 @@ public:
     assert(out_ptr);
     if(alignment == 0) return allocate(n, out_ptr);
 
-    PNOTICE("allocating with mmap...(pretending to be aligned)");
     *out_ptr = _rca_lb.alloc(n, 0, alignment);
+    PINF("MM: RCA LB - ALIGNED_ALLOC(%lu, %lu) --> %p", n, alignment, *out_ptr);
     return S_OK;
   }
 

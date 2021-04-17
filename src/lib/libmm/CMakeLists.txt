@@ -26,8 +26,12 @@ add_library(mm SHARED ${SOURCES})
 
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic")
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic-functions")
 # dl has its own version of malloc
-target_link_libraries(${PROJECT_NAME} dl -static libc.a common)
+target_link_libraries(${PROJECT_NAME} -static-libgcc -static-libstdc++ common-static dl libc.a libstdc++.a )
+
+#target_link_libraries(${PROJECT_NAME} dl -static-libstdc++ -static libc.a libstdc++.a common)
 
 
 # plain executable, we use LD_PRELOAD

@@ -35,6 +35,14 @@
 #include <sstream>
 #include <vector>
 
+#include "mm_wrapper.h"
+
+namespace real
+{
+extern malloc_function_t        malloc;
+extern free_function_t          free;
+}
+
 namespace core
 {
 namespace slab
@@ -51,10 +59,10 @@ class CRuntime : public common::Base_slab_allocator {
 #pragma GCC diagnostic ignored "-Wunused-parameter"
   CRuntime(size_t slots, bool exact = false) {}
 #pragma GCC diagnostic pop
-  void* alloc() { return ::malloc(sizeof(T)); }
+  void* alloc() { return real::malloc(sizeof(T)); }
   size_t free(void* ptr) {
     assert(ptr);
-    ::free(ptr);
+    real::free(ptr);
     return sizeof(T);
   }
   bool is_reconstructed() { return false; }

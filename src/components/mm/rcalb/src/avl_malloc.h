@@ -29,7 +29,7 @@
 
 #include "avl_tree.h"
 #include "slab.h"
-#include <common/stack.h>
+#include "stack.h"
 #include <common/types.h>
 #include <common/utils.h>
 #include <iostream>

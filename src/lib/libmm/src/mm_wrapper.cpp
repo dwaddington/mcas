@@ -8,6 +8,8 @@
 #include <api/mm_itf.h>
 #include <sys/mman.h>
 
+#include "mm_wrapper.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -16,13 +18,8 @@
 #define PREFIX "MM-Wrapper: "
 #define DEBUG_LEVEL 3
 
-//#define PASS_THROUGH_TO_GLIBC
-
 static void __copy_real_functions(void);
 
-using malloc_function_t = void* (*)(size_t);
-using free_function_t = void (*)(void *ptr);
-using aligned_alloc_function_t =  void* (*)(size_t alignment, size_t size);
 
 namespace globals
 {
@@ -37,9 +34,9 @@ namespace real
 malloc_function_t        malloc = nullptr;
 free_function_t          free;
 aligned_alloc_function_t aligned_alloc;
+realloc_function_t       realloc;
 }
 
-//malloc_function_t foo_malloc;
 
 static __attribute__((constructor)) void __init_components(void)
 {
@@ -96,6 +93,18 @@ extern "C" void __wrap_free(void * ptr)
   return real::free(ptr);
 }
 
+extern "C" void * __wrap___cxa_allocate_exception(size_t thrown_size)
+{
+  return real::malloc(thrown_size);
+}
+
+extern "C" void __wrap___cxa_free_exception(void * thrown_exception)
+{
+  real::free(thrown_exception);
+}
+
+
+
 static void __copy_real_functions(void)
 {
   real::malloc = reinterpret_cast<malloc_function_t>(dlsym(RTLD_NEXT, "malloc"));
@@ -106,10 +115,10 @@ static void __copy_real_functions(void)
   
   real::aligned_alloc = reinterpret_cast<aligned_alloc_function_t>(dlsym(RTLD_NEXT, "aligned_alloc"));
   assert(real::aligned_alloc);
+
+  real::realloc = reinterpret_cast<realloc_function_t>(dlsym(RTLD_NEXT, "realloc"));
+  assert(real::realloc);
 }
-
-
-
 
 
 #define EXPORT_C extern "C" __attribute__((visibility("default")))
@@ -133,25 +142,22 @@ EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept;
 
 EXPORT_C void mm_free(void* p) noexcept
 {
-  PLOG("mm_free(%p)", p);
-  if(!real::malloc) __copy_real_functions();
-  
-#ifdef PASS_THROUGH_TO_GLIBC
-  //  real::free(p);
-#else
-#endif
+  if(!real::free) __copy_real_functions();
+
+  if(globals::intercept_active) {
+    globals::mm->deallocate(p, 0 /* size is not known */);
+  }
+  else {
+    /* intercept is not yet active */
+    real::free(p); 
+  }
 }
 
 EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
 {
-  PLOG("mm_realloc(%p, %lu)", p, newsize);
+  if(!real::realloc) __copy_real_functions();
 
-#ifdef PASS_THROUGH_TO_GLIBC
-  return nullptr; // indicate failure
-#else
-  return nullptr; // indicate failure
-#endif
- 
+  return real::realloc(p, newsize);
 }
 
 EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
@@ -159,45 +165,16 @@ EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
   if(!real::malloc) __copy_real_functions();
   PLOG("mm_calloc(%lu, %lu)", count, size);
 
-#ifdef PASS_THROUGH_TO_GLIBC
   void * p = mm_malloc(count * size);
   memset(p, 0, count * size);
   return p;
-#else
-
-  // if(globals::intercept_active) {
-  //   PNOTICE("Active! sending to mm component");
-  //   void * p = nullptr;
-    
-  //   if(globals::mm->allocate(size * count, &p) != S_OK)
-  //     return nullptr;
-
-  //   return p;
-  // }
-  // else {
-    void * p = ::mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-    PLOG("mm_calloc(%lu) -> %p", size, p);
-    memset(p, 0, size);
-    return p;
-    //  }
-#endif
-
 }
 
 EXPORT_C void* mm_malloc(size_t size) noexcept
 {
   if(!real::malloc) __copy_real_functions();
-  PLOG("mm_alloc(%lu)", size);
 
-#ifdef PASS_THROUGH_TO_GLIBC
-  void * p = ::mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-  //void * p = real::malloc(size);
-  PLOG("mm_alloc(%lu) -> %p", size, p);
-  return p;
-#else
   if(globals::intercept_active) {
-
-    PNOTICE("Active! sending to MM component");
 
     void * p = nullptr;
     if(globals::mm->allocate(size, &p) != S_OK) {
@@ -207,22 +184,16 @@ EXPORT_C void* mm_malloc(size_t size) noexcept
     return p;
   }
   else {
+    /* intercept is not yet active */
     return sbrk(size);
   }
-
-#endif
-  
 }
 
 EXPORT_C size_t mm_usable_size(const void* p) noexcept
 {
   PLOG("mm_usable_size(%p)", p);
 
-#ifdef PASS_THROUGH_TO_GLIBC
   return 100000000;
-#else
-  return 100000000;
-#endif
 }
 
 EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept
