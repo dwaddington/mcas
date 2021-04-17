@@ -157,7 +157,14 @@ EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
 {
   if(!real::realloc) __copy_real_functions();
 
-  return real::realloc(p, newsize);
+  if(globals::intercept_active) {
+    PERR("not implemented");
+    asm("int3");
+    return nullptr;
+  }
+  else {
+    return real::realloc(p, newsize);
+  }
 }
 
 EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
@@ -165,7 +172,13 @@ EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
   if(!real::malloc) __copy_real_functions();
   PLOG("mm_calloc(%lu, %lu)", count, size);
 
-  void * p = mm_malloc(count * size);
+  void * p;
+  if(globals::intercept_active) {
+    p = mm_malloc(count * size);
+  }
+  else {
+    p = real::malloc(count * size);
+  }
   memset(p, 0, count * size);
   return p;
 }
@@ -192,7 +205,7 @@ EXPORT_C void* mm_malloc(size_t size) noexcept
 EXPORT_C size_t mm_usable_size(const void* p) noexcept
 {
   PLOG("mm_usable_size(%p)", p);
-
+  asm("int3");
   return 100000000;
 }
 
