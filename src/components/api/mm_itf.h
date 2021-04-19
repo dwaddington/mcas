@@ -51,10 +51,12 @@ public:
    * @param region_base Pointer to beginning of region
    * @param region_length Region length in bytes
    * 
-   * @return S_OK or E_FAIL
+   * @return E_NOT_IMPL, S_OK or E_FAIL
    */
   virtual status_t add_managed_region(void * region_base,
-                                      size_t region_length) = 0;
+                                      size_t region_length) {
+    return E_NOT_IMPL;
+  }
 
   /** 
    * Allocate a region of memory without alignment or hint
@@ -64,7 +66,7 @@ public:
    *
    * @return S_OK or E_FAIL
    */
-  virtual status_t allocate(size_t n, void **out_ptr) = 0;
+  virtual status_t allocate(size_t n, void ** out_ptr) = 0;
 
   /** 
    * Allocation region of memory that is aligned
@@ -75,7 +77,7 @@ public:
    * 
    * @return S_OK or E_FAIL
    */
-  virtual status_t aligned_allocate(size_t n, size_t alignment, void **out_ptr) = 0;
+  virtual status_t aligned_allocate(size_t n, size_t alignment, void ** out_ptr) = 0;
 
   /** 
    * Special case for EASTL
@@ -86,7 +88,7 @@ public:
    * 
    * @return 
    */
-  virtual status_t aligned_allocate(size_t n, size_t alignment, size_t offset, void **out_ptr) {
+  virtual status_t aligned_allocate(size_t n, size_t alignment, size_t offset, void ** out_ptr) {
     return E_NOT_IMPL;
   }
 
@@ -128,18 +130,19 @@ public:
    * 
    * @param ptr Pointer to existing allocated region
    * @param size New size in bytes
+   * @param ptr [out] New reallocated region or null on unable to reallocate
    * 
    * @return S_OK
    */
-  virtual status_t reallocate(void * ptr, size_t size) {
+  virtual status_t reallocate(void * ptr, size_t size, void ** out_ptr) {
     return E_NOT_IMPL;
   }
   
   /** 
-   * Get debugging information
+   * [optional] Get debugging information
    * 
    */
-  virtual void debug_dump() = 0;
+  virtual void debug_dump() {}
 
 };
 

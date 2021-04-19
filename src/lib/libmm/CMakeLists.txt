@@ -7,11 +7,11 @@ set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
 add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
-#include(../../../mk/clang-dev-tools.cmake)
+include(../../../mk/clang-dev-tools.cmake)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
-include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
+#include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
@@ -26,17 +26,16 @@ add_library(mm SHARED ${SOURCES})
 
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic")
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic-functions")
-# dl has its own version of malloc
-target_link_libraries(${PROJECT_NAME} -static-libgcc -static-libstdc++ common-static dl libc.a libstdc++.a )
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--no-undefined")
+target_link_libraries(${PROJECT_NAME} -static-libgcc -static-libstdc++ common-static -static libdl.a dl)
 
-#target_link_libraries(${PROJECT_NAME} dl -static-libstdc++ -static libc.a libstdc++.a common)
+# dl has its own version of malloc
 
 
 # plain executable, we use LD_PRELOAD
 add_executable(mmwrapper-test-prog src/test_prog.cpp)
-#target_compile_options(mmwrapper-test-prog PUBLIC $<$<CONFIG:Debug>:-O0>)
+
+#target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast> -fpermissive)
 
 

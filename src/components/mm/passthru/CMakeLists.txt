@@ -2,13 +2,11 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 set(CMAKE_CXX_STANDARD 14)
 
-project(component-mm-rcalb CXX)
+project(component-mm-passthru CXX)
 
 add_definitions(-DCONFIG_DEBUG)
 
 include(../../../../mk/clang-dev-tools.cmake)
-
-add_subdirectory(unit_test)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
@@ -26,7 +24,8 @@ target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 # (Procedure Linking Table) from being used to resolve the symbol and
 # stick to the internally provided symbol
 #
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wrap=malloc -Wl,--wrap=free") # leave undefined
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wrap=malloc \
+-Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc") # leave undefined
 
 # see https://libcxxabi.llvm.org/spec.html
 

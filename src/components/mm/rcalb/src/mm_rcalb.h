@@ -91,14 +91,18 @@ public:
   }
   
   virtual status_t callocate(size_t n, void ** out_ptr) override  {
-    asm("int3");
     if(out_ptr == nullptr) return E_INVAL;
     auto status = allocate(n, out_ptr);
     if(status == S_OK)
       ::memset(*out_ptr, 0, n);
+    PINF("MM: RCA LB - CALLOC(%lu) --> %p", n, *out_ptr);        
     return status;
   }
 
+  virtual status_t reallocate(void *ptr, size_t size, void **out_ptr) override {
+    *out_ptr = nullptr; /* indicate we can't handle it */
+    return S_OK;
+  }
 
   virtual status_t add_managed_region(void * region_base,
                                       size_t region_length) override {
