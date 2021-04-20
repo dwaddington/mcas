@@ -19,15 +19,21 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-#define PREFIX "Rca_LB_memory_manager:"
+#define PREFIX "Passthru_memory_manager:"
 
 #include <string.h>
+#include <malloc.h>
 #include <string>
 #include <set>
 #include <memory>
 #include <common/logging.h>
 #include <api/mm_itf.h>
 
+namespace stats
+{
+static unsigned long alloc_count = 0;
+static unsigned long free_count = 0;
+}
 
 /** 
  * Pass through memory allocation to libc
@@ -64,36 +70,48 @@ public:
   }
 
   virtual status_t allocate(std::size_t n, void **out_ptr) override {
-    assert(out_ptr);
+    assert(out_ptr);    
     *out_ptr = ::malloc(n);
-    PINF("MM: PASSTHRU LB - ALLOC(%lu) --> %p", n, *out_ptr);
+    stats::alloc_count++;
+    PINF("MM [%lu]: PASSTHRU LB - ALLOC(%lu) --> %p", stats::alloc_count, n, *out_ptr);
     return S_OK;
   }
 
   virtual status_t aligned_allocate(size_t n, size_t alignment, void **out_ptr) override {
     assert(out_ptr);
-    *out_ptr = ::aligned_alloc(alignment, n);
-    PINF("MM: PASSTHRU LB - ALIGNED_ALLOC(%lu, %lu) --> %p", n, alignment, *out_ptr);
+    /* don't use aligned_alloc because its statically defined */
+    *out_ptr = ::memalign(alignment, n);
+    stats::alloc_count++;
+    PINF("MM [%lu]: PASSTHRU LB - ALIGNED_ALLOC(%lu, %lu) --> %p", stats::alloc_count, n, alignment, *out_ptr);
     return S_OK;
   }
 
   virtual status_t deallocate(void * ptr, std::size_t size = 0) override {
-    PINF("MM: PASSTHRU LB - FREE(%p, %lu)", ptr, size);
+    PINF("MM [%lu]: PASSTHRU LB - FREE(%p, %lu)", stats::free_count, ptr, size);
+    stats::free_count++;
     ::free(ptr);
     return S_OK;
   }
   
   virtual status_t callocate(size_t n, void ** out_ptr) override  {
     assert(out_ptr);
-    PINF("MM: PASSTHRU LB - CALLOC(%lu) --> %p", n, *out_ptr);        
-    *out_ptr = ::calloc(1, n);
-    PINF("MM: PASSTHRU LB - CALLOC(%lu) --> %p", n, *out_ptr);        
+    *out_ptr = ::calloc(n, 1);
+    stats::alloc_count++;
+    PINF("MM [%lu]: PASSTHRU LB - CALLOC(%lu) --> %p", stats::alloc_count, n, *out_ptr);        
     return S_OK;
   }
 
   virtual status_t reallocate(void *ptr, size_t size, void **out_ptr) override {
     assert(out_ptr);
     *out_ptr = ::realloc(ptr, size);
+    stats::alloc_count++;
+    PINF("MM [%lu]: PASSTHRU LB - REALLOC(%p, %lu) --> %p", stats::alloc_count, ptr, size, *out_ptr);
+    return S_OK;
+  }
+
+  virtual status_t usable_size(void * ptr, size_t * out_size) override {
+    if(ptr == nullptr || out_size == nullptr) return E_INVAL;
+    *out_size = malloc_usable_size(ptr);
     return S_OK;
   }
   

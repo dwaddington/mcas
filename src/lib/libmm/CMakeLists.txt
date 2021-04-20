@@ -4,7 +4,7 @@ project(mm CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
+add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -O0)
 add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 
 include(../../../mk/clang-dev-tools.cmake)
@@ -24,10 +24,16 @@ file(GLOB SOURCES src/mm_wrapper.cpp)
 
 add_library(mm SHARED ${SOURCES})
 
+target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--no-undefined")
-target_link_libraries(${PROJECT_NAME} -static-libgcc -static-libstdc++ common-static -static libdl.a dl)
+#set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--no-undefined")
+#set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-nodefaultlibs -Wl,--no-undefined")
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
+target_link_libraries(${PROJECT_NAME} common-static dl) #-static-libgcc dl -static common-static libdl.a )
+#-static /home/danielwaddington/mcas/src/lib/musl-1.2.2/build/lib/libc.so)
+#target_link_libraries(${PROJECT_NAME} dl -static-libgcc -static-libstdc++ common-static -static libdl.a)
+#target_link_libraries(${PROJECT_NAME} common-static /home/danielwaddington/mcas/src/lib/musl-1.2.2/build/lib/libc.so)
 
 # dl has its own version of malloc
 

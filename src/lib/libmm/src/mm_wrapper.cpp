@@ -18,7 +18,7 @@
 #define PREFIX "MM-Wrapper: "
 #define DEBUG_LEVEL 3
 
-static void __copy_real_functions(void);
+static void __get_os_functions(void);
 
 
 namespace globals
@@ -32,18 +32,19 @@ static bool intercept_active = false;
 namespace real
 {
 malloc_function_t        malloc = nullptr;
-free_function_t          free;
-aligned_alloc_function_t aligned_alloc;
-realloc_function_t       realloc;
-calloc_function_t        calloc;
+free_function_t          free = nullptr;
+aligned_alloc_function_t aligned_alloc = nullptr;
+realloc_function_t       realloc = nullptr;
+calloc_function_t        calloc = nullptr;
+memalign_function_t      memalign = nullptr;
 }
 
 
-static __attribute__((constructor)) void __init_components(void)
+static void __init_components(void)
 {
   using namespace component;
 
-  __copy_real_functions();
+  //  __get_os_functions();
 
 #ifdef USE_MM_RCALB
   
@@ -53,9 +54,9 @@ static __attribute__((constructor)) void __init_components(void)
   PLOG(PREFIX "loaded MM component OK (%p)", reinterpret_cast<void*>(comp));
   
   auto fact =
-    make_itf_ref(
-      static_cast<IMemory_manager_factory *>(comp->query_interface(IMemory_manager_factory::iid()))
-    );
+    //    make_itf_ref(
+    static_cast<IMemory_manager_factory *>(comp->query_interface(IMemory_manager_factory::iid()));
+  //    );
   
   /* create instance of memory manager */
   globals::mm = fact->create_mm_volatile_reconstituting(3);
@@ -72,9 +73,9 @@ static __attribute__((constructor)) void __init_components(void)
   PLOG(PREFIX "loaded MM component OK (%p)", reinterpret_cast<void*>(comp));
   
   auto fact =
-    make_itf_ref(
-      static_cast<IMemory_manager_factory *>(comp->query_interface(IMemory_manager_factory::iid()))
-    );
+    //    make_itf_ref(
+    static_cast<IMemory_manager_factory *>(comp->query_interface(IMemory_manager_factory::iid()));
+    //    );
 
   /* create instance of memory manager */
   globals::mm = fact->create_mm_volatile(3);
@@ -86,28 +87,34 @@ static __attribute__((constructor)) void __init_components(void)
 /* OS versions of the memory functions */
 extern "C" void * __wrap_malloc(size_t size)
 {
-  if(!real::malloc) __copy_real_functions();
+  if(!real::malloc) __get_os_functions();
   return real::malloc(size);
 }
 
 extern "C" void __wrap_free(void * ptr)
 {
-  if(!real::free) __copy_real_functions();
+  if(!real::free) __get_os_functions();
   return real::free(ptr);
 }
 
 extern "C" void * __wrap_calloc(size_t nmemb, size_t size)
 {
-  if(!real::calloc) __copy_real_functions();
+  if(!real::calloc) __get_os_functions();
   return real::calloc(nmemb, size);
 }
 
 extern "C" void * __wrap_realloc(void * ptr, size_t size)
 {
-  if(!real::realloc)  __copy_real_functions();
+  if(!real::realloc)  __get_os_functions();
   return real::realloc(ptr, size);
 }
 
+extern "C" void * __wrap_memalign(size_t alignment, size_t size)
+{
+  PNOTICE("Calling __wrap_memalign");
+  if(!real::memalign)  __get_os_functions();
+  return real::memalign(alignment, size);
+}
 
 // extern "C" void * __wrap___cxa_allocate_exception(size_t thrown_size)
 // {
@@ -119,10 +126,18 @@ extern "C" void * __wrap_realloc(void * ptr, size_t size)
 //   real::free(thrown_exception);
 // }
 
+static void * dl_libc = nullptr;
 
-
-static void __copy_real_functions(void)
+/** 
+ * Collect the "original" OS implementations, so they can be used by
+ * the memory manager plugin itself.
+ * 
+ */
+static void __get_os_functions(void)
 {
+  real::calloc = reinterpret_cast<calloc_function_t>(dlsym(RTLD_NEXT, "calloc"));
+  assert(real::calloc);
+
   real::malloc = reinterpret_cast<malloc_function_t>(dlsym(RTLD_NEXT, "malloc"));
   assert(real::malloc && (real::malloc != __wrap_malloc));
   
@@ -135,48 +150,48 @@ static void __copy_real_functions(void)
   real::realloc = reinterpret_cast<realloc_function_t>(dlsym(RTLD_NEXT, "realloc"));
   assert(real::realloc);
 
-  real::calloc = reinterpret_cast<calloc_function_t>(dlsym(RTLD_NEXT, "calloc"));
-  assert(real::calloc);
+  real::memalign = reinterpret_cast<memalign_function_t>(dlsym(RTLD_NEXT, "memalign"));
+  assert(real::memalign);
+
+  /* initialize backend */
+  __init_components();
 }
 
 
 #define EXPORT_C extern "C" __attribute__((visibility("default")))
 
-EXPORT_C void  mm_free(void* p) noexcept;
-EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept;
-EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept;
-EXPORT_C void* mm_malloc(size_t size) noexcept;
-EXPORT_C size_t mm_usable_size(const void* p) noexcept;
-EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept;
-EXPORT_C void* mm_valloc(size_t size) noexcept;
-EXPORT_C void* mm_pvalloc(size_t size) noexcept;
-EXPORT_C void* mm_reallocarray(void* p, size_t count, size_t size) noexcept;
-EXPORT_C void* mm_memalign(size_t alignment, size_t size) noexcept;
-EXPORT_C int   mm_posix_memalign(void** p, size_t alignment, size_t size) noexcept;
-EXPORT_C void* mm_aligned_alloc(size_t alignment, size_t size) noexcept;
+EXPORT_C void   mm_free(void* p) noexcept;
+EXPORT_C void*  mm_realloc(void* p, size_t newsize) noexcept;
+EXPORT_C void*  mm_calloc(size_t count, size_t size) noexcept;
+EXPORT_C void*  mm_malloc(size_t size) noexcept;
+EXPORT_C size_t mm_usable_size(void* p) noexcept;
+EXPORT_C void*  mm_valloc(size_t size) noexcept;
+EXPORT_C void*  mm_pvalloc(size_t size) noexcept;
+EXPORT_C void*  mm_reallocarray(void* p, size_t count, size_t size) noexcept;
+EXPORT_C void*  mm_memalign(size_t alignment, size_t size) noexcept;
+EXPORT_C int    mm_posix_memalign(void** p, size_t alignment, size_t size) noexcept;
+EXPORT_C void*  mm_aligned_alloc(size_t alignment, size_t size) noexcept;
 
 
 #include "alloc-override.c"
 
 
-
 EXPORT_C void mm_free(void* p) noexcept
 {
-  if(!real::free) __copy_real_functions();
-  if(p == nullptr) return;
+  if(!real::free) __get_os_functions();
 
   if(globals::intercept_active) {
     globals::mm->deallocate(p, 0 /* size is not known */);
   }
   else {
     /* intercept is not yet active */
-    //    real::free(p); 
+    real::free(p); 
   }
 }
 
 EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
 {
-  if(!real::realloc) __copy_real_functions();
+  if(!real::realloc) __get_os_functions();
 
   if(globals::intercept_active) {
     void * new_ptr = nullptr;
@@ -189,28 +204,36 @@ EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
 }
 
 EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
-{
-  PLOG("mm_calloc(%lu, %lu)", count, size);
-  if(!real::calloc) __copy_real_functions();
-
+{  
+  if(!real::calloc) {
+    /* calloc is used by dl loader, so until we have it 
+       interpositioned, we use sbrk.  Apparently, we could
+       return null too */
+    void * p = sbrk(count * size);
+    memset(p, 0, count * size);
+    return p;
+  }
+  
   void * p = nullptr;
   if(globals::intercept_active) {
-    globals::mm->callocate(count * size, &p);
+     globals::mm->callocate(count * size, &p);
   }
   else {
     p = real::calloc(count, size);
   }
+  PLOG("mm_calloc(%lu, %lu) -> %p", count, size, p);
   return p;
 }
 
 EXPORT_C void* mm_malloc(size_t size) noexcept
 {
-  if(!real::malloc) __copy_real_functions();
+  if(!real::malloc) __get_os_functions();
 
   if(globals::intercept_active) {
 
     void * p = nullptr;
     if(globals::mm->allocate(size, &p) != S_OK) {
+      PWRN("globals::mm->allocate failed to allocate(%lu)", size);
       return nullptr;
     }
 
@@ -222,32 +245,34 @@ EXPORT_C void* mm_malloc(size_t size) noexcept
   }
 }
 
-EXPORT_C size_t mm_usable_size(const void* p) noexcept
+EXPORT_C size_t mm_usable_size(void* p) noexcept
 {
-  PNOTICE("mm_usable_size(%p)", p);
-  asm("int3");
-  return 100000000;
+  if(p == nullptr) return 0;
+  size_t us = 0;
+  if(globals::mm->usable_size(p, &us) != S_OK) {
+    PWRN("globals::mm->usable_size() failed");
+    return 0;
+  }
+  return us;
 }
 
-EXPORT_C void* mm_reallocf(void* p, size_t newsize) noexcept
-{
-  PNOTICE("mm_reallocf(%p, %lu)", p, newsize);
-  asm("int3");
-  return nullptr;
-}
-
+/* valloc is Linux deprecated */
 EXPORT_C void* mm_valloc(size_t size) noexcept
 {
-  PNOTICE("mm_valloc(%lu)", size);
-  asm("int3");
-  return nullptr;
+  void * p = nullptr;
+  if(size == 0) return nullptr;
+  status_t s = globals::mm->aligned_allocate(size, sysconf(_SC_PAGESIZE), &p);
+  if(s != S_OK) return nullptr; /* should really look at errno? */
+  return p;
 }
 
 EXPORT_C void* mm_pvalloc(size_t size) noexcept
 {
-  PNOTICE("mm_pvalloc(%lu)", size);
-  asm("int3");
-  return nullptr;  
+  void * p = nullptr;
+  if(size == 0) return nullptr;
+  status_t s = globals::mm->aligned_allocate(round_up(size, sysconf(_SC_PAGESIZE)), sysconf(_SC_PAGESIZE), &p);
+  if(s != S_OK) return nullptr; /* should really look at errno? */
+  return p;
 }
 
 EXPORT_C void* mm_reallocarray(void* p, size_t count, size_t size) noexcept
@@ -257,23 +282,33 @@ EXPORT_C void* mm_reallocarray(void* p, size_t count, size_t size) noexcept
 
 EXPORT_C void* mm_memalign(size_t alignment, size_t size) noexcept
 {
-  PNOTICE("mm_memalign");
-  asm("int3");
-  return nullptr;  
+  void * p = nullptr;
+  if(size == 0) return nullptr;
+  status_t s = globals::mm->aligned_allocate(size, alignment, &p);
+  if(s != S_OK) return nullptr; /* should really look at errno? */
+  return p;
 }
 
-EXPORT_C int   mm_posix_memalign(void** p, size_t alignment, size_t size) noexcept
+EXPORT_C int mm_posix_memalign(void** p, size_t alignment, size_t size) noexcept
 {
-  PNOTICE("mm_posix_memalign");
-  asm("int3");
+  if(p == nullptr) return EINVAL;
+  status_t s = globals::mm->aligned_allocate(size, alignment, p);
+  if(s != S_OK) {
+    if(s == E_NO_MEM) return ENOMEM;
+    return EINVAL;
+  }
   return 0;
 }
 
 EXPORT_C void* mm_aligned_alloc(size_t alignment, size_t size) noexcept
 {
-  PNOTICE("mm_aligned_alloc");
-  asm("int3");
-  return nullptr;
+  void * p = nullptr;
+  status_t s = globals::mm->aligned_allocate(size, alignment, &p);
+  if(s != S_OK) {
+    if(s == E_NO_MEM) return ENOMEM;
+    return EINVAL;
+  }
+  return 0;
 }
 
 

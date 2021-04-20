@@ -25,7 +25,7 @@ target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 # stick to the internally provided symbol
 #
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wrap=malloc \
--Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc") # leave undefined
+-Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=memalign") # leave undefined
 
 # see https://libcxxabi.llvm.org/spec.html
 

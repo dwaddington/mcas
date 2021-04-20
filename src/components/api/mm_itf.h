@@ -75,7 +75,7 @@ public:
    * @param alignment Alignment in bytes
    * @param out_ptr [out] Pointer to allocated region
    * 
-   * @return S_OK or E_FAIL
+   * @return S_OK, E_FAIL, E_INVAL (depending on implementation)
    */
   virtual status_t aligned_allocate(size_t n, size_t alignment, void ** out_ptr) = 0;
 
@@ -135,6 +135,19 @@ public:
    * @return S_OK
    */
   virtual status_t reallocate(void * ptr, size_t size, void ** out_ptr) {
+    return E_NOT_IMPL;
+  }
+
+  /** 
+   * Get the number of usable bytes in block pointed to by ptr.  The
+   * allocator *may* not have this information and should then return
+   * E_NOT_IMPL. Returned size may be larger than requested allocation
+   * 
+   * @param ptr Pointer to block base
+   * 
+   * @return Number of bytes in allocated block
+   */
+  virtual status_t usable_size(void * ptr, size_t * out_size) {
     return E_NOT_IMPL;
   }
   

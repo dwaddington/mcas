@@ -48,7 +48,6 @@ terms of the MIT license. A copy of the license can be found in the file
     MM_INTERPOSE_MI(strndup),
     MM_INTERPOSE_MI(realpath),
     MM_INTERPOSE_MI(posix_memalign),
-    MM_INTERPOSE_MI(reallocf),
     MM_INTERPOSE_MI(valloc),
     #ifndef MM_OSX_ZONE
     // some code allocates from default zone but deallocates using plain free :-( (like NxHashResizeToCapacity <https://github.com/nneonneo/osx-10.9-opensource/blob/master/objc4-551.1/runtime/hashtable2.mm>)
@@ -161,21 +160,14 @@ extern "C" {
 // ------------------------------------------------------
 
 void   cfree(void* p)                    MM_FORWARD0(mm_free, p);
-void*  reallocf(void* p, size_t newsize) MM_FORWARD2(mm_reallocf, p, newsize);
-size_t malloc_size(const void* p)        MM_FORWARD1(mm_usable_size,p);
-#if !defined(__ANDROID__)
+size_t malloc_size(void* p)              MM_FORWARD1(mm_usable_size,p);
 size_t malloc_usable_size(void *p)       MM_FORWARD1(mm_usable_size,p);
-#else
-size_t malloc_usable_size(const void *p) MM_FORWARD1(mm_usable_size,p);
-#endif
-
-// no forwarding here due to aliasing/name mangling issues
-void* valloc(size_t size)                                     { return mm_valloc(size); }
-void* pvalloc(size_t size)                                    { return mm_pvalloc(size); }
-void* reallocarray(void* p, size_t count, size_t size)        { return mm_reallocarray(p, count, size); }
-void* memalign(size_t alignment, size_t size)                 { return mm_memalign(alignment, size); }
-int   posix_memalign(void** p, size_t alignment, size_t size) { return mm_posix_memalign(p, alignment, size); }
-void* _aligned_malloc(size_t alignment, size_t size)          { return mm_aligned_alloc(alignment, size); }
+void*  valloc(size_t size)                                     { return mm_valloc(size); }
+void*  pvalloc(size_t size)                                    { return mm_pvalloc(size); }
+void*  reallocarray(void* p, size_t count, size_t size)        { return mm_reallocarray(p, count, size); }
+void*  memalign(size_t alignment, size_t size)                 { return mm_memalign(alignment, size); }
+int    posix_memalign(void** p, size_t alignment, size_t size) { return mm_posix_memalign(p, alignment, size); }
+void*  _aligned_malloc(size_t alignment, size_t size)          { return mm_aligned_alloc(alignment, size); }
 
 // on some glibc `aligned_alloc` is declared `static inline` so we cannot override it (e.g. Conda). This happens
 // when _GLIBCXX_HAVE_ALIGNED_ALLOC is not defined. However, in those cases it will use `memalign`, `posix_memalign`, 
