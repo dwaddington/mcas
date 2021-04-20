@@ -111,7 +111,6 @@ extern "C" void * __wrap_realloc(void * ptr, size_t size)
 
 extern "C" void * __wrap_memalign(size_t alignment, size_t size)
 {
-  PNOTICE("Calling __wrap_memalign");
   if(!real::memalign)  __get_os_functions();
   return real::memalign(alignment, size);
 }

@@ -47,6 +47,9 @@ class IMemory_manager_base : public component::IBase {
 public:
   /*< call back function to request more memory for slab */
   typedef void (*request_memory_callback_t)(void * param, size_t alignment, size_t size_hint, void * addr_hint);
+
+  /*< call back function for allocator to release memory back to OS */
+  typedef void (*release_memory_callback_t)(void * param, void * addr, size_t size);
   
 public:
   
@@ -55,12 +58,27 @@ public:
    * allocator does not need this as it takes directly from the OS.
    * 
    * @param region_base Pointer to beginning of region
-   * @param region_length Region length in bytes
+   * @param region_size Region length in bytes
    * 
    * @return E_NOT_IMPL, S_OK, E_FAIL, E_INVAL
    */
   virtual status_t add_managed_region(void * region_base,
-                                      size_t region_length) {
+                                      size_t region_size) {
+    return E_NOT_IMPL;
+  }
+
+  /** 
+   * Query memory regions being used by the allocator
+   * 
+   * @param region_id Index counting from 0
+   * @param [out] Base address of region
+   * @param [out] Size of region in bytes
+   * 
+   * @return S_MORE (continue to next region id), S_OK (done), E_INVAL
+   */  
+  virtual status_t query_managed_region(unsigned region_id,
+                                        void** out_region_base,
+                                        size_t* out_region_size) {
     return E_NOT_IMPL;
   }
 
@@ -77,6 +95,19 @@ public:
     return E_NOT_IMPL;
   }
 
+  /** 
+   * Register callback the allocator can use to release memory back to OS
+   * 
+   * @param callback Call back function pointer
+   * @param param Optional parameter which will be pass to callback function
+   * 
+   * @return E_NOT_IMPL, S_OK
+   */  
+  virtual status_t register_callback_release_memory(release_memory_callback_t callback,
+                                                    void * param = nullptr) {
+    return E_NOT_IMPL;
+  }
+  
   /** 
    * Allocate a region of memory without alignment or hint
    * 
