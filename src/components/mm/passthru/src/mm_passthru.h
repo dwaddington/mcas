@@ -73,7 +73,7 @@ public:
     assert(out_ptr);    
     *out_ptr = ::malloc(n);
     stats::alloc_count++;
-    PINF("MM [%lu]: PASSTHRU LB - ALLOC(%lu) --> %p", stats::alloc_count, n, *out_ptr);
+    PINF("MM [%lu]: PASSTHRU\t - ALLOC(%lu) --> %p", stats::alloc_count, n, *out_ptr);
     return S_OK;
   }
 
@@ -82,12 +82,12 @@ public:
     /* don't use aligned_alloc because its statically defined */
     *out_ptr = ::memalign(alignment, n);
     stats::alloc_count++;
-    PINF("MM [%lu]: PASSTHRU LB - ALIGNED_ALLOC(%lu, %lu) --> %p", stats::alloc_count, n, alignment, *out_ptr);
+    PINF("MM [%lu]: PASSTHRU\t - ALIGNED_ALLOC(%lu, %lu) --> %p", stats::alloc_count, n, alignment, *out_ptr);
     return S_OK;
   }
 
   virtual status_t deallocate(void * ptr, std::size_t size = 0) override {
-    PINF("MM [%lu]: PASSTHRU LB - FREE(%p, %lu)", stats::free_count, ptr, size);
+    PINF("MM [%lu]: PASSTHRU\t - FREE(%p, %lu)", stats::free_count, ptr, size);
     stats::free_count++;
     ::free(ptr);
     return S_OK;
@@ -97,7 +97,7 @@ public:
     assert(out_ptr);
     *out_ptr = ::calloc(n, 1);
     stats::alloc_count++;
-    PINF("MM [%lu]: PASSTHRU LB - CALLOC(%lu) --> %p", stats::alloc_count, n, *out_ptr);        
+    PINF("MM [%lu]: PASSTHRU\t - CALLOC(%lu) --> %p", stats::alloc_count, n, *out_ptr);        
     return S_OK;
   }
 
@@ -105,7 +105,7 @@ public:
     assert(out_ptr);
     *out_ptr = ::realloc(ptr, size);
     stats::alloc_count++;
-    PINF("MM [%lu]: PASSTHRU LB - REALLOC(%p, %lu) --> %p", stats::alloc_count, ptr, size, *out_ptr);
+    PINF("MM [%lu]: PASSTHRU\t - REALLOC(%p, %lu) --> %p", stats::alloc_count, ptr, size, *out_ptr);
     return S_OK;
   }
 

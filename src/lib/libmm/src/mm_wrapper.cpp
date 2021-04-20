@@ -221,7 +221,7 @@ EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
   else {
     p = real::calloc(count, size);
   }
-  PLOG("mm_calloc(%lu, %lu) -> %p", count, size, p);
+
   return p;
 }
 

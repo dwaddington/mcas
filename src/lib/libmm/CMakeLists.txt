@@ -27,16 +27,8 @@ add_library(mm SHARED ${SOURCES})
 target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 
-#set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--no-undefined")
-#set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-nodefaultlibs -Wl,--no-undefined")
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 target_link_libraries(${PROJECT_NAME} common-static dl) #-static-libgcc dl -static common-static libdl.a )
-#-static /home/danielwaddington/mcas/src/lib/musl-1.2.2/build/lib/libc.so)
-#target_link_libraries(${PROJECT_NAME} dl -static-libgcc -static-libstdc++ common-static -static libdl.a)
-#target_link_libraries(${PROJECT_NAME} common-static /home/danielwaddington/mcas/src/lib/musl-1.2.2/build/lib/libc.so)
-
-# dl has its own version of malloc
-
 
 # plain executable, we use LD_PRELOAD
 add_executable(mmwrapper-test-prog src/test_prog.cpp)
