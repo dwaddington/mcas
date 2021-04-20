@@ -43,18 +43,37 @@ namespace component
  * Base interface. Methods that all allocators should support.
  */
 class IMemory_manager_base : public component::IBase {
+
+public:
+  /*< call back function to request more memory for slab */
+  typedef void (*request_memory_callback_t)(void * param, size_t alignment, size_t size_hint, void * addr_hint);
+  
 public:
   
   /** 
-   * Add (slab) region of memory to fuel the allocator
+   * Add (slab) region of memory to fuel the allocator.  The passthru
+   * allocator does not need this as it takes directly from the OS.
    * 
    * @param region_base Pointer to beginning of region
    * @param region_length Region length in bytes
    * 
-   * @return E_NOT_IMPL, S_OK or E_FAIL
+   * @return E_NOT_IMPL, S_OK, E_FAIL, E_INVAL
    */
   virtual status_t add_managed_region(void * region_base,
                                       size_t region_length) {
+    return E_NOT_IMPL;
+  }
+
+  /** 
+   * Register callback the allocator can use to request more memory
+   * 
+   * @param callback Call back function pointer
+   * @param param Optional parameter which will be pass to callback function
+   * 
+   * @return E_NOT_IMPL, S_OK
+   */  
+  virtual status_t register_callback_request_memory(request_memory_callback_t callback,
+                                                    void * param = nullptr) {
     return E_NOT_IMPL;
   }
 
