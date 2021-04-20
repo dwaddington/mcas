@@ -41,7 +41,6 @@ target_compile_options(${PROJECT_NAME}-static PUBLIC "-fPIC")
 target_link_libraries(${PROJECT_NAME} dl gcov numa)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
-target_link_libraries(${PROJECT_NAME}-static -static libdl.a)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-static ARCHIVE DESTINATION lib)
