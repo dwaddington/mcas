@@ -37,6 +37,7 @@ aligned_alloc_function_t aligned_alloc = nullptr;
 realloc_function_t       realloc = nullptr;
 calloc_function_t        calloc = nullptr;
 memalign_function_t      memalign = nullptr;
+vfprintf_function_t      vfprintf = nullptr;
 }
 
 
@@ -115,6 +116,19 @@ extern "C" void * __wrap_memalign(size_t alignment, size_t size)
   return real::memalign(alignment, size);
 }
 
+extern "C" int __wrap_fprintf(FILE *stream, const char *format,...)
+{
+  if(!real::vfprintf)  __get_os_functions();
+
+  va_list args;
+  va_start(args, format);
+  int rc = real::vfprintf(stream, format, args);
+  va_end(args);
+  return rc;
+}
+  
+
+
 // extern "C" void * __wrap___cxa_allocate_exception(size_t thrown_size)
 // {
 //   return real::malloc(thrown_size);
@@ -151,6 +165,10 @@ static void __get_os_functions(void)
 
   real::memalign = reinterpret_cast<memalign_function_t>(dlsym(RTLD_NEXT, "memalign"));
   assert(real::memalign);
+
+  real::vfprintf = reinterpret_cast<vfprintf_function_t>(dlsym(RTLD_NEXT, "vfprintf"));
+  assert(real::vfprintf);
+
 
   /* initialize backend */
   __init_components();

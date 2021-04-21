@@ -13,7 +13,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libmm/src)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
   
-file(GLOB SOURCES src/*)
+file(GLOB SOURCES src/mm_passthru.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
@@ -25,7 +25,7 @@ target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 # stick to the internally provided symbol
 #
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wrap=malloc \
--Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=memalign") # leave undefined
+-Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=memalign -Wl,--wrap=fprintf") # leave undefined
 
 # see https://libcxxabi.llvm.org/spec.html
 
