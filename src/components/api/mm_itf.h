@@ -202,10 +202,10 @@ public:
   }
   
   /** 
-   * [optional] Get debugging information
+   * Get debugging information
    * 
    */
-  virtual void debug_dump() {}
+  virtual void debug_dump() = 0;
 
 };
 

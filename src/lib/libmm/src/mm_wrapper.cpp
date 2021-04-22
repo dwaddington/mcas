@@ -40,12 +40,9 @@ memalign_function_t      memalign = nullptr;
 vfprintf_function_t      vfprintf = nullptr;
 }
 
-
 static void __init_components(void)
 {
   using namespace component;
-
-  //  __get_os_functions();
 
 #ifdef USE_MM_RCALB
   
@@ -127,19 +124,6 @@ extern "C" int __wrap_fprintf(FILE *stream, const char *format,...)
   return rc;
 }
   
-
-
-// extern "C" void * __wrap___cxa_allocate_exception(size_t thrown_size)
-// {
-//   return real::malloc(thrown_size);
-// }
-
-// extern "C" void __wrap___cxa_free_exception(void * thrown_exception)
-// {
-//   real::free(thrown_exception);
-// }
-
-static void * dl_libc = nullptr;
 
 /** 
  * Collect the "original" OS implementations, so they can be used by
