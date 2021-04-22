@@ -112,18 +112,7 @@ extern "C" void * __wrap_memalign(size_t alignment, size_t size)
   if(!real::memalign)  __get_os_functions();
   return real::memalign(alignment, size);
 }
-
-extern "C" int __wrap_fprintf(FILE *stream, const char *format,...)
-{
-  if(!real::vfprintf)  __get_os_functions();
-
-  va_list args;
-  va_start(args, format);
-  int rc = real::vfprintf(stream, format, args);
-  va_end(args);
-  return rc;
-}
-  
+ 
 
 /** 
  * Collect the "original" OS implementations, so they can be used by
