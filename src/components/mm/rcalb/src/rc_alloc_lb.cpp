@@ -11,17 +11,18 @@
    limitations under the License.
 */
 
-#include "rc_alloc_lb.h"
-
-#include "avl_malloc.h"
-#include "slab.h"
-#include "region.h"
-
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <common/utils.h>
 #include <numa.h>
 #include <stdexcept>
+
+#include "safe_print.h"
+#include "rc_alloc_lb.h"
+#include "avl_malloc.h"
+#include "slab.h"
+#include "region.h"
+
 
 Rca_LB::Rca_LB(unsigned debug_level_) : _rmap(new Region_map(debug_level_)) {}
 
@@ -49,7 +50,7 @@ void *Rca_LB::alloc(size_t size, int numa_node, size_t alignment)
 
   void * result = _rmap->allocate(size, numa_node, alignment);
   if(result == nullptr) {
-    PWRN("Region allocator unable to allocate (size=%lu, alignment=%lu)", size, alignment);
+    SAFE_PRINT("Region allocator unable to allocate (size=%lu, alignment=%lu)", size, alignment);
     throw std::bad_alloc();
   }
   //  PNOTICE("Rca_LB::alloc (%p,%lu)", result, size);

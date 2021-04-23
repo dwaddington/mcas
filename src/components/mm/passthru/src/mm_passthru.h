@@ -96,12 +96,20 @@ public:
     return S_OK;
   }
 
-  virtual status_t deallocate(void * ptr, std::size_t size = 0) override {
+  virtual status_t deallocate(void * ptr, std::size_t ) override {
     SAFE_PRINT("MM: De-allocate: (%p) %lu", ptr, stats.free_count);
     stats.free_count++;
     ::free(ptr);
     return S_OK;
   }
+
+  virtual status_t deallocate_without_size(void * ptr) override {
+    SAFE_PRINT("MM: De-allocate: (%p) %lu", ptr, stats.free_count);
+    stats.free_count++;
+    ::free(ptr);
+    return S_OK;
+  }
+
   
   virtual status_t callocate(size_t n, void ** out_ptr) override  {
     SAFE_PRINT("MM: Callocate: (%lu) %lu", n, stats.alloc_count);

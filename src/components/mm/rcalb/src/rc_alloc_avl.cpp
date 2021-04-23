@@ -11,16 +11,16 @@
    limitations under the License.
 */
 
-
-#include "rc_alloc_avl.h"
-
-#include "avl_malloc.h"
-#include "slab.h"
 #include <boost/numeric/conversion/cast.hpp>
 #include <common/exceptions.h>
 #include <common/logging.h>
 #include <numa.h>
 #include <stdexcept>
+
+#include "safe_print.h"
+#include "rc_alloc_avl.h"
+#include "avl_malloc.h"
+#include "slab.h"
 
 namespace rca
 {
@@ -78,7 +78,7 @@ class Rca_AVL_internal : private common::log_source {
     const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     try {
       auto mr = _allocators[numa_node_u]->alloc(size, alignment);
-      CPLOG(1, "AVL allocated: 0x%lx size=%lu", mr->addr(), size);
+      SAFE_PRINT("AVL allocated: 0x%lx size=%lu", mr->addr(), size);
 
       assert(mr);
       return mr->paddr();

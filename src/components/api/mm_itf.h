@@ -159,9 +159,7 @@ public:
    * 
    * @return S_OK
    */
-  virtual status_t deallocate_without_size(void * ptr) {
-    return E_NOT_IMPL;
-  }
+  virtual status_t deallocate_without_size(void * ptr) = 0;
 
   /** 
    * Allocate region and zero memory

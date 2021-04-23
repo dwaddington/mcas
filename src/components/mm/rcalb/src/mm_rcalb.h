@@ -28,8 +28,8 @@
 #include <common/logging.h>
 #include <api/mm_itf.h>
 
+#include "safe_print.h"
 #include "rc_alloc_lb.h"
-
 
 class Rca_LB_memory_manager : public component::IMemory_manager_volatile_reconstituting
 {
@@ -40,7 +40,7 @@ public:
     : _rca_lb(debug_level)
   {
     if(debug_level > 0)
-      PLOG("Rca_LB_memory_manager: ctor");
+      SAFE_PRINT("Rca_LB_memory_manager: ctor");
   }
 
   virtual ~Rca_LB_memory_manager() {
@@ -62,13 +62,13 @@ public:
 public:
   virtual void debug_dump() override {
 
-    PINF("MM: RCA LB (mmap)");
+    SAFE_PRINT("MM: RCA LB (mmap)");
   }
 
   virtual status_t allocate(std::size_t n, void **out_ptr) override {
     assert(out_ptr);
     *out_ptr = _rca_lb.alloc(n, 0);
-    PINF("MM: RCA LB - ALLOC(%lu) --> %p", n, *out_ptr);
+    SAFE_PRINT("MM: RCA LB - ALLOC(%lu) --> %p", n, *out_ptr);
     return S_OK;
   }
 
@@ -78,15 +78,22 @@ public:
     if(alignment == 0) return allocate(n, out_ptr);
 
     *out_ptr = _rca_lb.alloc(n, 0, alignment);
-    PINF("MM: RCA LB - ALIGNED_ALLOC(%lu, %lu) --> %p", n, alignment, *out_ptr);
+    SAFE_PRINT("MM: RCA LB - ALIGNED_ALLOC(%lu, %lu) --> %p", n, alignment, *out_ptr);
     return S_OK;
   }
 
-  virtual status_t deallocate(void * ptr, std::size_t size = 0) override {
-    PINF("MM: RCA LB - FREE(%p, %lu)", ptr, size);
-    size > 0 ?
-      _rca_lb.free(ptr, DEFAULT_NUMA_NODE, size) :
-      _rca_lb.free(ptr, DEFAULT_NUMA_NODE);
+
+  virtual status_t deallocate(void * ptr, std::size_t size) override {
+    SAFE_PRINT("MM: RCA LB - FREE(%p, %lu)", ptr, size);
+    if(ptr == nullptr || size == 0) return S_OK;
+    //    _rca_lb.free(ptr, DEFAULT_NUMA_NODE, size);
+    return S_OK;
+  }
+  
+  virtual status_t deallocate_without_size(void * ptr) override {
+    SAFE_PRINT("MM: RCA LB - FREE WITHOUT SIZE (%p)", ptr);
+    if(ptr == nullptr) return S_OK;
+    _rca_lb.free(ptr, DEFAULT_NUMA_NODE);
     return S_OK;
   }
   
@@ -95,7 +102,7 @@ public:
     auto status = allocate(n, out_ptr);
     if(status == S_OK)
       ::memset(*out_ptr, 0, n);
-    PINF("MM: RCA LB - CALLOC(%lu) --> %p", n, *out_ptr);        
+    SAFE_PRINT("MM: RCA LB - CALLOC(%lu) --> %p", n, *out_ptr);        
     return status;
   }
 
@@ -107,7 +114,7 @@ public:
   virtual status_t add_managed_region(void * region_base,
                                       size_t region_length) override {
 
-    PINF("MM: RCA LB - ADD MANAGED REGION(%p, %lu)", region_base, region_length);
+    SAFE_PRINT("MM: RCA LB - ADD MANAGED REGION(%p, %lu)", region_base, region_length);
     _rca_lb.add_managed_region(region_base, region_length, 0 /* numa node */);
     return S_OK;
   }

@@ -21,8 +21,6 @@
 #ifndef __REGION_H__
 #define __REGION_H__
 
-#include "mappers.h"
-#include "rc_alloc_avl.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -38,6 +36,11 @@
 #include <memory>
 #include <set>
 #include <sstream> /* stringstream */
+
+#include "safe_print.h"
+#include "mappers.h"
+#include "rc_alloc_avl.h"
+
 
 #define SANITY_CHECK 0
 
@@ -86,7 +89,7 @@ public:
         _reclaim_when_empty(false),
         _use_count(0)
   {
-    CPLOG(1,"new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
+    SAFE_PRINT("new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
           region_ptr, region_size, object_size, _capacity);
 
     if (region_size % object_size)
@@ -288,10 +291,10 @@ public:
        {
          if ( ! bucket_list.empty() )
          {
-           CPLOG(0, "%s: node %d size %d", __func__, node_ix, 1 << list_ix);
+           SAFE_PRINT("%s: node %d size %d", __func__, node_ix, 1 << list_ix);
            for ( const auto &bucket : bucket_list )
            {
-             CPLOG(0, "%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
+             SAFE_PRINT("%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
            }
          }
          ++list_ix;
@@ -427,7 +430,7 @@ public:
       auto region_base = _mapper.base(ptr, size);
 
       if (debug_level() > 2) {
-        PLOG("derived (ptr=%p size=%lu) region_base=%p region_size=%lu\n", ptr,
+        SAFE_PRINT("derived (ptr=%p size=%lu) region_base=%p region_size=%lu\n", ptr,
              size, region_base, region_size);
       }
 
@@ -450,9 +453,9 @@ public:
     }
     catch ( const Logic_exception & ) {
       //      region->debug_dump();
-      PLOG("rounded up object size: %lu",
+      SAFE_PRINT("rounded up object size: %lu",
            _mapper.rounded_up_object_size(size));
-      PLOG("region object size: %lu", region->object_size());
+      SAFE_PRINT("region object size: %lu", region->object_size());
       throw Logic_exception(
           "inject allocation found/created region, but allocate_at failed (%p,%lu)",
           ptr, size);

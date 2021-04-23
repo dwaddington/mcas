@@ -22,7 +22,6 @@
 #ifndef __RC_ALLOC_LB__
 #define __RC_ALLOC_LB__
 
-//#include "mr_traits.h"
 #include <common/memory.h>
 #include <memory>
 #include <string>

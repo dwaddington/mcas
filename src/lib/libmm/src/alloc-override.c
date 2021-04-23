@@ -5,6 +5,10 @@ terms of the MIT license. A copy of the license can be found in the file
 "LICENSE" at the root of this distribution.
 -----------------------------------------------------------------------------*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // ------------------------------------------------------
 // Override system malloc
 // ------------------------------------------------------
@@ -30,45 +34,10 @@ terms of the MIT license. A copy of the license can be found in the file
   #define MM_FORWARD02(fun,x,y)   { fun(x,y); }
 #endif
 
-#if defined(__APPLE__) && defined(MM_SHARED_LIB_EXPORT) && defined(MM_INTERPOSE)
-  // use interposing so `DYLD_INSERT_LIBRARIES` works without `DYLD_FORCE_FLAT_NAMESPACE=1`
-  // See: <https://books.google.com/books?id=K8vUkpOXhN4C&pg=PA73>
-  struct mm_interpose_s {
-    const void* replacement;
-    const void* target;
-  };
-  #define MM_INTERPOSE_FUN(oldfun,newfun) { (const void*)&newfun, (const void*)&oldfun }
-  #define MM_INTERPOSE_MI(fun)            MM_INTERPOSE_FUN(fun,mm_##fun)
-  __attribute__((used)) static struct mm_interpose_s _mm_interposes[]  __attribute__((section("__DATA, __interpose"))) =
-  {
-    MM_INTERPOSE_MI(malloc),
-    MM_INTERPOSE_MI(calloc),
-    MM_INTERPOSE_MI(realloc),
-    MM_INTERPOSE_MI(strdup),
-    MM_INTERPOSE_MI(strndup),
-    MM_INTERPOSE_MI(realpath),
-    MM_INTERPOSE_MI(posix_memalign),
-    MM_INTERPOSE_MI(valloc),
-    #ifndef MM_OSX_ZONE
-    // some code allocates from default zone but deallocates using plain free :-( (like NxHashResizeToCapacity <https://github.com/nneonneo/osx-10.9-opensource/blob/master/objc4-551.1/runtime/hashtable2.mm>)
-    MM_INTERPOSE_FUN(free,mm_cfree), // use safe free that checks if pointers are from us
-    #else
-    // We interpose malloc_default_zone in alloc-override-osx.c
-    MM_INTERPOSE_MI(free),
-    #endif
-    // some code allocates from a zone but deallocates using plain free :-( (like NxHashResizeToCapacity <https://github.com/nneonneo/osx-10.9-opensource/blob/master/objc4-551.1/runtime/hashtable2.mm>)
-    MM_INTERPOSE_FUN(free,mm_cfree), // use safe free that checks if pointers are from us
-  };
-#elif defined(_MSC_VER)
-  // cannot override malloc unless using a dll.
-  // we just override new/delete which does work in a static library.
-#else
-  // On all other systems forward to our API
-  void* malloc(size_t size)              MM_FORWARD1(mm_malloc, size);
-  void* calloc(size_t size, size_t n)    MM_FORWARD2(mm_calloc, size, n);
-  void* realloc(void* p, size_t newsize) MM_FORWARD2(mm_realloc, p, newsize);
-  void  free(void* p)                    MM_FORWARD0(mm_free, p);
-#endif
+void* malloc(size_t size)              MM_FORWARD1(mm_malloc, size);
+void* calloc(size_t size, size_t n)    MM_FORWARD2(mm_calloc, size, n);
+void* realloc(void* p, size_t newsize) MM_FORWARD2(mm_realloc, p, newsize);
+void  free(void* p)                    MM_FORWARD0(mm_free, p);
 
 #if (defined(__GNUC__) || defined(__clang__)) && !defined(__MACH__)
 #pragma GCC visibility push(default)
@@ -151,9 +120,6 @@ terms of the MIT license. A copy of the license can be found in the file
 /* #endif // __cplusplus */
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 // ------------------------------------------------------
 // Posix & Unix functions definitions

@@ -27,6 +27,7 @@
 #error("C++ header only")
 #endif
 
+#include "safe_print.h"
 #include "avl_tree.h"
 #include "slab.h"
 #include "stack.h"
@@ -99,7 +100,7 @@ public:
    *
    */
   void dump() {
-    PLOG("node [%p]: addr=0x%lx size=%ld free=%s", common::p_fmt(this), _addr, _size,
+    SAFE_PRINT("node [%p]: addr=0x%lx size=%ld free=%s", common::p_fmt(this), _addr, _size,
          _free ? "yes" : "no");
   }
 
@@ -328,7 +329,7 @@ public:
       assert(size > 0);
 
 #ifdef DEBUG_AVL_ALLOCATOR
-      PLOG("AVL: slab %lu MB", REDUCE_MB(size));
+      SAFE_PRINT("AVL: slab %lu MB", REDUCE_MB(size));
 #endif
 
       /* establish root */
@@ -340,14 +341,14 @@ public:
         /* the first entry will be the root (at least it should be!) */
         root = reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(reinterpret_cast<addr_t>(slab.get_first_element()));
 
-        if (option_DEBUG) PLOG("reconstructed root pointer: %p", common::p_fmt(root));
+        if (option_DEBUG) SAFE_PRINT("reconstructed root pointer: %p", common::p_fmt(root));
       }
       else {
         /* create root pointer on slab */
         root =
           reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(slab.alloc());
 
-        if (option_DEBUG) PLOG("new root pointer: %p", static_cast<void*>(root));
+        if (option_DEBUG) SAFE_PRINT("new root pointer: %p", static_cast<void*>(root));
 
         *root = packed_ptr<core::AVL_node<core::Memory_region>>{};
       }
@@ -362,7 +363,7 @@ public:
           throw General_exception("AVL_range_allocator: failed to allocate from slab");
 
         if (option_DEBUG)
-          PLOG("inserting root region (%lx-%lx)", start, start + size);
+          SAFE_PRINT("inserting root region (%lx-%lx)", start, start + size);
 
         try {
           _tree->insert_node(new (p) Memory_region(start, size));
@@ -392,7 +393,7 @@ public:
     _tree->apply_topdown([=](void* p, size_t) {
                            Memory_region* mr = static_cast<Memory_region*>(p);
                            if ( option_DEBUG )  {
-                             PLOG("%s: region %p, 0x%zx, %s", __func__, mr->paddr(),
+                             SAFE_PRINT("%s: region %p, 0x%zx, %s", __func__, mr->paddr(),
                                   mr->size(), mr->is_free() ? "free" : "used");
                            }
                            _slab.free(mr);
@@ -414,7 +415,7 @@ public:
     try {
 
 #ifdef DEBUG_AVL_ALLOCATOR
-      PLOG("AVL: request  %lu MB", REDUCE_MB(size));
+      SAFE_PRINT("AVL: request  %lu MB", REDUCE_MB(size));
 #endif
 
       /* look for fitting region that is aligned */
@@ -467,19 +468,19 @@ public:
 
         assert(region->_free == true);
         if (option_DEBUG) {
-          PLOG("Region to split: %lx-%lx size=%lu (requested size=%lu, requested alignment = %lu, free=%d)",
+          SAFE_PRINT("Region to split: %lx-%lx size=%lu (requested size=%lu, requested alignment = %lu, free=%d)",
                region->_addr, region->_addr + region->_size, region->_size, size, alignment, region->_free);
           
           assert(region->_addr % alignment);
           
-          PLOG("%lx rounded up %lx", region->_addr, round_up(region->_addr, alignment));
+          SAFE_PRINT("%lx rounded up %lx", region->_addr, round_up(region->_addr, alignment));
           assert(region->_addr % alignment);
         }
 
         /* left split */
         size_t left_split_size = round_up(region->_addr, alignment) - region->_addr;
         if (option_DEBUG) {
-          PLOG("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
+          SAFE_PRINT("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
         }
 
         /* center split */
@@ -487,7 +488,7 @@ public:
         size_t center_split_size = size;
 
         if (option_DEBUG) {
-          PLOG("Center split: %lx-%lx size=%lu (remaining=%lu)",
+          SAFE_PRINT("Center split: %lx-%lx size=%lu (remaining=%lu)",
                center_split_base, center_split_base + center_split_size,
                center_split_size, center_split_base % alignment);
           assert(center_split_base % alignment == 0);
@@ -498,7 +499,7 @@ public:
         size_t right_split_size = region->_size - left_split_size - center_split_size;
 
         if (option_DEBUG) {
-          PLOG("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
+          SAFE_PRINT("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
         }
         assert(right_split_size > 0);
         assert(left_split_size > 0);
@@ -537,7 +538,7 @@ public:
       }
 
 #ifdef DEBUG_AVL_ALLOCATOR
-      PLOG("AVL: remaining free: %lu MB", REDUCE_MB(get_free()));
+      SAFE_PRINT("AVL: remaining free: %lu MB", REDUCE_MB(get_free()));
 #endif
       return aligned_region;
     }
@@ -601,7 +602,7 @@ public:
                           addr, size);
 
     if (option_DEBUG)
-      PLOG("alloc_at (addr=0x%lx,size=%ld) found fitting region %lx-%lx:", addr,
+      SAFE_PRINT("alloc_at (addr=0x%lx,size=%ld) found fitting region %lx-%lx:", addr,
            size, region->_addr, region->_addr + region->_size);
 
     if(region->_size < size)
@@ -679,7 +680,7 @@ public:
   void add_new_region(addr_t addr, size_t size) {
 
 #ifdef DEBUG_AVL_ALLOCATOR
-    PLOG("AVL: add to slab %lu MB", REDUCE_MB(size));
+    SAFE_PRINT("AVL: add to slab %lu MB", REDUCE_MB(size));
 #endif
     assert(addr > 0);
     assert(size > 0);
@@ -704,7 +705,7 @@ public:
   size_t free(addr_t addr) {
     Memory_region* region = find(addr);
     if (region == nullptr) {
-      PERR("invalid call to %s: bad address", __func__);
+      SAFE_PRINT("invalid call to %s: bad address", __func__);
       return size_t(-1);
     }
 
@@ -843,7 +844,7 @@ public:
       assert(mr);
       return reinterpret_cast<void*>(mr->addr());
     } catch (const General_exception &e) {
-      PERR("Arena_allocator: out of memory %s", e.cause());
+      SAFE_PRINT("Arena_allocator: out of memory %s", e.cause());
       std::exit(0);
     }
   }

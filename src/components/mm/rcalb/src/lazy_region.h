@@ -34,6 +34,8 @@
 #include <common/types.h>
 #include <common/utils.h>
 
+#include "safe_print.h"
+
 namespace core
 {
 namespace slab
@@ -88,7 +90,7 @@ static Lazily_extending_region *__lookup_inst(addr_t addr) {
   for (auto i : _interval_map) {
     if (addr >= i.start && addr <= i.end) return i.inst;
   }
-  PERR("address (%p) not found in interval map", reinterpret_cast<void *>(addr));
+  SAFE_PRINT("address (%p) not found in interval map", reinterpret_cast<void *>(addr));
   assert(0);
   return NULL;  // not found
 }
@@ -142,7 +144,7 @@ class Lazily_extending_region {
     addr_hint += 0x10000000ULL;
 
     if (option_DEBUG) {
-      PLOG("mmap allocated region (%p)", _ptr);
+      SAFE_PRINT("mmap allocated region (%p)", _ptr);
     }
 
     auto ptr_addr = reinterpret_cast<addr_t>(_ptr);
@@ -157,7 +159,7 @@ class Lazily_extending_region {
     assert(_ptr);
     int rc = ::munmap(_ptr, _max_size);
     if (rc)
-      PLOG("::munmap failed in Lazilty_extending_region dtor");
+      SAFE_PRINT("::munmap failed in Lazilty_extending_region dtor");
     assert(rc == 0);
   }
 

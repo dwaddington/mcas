@@ -23,9 +23,10 @@
 #ifndef __COMMON_SLAB_H__
 #define __COMMON_SLAB_H__
 
-#include <common/memory.h>
-
+#include "safe_print.h"
 #include "lazy_region.h"
+
+#include <common/memory.h>
 #include <common/chksum.h>
 #include <algorithm>
 #include <cstring>
@@ -145,12 +146,10 @@ class Allocator : public common::Base_slab_allocator {
 
     _header->magic[6] = '\0';
 
-    if (option_DEBUG) PLOG("Slab magic=%s", _header->magic);
-
     // recover existing state
     if ((strncmp(_header->magic, "_SLAB_", 6) == 0) && !as_new) {
       /* already initialized */
-      PLOG("Reconstructed slab: region_size=%ld, slots=%ld, max_slots=%ld, "
+      SAFE_PRINT("Reconstructed slab: region_size=%ld, slots=%ld, max_slots=%ld, "
            "slot_size=%ld, label=%s",
            _header->region_size, _header->slots, _header->max_slots,
            _header->slot_size, _header->label);
@@ -181,10 +180,10 @@ class Allocator : public common::Base_slab_allocator {
       _header->slot_size = sizeof(Element<T>);
       _header->slots = 0;
 
-      PLOG("New slab: region_size=%ld, slots=%ld, max_slots=%ld, "
-           "slot_size=%ld, label=%s",
-           _header->region_size, _header->slots, _header->max_slots,
-           _header->slot_size, _header->label);
+      SAFE_PRINT("New slab: region_size=%ld, slots=%ld, max_slots=%ld, "
+                 "slot_size=%ld, label=%s",
+                 _header->region_size, _header->slots, _header->max_slots,
+                 _header->slot_size, _header->label);
 
       _reconstructed = false;
     }
@@ -268,9 +267,6 @@ class Allocator : public common::Base_slab_allocator {
 
     if (_free_slots.size() > 0) {
       Element<T>* slot = _free_slots.back();
-      if (option_DEBUG)
-        PDBG("picked up free slot (%p, flags=%x)", slot,
-             slot->hdr.flags);
       assert(slot);
       assert(slot->hdr.use.used == false);
       slot->hdr.use.used = true;
@@ -279,9 +275,9 @@ class Allocator : public common::Base_slab_allocator {
     }
     else {
       if (option_DEBUG)
-        PLOG("adding new slot (array_len=%ld)...", _header->slots);
+        SAFE_PRINT("adding new slot (array_len=%ld)...", _header->slots);
+      
       if (_header->slots >= _header->max_slots) {
-        PERR("max slots (%ld) exceeded", _header->max_slots);
         throw API_exception("Slab allocator (%s) run out of memory!",
                             _header->label);
       }
@@ -363,22 +359,22 @@ class Allocator : public common::Base_slab_allocator {
     addr_t base = reinterpret_cast<addr_t>(_region);
     addr_t top = base + _header->region_size;
 
-    PLOG("%s", "---------------------------------------------------");
-    PLOG("HEADER: magic         (%s) ", _header->magic);
-    PLOG("      : slots         (%ld)", _header->slots);
-    PLOG("      : max slots     (%ld)", _header->max_slots);
-    PLOG("      : slot size     (%ld)", _header->slot_size);
-    PLOG("      : label         (%s)", _header->label);
-    PLOG("      : memory range  (%p-%p) %ld KB", reinterpret_cast<void*>(_header), reinterpret_cast<void*>(top),
+    SAFE_PRINT("%s", "---------------------------------------------------");
+    SAFE_PRINT("HEADER: magic         (%s) ", _header->magic);
+    SAFE_PRINT("      : slots         (%ld)", _header->slots);
+    SAFE_PRINT("      : max slots     (%ld)", _header->max_slots);
+    SAFE_PRINT("      : slot size     (%ld)", _header->slot_size);
+    SAFE_PRINT("      : label         (%s)", _header->label);
+    SAFE_PRINT("      : memory range  (%p-%p) %ld KB", reinterpret_cast<void*>(_header), reinterpret_cast<void*>(top),
          REDUCE_KB((top - base)));
-    PLOG("      : chksum        (%x)",
+    SAFE_PRINT("      : chksum        (%x)",
          common::chksum32(_header, _header->region_size));
-    PLOG("%s", "---------------------------------------------------");
+    SAFE_PRINT("%s", "---------------------------------------------------");
 
 #ifdef SHOW_ENTRIES
     for (unsigned i = 0; i < _header->slots; i++) {
       if (i == 100) {
-        PLOG("...");
+        SAFE_PRINT("...");
         break;  // short circuit
       }
 
@@ -393,23 +389,23 @@ class Allocator : public common::Base_slab_allocator {
         if (i > 10) break;
       }
 
-      PLOG("\t[%u]: %s %p : %s", i, slot->hdr.use.used ? "USED" : "EMPTY",
+      SAFE_PRINT("\t[%u]: %s %p : %s", i, slot->hdr.use.used ? "USED" : "EMPTY",
            (void*) &slot->val, sstr.str().c_str());
     }
 #endif
 
-    PLOG("%s", "---------------------------------------------------");
-    PLOG(" Volatile status: _free_slots.size = %ld", _free_slots.size());
+    SAFE_PRINT("%s", "---------------------------------------------------");
+    SAFE_PRINT(" Volatile status: _free_slots.size = %ld", _free_slots.size());
     unsigned i = 0;
     for (auto fs : _free_slots) {
-      PLOG("FREE slot entry: %p", fs);
+      SAFE_PRINT("FREE slot entry: %p", fs);
       i++;
       if (i == 100) {
-        PLOG("%s", "...");
+        SAFE_PRINT("%s", "...");
         break;
       }
     }
-    PLOG("%s", "---------------------------------------------------");
+    SAFE_PRINT("%s", "---------------------------------------------------");
   }
 
   /**
