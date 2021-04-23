@@ -23,17 +23,18 @@ add_definitions(-DCONFIG_DEBUG)
 
 file(GLOB SOURCES src/mm_wrapper.cpp)
 
-add_library(mm SHARED ${SOURCES})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast>)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
-target_link_libraries(${PROJECT_NAME} dl common-static ) #
+target_link_libraries(${PROJECT_NAME} common-static dl ) #
 #target_link_libraries(${PROJECT_NAME} -static-libgcc dl -static common-static libdl.a )
 
 # plain executable, we use LD_PRELOAD
-add_executable(mmwrapper-test-prog src/test_prog.cpp)
+add_executable(${PROJECT_NAME}wrapper-test-prog src/test_prog.cpp)
+target_link_libraries(${PROJECT_NAME}wrapper-test-prog dl) # add dl for load test
 
 #target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:Debug>:-O0>)
 target_compile_options(${PROJECT_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Weffc++ -Wold-style-cast> -fpermissive)

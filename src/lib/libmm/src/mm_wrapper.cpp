@@ -25,7 +25,8 @@
 
 static void __get_os_functions(void);
 
-static const char * PLUGIN_PATH = "/home/danielwaddington/mcas/build/src/mm/passthru/libmm-plugin-passthru.so";
+//static const char * PLUGIN_PATH = "/home/danielwaddington/mcas/build/src/mm/passthru/libmm-plugin-passthru.so";
+static const char * PLUGIN_PATH = "/home/danielwaddington/mcas/build/dist/lib/libmm-plugin-jemalloc.so";
 
 namespace globals
 {
@@ -78,17 +79,19 @@ static void __init_components(void)
   LOAD_SYMBOL(mm_plugin_usable_size);
   LOAD_SYMBOL(mm_plugin_debug);
 
-  __mm_funcs.mm_plugin_init();
+  __mm_funcs.mm_plugin_init();  
   __mm_funcs.mm_plugin_create(nullptr, &__mm_heap);
 
+  /* give some memory */
 #if 1
   size_t slab_size = MiB(256);
-  globals::slab_memory = real::aligned_alloc(PAGE_SIZE, slab_size);
+  globals::slab_memory = real::aligned_alloc(MiB(2), slab_size);
   
   __mm_funcs.mm_plugin_add_managed_region(__mm_heap,
                                           globals::slab_memory,
                                           slab_size);
 #endif
+
   globals::intercept_active = true;
 }
 
