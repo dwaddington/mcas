@@ -10,7 +10,8 @@ add_subdirectory(jemalloc-source)
 add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
-link_directories(${CMAKE_BINARY_DIR}/src/mm/jemalloc-dist/lib)
+include_directories(${CMAKE_INSTALL_PREFIX}/include)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
