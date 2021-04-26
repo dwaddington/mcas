@@ -13,7 +13,7 @@ ExternalProject_Add(
   URL https://github.com/jemalloc/jemalloc/archive/refs/tags/5.2.1.tar.gz
   SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/${JEMALLOC_PROJECT}
   CONFIGURE_COMMAND ./autogen.sh
-  BUILD_COMMAND ./configure --disable-prof-gcc --enable-prof-libunwind --disable-initial-exec-tls --with-jemalloc-prefix=jel_ --prefix ${CMAKE_INSTALL_PREFIX} COMMAND make 
-  INSTALL_COMMAND make install
+  BUILD_COMMAND ./configure --disable-prof-gcc --enable-prof-libunwind --disable-initial-exec-tls --with-jemalloc-prefix=jel_ --prefix ${CMAKE_CURRENT_BINARY_DIR}/build COMMAND make 
+  INSTALL_COMMAND make install_include COMMAND make install_lib_static
   )
 

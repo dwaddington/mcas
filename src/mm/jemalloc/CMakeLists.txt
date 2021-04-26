@@ -7,11 +7,14 @@ set(SOURCES src/mm_plugin_jemalloc.cpp)
 
 add_subdirectory(jemalloc-source)
 
-add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
+add_compile_options(-DCONFIG_DEBUG -pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/jemalloc-source/build/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
-link_directories(${CMAKE_INSTALL_PREFIX}/lib)
+
+link_directories(${CMAKE_CURRENT_BINARY_DIR}/jemalloc-source/build/lib)
+message(${CMAKE_CURRENT_BINARY_DIR}/jemalloc-source/build)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 

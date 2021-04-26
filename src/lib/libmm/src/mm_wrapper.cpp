@@ -4,6 +4,7 @@
 
 #include <dlfcn.h>
 #include <stdio.h>
+#include <fstream>
 #include <common/logging.h>
 #include <common/utils.h>
 #include <common/exceptions.h>
@@ -21,12 +22,8 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-#define PREFIX "MM-Wrapper: "
-
 static void __get_os_functions(void);
-
-//static const char * PLUGIN_PATH = "/home/danielwaddington/mcas/build/src/mm/passthru/libmm-plugin-passthru.so";
-static const char * PLUGIN_PATH = "/home/danielwaddington/mcas/build/dist/lib/libmm-plugin-jemalloc.so";
+extern "C" int __wrap_puts(const char *s);
 
 namespace globals
 {
@@ -59,10 +56,14 @@ static void __init_components(void)
 {
   using namespace component;
 
-  __mm_plugin_module = dlopen(PLUGIN_PATH, RTLD_NOW | RTLD_DEEPBIND);
+  auto path = ::getenv("PLUGIN");
+  
+  __mm_plugin_module = dlopen(path, RTLD_NOW | RTLD_DEEPBIND);
 
-  if(!__mm_plugin_module) printf("Error: %s\n", dlerror());
-  assert(__mm_plugin_module);
+  if(!__mm_plugin_module) {
+    printf("Error: invalid PLUGIN (%s)\n", path);
+    exit(0);
+  }
   
   LOAD_SYMBOL(mm_plugin_init);
   LOAD_SYMBOL(mm_plugin_create);
@@ -83,14 +84,15 @@ static void __init_components(void)
   __mm_funcs.mm_plugin_create(nullptr, &__mm_heap);
 
   /* give some memory */
-#if 1
-  size_t slab_size = MiB(256);
-  globals::slab_memory = real::aligned_alloc(MiB(2), slab_size);
-  
+  size_t slab_size = GiB(8);
+  globals::slab_memory = mmap(reinterpret_cast<void*>(0xAA00000000),
+                              slab_size,
+                              PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
+                              -1, 0);
+
   __mm_funcs.mm_plugin_add_managed_region(__mm_heap,
                                           globals::slab_memory,
                                           slab_size);
-#endif
 
   globals::intercept_active = true;
 }
@@ -110,11 +112,6 @@ extern "C" void __wrap_free(void * ptr)
 
 extern "C" void * __wrap_calloc(size_t nmemb, size_t size)
 {
-  
-//   void * p = sbrk(nmemb * size);
-  
-  // if(!real::calloc) __get_os_functions();
-  // return real::calloc(nmemb, size);
   if(!real::malloc) __get_os_functions();
   void * p = real::malloc(size * nmemb);
   __builtin_memset(p, 0, size * nmemb);
@@ -202,9 +199,13 @@ EXPORT_C void*  mm_aligned_alloc(size_t alignment, size_t size) noexcept;
 
 #include "alloc-override.c"
 
+static addr_t sbrk_base = reinterpret_cast<addr_t>(sbrk(0));
 
 EXPORT_C void mm_free(void* p) noexcept
 {
+  /* HACK: fix free of memory allocated from sbrk */
+  if(reinterpret_cast<addr_t>(p) & sbrk_base) return;
+  
   if(!real::free) return; //__get_os_functions();
 
   if(globals::intercept_active) {
@@ -212,8 +213,9 @@ EXPORT_C void mm_free(void* p) noexcept
   }
   else {
     /* intercept is not yet active */
-    real::free(p); 
+    //real::free(p); 
   }
+
 }
 
 EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
@@ -226,7 +228,8 @@ EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
     return new_ptr;
   }
   else {
-    return real::realloc(p, newsize);
+    //return real::realloc(p, newsize);
+    return nullptr;
   }
 }
 
@@ -234,26 +237,22 @@ EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
 {
   /* dlopen / dlsym use calloc */
   if(!real::calloc) {
-    SAFE_PRINT("Real calloc not ready\n");
     /* use poor man's calloc, because dlopen uses calloc */
     void * p = sbrk(count*size);
     __builtin_memset(p, 0, count * size);
     return p;
   }
-  SAFE_PRINT("Real calloc\n");
-  return real::calloc(count, size);
-  // void * p;
-  // if(globals::intercept_active) {
-  //   p = nullptr;
-  //   //    __mm_funcs.mm_plugin_callocate(__mm_heap, count * size, &p);
-  //   __mm_funcs.mm_plugin_allocate(__mm_heap, count * size, &p);
-  //   assert(p);
-  // }
-  // else {
-  //   p = real::calloc(count, size);
-  // }
+  void * p;
+  if(globals::intercept_active) {
+    p = nullptr;
+    __mm_funcs.mm_plugin_callocate(__mm_heap, count * size, &p);
+    assert(p);
+  }
+  else {
+    p = real::calloc(count, size);
+  }
 
-  // return p;
+  return p;
 }
 
 EXPORT_C void* mm_malloc(size_t size) noexcept
@@ -267,7 +266,6 @@ EXPORT_C void* mm_malloc(size_t size) noexcept
     return p;
   }
   else {
-    /* intercept is not yet active */
     return sbrk(size);
   }
 }
@@ -276,10 +274,10 @@ EXPORT_C size_t mm_usable_size(void* p) noexcept
 {
   if(p == nullptr) return 0;
   size_t us = 0;
-  // if(globals::mm->usable_size(p, &us) != S_OK) {
-  //   PWRN("globals::mm->usable_size() failed");
-  //   return 0;
-  // }
+  if(__mm_funcs.mm_plugin_usable_size(__mm_heap, p, &us) != S_OK) {
+    PWRN("globals::mm->usable_size() failed");
+    return 0;
+  }
   return us;
 }
 

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <dlfcn.h>
-
+#include <vector>
 //#define TEST_LOAD
 
 int main()
@@ -13,24 +13,40 @@ int main()
   if(!mod) printf("Error: %s\n", dlerror());
 #endif
   
-  printf("Test prog.\n");
+  printf("> Test prog.\n");
 
   {
-    size_t s = 1024 * 2048;
+    printf("Performing 1MB mallocs ...\n");
+    std::vector<void*> v;
+    for(unsigned i=0;i<10;i++) {
+      v.push_back(malloc(1024*1024));
+    }
+
+    for(unsigned i=0;i<10;i++) {
+      free(v[i]);
+    }
+  }
+    
+  
+  {
+    printf("Performing large malloc ...\n");
+    size_t s = 1024 * 4096; // 4MiB
+    printf("> allocating %lu bytes\n", s);
     void * p = malloc(s);
-    printf("result of malloc: p=%p\n", p);
+    printf("> result of malloc: p=%p\n", p);
     memset(p, 0, s);
     free(p);
   }
 
   {
+    printf("Performing calloc ...\n");
     void * p = calloc(32, 128);
-    printf("result of calloc: p=%p\n", p);
+    printf(">result of calloc: p=%p\n", p);
     free(p);
   }
   
 
-  printf("Done.\n");
+  printf("> Done.\n");
 
   return 0;
 }

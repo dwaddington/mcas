@@ -6,14 +6,19 @@
 #include <stdarg.h>
 
 #include <vector>
-
+#include "avl_malloc.h"
 #include "logging.h"
+
 #include "../../mm_plugin_itf.h"
+
+#undef  DEBUG_EXTENTS
+#define DEBUG_ALLOCS
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-value"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+#define CAST_HEAP(X) (reinterpret_cast<Heap*>(X))
 // forward decls
 static void hook_extents(unsigned arena_id);
   
@@ -23,56 +28,80 @@ static constexpr unsigned MAX_HEAPS = 255;
 class Heap;
 Heap * g_heap_map[MAX_HEAPS] = {0};
 
-int mallocx_flags = 0;
 
-typedef void * aligned_2M_region_t;
-  
+/** 
+ * Manages a heap instance
+ * 
+ */
+#define USE_AVL
+
 class Heap
 {
 public:
-  Heap(unsigned arena_id) : _arena_id(arena_id) {}
+  Heap(unsigned arena_id) : _arena_id(arena_id) {
+  }
 
   void add_region(void * base, size_t len) {
 
-    if(!check_aligned(base, MiB(2))) {
-      PPERR("adding non 2MB-aligned region");
+    if(!check_aligned(base, KiB(4))) {
+      PPERR("adding non 4KiB-aligned region");
       return;
     }
 
     bool needs_hooking = (_managed_size == 0);
-    byte * ptr = reinterpret_cast<byte*>(base);
-    unsigned count = 0;
-    while(len > MiB(2)) {
-      _2M_aligned_free_regions.push_back(ptr);
-      ptr += MiB(2);
-      len -= MiB(2);
-      count++;
-    }
-    _managed_size += MiB(2);
 
-    if(needs_hooking)
+#ifdef USE_AVL
+    /* add memory to allocator */
+    if(_managed_size == 0) {
+      _avl_allocator = std::make_unique<core::AVL_range_allocator>(reinterpret_cast<addr_t>(base), len);
+    }
+    else {
+      _avl_allocator->add_new_region(reinterpret_cast<addr_t>(base), len);
+    }
+#else
+    _log_ptr = _log_base = reinterpret_cast<byte*>(base);
+    _log_end = _log_base + len;
+#endif
+    /* once-only hook in extent allocators */
+    if(needs_hooking) {
       hook_extents(_arena_id);
-      
-    PPLOG("added %lu blocks @2M", count);
+      _x_flags = MALLOCX_ARENA(_arena_id) | MALLOCX_TCACHE_NONE;
+    }     
   }    
 
-  void * allocate_2M() {
-    if(_2M_aligned_free_regions.empty()) return nullptr;
-    auto p = _2M_aligned_free_regions.back();
-    _2M_aligned_free_regions.pop_back();
-    _2M_aligned_used_regions.push_back(p);
-    PPNOTICE("allocating %p", p);
-    return p;
+  void * allocate(const size_t size, const size_t alignment) {
+
+    _managed_size += size;
+    PPLOG("managed size: %lu MiB", REDUCE_MB(_managed_size));
+#ifdef USE_AVL
+    auto extent = _avl_allocator->alloc(size, alignment);
+    if(!extent) return nullptr; /* ran out of memory */   
+    return extent->paddr();
+#else
+    if(_log_ptr + size > _log_end) return nullptr;
+    auto extent = _log_ptr;
+    _log_ptr += size;
+    return extent;
+#endif
   }
 
-  void set_arena(unsigned id) { _arena_id = id; }
+  void set_arena(const unsigned id) { _arena_id = id; }
+
+  unsigned x_flags() const { return _x_flags; }
   
 private:
   size_t   _managed_size = 0;
-  unsigned _mallocx_flags = 0;
+  unsigned _x_flags = 0;
   unsigned _arena_id;
-  std::vector<aligned_2M_region_t> _2M_aligned_free_regions;
-  std::vector<aligned_2M_region_t> _2M_aligned_used_regions;
+
+#ifdef USE_AVL
+  /* use an AVL tree to manage the extents */
+  std::unique_ptr<core::AVL_range_allocator> _avl_allocator;
+#else
+  byte * _log_base;
+  byte * _log_end;
+  byte * _log_ptr;
+#endif
 };
 
 
@@ -83,29 +112,32 @@ void * custom_extent_alloc(extent_hooks_t *extent_hooks,
                            bool *zero,
                            bool *commit,
                            unsigned arena_id)
-{  
-  PPNOTICE("%s: new_addr=%p size=%lu alignment=%lu arena=%u",
-           __func__, new_addr, size, alignment, arena_id);
-
+{
+#ifdef DEBUG_EXTENTS
+  PPLOG("%s: new_addr=%p size=%lu alignment=%lu arena=%u",
+        __func__, new_addr, size, alignment, arena_id);
+#endif
+  
   if(g_heap_map[arena_id] == nullptr) return nullptr;
   
   if(new_addr != nullptr) {
     PPERR("%s does not know how to handle predefined newaddr",__func__);
   }
-  assert(alignment == MiB(2));
-  assert(size == MiB(2));
-
+  assert(MiB(2) % alignment == 0);
   assert(arena_id < MAX_HEAPS);
   assert(g_heap_map[arena_id]);
 
-  void * p = g_heap_map[arena_id]->allocate_2M();
-  PPLOG("2M block at %p allocated", p);
+  void * p = g_heap_map[arena_id]->allocate(size, alignment);
+
+#ifdef DEBUG_EXTENTS  
+  PPLOG("extent at %p allocated", p);
+#endif
   return p;
 }
 
-bool custom_extent_dalloc(extent_hooks_t *extent_hooks, void *addr, size_t size, bool committed, unsigned arena_ind)
+bool custom_extent_dalloc(extent_hooks_t *extent_hooks, void *addr, size_t size, bool committed, unsigned arena_id)
 {
-  PPLOG("%s",__func__);  
+  asm("int3");
   return true;
 }
 
@@ -113,8 +145,9 @@ void custom_extent_destroy(extent_hooks_t *extent_hooks,
                            void *addr,
                            size_t size,
                            bool committed,
-                           unsigned arena_ind)
+                           unsigned arena_id)
 {
+  asm("int3");
   PPLOG("%s",__func__);
 }
 
@@ -123,7 +156,7 @@ bool custom_extent_commit(extent_hooks_t *extent_hooks,
                           size_t size,
                           size_t offset,
                           size_t length,
-                          unsigned arena_ind)
+                          unsigned arena_id)
 {
   PPLOG("%s",__func__);
   return false;
@@ -134,7 +167,7 @@ bool custom_extent_decommit(extent_hooks_t *extent_hooks,
                             size_t size,
                             size_t offset,
                             size_t length,
-                            unsigned arena_ind)
+                            unsigned arena_id)
 {
   PPLOG("%s",__func__);
   return false;
@@ -145,9 +178,8 @@ bool custom_extent_purge(extent_hooks_t *extent_hooks,
                          size_t size,
                          size_t offset,
                          size_t length,
-                         unsigned arena_ind)
+                         unsigned arena_id)
 {
-  PPLOG("%s",__func__);
   return false;
 }
 
@@ -157,7 +189,7 @@ bool custom_extent_split(extent_hooks_t *extent_hooks,
                          size_t size_a,
                          size_t size_b,
                          bool committed,
-                         unsigned arena_ind)
+                         unsigned arena_id)
 {
   return true; /* leave as whole */
 }
@@ -168,8 +200,9 @@ bool custom_extent_merge(extent_hooks_t *extent_hooks,
                          void *addr_b,
                          size_t size_b,
                          bool committed,
-                         unsigned arena_ind)
+                         unsigned arena_id)
 {
+  PPLOG("%s",__func__);
   return true;  /* leave split */
 }
 
@@ -286,7 +319,7 @@ status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
                                         size_t* out_region_size)
 {
   PPLOG("%s",__func__);
-  return S_OK;
+  return E_NOT_IMPL;
 }
 
 status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
@@ -294,63 +327,104 @@ status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
                                                     void * param)
 {
   PPLOG("%s",__func__);
-  return S_OK;
+  return E_NOT_IMPL;
 }
 
 status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
-  PPLOG("%s",__func__);
-  void * ptr = jel_mallocx(n, mallocx_flags);
-  assert(ptr);
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%lu) x_flags=%x",__func__, n, CAST_HEAP(heap)->x_flags());
+#endif
+  void * ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags());
+  if(ptr == nullptr) PPERR("out of memory");
   *out_ptr = ptr;
   return S_OK;
 }
 
 status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
 {
-  PPLOG("%s",__func__);
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%lu,%lu) x_flags=%x",__func__, n, alignment, CAST_HEAP(heap)->x_flags());
+#endif
+  
+  assert(is_power_of_two(alignment));
+  void * ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags() | MALLOCX_ALIGN(alignment));
+  if(ptr == nullptr) PPERR("out of memory");
+  assert(ptr);
+  assert(check_aligned(ptr, alignment));
+  *out_ptr = ptr;
   return S_OK;
 }
 
 status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
 {
-  PPLOG("%s",__func__);
-  return S_OK;
+  asm("int3");
+  return E_NOT_IMPL;
 }
 
-status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
+status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
 {
-  PPLOG("%s",__func__);
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%p, %lu) x_flags=%x",__func__, ptr, n, CAST_HEAP(heap)->x_flags());
+#endif
+  
+  jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
   return S_OK;
 }
 
 status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
 {
-  PPLOG("%s",__func__);
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%p) x_flags=%x",__func__, ptr, CAST_HEAP(heap)->x_flags());
+#endif
+
+  if(ptr == nullptr) return S_OK;
+  //  jel_free(ptr);
+  jel_dallocx(ptr, CAST_HEAP(heap)->x_flags());
   return S_OK;
 }
 
 status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
-  PPLOG("%s",__func__);
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%lu) x_flags=%x",__func__, n, CAST_HEAP(heap)->x_flags());
+#endif
+  void * ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags() | MALLOCX_ZERO);
+  if(ptr == nullptr) {
+    PPERR("callocate: out of memory");
+    return E_NO_MEM;
+  }
+  assert(ptr);
+  *out_ptr = ptr;
   return S_OK;
 }
 
-status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t size, void ** out_ptr)
+status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
 {
-  PPLOG("%s",__func__);
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%p, %lu) x_flags=%x",__func__, ptr, n, CAST_HEAP(heap)->x_flags());
+#endif
+  
+  if(ptr == nullptr) {
+    /* if pointer is null, then we just do a new allocation */
+    *out_ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags());
+  }
+  else {
+    *out_ptr = jel_rallocx(ptr, n, CAST_HEAP(heap)->x_flags());
+  }
   return S_OK;
 }
 
 status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
 {
-  PPLOG("%s",__func__);
+  *out_size = jel_sallocx(ptr, CAST_HEAP(heap)->x_flags());
+  //  *out_size = jel_malloc_usable_size(ptr);
   return S_OK;
 }
 
 void mm_plugin_debug(mm_plugin_heap_t heap)
 {
-  PPLOG("%s",__func__);
+  jel_malloc_stats_print(nullptr,nullptr,nullptr);
 }
 
 
