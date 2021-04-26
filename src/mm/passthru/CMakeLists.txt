@@ -28,4 +28,4 @@ set(CMAKE_SHARED_LINKER_FLAGS "-Bsymbolic -Bsymbolic-functions \
 
 #target_link_libraries(${PROJECT_NAME} c) #-nodefaultlibs -static /home/danielwaddington/git/musl-1.2.2/lib/libc.a )
 
-#install (TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
+install (TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
