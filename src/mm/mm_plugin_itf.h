@@ -16,6 +16,7 @@ extern "C"
   /** 
    * Initialize mm library
    * 
+   * @return S_OK, E_FAIL
    */
   status_t mm_plugin_init();
 
@@ -25,7 +26,7 @@ extern "C"
    * @param params Constructor parameters (e.g., JSON)
    * @param out_heap Heap context 
    * 
-   * @return 
+   * @return S_OK, E_FAIL
    */
   status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap); 
   
@@ -157,10 +158,23 @@ extern "C"
    * 
    * @param heap Heap context
    * @param ptr Pointer to block base
+   * @param out_ptr [out] Number of bytes in allocated block
    * 
-   * @return Number of bytes in allocated block
+   * @return S_OK, E_NOT_IMPL
    */
   status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size);
+
+
+  /** 
+   * Inject an allocation back into the allocator (reconstituing)
+   * 
+   * @param heap Heap context
+   * @param ptr Pointer to region of memory to mark allocated
+   * @param size Size of region in bytes
+   * 
+   * @return S_OK, E_NOT_IMPL
+   */
+  status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size);
 
   /** 
    * Get debugging information
@@ -197,7 +211,8 @@ extern "C"
     status_t (*mm_plugin_callocate)(mm_plugin_heap_t heap, size_t n, void ** out_ptr);
     status_t (*mm_plugin_reallocate)(mm_plugin_heap_t heap, void * ptr, size_t size, void ** out_ptr);
     status_t (*mm_plugin_usable_size)(mm_plugin_heap_t heap, void * ptr, size_t * out_size);
-    void (*mm_plugin_debug)(mm_plugin_heap_t heap);    
+    void     (*mm_plugin_debug)(mm_plugin_heap_t heap);
+    status_t (*mm_plugin_inject_allocation)(mm_plugin_heap_t heap, void * ptr, size_t size);
   } mm_plugin_function_table_t;
 
 #if defined(__cplusplus)
