@@ -28,7 +28,16 @@ extern "C"
    * 
    * @return S_OK, E_FAIL
    */
-  status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap); 
+  status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap);
+
+  /** 
+   * Delete a heap instance
+   * 
+   * @param heap Heap context to destroy
+   * 
+   * @return S_OK, E_INVAL, E_FAIL
+   */
+  status_t mm_plugin_destroy(mm_plugin_heap_t heap);
   
   /** 
    * Add (slab) region of memory to fuel the allocator.  The passthru
@@ -193,6 +202,7 @@ extern "C"
   {
     status_t (*mm_plugin_init)();
     status_t (*mm_plugin_create)(const char * params, mm_plugin_heap_t * out_heap);
+    status_t (*mm_plugin_destroy)(mm_plugin_heap_t heap);
     status_t (*mm_plugin_add_managed_region)(mm_plugin_heap_t heap,
                                              void * region_base,
                                              size_t region_size);

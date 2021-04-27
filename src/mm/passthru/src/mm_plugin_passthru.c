@@ -8,13 +8,13 @@
 #include "../../mm_plugin_itf.h"
 
 #define DEBUG
+
 #include "safe_print.h"
 
-struct {
-  size_t alloc_count;
-  size_t free_count;
-}
-  stats;
+struct heap_t {
+  size_t _alloc_count;
+  size_t _free_count;
+};
 
 /** 
  * Initialize mm library
@@ -35,7 +35,17 @@ status_t mm_plugin_init()
  */
 status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
 {
+  struct heap_t * inst = malloc(sizeof(struct heap_t));
+  memset(inst, 0, sizeof(struct heap_t));
+  
+  *out_heap = inst;
+  
   return S_OK;
+}
+
+status_t mm_plugin_destroy(mm_plugin_heap_t heap)
+{
+  return E_NOT_IMPL;
 }
   
   
@@ -106,8 +116,12 @@ status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
   assert(out_ptr);    
   *out_ptr = malloc(n);
-  stats.alloc_count++;
-  SAFE_PRINT("MM [%lu]: PASSTHRU\t - ALLOC(%lu) --> %p\n", stats.alloc_count, n, *out_ptr);
+
+  struct heap_t* h = heap;
+  h->_alloc_count++;
+  SAFE_PRINT("MM [%lu]: PASSTHRU\t - ALLOC(%lu) --> %p",
+             h->_alloc_count, n, *out_ptr);
+
   return S_OK;
 }
 
@@ -127,8 +141,11 @@ status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alig
   assert(out_ptr);
   /* don't use aligned_alloc because its statically defined */
   *out_ptr = memalign(alignment, n);
-  stats.alloc_count++;
-  SAFE_PRINT("MM [%lu]: PASSTHRU\t - ALIGNED_ALLOC(%lu, %lu) --> %p\n", stats.alloc_count, n, alignment, *out_ptr);
+  struct heap_t * h = heap;
+  h->_alloc_count++;
+  SAFE_PRINT("MM [%lu]: PASSTHRU\t - ALIGNED_ALLOC(%lu, %lu) --> %p",
+             ((struct heap_t*)heap)->_alloc_count, n, alignment, *out_ptr);
+
   return S_OK;
 }
 
@@ -161,7 +178,8 @@ status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size
 status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
 {
   free(ptr);
-  stats.free_count++;
+
+  ((struct heap_t*)heap)->_free_count++;
   return S_OK;
 }
   
@@ -177,7 +195,7 @@ status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
 status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
 {
   free(ptr);
-  stats.free_count++;  
+  ((struct heap_t*)heap)->_free_count++;
   return S_OK;
 }
 

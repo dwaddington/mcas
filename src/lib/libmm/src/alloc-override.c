@@ -37,7 +37,7 @@ extern "C" {
 void* malloc(size_t size)              MM_FORWARD1(mm_malloc, size);
 void* calloc(size_t size, size_t n)    MM_FORWARD2(mm_calloc, size, n);
 void* realloc(void* p, size_t newsize) MM_FORWARD2(mm_realloc, p, newsize);
-void  free(void* p)                    MM_FORWARD0(mm_free, p);
+void  free(void* p)                    MM_FORWARD1(mm_free, p);
 
 #if (defined(__GNUC__) || defined(__clang__)) && !defined(__MACH__)
 #pragma GCC visibility push(default)
@@ -125,7 +125,7 @@ void  free(void* p)                    MM_FORWARD0(mm_free, p);
 // Posix & Unix functions definitions
 // ------------------------------------------------------
 
-void   cfree(void* p)                    MM_FORWARD0(mm_free, p);
+void   cfree(void* p)                    MM_FORWARD1(mm_free, p);
 size_t malloc_size(void* p)              MM_FORWARD1(mm_usable_size,p);
 size_t malloc_usable_size(void *p)       MM_FORWARD1(mm_usable_size,p);
 void*  valloc(size_t size)                                     { return mm_valloc(size); }

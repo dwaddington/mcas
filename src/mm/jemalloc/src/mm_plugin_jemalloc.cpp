@@ -4,13 +4,14 @@
 #include <common/utils.h>
 #include <jemalloc/jemalloc.h>
 #include <stdarg.h>
-
+#include <fstream>
 #include <vector>
 #include "avl_malloc.h"
 #include "logging.h"
 
 #include "../../mm_plugin_itf.h"
 
+#define LOG_TO_FILE
 #undef  DEBUG_EXTENTS
 #define DEBUG_ALLOCS
 
@@ -28,7 +29,6 @@ static constexpr unsigned MAX_HEAPS = 255;
 class Heap;
 Heap * g_heap_map[MAX_HEAPS] = {0};
 
-
 /** 
  * Manages a heap instance
  * 
@@ -38,7 +38,11 @@ Heap * g_heap_map[MAX_HEAPS] = {0};
 class Heap
 {
 public:
-  Heap(unsigned arena_id) : _arena_id(arena_id) {
+  Heap(unsigned arena_id) : _arena_id(arena_id)
+#ifdef LOG_TO_FILE
+                          , _ofs("mm.log")
+#endif
+  {
   }
 
   void add_region(void * base, size_t len) {
@@ -85,14 +89,31 @@ public:
 #endif
   }
 
+  void deallocate(void * ptr, size_t size) {
+
+#ifdef USE_AVL
+    _avl_allocator->free(reinterpret_cast<addr_t>(ptr));
+#endif
+  }
+
   void set_arena(const unsigned id) { _arena_id = id; }
 
   unsigned x_flags() const { return _x_flags; }
+
+  void log_allocation(const void * p, const size_t size, const size_t alignment) {
+    _ofs << "alloc," << std::hex << p << "," << std::dec << size << "," << alignment << std::endl;
+  }
+
+  void log_free(const void * p) {
+    _ofs << "free," << std::hex << p << "," << std::dec << 0 << "," << 0 << std::endl;
+  }
+
   
 private:
   size_t   _managed_size = 0;
   unsigned _x_flags = 0;
   unsigned _arena_id;
+  std::ofstream _ofs;
 
 #ifdef USE_AVL
   /* use an AVL tree to manage the extents */
@@ -137,7 +158,7 @@ void * custom_extent_alloc(extent_hooks_t *extent_hooks,
 
 bool custom_extent_dalloc(extent_hooks_t *extent_hooks, void *addr, size_t size, bool committed, unsigned arena_id)
 {
-  asm("int3");
+  g_heap_map[arena_id]->deallocate(addr, size);
   return true;
 }
 
@@ -303,6 +324,11 @@ status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
   return S_OK;
 }
 
+status_t mm_plugin_destroy(mm_plugin_heap_t heap)
+{
+  return E_NOT_IMPL;
+}
+
 status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
                                       void * region_base,
                                       size_t region_size)
@@ -338,6 +364,11 @@ status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
   void * ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags());
   if(ptr == nullptr) PPERR("out of memory");
   *out_ptr = ptr;
+
+#ifdef LOG_TO_FILE
+  CAST_HEAP(heap)->log_allocation(ptr, n, 0);
+#endif
+  
   return S_OK;
 }
 
@@ -353,6 +384,11 @@ status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alig
   assert(ptr);
   assert(check_aligned(ptr, alignment));
   *out_ptr = ptr;
+
+#ifdef LOG_TO_FILE
+  CAST_HEAP(heap)->log_allocation(ptr, n, alignment);
+#endif
+
   return S_OK;
 }
 
@@ -369,6 +405,11 @@ status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
 #endif
   
   jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
+
+#ifdef LOG_TO_FILE
+  CAST_HEAP(heap)->log_free(ptr);
+#endif
+  
   return S_OK;
 }
 
@@ -381,6 +422,11 @@ status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
   if(ptr == nullptr) return S_OK;
   //  jel_free(ptr);
   jel_dallocx(ptr, CAST_HEAP(heap)->x_flags());
+
+#ifdef LOG_TO_FILE
+  CAST_HEAP(heap)->log_free(ptr);
+#endif
+  
   return S_OK;
 }
 

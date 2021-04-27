@@ -8,7 +8,7 @@
 int main()
 {
 #ifdef TEST_LOAD
-  static const char * PLUGIN_PATH = "/home/danielwaddington/mcas/build/dist/lib/libmm-plugin-jemalloc.so";
+  static const char * PLUGIN_PATH = "dist/lib/libmm-plugin-jemalloc.so";
   void * mod = dlopen(PLUGIN_PATH, RTLD_NOW | RTLD_DEEPBIND);
   if(!mod) printf("Error: %s\n", dlerror());
 #endif
@@ -22,6 +22,7 @@ int main()
       v.push_back(malloc(1024*1024));
     }
 
+    printf("Freeing previous allocs ...\n");
     for(unsigned i=0;i<10;i++) {
       free(v[i]);
     }

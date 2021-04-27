@@ -2,6 +2,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <cstdlib>
 #include <dlfcn.h>
 #include <stdio.h>
 #include <fstream>
@@ -48,6 +49,7 @@ calloc_function_t        calloc = nullptr;
 memalign_function_t      memalign = nullptr;
 vfprintf_function_t      vfprintf = nullptr;
 puts_function_t          puts = nullptr;
+fputs_function_t         fputs = nullptr;
 
 malloc_usable_size_function_t malloc_usable_size = nullptr;
 }
@@ -79,6 +81,7 @@ static void __init_components(void)
   LOAD_SYMBOL(mm_plugin_reallocate);
   LOAD_SYMBOL(mm_plugin_usable_size);
   LOAD_SYMBOL(mm_plugin_debug);
+  LOAD_SYMBOL(mm_plugin_destroy);
 
   __mm_funcs.mm_plugin_init();  
   __mm_funcs.mm_plugin_create(nullptr, &__mm_heap);
@@ -136,6 +139,13 @@ extern "C" int __wrap_puts(const char *s)
   return real::puts(s);
 }
 
+extern "C" int __wrap_fputs(const char *s, FILE* stream)
+{
+  if(!real::fputs)  __get_os_functions();
+  return real::fputs(s, stream);
+}
+
+
 extern "C" size_t __wrap_malloc_usable_size(void * ptr)
 {
   if(!real::malloc_usable_size) __get_os_functions();
@@ -173,6 +183,9 @@ static void __get_os_functions()
   real::puts = reinterpret_cast<puts_function_t>(dlsym(RTLD_NEXT, "puts"));
   assert(real::puts);
 
+  real::fputs = reinterpret_cast<fputs_function_t>(dlsym(RTLD_NEXT, "fputs"));
+  assert(real::fputs);
+
   real::malloc_usable_size = reinterpret_cast<malloc_usable_size_function_t>(dlsym(RTLD_NEXT, "malloc_usable_size"));
   assert(real::malloc_usable_size);
   
@@ -203,9 +216,8 @@ static addr_t sbrk_base = reinterpret_cast<addr_t>(sbrk(0));
 
 EXPORT_C void mm_free(void* p) noexcept
 {
-  /* HACK: fix free of memory allocated from sbrk */
-  if(reinterpret_cast<addr_t>(p) & sbrk_base) return;
-  
+  if(p == nullptr) return;
+
   if(!real::free) return; //__get_os_functions();
 
   if(globals::intercept_active) {
