@@ -5,7 +5,9 @@
 #include <jemalloc/jemalloc.h>
 #include <stdarg.h>
 #include <fstream>
+#include <sstream>
 #include <vector>
+#include <mutex>
 #include "avl_malloc.h"
 #include "logging.h"
 
@@ -100,14 +102,11 @@ public:
 
   unsigned x_flags() const { return _x_flags; }
 
-  void log_allocation(const void * p, const size_t size, const size_t alignment) {
-    _ofs << "alloc," << std::hex << p << "," << std::dec << size << "," << alignment << std::endl;
+  void log(const char * type, const void * p, const size_t size = 0, const size_t alignment = 0) {
+    char tmp[1024];
+    sprintf(tmp, "%s,%p,%lu,%lu\n",type, p, size, alignment);
+    _ofs << tmp;
   }
-
-  void log_free(const void * p) {
-    _ofs << "free," << std::hex << p << "," << std::dec << 0 << "," << 0 << std::endl;
-  }
-
   
 private:
   size_t   _managed_size = 0;
@@ -366,7 +365,7 @@ status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
   *out_ptr = ptr;
 
 #ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log_allocation(ptr, n, 0);
+  CAST_HEAP(heap)->log("MA",ptr, n, 0);
 #endif
   
   return S_OK;
@@ -386,7 +385,7 @@ status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alig
   *out_ptr = ptr;
 
 #ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log_allocation(ptr, n, alignment);
+  CAST_HEAP(heap)->log("AA", ptr, n, alignment);
 #endif
 
   return S_OK;
@@ -407,7 +406,7 @@ status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
   jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
 
 #ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log_free(ptr);
+  CAST_HEAP(heap)->log("DE",ptr);
 #endif
   
   return S_OK;
@@ -424,7 +423,7 @@ status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
   jel_dallocx(ptr, CAST_HEAP(heap)->x_flags());
 
 #ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log_free(ptr);
+  CAST_HEAP(heap)->log("DW",ptr);
 #endif
   
   return S_OK;
@@ -442,6 +441,11 @@ status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
   }
   assert(ptr);
   *out_ptr = ptr;
+
+#ifdef LOG_TO_FILE
+  CAST_HEAP(heap)->log("CA", ptr, n, 0);
+#endif
+
   return S_OK;
 }
 
@@ -458,6 +462,11 @@ status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void 
   else {
     *out_ptr = jel_rallocx(ptr, n, CAST_HEAP(heap)->x_flags());
   }
+
+#ifdef LOG_TO_FILE
+  CAST_HEAP(heap)->log("RE", ptr, n, 0);
+#endif
+  
   return S_OK;
 }
 
