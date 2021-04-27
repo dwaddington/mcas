@@ -10,8 +10,6 @@
 #include <common/utils.h>
 #include <common/exceptions.h>
 #include <common/stack_trace.h>
-#include <api/components.h>
-#include <api/mm_itf.h>
 #include <sys/mman.h>
 
 #include "mm_wrapper.h"
@@ -56,8 +54,6 @@ malloc_usable_size_function_t malloc_usable_size = nullptr;
 
 static void __init_components(void)
 {
-  using namespace component;
-
   auto path = ::getenv("PLUGIN");
   
   __mm_plugin_module = dlopen(path, RTLD_NOW | RTLD_DEEPBIND);
