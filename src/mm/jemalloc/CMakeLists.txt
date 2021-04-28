@@ -22,7 +22,6 @@ set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wra
 -Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=memalign")
 
 add_dependencies(${PROJECT_NAME} jemalloc-lib)
-target_compile_options(${PROJECT_NAME} PUBLIC "-O0")
 target_link_libraries(${PROJECT_NAME} -static-libgcc libjemalloc_pic.a pthread)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)

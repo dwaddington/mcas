@@ -148,6 +148,19 @@ extern "C"
    */
   status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr);
 
+  /*
+    The POSIX realloc() function changes the size of the memory block pointed
+    to by ptr to size bytes.  The contents will be unchanged in the
+    range from the start of the region up to the minimum of the old and
+    new sizes.  If the new size is larger than the old size, the added
+    memory will not be initialized.  If ptr is NULL, then the call is
+    equivalent to malloc(size), for all values of size; if size is equal
+    to zero, and ptr is not NULL, then the call is equivalent to
+    free(ptr).  Unless ptr is NULL, it must have been returned by an
+    earlier call to malloc(), calloc(), or realloc().  If the area
+    pointed to was moved, a free(ptr) is done.
+  */
+
   /** 
    * Resize an existing allocation
    * 
@@ -155,6 +168,7 @@ extern "C"
    * @param ptr Pointer to existing allocated region
    * @param size New size in bytes
    * @param ptr [out] New reallocated region or null on unable to reallocate
+   *
    * 
    * @return S_OK
    */

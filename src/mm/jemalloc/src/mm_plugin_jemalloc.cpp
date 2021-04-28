@@ -455,6 +455,9 @@ status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void 
     /* if pointer is null, then we just do a new allocation */
     *out_ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags());
   }
+  else if(n == 0 && ptr != nullptr) {
+    return mm_plugin_deallocate_without_size(heap, ptr);
+  }
   else {
     *out_ptr = jel_rallocx(ptr, n, CAST_HEAP(heap)->x_flags());
   }
