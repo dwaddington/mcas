@@ -1,21 +1,36 @@
+/*
+   Copyright [2021] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include <stdio.h>
 #include <assert.h>
-#include <common/errors.h>
-#include <common/utils.h>
-#include <jemalloc/jemalloc.h>
 #include <stdarg.h>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <mutex>
+#include <common/errors.h>
+#include <common/utils.h>
+#include <jemalloc/jemalloc.h>
+
 #include "avl_malloc.h"
 #include "logging.h"
 
 #include "../../mm_plugin_itf.h"
 
 //#define LOG_TO_FILE
-#undef  DEBUG_EXTENTS
-#define DEBUG_ALLOCS
+//#define DEBUG_EXTENTS
+//#define DEBUG_ALLOCS
+//#define DEBUG
 #define USE_AVL
 
 
@@ -37,7 +52,6 @@ Heap * g_heap_map[MAX_HEAPS] = {0};
  * Manages a heap instance
  * 
  */
-
 class Heap
 {
 public:
@@ -404,7 +418,8 @@ PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n
   PPLOG("%s (%p, %lu) x_flags=%x",__func__, ptr, n, CAST_HEAP(heap)->x_flags());
 #endif
   
-  jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
+  //  jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
+  jel_free(ptr);
 
 #ifdef LOG_TO_FILE
   CAST_HEAP(heap)->log("DE",ptr);

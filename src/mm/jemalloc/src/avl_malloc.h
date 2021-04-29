@@ -11,17 +11,8 @@
   limitations under the License.
 */
 
-
-
-/*
- * Authors:
- *
- * Daniel G. Waddington (daniel.waddington@ibm.com)
- *
- */
-
-#ifndef __NUPM_AVL_MALLOC_H__
-#define __NUPM_AVL_MALLOC_H__
+#ifndef __AVL_MALLOC_H__
+#define __AVL_MALLOC_H__
 
 #if !defined(__cplusplus)
 #error("C++ header only")
@@ -37,7 +28,7 @@
 #include <vector>
 #include <cstdlib> // exit
 
-#define DEBUG_AVL_ALLOCATOR
+//#define DEBUG_AVL_ALLOCATOR
 
 namespace core
 {
