@@ -31,6 +31,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include "resource_unavailable.h"
+#include "env.h"
 
 #include <sys/types.h> /* getpid */
 #include <unistd.h>
@@ -177,7 +178,7 @@ Shard::Shard(const Config_file &config_file,
 }
 
 void Shard::thread_entry(const std::string &backend,
-                         const std::string &index,
+                         const std::string &, //mm_plugin_path,
                          const std::string &dax_config,
                          const unsigned     debug_level,
                          const std::string  ado_cores,
@@ -200,7 +201,9 @@ void Shard::thread_entry(const std::string &backend,
 
   try {
     try {
-      initialize_components(backend, index, dax_config, debug_level, ado_cores, ado_core_num);
+      initialize_components(backend,
+                            DEFAULT_MM_PLUGIN_PATH, /* todo, option to override through config file */
+                            dax_config, debug_level, ado_cores, ado_core_num);
     }
     catch (const General_exception &e) {
       PERR("Shard component initialization failed: %s.", e.cause());
@@ -228,7 +231,7 @@ void Shard::thread_entry(const std::string &backend,
 }
 
 void Shard::initialize_components(const std::string &backend,
-                                  const std::string &,  // index
+                                  const std::string &mm_plugin_path,
                                   const std::string &dax_config,
                                   unsigned debug_level,
                                   const std::string ado_cores,
@@ -266,8 +269,11 @@ void Shard::initialize_components(const std::string &backend,
                                     }
                                     ));
     }
-    else {
-      _i_kvstore.reset(fact->create(debug_level, {}));
+    else { /* mapstore */
+      _i_kvstore.reset(fact->create(debug_level,
+                                    {
+                                     {+component::IKVStore_factory::k_mm_plugin_path, mm_plugin_path}
+                                    }));
     }
   }
 

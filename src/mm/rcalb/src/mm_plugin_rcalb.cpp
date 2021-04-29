@@ -9,6 +9,7 @@
 #include "../../mm_plugin_itf.h"
 #include "rc_alloc_lb.h"
 #include "logging.h"
+//#define DEBUG /* enable log output */
 
 namespace global
 {
@@ -19,7 +20,6 @@ using Heap = Rca_LB;
 
 PUBLIC status_t mm_plugin_init()
 {
-  PPLOG("init");
   return S_OK;
 }
 
@@ -83,7 +83,7 @@ PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size
 {
   PPLOG("%s (%lu,%lu)",__func__, n, alignment);
   auto h = reinterpret_cast<Heap*>(heap);
-  *out_ptr = h->alloc(n, alignment);
+  *out_ptr = h->alloc(n, 0, alignment);
   assert(*out_ptr);
   return S_OK;
 }
@@ -130,7 +130,7 @@ PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n
   if(n == 0 && ptr != nullptr)
     return mm_plugin_deallocate_without_size(heap, ptr);
 
-  PPNOTICE("%s (%p, %lu)",__func__, ptr, n);
+  PPLOG("%s (%p, %lu)",__func__, ptr, n);
   *out_ptr = nullptr;
   return E_NOT_IMPL; /* we don't support reallocation */
 }

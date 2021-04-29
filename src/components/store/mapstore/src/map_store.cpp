@@ -46,7 +46,6 @@
 
 #define DEFAULT_ALIGNMENT 8
 #define SINGLE_THREADED
-#define NUMA_ZONE 0 /* treat memory as a single zone, although it may not be */
 #define MIN_POOL (1ULL << DM_REGION_LOG_GRAIN_SIZE)
 
 #include "mm_plugin_itf.h"
@@ -168,13 +167,16 @@ private:
   };
 
 public:
-  Pool_instance(const unsigned debug_level, const std::string & name_, size_t nsize, unsigned flags_)
+  Pool_instance(const unsigned debug_level,
+                const std::string& mm_plugin_path,
+                const std::string& name_,
+                size_t nsize,
+                unsigned flags_)
     : _debug_level(debug_level),
       _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
       _regions{{allocate_region_memory(MiB(2) /* alignment */, _nsize), _nsize}},
       _name{name_},
-      //      _mm_plugin(::getenv("PLUGIN")), /* temporary */
-      _mm_plugin("/home/danielwaddington/mcas/build/dist/lib/libmm-plugin-rcalb.so"),
+      _mm_plugin(mm_plugin_path), /* plugin path for heap allocator */
       _map_lock{},
       _flags{flags_},
       _iterators{},
@@ -1016,8 +1018,11 @@ void Pool_instance::free_region_memory(void *addr, const size_t size)
 
 /** Main class */
 
-Map_store::Map_store(const unsigned debug_level, const std::string&, const std::string &)
-  : _debug_level(debug_level)
+Map_store::Map_store(const unsigned debug_level,
+                     const std::string &mm_plugin_path,
+                     const std::string& /* owner */,
+                     const std::string& /* name */)
+  : _debug_level(debug_level), _mm_plugin_path(mm_plugin_path)
 {
 }
 
@@ -1035,7 +1040,8 @@ Map_store::~Map_store() {
 }
 
 IKVStore::pool_t Map_store::create_pool(const std::string &name,
-                                        const size_t nsize, unsigned int flags,
+                                        const size_t nsize,
+                                        unsigned int flags,
                                         uint64_t /*args*/,
                                         IKVStore::Addr /*base addr unused */)
 {
@@ -1060,7 +1066,7 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
       CPLOG(1, PREFIX "using existing pool instance");
     }
     else {
-      handle = new Pool_instance(debug_level(), name, nsize, flags);
+      handle = new Pool_instance(debug_level(), _mm_plugin_path, name, nsize, flags);
       CPLOG(1, PREFIX "creating new pool instance");
     }
 

@@ -2,6 +2,7 @@
 
 #define PREFIX "MM-PLUGIN-RCALB:"
 
+#ifdef DEBUG
 void PPLOG(const char * format, ...)
 {
   static const size_t m_max_buffer = 512;
@@ -15,7 +16,11 @@ void PPLOG(const char * format, ...)
   //  write(1, buffer, strlen(buffer));
   printf("%s",buffer);
 }
+#else
+void PPLOG(const char * format, ...) {}
+#endif
 
+#ifdef DEBUG
 void PPERR(const char * format, ...)
 {
   static const size_t m_max_buffer = 512;
@@ -29,8 +34,11 @@ void PPERR(const char * format, ...)
   //  write(1, buffer, strlen(buffer));
   printf("%s",buffer);
 }
+#else
+void PPERR(const char * format, ...) {}
+#endif
 
-
+#ifdef DEBUG
 void PPNOTICE(const char * format, ...)
 {
   static const size_t m_max_buffer = 512;
@@ -44,3 +52,6 @@ void PPNOTICE(const char * format, ...)
   //  write(1, buffer, strlen(buffer));
   printf("%s",buffer);
 }
+#else
+void PPNOTICE(const char * format, ...) {}
+#endif
