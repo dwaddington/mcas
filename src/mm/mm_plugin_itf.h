@@ -403,7 +403,8 @@ public:
   {
   }
   
-  template <class U> MM_plugin_cxx_allocator(MM_plugin_cxx_allocator<U> const&) noexcept {}
+  template <class U>
+  MM_plugin_cxx_allocator(MM_plugin_cxx_allocator<U> const& a_) noexcept : _wrapper(a_._wrapper)  {}
 
   pointer allocate(std::size_t n)
   {
@@ -450,7 +451,6 @@ public:
   using propagate_on_container_swap            = std::false_type;
   using is_always_equal                        = std::is_empty<MM_plugin_cxx_allocator>;
   
-private:
   MM_plugin_wrapper& _wrapper;
 };
 

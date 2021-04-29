@@ -8,5 +8,5 @@ if( ${ARCHITECTURE} STREQUAL "x86_64" )
   add_subdirectory(hstore)
 endif()
 
-#add_subdirectory(mapstore)
+add_subdirectory(mapstore)
 add_subdirectory(test)
