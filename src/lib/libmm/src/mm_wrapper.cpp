@@ -22,13 +22,15 @@
 #pragma GCC diagnostic ignored "-Wunused-function"
 
 static void __get_os_functions(void);
-extern "C" int __wrap_puts(const char *s);
+
+
 
 namespace globals
 {
 static void * slab_memory = nullptr; /*< memory which will be used as the slab for the allocator */
 static unsigned alloc_count = 0;
 static bool intercept_active = false;
+static uint64_t dl_module_mask = 0;
 }
 
 static mm_plugin_function_table_t __mm_funcs;
@@ -57,6 +59,8 @@ static void __init_components(void)
   auto path = ::getenv("PLUGIN");
   
   __mm_plugin_module = dlopen(path, RTLD_NOW | RTLD_DEEPBIND);
+
+  globals::dl_module_mask = reinterpret_cast<uint64_t>(__mm_plugin_module) & 0xFFFFFFFFFF000000;
 
   if(!__mm_plugin_module) {
     printf("Error: invalid PLUGIN (%s)\n", path);
@@ -96,58 +100,6 @@ static void __init_components(void)
   globals::intercept_active = true;
 }
 
-/* OS versions of the memory functions */
-extern "C" void * __wrap_malloc(size_t size)
-{
-  if(!real::malloc) __get_os_functions();
-  return real::malloc(size);
-}
-
-extern "C" void __wrap_free(void * ptr)
-{
-  if(!real::free) __get_os_functions();
-  return real::free(ptr);
-}
-
-extern "C" void * __wrap_calloc(size_t nmemb, size_t size)
-{
-  if(!real::malloc) __get_os_functions();
-  void * p = real::malloc(size * nmemb);
-  __builtin_memset(p, 0, size * nmemb);
-  return p;
-}
-
-extern "C" void * __wrap_realloc(void * ptr, size_t size)
-{
-  if(!real::realloc)  __get_os_functions();
-  return real::realloc(ptr, size);
-}
-
-extern "C" void * __wrap_memalign(size_t alignment, size_t size)
-{
-  if(!real::memalign)  __get_os_functions();
-  return real::memalign(alignment, size);
-}
-
-extern "C" int __wrap_puts(const char *s)
-{
-  if(!real::puts)  __get_os_functions();
-  return real::puts(s);
-}
-
-extern "C" int __wrap_fputs(const char *s, FILE* stream)
-{
-  if(!real::fputs)  __get_os_functions();
-  return real::fputs(s, stream);
-}
-
-
-extern "C" size_t __wrap_malloc_usable_size(void * ptr)
-{
-  if(!real::malloc_usable_size) __get_os_functions();
-  return real::malloc_usable_size(ptr);
-}
-
 /** 
  * Collect the "original" OS implementations, so they can be used by
  * the memory manager plugin itself.
@@ -156,13 +108,13 @@ extern "C" size_t __wrap_malloc_usable_size(void * ptr)
 static void __get_os_functions()
 {
   real::malloc = reinterpret_cast<malloc_function_t>(dlsym(RTLD_NEXT, "malloc"));
-  assert(real::malloc && (real::malloc != __wrap_malloc));
+  assert(real::malloc);
 
   real::calloc = reinterpret_cast<calloc_function_t>(dlsym(RTLD_NEXT, "calloc"));
   assert(real::calloc);
   
   real::free = reinterpret_cast<free_function_t>(dlsym(RTLD_NEXT, "free"));
-  assert(real::free && (real::free != __wrap_free));
+  assert(real::free);
   
   real::aligned_alloc = reinterpret_cast<aligned_alloc_function_t>(dlsym(RTLD_NEXT, "aligned_alloc"));
   assert(real::aligned_alloc);
@@ -215,6 +167,15 @@ EXPORT_C void mm_free(void* p) noexcept
   if(p == nullptr) return;
 
   if(!real::free) return; //__get_os_functions();
+
+  /* hack to deal with something allocated by dl_main before we could hook
+     calloc.  we have two options, one try to identify if the memory
+     was part of the management region, or two, try to see if the memory
+     came from the dl_main call.  this might be risky!
+  */
+  //  if((reinterpret_cast<uint64_t>(p) & 0xAA00000000) != 0xAA00000000) return;
+  if((globals::dl_module_mask & reinterpret_cast<uint64_t>(p)) == globals::dl_module_mask) return;
+
 
   if(globals::intercept_active) {
     __mm_funcs.mm_plugin_deallocate_without_size(__mm_heap, p);
