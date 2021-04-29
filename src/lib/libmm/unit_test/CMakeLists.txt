@@ -6,7 +6,8 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/mm)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
 
-link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+link_directories(${CMAKE_INSTALL_PREFIX}/lib)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
 add_compile_options(-g -fPIC -DCONFIG_DEBUG)
 
@@ -19,4 +20,4 @@ endif()
 
 add_executable(${PROJECT_NAME} test1.cpp)
 
-target_link_libraries(${PROJECT_NAME} ${GTEST_LIB} common pthread dl gtest)
+target_link_libraries(${PROJECT_NAME} ${GTEST_LIB} common pthread dl ${GTEST})
