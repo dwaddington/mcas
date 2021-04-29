@@ -1,7 +1,19 @@
 #ifndef __MM_PLUGIN_ITF_H__
 #define __MM_PLUGIN_ITF_H__
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
+#define PUBLIC __attribute__((__visibility__("default")))
+
+#if defined(__cplusplus)
+#pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
 #include <stdlib.h>
+#include <assert.h>
 
 #if defined(__cplusplus)
 extern "C"
@@ -243,5 +255,224 @@ extern "C"
 }
 #endif  
 
+
+#if defined(__cplusplus)
+
+#include <dlfcn.h>
+#include <string>
+#include <stdio.h>
+#include <stdexcept>
+
+#define LOAD_SYMBOL(X) _ft.X = reinterpret_cast<typeof(_ft.X)>(dlsym(_module, # X)); assert(_ft.X)
+
+/** 
+ * C++ wrapper on C-based plugin API
+ * 
+ */
+class MM_plugin_wrapper
+{
+public:
+    
+  MM_plugin_wrapper(const std::string& plugin_path,
+                    const std::string& config = "") {
+    assert(plugin_path.empty() == false);
+    _module = dlopen(plugin_path.c_str(), RTLD_NOW | RTLD_NODELETE); // RTLD_DEEPBIND | 
+
+    if(_module == nullptr) {
+      char err[1024];
+      sprintf(err, "%s\n", dlerror());
+      throw std::invalid_argument(err);
+    }
+
+    LOAD_SYMBOL(mm_plugin_init);
+    LOAD_SYMBOL(mm_plugin_create);
+    LOAD_SYMBOL(mm_plugin_add_managed_region);
+    LOAD_SYMBOL(mm_plugin_query_managed_region);
+    LOAD_SYMBOL(mm_plugin_register_callback_request_memory);
+    LOAD_SYMBOL(mm_plugin_allocate);
+    LOAD_SYMBOL(mm_plugin_aligned_allocate);
+    LOAD_SYMBOL(mm_plugin_aligned_allocate_offset);
+    LOAD_SYMBOL(mm_plugin_deallocate);
+    LOAD_SYMBOL(mm_plugin_deallocate_without_size);
+    LOAD_SYMBOL(mm_plugin_callocate);
+    LOAD_SYMBOL(mm_plugin_reallocate);
+    LOAD_SYMBOL(mm_plugin_usable_size);
+    LOAD_SYMBOL(mm_plugin_debug);
+    LOAD_SYMBOL(mm_plugin_destroy);
+
+    //      dlclose(_module);
+      
+    /* create heap instance */      
+    _ft.mm_plugin_create(config.c_str(),&_heap);
+  }
+
+  virtual ~MM_plugin_wrapper() noexcept {
+    _ft.mm_plugin_destroy(_heap);
+  }
+
+  /* forwarding in liners */
+  inline status_t init() noexcept {
+    return _ft.mm_plugin_init();
+  }
+    
+
+  inline status_t add_managed_region(void * region_base, size_t region_size) noexcept {
+    return _ft.mm_plugin_add_managed_region(_heap, region_base, region_size);
+  }
+
+  inline status_t query_managed_region(unsigned region_id, void** out_region_base, size_t* out_region_size) noexcept {
+    return _ft.mm_plugin_query_managed_region(_heap, region_id, out_region_base, out_region_size);
+  }
+    
+  inline status_t register_callback_request_memory(request_memory_callback_t callback, void * param) noexcept {
+    return _ft.mm_plugin_register_callback_request_memory(_heap, callback, param);
+  }
+    
+  inline status_t allocate(size_t n, void ** out_ptr) noexcept {
+    return _ft.mm_plugin_allocate(_heap, n, out_ptr);
+  }
+    
+  inline status_t aligned_allocate(size_t n, size_t alignment, void ** out_ptr) noexcept {
+    return _ft.mm_plugin_aligned_allocate(_heap, n, alignment, out_ptr);
+  }
+    
+  inline status_t aligned_allocate_offset(size_t n, size_t alignment, size_t offset, void ** out_ptr) noexcept {
+    return _ft.mm_plugin_aligned_allocate_offset(_heap, n, alignment, offset, out_ptr);
+  }
+    
+  inline status_t deallocate(void * ptr, size_t size) noexcept {
+    return _ft.mm_plugin_deallocate(_heap, ptr, size);
+  }
+    
+  inline status_t deallocate_without_size(void * ptr) noexcept {
+    return _ft.mm_plugin_deallocate_without_size(_heap, ptr);
+  }
+    
+  inline status_t callocate(size_t n, void ** out_ptr) noexcept {
+    return _ft.mm_plugin_callocate(_heap, n, out_ptr);
+  }
+    
+  inline status_t reallocate(void * ptr, size_t size, void ** out_ptr) noexcept {
+    return _ft.mm_plugin_reallocate(_heap, ptr, size, out_ptr);
+  }
+    
+  inline status_t usable_size(void * ptr, size_t * out_size) noexcept {
+    return _ft.mm_plugin_usable_size(_heap, ptr, out_size);
+  }
+    
+  inline void debug(mm_plugin_heap_t heap) noexcept {
+    return _ft.mm_plugin_debug(_heap);
+  }
+    
+  inline status_t inject_allocation(void * ptr, size_t size) noexcept {
+    return _ft.mm_plugin_inject_allocation(_heap, ptr, size);
+  }
+
+private:
+  void *                     _module;
+  mm_plugin_function_table_t _ft;
+  mm_plugin_heap_t           _heap;
+};
+
+#include <limits>
+#include <new>
+
+/** 
+ * Standard C++ allocator wrapper
+ * 
+ */
+template <class T>
+class MM_plugin_cxx_allocator
+{
+public:
+  using value_type    = T;
+  using pointer       = value_type*;
+  using const_pointer = typename std::pointer_traits<pointer>::template
+    rebind<value_type const>;
+  using void_pointer       = typename std::pointer_traits<pointer>::template
+    rebind<void>;
+  using const_void_pointer = typename std::pointer_traits<pointer>::template
+    rebind<const void>;
+  
+  using difference_type = typename std::pointer_traits<pointer>::difference_type;
+  using size_type       = std::make_unsigned_t<difference_type>;
+  
+  template <class U> struct rebind {typedef MM_plugin_cxx_allocator<U> other;};
+
+  MM_plugin_cxx_allocator(MM_plugin_wrapper& wrapper) noexcept : _wrapper(wrapper)
+  {
+  }
+  
+  template <class U> MM_plugin_cxx_allocator(MM_plugin_cxx_allocator<U> const&) noexcept {}
+
+  pointer allocate(std::size_t n)
+  {
+    pointer p = nullptr;
+    auto status = _wrapper.allocate(n*sizeof(value_type), reinterpret_cast<void**>(&p));
+    if(status != 0) throw std::bad_alloc();
+    return p;
+  }
+
+  void deallocate(pointer p, std::size_t n) noexcept
+  {
+    _wrapper.deallocate(p, n);
+  }
+
+  pointer allocate(std::size_t n, const_void_pointer)
+  {
+    return allocate(n);
+  }
+
+  template <class U, class ...Args>
+  void construct(U* p, Args&& ...args)
+  {
+    ::new(p) U(std::forward<Args>(args)...);
+  }
+
+  template <class U>
+  void destroy(U* p) noexcept
+  {
+    p->~U();
+  }
+
+  std::size_t max_size() const noexcept
+  {
+    return std::numeric_limits<size_type>::max();
+  }
+
+  MM_plugin_cxx_allocator select_on_container_copy_construction() const
+  {
+    return *this;
+  }
+
+  using propagate_on_container_copy_assignment = std::false_type;
+  using propagate_on_container_move_assignment = std::false_type;
+  using propagate_on_container_swap            = std::false_type;
+  using is_always_equal                        = std::is_empty<MM_plugin_cxx_allocator>;
+  
+private:
+  MM_plugin_wrapper& _wrapper;
+};
+
+template <class T, class U>
+bool
+operator==(MM_plugin_cxx_allocator<T> const&, MM_plugin_cxx_allocator<U> const&) noexcept
+{
+  return true;
+}
+
+template <class T, class U>
+bool
+operator!=(MM_plugin_cxx_allocator<T> const& x, MM_plugin_cxx_allocator<U> const& y) noexcept
+{
+  return !(x == y);
+}
+
+
+#undef LOAD_SYMBOL
+#endif
+
+
+#pragma GCC diagnostic pop
 
 #endif // __MM_PLUGIN_ITF_H__

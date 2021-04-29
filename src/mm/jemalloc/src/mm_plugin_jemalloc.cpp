@@ -11,9 +11,11 @@
 
 #include "../../mm_plugin_itf.h"
 
-#define LOG_TO_FILE
+//#define LOG_TO_FILE
 #undef  DEBUG_EXTENTS
 #define DEBUG_ALLOCS
+#define USE_AVL
+
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-value"
@@ -33,7 +35,6 @@ Heap * g_heap_map[MAX_HEAPS] = {0};
  * Manages a heap instance
  * 
  */
-#define USE_AVL
 
 class Heap
 {
@@ -240,7 +241,7 @@ extent_hooks_t custom_extent_hooks =
    custom_extent_merge,
   };                            
 
-status_t mm_plugin_init()
+PUBLIC status_t mm_plugin_init()
 {
   PPLOG("init");
 
@@ -311,7 +312,7 @@ static void hook_extents(unsigned arena_id)
 }
 
 
-status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
 
@@ -324,12 +325,12 @@ status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
   return S_OK;
 }
 
-status_t mm_plugin_destroy(mm_plugin_heap_t heap)
+PUBLIC status_t mm_plugin_destroy(mm_plugin_heap_t heap)
 {
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
                                       void * region_base,
                                       size_t region_size)
 {
@@ -339,7 +340,7 @@ status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
   return S_OK;
 }
 
-status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
                                         unsigned region_id,
                                         void** out_region_base,
                                         size_t* out_region_size)
@@ -348,7 +349,7 @@ status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
                                                     request_memory_callback_t callback,
                                                     void * param)
 {
@@ -356,7 +357,7 @@ status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%lu) x_flags=%x",__func__, n, CAST_HEAP(heap)->x_flags());
@@ -372,7 +373,7 @@ status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
   return S_OK;
 }
 
-status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
+PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
 {
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%lu,%lu) x_flags=%x",__func__, n, alignment, CAST_HEAP(heap)->x_flags());
@@ -392,13 +393,13 @@ status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alig
   return S_OK;
 }
 
-status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
+PUBLIC status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
 {
   asm("int3");
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
+PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
 {
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%p, %lu) x_flags=%x",__func__, ptr, n, CAST_HEAP(heap)->x_flags());
@@ -413,14 +414,19 @@ status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
   return S_OK;
 }
 
-status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
+PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
 {
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%p) x_flags=%x",__func__, ptr, CAST_HEAP(heap)->x_flags());
 #endif
 
   if(ptr == nullptr) return S_OK;
-  //  jel_free(ptr);
+
+  /* hack to deal with something allocated by dl_main before we could hook
+     calloc */
+
+  //  if((reinterpret_cast<uint64_t>(ptr) & 0xAA00000000) != 0xAA00000000) return S_OK;
+
   jel_dallocx(ptr, CAST_HEAP(heap)->x_flags());
 
 #ifdef LOG_TO_FILE
@@ -430,7 +436,7 @@ status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
   return S_OK;
 }
 
-status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%lu) x_flags=%x",__func__, n, CAST_HEAP(heap)->x_flags());
@@ -445,7 +451,7 @@ status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
   return S_OK;
 }
 
-status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
 {
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%p, %lu) x_flags=%x",__func__, ptr, n, CAST_HEAP(heap)->x_flags());
@@ -464,14 +470,14 @@ status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void 
   return S_OK;
 }
 
-status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
+PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
 {
   *out_size = jel_sallocx(ptr, CAST_HEAP(heap)->x_flags());
   //  *out_size = jel_malloc_usable_size(ptr);
   return S_OK;
 }
 
-void mm_plugin_debug(mm_plugin_heap_t heap)
+PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)
 {
   jel_malloc_stats_print(nullptr,nullptr,nullptr);
 }

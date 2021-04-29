@@ -17,13 +17,13 @@ static unsigned debug_level = 3;
 
 using Heap = Rca_LB;
 
-status_t mm_plugin_init()
+PUBLIC status_t mm_plugin_init()
 {
   PPLOG("init");
   return S_OK;
 }
 
-status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
 
@@ -33,14 +33,14 @@ status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
   return S_OK;
 }
 
-status_t mm_plugin_destroy(mm_plugin_heap_t heap)
+PUBLIC status_t mm_plugin_destroy(mm_plugin_heap_t heap)
 {
   auto h = reinterpret_cast<Heap*>(heap);
   delete h;
   return S_OK;
 }
 
-status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
                                       void * region_base,
                                       size_t region_size)
 {
@@ -51,7 +51,7 @@ status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
   return S_OK;
 }
 
-status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
                                         unsigned region_id,
                                         void** out_region_base,
                                         size_t* out_region_size)
@@ -61,7 +61,7 @@ status_t mm_plugin_query_managed_region(mm_plugin_heap_t heap,
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
+PUBLIC status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
                                                     request_memory_callback_t callback,
                                                     void * param)
 {
@@ -70,16 +70,16 @@ status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap,
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
-  PPLOG("%s (%lu)",__func__, n);
   auto h = reinterpret_cast<Heap*>(heap);
   *out_ptr = h->alloc(n, 0);
   assert(*out_ptr);
+  PPLOG("%s (%lu) -> %p",__func__, n, *out_ptr);
   return S_OK;
 }
 
-status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
+PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
 {
   PPLOG("%s (%lu,%lu)",__func__, n, alignment);
   auto h = reinterpret_cast<Heap*>(heap);
@@ -88,22 +88,22 @@ status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alig
   return S_OK;
 }
 
-status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
+PUBLIC status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
 {
   asm("int3");  
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
+PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
 {
   if(ptr == nullptr || n == 0) return S_OK;
   PPLOG("%s (%p, %lu)",__func__, ptr, n);
   auto h = reinterpret_cast<Heap*>(heap);
-  h->free(ptr, 0, n);
+  h->free(ptr, 0); // should use size   h->free(ptr, 0);
   return S_OK;
 }
 
-status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
+PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
 {
   PPLOG("%s (%p)",__func__, ptr);
   auto h = reinterpret_cast<Heap*>(heap);
@@ -111,7 +111,7 @@ status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
   return S_OK;
 }
 
-status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
   if(out_ptr == nullptr) return E_INVAL;
 
@@ -122,7 +122,7 @@ status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
   return S_OK;
 }
 
-status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
 {
   if(ptr == nullptr)
     return mm_plugin_allocate(heap, n, out_ptr);
@@ -135,20 +135,20 @@ status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void 
   return E_NOT_IMPL; /* we don't support reallocation */
 }
 
-status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
+PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
 {
   asm("int3");
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size)
+PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size)
 {
   auto h = reinterpret_cast<Heap*>(heap);
   h->inject_allocation(ptr, size, 0);
   return S_OK;
 }
 
-void mm_plugin_debug(mm_plugin_heap_t heap)
+PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)
 {
 }
 

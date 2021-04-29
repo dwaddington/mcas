@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 project(mm-plugin-rcalb C CXX)
 
 add_definitions(-DCONFIG_DEBUG)
+add_compile_options("-fvisibility=hidden")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
@@ -15,17 +16,9 @@ file(GLOB SOURCES src/*.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
+#set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wrap=malloc -Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=memalign")
 
-# see https://flameeyes.blog/2012/10/07/symbolism-and-elf-files-or-what-does-bsymbolic-do/
-#
-# -Bsymbolic and -Bsymbolic-functions effectively prevent the PLT
-# (Procedure Linking Table) from being used to resolve the symbol and
-# stick to the internally provided symbol
-#
-# 
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-Bsymbolic -Wl,-Bsymbolic-functions -Wl,--wrap=malloc \
--Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=memalign") # leave undefined
+target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 
 target_link_libraries(${PROJECT_NAME} -static-libgcc -static-libstdc++ common-static dl pthread)
 
