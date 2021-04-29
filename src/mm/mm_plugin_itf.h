@@ -36,11 +36,14 @@ extern "C"
    * Create a heap instance
    * 
    * @param params Constructor parameters (e.g., JSON)
+   * @param root_ptr Root point for persistent heaps
    * @param out_heap Heap context 
    * 
    * @return S_OK, E_FAIL
    */
-  status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap);
+  status_t mm_plugin_create(const char * params,
+                            void * root_ptr,
+                            mm_plugin_heap_t * out_heap);
 
   /** 
    * Delete a heap instance
@@ -227,7 +230,7 @@ extern "C"
   typedef struct tag_mm_plugin_function_table_t
   {
     status_t (*mm_plugin_init)();
-    status_t (*mm_plugin_create)(const char * params, mm_plugin_heap_t * out_heap);
+    status_t (*mm_plugin_create)(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap);
     status_t (*mm_plugin_destroy)(mm_plugin_heap_t heap);
     status_t (*mm_plugin_add_managed_region)(mm_plugin_heap_t heap,
                                              void * region_base,
@@ -274,7 +277,8 @@ class MM_plugin_wrapper
 public:
     
   MM_plugin_wrapper(const std::string& plugin_path,
-                    const std::string& config = "") {
+                    const std::string& config = "",
+                    void * root_ptr = nullptr) {
     assert(plugin_path.empty() == false);
     _module = dlopen(plugin_path.c_str(), RTLD_NOW | RTLD_NODELETE); // RTLD_DEEPBIND | 
 
@@ -303,7 +307,7 @@ public:
     //      dlclose(_module);
       
     /* create heap instance */      
-    _ft.mm_plugin_create(config.c_str(),&_heap);
+    _ft.mm_plugin_create(config.c_str(), root_ptr, &_heap);
   }
 
   virtual ~MM_plugin_wrapper() noexcept {

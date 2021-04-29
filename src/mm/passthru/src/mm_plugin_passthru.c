@@ -33,7 +33,7 @@ PUBLIC status_t mm_plugin_init()
  * 
  * @return 
  */
-PUBLIC status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   struct heap_t * inst = malloc(sizeof(struct heap_t));
   memset(inst, 0, sizeof(struct heap_t));

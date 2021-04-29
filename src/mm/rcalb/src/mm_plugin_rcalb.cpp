@@ -23,7 +23,7 @@ PUBLIC status_t mm_plugin_init()
   return S_OK;
 }
 
-PUBLIC status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
 
