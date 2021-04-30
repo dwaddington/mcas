@@ -17,7 +17,7 @@ void PPLOG(const char * format, ...)
   printf("%s",buffer);
 }
 #else
-void PPLOG(const char * format, ...) {}
+inline void PPLOG(const char * format, ...) {}
 #endif
 
 #ifdef DEBUG
@@ -35,7 +35,7 @@ void PPERR(const char * format, ...)
   printf("%s",buffer);
 }
 #else
-void PPERR(const char * format, ...) {}
+inline void PPERR(const char * format, ...) {}
 #endif
 
 #ifdef DEBUG
@@ -53,5 +53,5 @@ void PPNOTICE(const char * format, ...)
   printf("%s",buffer);
 }
 #else
-void PPNOTICE(const char * format, ...) {}
+inline void PPNOTICE(const char * format, ...) {}
 #endif

@@ -74,7 +74,6 @@ PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_
 {
   auto h = reinterpret_cast<Heap*>(heap);
   *out_ptr = h->alloc(n, 0);
-  assert(*out_ptr);
   PPLOG("%s (%lu) -> %p",__func__, n, *out_ptr);
   return S_OK;
 }
