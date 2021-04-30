@@ -6,8 +6,10 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <fstream>
+#include <iostream>
 #include <common/logging.h>
 #include <common/utils.h>
+#include <common/cycles.h>
 #include <common/exceptions.h>
 #include <common/stack_trace.h>
 #include <sys/mman.h>
@@ -21,22 +23,42 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 
+#define LOG_TO_FILE
+
+#define LOAD_SYMBOL(X) __mm_funcs.X = reinterpret_cast<typeof(__mm_funcs.X)>(dlsym(__mm_plugin_module, # X)); assert(__mm_funcs.X)
+
 static void __get_os_functions(void);
 
+class Logger
+{
+public:
+  Logger() : _ofs("mm.log") {
+  }
 
+  void log(const char * type, const cpu_time_t timestamp, const void * p, const size_t size = 0, const size_t alignment = 0) {
+    char tmp[1024];
+    sprintf(tmp, "%s,%lu,%p,%lu,%lu\n", type, timestamp, p, size, alignment);
+    _ofs << tmp;
+  }
+
+private:
+  std::ofstream _ofs;
+};
 
 namespace globals
 {
 static void * slab_memory = nullptr; /*< memory which will be used as the slab for the allocator */
-static unsigned alloc_count = 0;
 static bool intercept_active = false;
 static uint64_t dl_module_mask = 0;
+
+#ifdef LOG_TO_FILE
+static Logger * log = nullptr;
+#endif
 }
 
 static mm_plugin_function_table_t __mm_funcs;
 static void * __mm_plugin_module;
 static mm_plugin_heap_t __mm_heap;
-#define LOAD_SYMBOL(X) __mm_funcs.X = reinterpret_cast<typeof(__mm_funcs.X)>(dlsym(__mm_plugin_module, # X)); assert(__mm_funcs.X)
 
 /* real function implementations */
 namespace real
@@ -99,7 +121,13 @@ static void __init_components(void)
                                           globals::slab_memory,
                                           slab_size);
 
+  globals::log = new Logger();
+  
   globals::intercept_active = true;
+}
+
+static void __attribute__((destructor)) __mm_wrapper_dtor()
+{
 }
 
 /** 
@@ -180,7 +208,17 @@ EXPORT_C void mm_free(void* p) noexcept
 
 
   if(globals::intercept_active) {
+
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif
+    
     __mm_funcs.mm_plugin_deallocate_without_size(__mm_heap, p);
+
+#ifdef LOG_TO_FILE
+    globals::log->log("free", rdtsc()-start, p, 0, 0);
+#endif
+    
   }
   else {
     /* intercept is not yet active */
@@ -195,7 +233,17 @@ EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
 
   if(globals::intercept_active) {
     void * new_ptr = nullptr;
+
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif
+
     __mm_funcs.mm_plugin_reallocate(__mm_heap, p, newsize, &new_ptr);
+
+#ifdef LOG_TO_FILE
+    globals::log->log("realloc",rdtsc()-start, p, newsize, 0);
+#endif
+    
     return new_ptr;
   }
   else {
@@ -216,7 +264,17 @@ EXPORT_C void* mm_calloc(size_t count, size_t size) noexcept
   void * p;
   if(globals::intercept_active) {
     p = nullptr;
+
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif   
+
     __mm_funcs.mm_plugin_callocate(__mm_heap, count * size, &p);
+
+#ifdef LOG_TO_FILE
+    globals::log->log("calloc",rdtsc()-start, p, count * size, 0);
+#endif
+    
     assert(p);
   }
   else {
@@ -233,7 +291,17 @@ EXPORT_C void* mm_malloc(size_t size) noexcept
   if(globals::intercept_active) {
 
     void * p = nullptr;
+    
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif
+    
     __mm_funcs.mm_plugin_allocate(__mm_heap, size, &p);
+
+#ifdef LOG_TO_FILE
+    globals::log->log("malloc",rdtsc()-start,p, size, 0);
+#endif
+
     return p;
   }
   else {
@@ -279,21 +347,46 @@ EXPORT_C void* mm_memalign(size_t alignment, size_t size) noexcept
 {
   if(size == 0) return nullptr;
   void * p = nullptr;
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif
+
   __mm_funcs.mm_plugin_aligned_allocate(__mm_heap, size, alignment, &p);
+
+#ifdef LOG_TO_FILE
+  globals::log->log("memalign",rdtsc()-start, p, size, alignment);
+#endif  
   return p;
 }
 
 EXPORT_C int mm_posix_memalign(void** p, size_t alignment, size_t size) noexcept
 {
   if(p == nullptr) return EINVAL;
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif
+  
   __mm_funcs.mm_plugin_aligned_allocate(__mm_heap, size, alignment, p);
+
+#ifdef LOG_TO_FILE
+  globals::log->log("posix_memalign",rdtsc()-start, *p, size, alignment);
+#endif  
   return 0;
 }
 
 EXPORT_C void* mm_aligned_alloc(size_t alignment, size_t size) noexcept
 {
   void * p = nullptr;
+#ifdef LOG_TO_FILE
+    auto start = rdtsc();
+#endif  
+
   __mm_funcs.mm_plugin_aligned_allocate(__mm_heap, size, alignment, &p);
+
+#ifdef LOG_TO_FILE
+  globals::log->log("aligned_alloc", rdtsc()-start, p, size, alignment);
+#endif  
+  
   return p;
 }
 
