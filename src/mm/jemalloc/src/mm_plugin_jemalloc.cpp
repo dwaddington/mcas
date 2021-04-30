@@ -27,7 +27,6 @@
 
 #include "../../mm_plugin_itf.h"
 
-//#define LOG_TO_FILE
 //#define DEBUG_EXTENTS
 //#define DEBUG_ALLOCS
 //#define DEBUG
@@ -56,9 +55,6 @@ class Heap
 {
 public:
   Heap(unsigned arena_id) : _arena_id(arena_id)
-#ifdef LOG_TO_FILE
-                          , _ofs("mm.log")
-#endif
   {
   }
 
@@ -379,10 +375,6 @@ PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_
   if(ptr == nullptr) PPERR("out of memory");
   *out_ptr = ptr;
 
-#ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log("MA",ptr, n, 0);
-#endif
-  
   return S_OK;
 }
 
@@ -399,10 +391,6 @@ PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size
   assert(check_aligned(ptr, alignment));
   *out_ptr = ptr;
 
-#ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log("AA", ptr, n, alignment);
-#endif
-
   return S_OK;
 }
 
@@ -418,13 +406,8 @@ PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n
   PPLOG("%s (%p, %lu) x_flags=%x",__func__, ptr, n, CAST_HEAP(heap)->x_flags());
 #endif
   
-  //  jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
-  jel_free(ptr);
+  jel_sdallocx(ptr, n, CAST_HEAP(heap)->x_flags());
 
-#ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log("DE",ptr);
-#endif
-  
   return S_OK;
 }
 
@@ -436,17 +419,8 @@ PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * 
 
   if(ptr == nullptr) return S_OK;
 
-  /* hack to deal with something allocated by dl_main before we could hook
-     calloc */
-
-  //  if((reinterpret_cast<uint64_t>(ptr) & 0xAA00000000) != 0xAA00000000) return S_OK;
-
   jel_dallocx(ptr, CAST_HEAP(heap)->x_flags());
 
-#ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log("DW",ptr);
-#endif
-  
   return S_OK;
 }
 
@@ -462,10 +436,6 @@ PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out
   }
   assert(ptr);
   *out_ptr = ptr;
-
-#ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log("CA", ptr, n, 0);
-#endif
 
   return S_OK;
 }
@@ -487,10 +457,6 @@ PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n
     *out_ptr = jel_rallocx(ptr, n, CAST_HEAP(heap)->x_flags());
   }
 
-#ifdef LOG_TO_FILE
-  CAST_HEAP(heap)->log("RE", ptr, n, 0);
-#endif
-  
   return S_OK;
 }
 

@@ -29,10 +29,30 @@
 
 static void __get_os_functions(void);
 
+static const char * build_log_filename()
+{
+  static char tmp[1024];
+  sprintf(tmp, "%s-%d-mm.log", basename(::getenv("PLUGIN")), ::getpid());
+  return tmp;
+}
+
+static size_t size_to_allocate()
+{
+  auto env = ::getenv("SLAB_SIZE_GB");
+  if(env) {
+    auto gb = std::stoul(env);
+    PINF("MM: (%d) using %lu GiB for slab", ::getpid(), gb);
+    return GiB(gb);
+  }
+  else {
+    return GiB(4);
+  }
+}
+
 class Logger
 {
 public:
-  Logger() : _ofs("mm.log") {
+  Logger() : _ofs(build_log_filename()) {
   }
 
   void log(const char * type, const cpu_time_t timestamp, const void * p, const size_t size = 0, const size_t alignment = 0) {
@@ -111,7 +131,7 @@ static void __init_components(void)
                               &__mm_heap);
 
   /* give some memory */
-  size_t slab_size = GiB(8);
+  size_t slab_size = size_to_allocate();
   globals::slab_memory = mmap(reinterpret_cast<void*>(0xAA00000000),
                               slab_size,
                               PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
