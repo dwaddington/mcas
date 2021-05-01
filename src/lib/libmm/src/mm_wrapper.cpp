@@ -55,9 +55,10 @@ public:
   Logger() : _ofs(build_log_filename()) {
   }
 
-  void log(const char * type, const cpu_time_t timestamp, const void * p, const size_t size = 0, const size_t alignment = 0) {
+  void log(const char * type, const cpu_time_t time_cycles, const void * p, const size_t size = 0, const size_t alignment = 0) {
     char tmp[1024];
-    sprintf(tmp, "%s,%lu,%p,%lu,%lu\n", type, timestamp, p, size, alignment);
+    /* timestamp, type, cycles, p, size, alignment */
+    sprintf(tmp, "%lu,%s,%lu,%p,%lu,%lu\n", rdtsc(), type, time_cycles, p, size, alignment);
     _ofs << tmp;
   }
 
