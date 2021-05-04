@@ -1,0 +1,3 @@
+#!/bin/bash
+#PYTHONPATH=:/home/danielwaddington/mcas/build/src/python/pymm/build/lib.linux-x86_64-3.6 gdb --args "/usr/bin/python3.6" -i /home/danielwaddington/mcas/build/dist/lib/pymm-shell-init.py
+PYTHONPATH=:/home/danielwaddington/mcas/build/src/python/pymm/build/lib.linux-x86_64-3.6 "/usr/bin/python3.6" -i /home/danielwaddington/mcas/build/dist/lib/pymm-shell-init.py

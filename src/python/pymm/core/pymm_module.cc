@@ -1,9 +1,9 @@
 
-#define PYMM_API_VERSION "v0.1beta"
+#define PYMMCORE_API_VERSION "v0.1beta"
 #define PAGE_SIZE 4096
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#define PY_ARRAY_UNIQUE_SYMBOL pymm_ARRAY_API
+#define PY_ARRAY_UNIQUE_SYMBOL pymmcore_ARRAY_API
 
 #include <Python.h>
 #include <structmember.h>
@@ -20,67 +20,69 @@
 #include <list>
 #include <common/logging.h>
 
-namespace global
-{
-unsigned debug_level = 0;
-}
-
 // forward declaration of custom types
 //
+extern PyTypeObject MemoryResourceType;
 
-PyDoc_STRVAR(pymm_version_doc,
+PyDoc_STRVAR(pymmcore_version_doc,
              "version() -> Get module version");
-PyDoc_STRVAR(pymm_allocate_direct_memory_doc,
+PyDoc_STRVAR(pymmcore_allocate_direct_memory_doc,
              "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
-PyDoc_STRVAR(pymm_free_direct_memory_doc,
+PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
 
 
-static PyObject * pymm_version(PyObject * self,
+static PyObject * pymmcore_version(PyObject * self,
                                PyObject * args,
                                PyObject * kwargs);
 
-static PyObject * pymm_allocate_direct_memory(PyObject * self,
+static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
                                               PyObject * args,
                                               PyObject * kwargs);
 
-static PyObject * pymm_free_direct_memory(PyObject * self,
+static PyObject * pymmcore_free_direct_memory(PyObject * self,
                                           PyObject * args,
                                           PyObject * kwargs);
 
 
-static PyMethodDef pymm_methods[] =
+static PyMethodDef pymmcore_methods[] =
   {
    {"version",
-    (PyCFunction) pymm_version, METH_NOARGS, pymm_version_doc },
+    (PyCFunction) pymmcore_version, METH_NOARGS, pymmcore_version_doc },
    {"allocate_direct_memory",
-    (PyCFunction) pymm_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, pymm_allocate_direct_memory_doc },
+    (PyCFunction) pymmcore_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_allocate_direct_memory_doc },
    {"free_direct_memory",
-    (PyCFunction) pymm_free_direct_memory, METH_VARARGS | METH_KEYWORDS, pymm_free_direct_memory_doc },
+    (PyCFunction) pymmcore_free_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_free_direct_memory_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 
 
-static PyModuleDef pymm_module = {
+static PyModuleDef pymmcore_module = {
     PyModuleDef_HEAD_INIT,
-    "pymm",
+    "pymmcore",
     "Python Micro MCAS module",
     -1,
-    pymm_methods,
+    pymmcore_methods,
     NULL, NULL, NULL, NULL
 };
 
                                      
 PyMODINIT_FUNC
-PyInit_pymm(void)
+PyInit_pymmcore(void)
 {  
   PyObject *m;
 
   PLOG("Init Pymm extension");
 
+  MemoryResourceType.tp_base = 0; // no inheritance
+  if(PyType_Ready(&MemoryResourceType) < 0) {
+    assert(0);
+    return NULL;
+  }
+
   /* register module */
 #if PY_MAJOR_VERSION >= 3
-  m = PyModule_Create(&pymm_module);
+  m = PyModule_Create(&pymmcore_module);
 #else
 #error "Extension for Python 3 only."
 #endif
@@ -89,6 +91,11 @@ PyInit_pymm(void)
     return NULL;
 
   /* add types */
+  int rc;
+
+  Py_INCREF(&MemoryResourceType);
+  rc = PyModule_AddObject(m, "MemoryResource", (PyObject *) &MemoryResourceType);
+  if(rc) return NULL;
 
   return m;
 }
@@ -104,7 +111,7 @@ PyInit_pymm(void)
  * 
  * @return memoryview object
  */
-static PyObject * pymm_allocate_direct_memory(PyObject * self,
+static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
                                               PyObject * args,
                                               PyObject * kwds)
 {
@@ -150,7 +157,7 @@ static PyObject * pymm_allocate_direct_memory(PyObject * self,
  * 
  * @return 
  */
-static PyObject * pymm_free_direct_memory(PyObject * self,
+static PyObject * pymmcore_free_direct_memory(PyObject * self,
                                           PyObject * args,
                                           PyObject * kwds)
 {
@@ -179,9 +186,9 @@ static PyObject * pymm_free_direct_memory(PyObject * self,
   Py_RETURN_NONE;
 }
 
-static PyObject * pymm_version(PyObject * self,
+static PyObject * pymmcore_version(PyObject * self,
                                PyObject * args,
                                PyObject * kwds)
 {
-  return PyUnicode_FromString(PYMM_API_VERSION);
+  return PyUnicode_FromString(PYMMCORE_API_VERSION);
 }
