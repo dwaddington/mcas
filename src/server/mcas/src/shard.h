@@ -438,6 +438,7 @@ class Shard : public Shard_transport, private common::log_source {
   Shard_security                                    _security; /* manages TLS authentication etc. */
   Cluster_signal_queue                              _cluster_signal_queue;
   std::string                                       _backend;
+  std::string                                       _mm_plugin_path;
   std::string                                       _dax_config;
   std::future<void>                                 _thread;
 };
