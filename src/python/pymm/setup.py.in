@@ -1,0 +1,64 @@
+# Python setup.py file
+
+import setuptools
+import os
+from distutils.core import setup, Extension
+import distutils.sysconfig
+
+# remove the pesky -Wstrict-prototypes flag!
+#
+cfg_vars = distutils.sysconfig.get_config_vars()
+include_dir = '/usr/include/${PYTHON_FILENAME}'
+
+for key, value in cfg_vars.items():
+    if(key == 'OPT'):
+        cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
+        cfg_vars[key] = value.replace("-O0", "-O2")
+        cfg_vars[key] += " -Wno-write-strings"  # add option to disable write strings warning
+
+module_core = Extension('pymm',
+                        define_macros = [('MAJOR_VERSION', '1'),
+                                         ('CXX',''),
+                                         ('MINOR_VERSION', '0')],
+                        include_dirs = [include_dir,
+                                        '${CMAKE_SOURCE_DIR}/src/components',
+                                        '${CMAKE_SOURCE_DIR}/src/lib/common/include',
+                                        '${CMAKE_SOURCE_DIR}/src/lib/GSL/include',
+                                        '${CMAKE_SOURCE_DIR}/src/lib64/GSL/include',
+                                        '${CMAKE_CURRENT_BINARY_DIR}/src',
+                                        '${PYTHON_SITE_NUMPY_INCLUDES}'
+                        ],
+                        library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
+                                        '${CMAKE_BINARY_DIR}/lib/common',
+                                        '${CMAKE_BINARY_DIR}/lib64/common',
+                                        '${CMAKE_INSTALL_PREFIX}/lib',
+                                        '${CMAKE_INSTALL_PREFIX}/lib64',
+                                        '/usr/local/lib',
+                        ],
+                        libraries = ['common','numa','pthread','z','rt','dl',
+                        ],
+                        sources = ['${CMAKE_CURRENT_SOURCE_DIR}/src/pymm_module.cc',
+                        ],
+                        extra_compile_args = ['-fPIC','-std=c++17','-DCONFIG_DEBUG','-g','-O2'],
+                        runtime_library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
+                                                '${CMAKE_INSTALL_PREFIX}/lib',
+                                                '${CMAKE_INSTALL_PREFIX}/lib64',
+                                                '/usr/local/lib',
+                                                '-Wl,--rpath=${CMAKE_INSTALL_PREFIX}/lib'
+                        ]
+)
+
+
+setup (name = 'PymmPackage',
+       version='0.1',
+       author='Daniel Waddington',
+       author_email='daniel.waddington@ibm.com',
+       description='Python Micro MCAS library',
+       package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+       packages=setuptools.find_packages(),
+       ext_modules=[module_core],
+       python_requires='>=3.5',
+)
+
+
+

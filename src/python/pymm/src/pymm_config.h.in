@@ -1,0 +1,8 @@
+/* mcas_python_config.h */
+#ifndef __MCAS_PYTHON_CONFIG_H__
+#define __MCAS_PYTHON_CONFIG_H__
+
+const char * MCAS_LIB_PATH="${CMAKE_INSTALL_PREFIX}/lib";
+
+#endif
+
