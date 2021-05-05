@@ -1,4 +1,3 @@
-from pymmcore import *
-
-def test0():
+def foobar():
     return None
+

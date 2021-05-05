@@ -23,7 +23,6 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   message("--         stdlib : ${PYTHON_LIB_DIR}")
   message("--        include : ${PYTHON_INCLUDE_DIR}")
   
-
   message("-- Building Python support.")
   set(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in")
   set(SETUP_PY "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
@@ -44,8 +43,11 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/LICENSE ${CMAKE_CURRENT_BINARY_DIR}/LICENSE)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pymm.py ${PKG_SOURCE_DIR}/pymm.py COPYONLY)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/__init__.py ${PKG_SOURCE_DIR}/__init__.py COPYONLY)
-  
-  add_custom_target(${PROJECT_NAME}-wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution
+
+  message("SOURCES-->${CMAKE_CURRENT_SOURCE_DIR}/core/memory_resource_type.cc")
+  add_custom_target(${PROJECT_NAME}-wheel
+    COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution
+    )
 
   # install as a site-package
   install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")

@@ -1,10 +1,16 @@
 #include <assert.h>
+#include <stdlib.h>
 #include <common/logging.h>
 #include <common/utils.h>
 #include <api/mcas_itf.h>
 #include <api/kvstore_itf.h>
 #include <Python.h>
 #include <structmember.h>
+
+/* defaults */
+constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
+constexpr const char * DEFAULT_POOL_NAME = "default";
+constexpr uint64_t DEFAULT_LOAD_ADDR     = 0x900000000;
 
 typedef struct {
   PyObject_HEAD
@@ -42,7 +48,8 @@ MemoryResource_dealloc(MemoryResource *self)
 }
 
 static component::IKVStore * load_backend(const std::string& backend,
-                                          const std::string& config,
+                                          const std::string& path,
+                                          const uint64_t load_addr,
                                           const unsigned debug_level)
 {
   using namespace component;
@@ -61,6 +68,7 @@ static component::IKVStore * load_backend(const std::string& backend,
   assert(fact);
 
   /* TODO configure from params */
+  std::stringstream ss;
   const char * temp_dax_config = "[{\"path\":\"/mnt/pmem0\",\"addr\":38654705664}]";
 
   store = fact->create(debug_level,
@@ -76,19 +84,25 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
 {
   static const char *kwlist[] = {"pool_name",
                                  "size_mb",
+                                 "pmem_path",
+                                 "load_addr",
                                  "debug",
                                  NULL,
   };
 
   const char * p_pool_name = nullptr;
   int size_mb = 32;
+  const char * p_path = nullptr;
+  const char * p_addr = nullptr;
   int debug_level = 3;
 
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "|sii",
+                                    "|sissi",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
+                                    &p_path,
+                                    &p_addr,
                                     &size_mb,
                                     &debug_level)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
@@ -96,9 +110,12 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
     return -1;
   }
 
-  std::string pool_name = p_pool_name ? p_pool_name : "default";
+  unsigned long addr = ::strtoul(p_addr,NULL,16);
+  std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
+  std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
+  uint64_t load_addr = addr > 0 ? addr : DEFAULT_LOAD_ADDR;
 
-  self->_store = load_backend("hstore-cc","",debug_level);
+  self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
   assert(self->_store);
 
   if((self->_pool = self->_store->create_pool(pool_name, MiB(32))) == 0) {
