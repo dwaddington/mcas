@@ -69,6 +69,7 @@ static component::IKVStore * load_backend(const std::string& backend,
 
   /* TODO configure from params */
   std::stringstream ss;
+  
   const char * temp_dax_config = "[{\"path\":\"/mnt/pmem0\",\"addr\":38654705664}]";
 
   store = fact->create(debug_level,
@@ -110,10 +111,12 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
     return -1;
   }
 
-  unsigned long addr = ::strtoul(p_addr,NULL,16);
+  uint64_t load_addr = DEFAULT_LOAD_ADDR;
+  if(p_addr)
+    load_addr = ::strtoul(p_addr,NULL,16);
+  
   std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
   std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
-  uint64_t load_addr = addr > 0 ? addr : DEFAULT_LOAD_ADDR;
 
   self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
   assert(self->_store);

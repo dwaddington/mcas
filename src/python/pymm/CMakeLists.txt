@@ -37,17 +37,26 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
   configure_file(${SETUP_PY_IN} ${SETUP_PY})
 
+  file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
   # copy python files to build
   
   file(MAKE_DIRECTORY ${PKG_SOURCE_DIR})
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/LICENSE ${CMAKE_CURRENT_BINARY_DIR}/LICENSE)
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pymm.py ${PKG_SOURCE_DIR}/pymm.py COPYONLY)
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/__init__.py ${PKG_SOURCE_DIR}/__init__.py COPYONLY)
-
-  message("SOURCES-->${CMAKE_CURRENT_SOURCE_DIR}/core/memory_resource_type.cc")
-  add_custom_target(${PROJECT_NAME}-wheel
-    COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/pymm.py DESTINATION ${PKG_SOURCE_DIR})
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py DESTINATION ${PKG_SOURCE_DIR})
+  
+  add_custom_command(
+    OUTPUT build.stamp
+    COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
+    COMMAND cmake -E touch build.stamp
+    DEPENDS ${PACKAGE_SOURCE_FILES} 
     )
+
+  add_custom_target(${PROJECT_NAME} ALL
+    DEPENDS build.stamp
+    )
+  
+    
 
   # install as a site-package
   install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")

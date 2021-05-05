@@ -1,3 +1,4 @@
+
 def foobar():
     return None
 
