@@ -1,75 +1,20 @@
-# __init__.py
-import numpy as np
+# 
+#    Copyright [2021] [IBM Corporation]
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+#
+
 import pymmcore
-#from pymmcore import *
 
-dtypedescr = np.dtype
-
-#class FooMemoryResource(pymmcore.MemoryResource): pass
-#from .numeric import uint8, ndarray, dtype
-
-class ndarray(np.ndarray):
-
-    __array_priority__ = -100.0 # what does this do?
-
-    def __new__(subtype, dtype=np.uint8, shape=None, order='C'):
-
-        # determine size of memory needed
-        descr = dtypedescr(dtype)
-        _dbytes = descr.itemsize
-
-        if shape is None:
-            raise ValueError("don't know how to handle no shape")
-        else:
-            if not isinstance(shape, tuple):
-                shape = (shape,)
-            size = np.intp(1)  # avoid default choice of np.int_, which might overflow
-            for k in shape:
-                size *= k
-
-        # allocate memory
-        mm = pymmcore.allocate_direct_memory(int(size*_dbytes))
-
-        # construct array using supplied memory
-        self = np.ndarray.__new__(subtype, shape=shape, dtype=dtype, buffer=mm,
-                                  order=order)
-
-        self._mm = mm
-        
-        return self
-
-    def __del__(self):
-        # free memory - not for persistent?
-        pymmcore.free_direct_memory(self._mm)
-
-    def __array_finalize__(self, obj):
-        print('In array_finalize:')
-        print('   self type is %s' % type(self))
-        print('   obj type is %s' % type(obj))
-        
-        # if hasattr(obj, '_mmap') and np.may_share_memory(self, obj):
-        #     self._mmap = obj._mmap
-        #     self.filename = obj.filename
-        #     self.offset = obj.offset
-        #     self.mode = obj.mode
-        # else:
-        #     self._mmap = None
-        #     self.filename = None
-        #     self.offset = None
-        #     self.mode = None
-
-    # def __new__(cls, *args, **kwargs):
-    #     print('In __new__ with class %s' % cls)
-    #     return super(ndarray, cls).__new__(cls, *args, **kwargs)
-
-#     def __init__(self, *args, **kwargs):
-#         # in practice you probably will not need or want an __init__
-#         # method for your subclass
-#         for arg in args:
-#             print("ARG:", arg);
-#         for key, value in kwargs.items():
-#             print("KWARG: {} is {}".format(key,value))
-# #        print('In __init__ with class %s' % self.__class__)
+from .ndarray import ndarray
+from .shelf import shelf
 
 def testX():
     import pymm
@@ -77,13 +22,27 @@ def testX():
     y = pymm.ndarray(shape=(4,4),dtype=np.uint8)
     print("created ndarray subclass");
 #    hdr = pymm.pymmcore.ndarray_header(y);
-    print("size=", pymm.pymmcore.ndarray_header_size(y))
+    print("hdr=", pymm.pymmcore.ndarray_header(y))
     return None
 
 def test1():
     print('test1 running...')
     mr = MemoryResource()
     return None
+
+def test2():
+    import pymm
+    import numpy as np
+    x = np.ndarray((8,8),dtype=np.uint8)
+    print(pymm.pymmcore.ndarray_header(x))
+    print(pymm.pymmcore.ndarray_header_size(x))
+
+def test3():
+    import pymm
+    import numpy as np
+    x = pymm.ndarray('foo',(4,4),dtype=np.uint8)
+    print(x.__name__)
+    print(x)
 
 
 ###pointer, read_only_flag = a.__array_interface__['data']

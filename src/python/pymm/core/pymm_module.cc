@@ -1,3 +1,15 @@
+/*
+   Copyright [2021] [IBM Corporation]
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 #define PYMMCORE_API_VERSION "v0.1beta"
 #define PAGE_SIZE 4096
@@ -9,6 +21,7 @@
 #include <structmember.h>
 #include <objimpl.h>
 #include <pythread.h>
+#include <numpy/arrayobject.h>
 
 #include <api/components.h>
 #include <api/kvstore_itf.h>
@@ -19,6 +32,7 @@
 
 #include <list>
 #include <common/logging.h>
+#include "ndarray_helpers.h"
 
 // forward declaration of custom types
 //
@@ -34,15 +48,6 @@ PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
              "ndarray_header_size(array) -> Return size of memory needed for header");
 PyDoc_STRVAR(pymcas_ndarray_header_doc,
              "ndarray_header(array) -> Return ndarray persistent header");
-
-
-extern PyObject * pymcas_ndarray_header_size(PyObject * self,
-                                             PyObject * args,
-                                             PyObject * kwargs);
-
-extern PyObject * pymcas_ndarray_header(PyObject * self,
-                                        PyObject * args,
-                                        PyObject * kwargs);
 
 
 static PyObject * pymmcore_version(PyObject * self,
@@ -90,6 +95,8 @@ PyInit_pymmcore(void)
   PyObject *m;
 
   PLOG("Init Pymm extension");
+
+  import_array();
 
   MemoryResourceType.tp_base = 0; // no inheritance
   if(PyType_Ready(&MemoryResourceType) < 0) {

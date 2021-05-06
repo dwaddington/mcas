@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 
 project(pymm CXX)
 
-option(BUILD_PYTHON_SUPPORT "Build Python support" OFF)
+option(BUILD_PYMM_NOPACKAGE "do not build a python package" ON)
 
 if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
@@ -39,30 +39,37 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
   file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
   # copy python files to build
-  
+
   file(MAKE_DIRECTORY ${PKG_SOURCE_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/pymm.py DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py DESTINATION ${PKG_SOURCE_DIR})
-  
-  add_custom_command(
-    OUTPUT build.stamp
-    COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
-    COMMAND cmake -E touch build.stamp
-    DEPENDS ${PACKAGE_SOURCE_FILES} 
-    )
 
-  add_custom_target(${PROJECT_NAME} ALL
-    DEPENDS build.stamp
-    )
+  if(BUILD_PYMM_NOPACKAGE)
+    add_custom_target(${PROJECT_NAME} ALL
+      COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
+      COMMAND ${PYTHON} ${SETUP_PY} build
+      DEPENDS ${PACKAGE_SOURCE_FILES} 
+      )    
+  else()
+    add_custom_command(
+      OUTPUT build.stamp
+      COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
+      COMMAND cmake -E touch build.stamp
+      DEPENDS ${PACKAGE_SOURCE_FILES} 
+      )
+
+    add_custom_target(${PROJECT_NAME} ALL
+      DEPENDS build.stamp
+      )
+    
+  endif()
+
   
     
 
   # install as a site-package
   install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")
   
-  
-else()
-  message("-- NOT building Python support.")
 endif()
 
