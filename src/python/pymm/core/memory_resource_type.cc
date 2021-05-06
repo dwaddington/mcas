@@ -69,13 +69,13 @@ static component::IKVStore * load_backend(const std::string& backend,
 
   /* TODO configure from params */
   std::stringstream ss;
+  ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
+  //  PLOG("dax config: %s", ss.str().c_str());
   
-  const char * temp_dax_config = "[{\"path\":\"/mnt/pmem0\",\"addr\":38654705664}]";
-
   store = fact->create(debug_level,
     {
      {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-     {+component::IKVStore_factory::k_dax_config, temp_dax_config} //dax_config}
+     {+component::IKVStore_factory::k_dax_config, ss.str()} //dax_config}
     });
   
   return store;

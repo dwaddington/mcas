@@ -64,6 +64,54 @@ static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_
   }
 }
 
+PyObject * pymcas_ndarray_header_size(PyObject * self,
+                                      PyObject * args,
+                                      PyObject * kwargs)
+{
+
+  static const char *kwlist[] = {"array",
+                                 NULL};
+
+  PyObject * src_array = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &src_array)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+  PNOTICE("src_array %p", src_array);
+  
+  if (! src_array) {
+    PyErr_SetString(PyExc_RuntimeError,"array parameter missing");
+    return NULL;
+  }
+
+  if (! PyArray_Check(src_array)) {
+    PyErr_SetString(PyExc_RuntimeError,"not ndarray type");
+    return NULL;
+  }
+#if 0
+  PyArrayObject * src_ndarray = reinterpret_cast<PyArrayObject*>(src_array);
+
+  /* sanity checks */
+  if (! PyArray_ISBEHAVED(src_ndarray)) {
+    PyErr_SetString(PyExc_RuntimeError,"un-behaving ndarray type not supported");
+    return NULL;
+  }
+
+  if (! PyArray_ISONESEGMENT(src_ndarray)) {
+    PyErr_SetString(PyExc_RuntimeError,"only single-segment ndarray supported");
+    return NULL;
+  }
+#endif
+  //  std::string hdr;
+  //  create_ndarray_header(src_ndarray, hdr); /* TODO optimize; no need to build */
+  return PyLong_FromUnsignedLong(99); //hdr.size());
+}
+
 PyObject * pymcas_ndarray_header(PyObject * self,
                                  PyObject * args,
                                  PyObject * kwargs)
@@ -153,7 +201,6 @@ PyObject * unmarshall_nparray(byte * ptr)
                                   item_size,
                                   flags,
                                   NULL);
-  PLOG("PyArray_New OK");
   return nparray;
 }
 

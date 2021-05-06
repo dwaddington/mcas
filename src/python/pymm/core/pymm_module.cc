@@ -30,19 +30,32 @@ PyDoc_STRVAR(pymmcore_allocate_direct_memory_doc,
              "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
 PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
+PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
+             "ndarray_header_size(array) -> Return size of memory needed for header");
+PyDoc_STRVAR(pymcas_ndarray_header_doc,
+             "ndarray_header(array) -> Return ndarray persistent header");
+
+
+extern PyObject * pymcas_ndarray_header_size(PyObject * self,
+                                             PyObject * args,
+                                             PyObject * kwargs);
+
+extern PyObject * pymcas_ndarray_header(PyObject * self,
+                                        PyObject * args,
+                                        PyObject * kwargs);
 
 
 static PyObject * pymmcore_version(PyObject * self,
-                               PyObject * args,
-                               PyObject * kwargs);
+                                   PyObject * args,
+                                   PyObject * kwargs);
 
 static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
-                                              PyObject * args,
-                                              PyObject * kwargs);
+                                                  PyObject * args,
+                                                  PyObject * kwargs);
 
 static PyObject * pymmcore_free_direct_memory(PyObject * self,
-                                          PyObject * args,
-                                          PyObject * kwargs);
+                                              PyObject * args,
+                                              PyObject * kwargs);
 
 
 static PyMethodDef pymmcore_methods[] =
@@ -53,6 +66,10 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymmcore_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_allocate_direct_memory_doc },
    {"free_direct_memory",
     (PyCFunction) pymmcore_free_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_free_direct_memory_doc },
+   {"ndarray_header_size",
+    (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
+   {"ndarray_header",
+    (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },   
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 
@@ -112,8 +129,8 @@ PyInit_pymmcore(void)
  * @return memoryview object
  */
 static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
-                                              PyObject * args,
-                                              PyObject * kwds)
+                                                  PyObject * args,
+                                                  PyObject * kwds)
 {
   static const char *kwlist[] = {"size",
                                  "zero",
@@ -142,7 +159,7 @@ static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
     return NULL;
   }
   
-  //  PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
+  PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
   return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
 }
 
@@ -158,8 +175,8 @@ static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
  * @return 
  */
 static PyObject * pymmcore_free_direct_memory(PyObject * self,
-                                          PyObject * args,
-                                          PyObject * kwds)
+                                              PyObject * args,
+                                              PyObject * kwds)
 {
   static const char *kwlist[] = {"memory",
                                  NULL};
@@ -183,6 +200,7 @@ static PyObject * pymmcore_free_direct_memory(PyObject * self,
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(memview);
   buffer->len = 0;
   PyBuffer_Release(buffer);
+  PNOTICE("%s freed memory %p", __func__, buffer->buf);
   Py_RETURN_NONE;
 }
 
