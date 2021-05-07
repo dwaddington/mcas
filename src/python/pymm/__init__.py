@@ -16,6 +16,20 @@ import pymmcore
 from .ndarray import ndarray
 from .shelf import shelf
 
+class CustomList(list):
+    def __getslice__(self,i,j):
+        return CustomList(list.__getslice__(self, i, j))
+    def __add__(self,rhs):
+        return CustomList(list.__add__(self,rhs))
+    def __mul__(self,rhs):
+        return CustomList(list.__mul__(self,rhs))
+    def __getitem__(self, item):
+        result = list.__getitem__(self, item)
+        try:
+            return CustomList(result)
+        except TypeError:
+            return result
+        
 def testX():
     import pymm
     import numpy as np
