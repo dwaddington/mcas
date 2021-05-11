@@ -58,5 +58,36 @@ def test3():
     print(x.__name__)
     print(x)
 
+def test_arrow0():
+    import pymm
+    import pyarrow as pa
+    data = [
+        pa.array([1, 2, 3, 4]),
+        pa.array(['foo', 'bar', 'baz', None]),
+        pa.array([True, None, False, True])
+    ]
+    
+    raw_buffer = pymm.pymmcore.allocate_direct_memory(2048)
+    raw_buffer2 = pymm.pymmcore.allocate_direct_memory(2048)
+    print(hex(pymm.pymmcore.memoryview_addr(raw_buffer)))
+    buffer = pa.py_buffer(raw_buffer);
+    buffer2 = pa.py_buffer(raw_buffer2);
+    return pa.Array.from_buffers(pa.uint8(), 10, [buffer, buffer2])
+
 
 ###pointer, read_only_flag = a.__array_interface__['data']
+
+# data = [
+#     pa.array([1, 2, 3, 4]),
+#     pa.array(['foo', 'bar', 'baz', None]),
+#     pa.array([True, None, False, True])
+# ]
+# batch = pa.RecordBatch.from_arrays(data, ['f0', 'f1', 'f2'])
+# table = pa.Table.from_batches([batch])
+
+# raw_buffer = pymm.pymmcore.allocate_direct_memory(2048)
+# raw_buffer2 = pymm.pymmcore.allocate_direct_memory(2048)
+# print(hex(pymm.pymmcore.memoryview_addr(raw_buffer)))
+# buffer = pa.py_buffer(raw_buffer);
+# buffer2 = pa.py_buffer(raw_buffer2);
+# return pa.Array.from_buffers(pa.uint8(), 10, [buffer, buffer2])

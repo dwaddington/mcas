@@ -48,7 +48,8 @@ PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
              "ndarray_header_size(array) -> Return size of memory needed for header");
 PyDoc_STRVAR(pymcas_ndarray_header_doc,
              "ndarray_header(array) -> Return ndarray persistent header");
-
+PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
+             "memoryview_addr(m) -> Return address of memory (for debugging)");
 
 static PyObject * pymmcore_version(PyObject * self,
                                    PyObject * args,
@@ -62,6 +63,10 @@ static PyObject * pymmcore_free_direct_memory(PyObject * self,
                                               PyObject * args,
                                               PyObject * kwargs);
 
+static PyObject * pymmcore_memoryview_addr(PyObject * self,
+                                           PyObject * args,
+                                           PyObject * kwargs);
+
 
 static PyMethodDef pymmcore_methods[] =
   {
@@ -74,7 +79,9 @@ static PyMethodDef pymmcore_methods[] =
    {"ndarray_header_size",
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"ndarray_header",
-    (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },   
+    (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },
+   {"memoryview_addr",
+    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 
@@ -165,7 +172,8 @@ static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
     PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
     return NULL;
   }
-  
+
+  memset(ptr, 0xe, nsize); // temporary
   PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
   return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
 }
@@ -212,8 +220,36 @@ static PyObject * pymmcore_free_direct_memory(PyObject * self,
 }
 
 static PyObject * pymmcore_version(PyObject * self,
-                               PyObject * args,
-                               PyObject * kwds)
+                                   PyObject * args,
+                                   PyObject * kwds)
 {
   return PyUnicode_FromString(PYMMCORE_API_VERSION);
+}
+
+static PyObject * pymmcore_memoryview_addr(PyObject * self,
+                                           PyObject * args,
+                                           PyObject * kwds)
+{
+  static const char *kwlist[] = {"memoryview",
+                                 NULL};
+
+  PyObject * p_memoryview = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &p_memoryview)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  if (! PyMemoryView_Check(p_memoryview)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  Py_buffer * buffer = PyMemoryView_GET_BUFFER(p_memoryview);
+  
+  return PyLong_FromUnsignedLong(reinterpret_cast<unsigned long>(buffer->buf));
 }

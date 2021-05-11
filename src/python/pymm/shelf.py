@@ -23,3 +23,66 @@ class shelf():
         self.__dict__[name] = value
 
 
+
+# NUMPY
+#
+# Note: all invocations define a transaction boundary
+#-----------------------------------------------------
+# import numpy as np
+# import pyarrow as pa
+#
+# myShelf = pymm.shelf("/mnt/pmem0/data.pm")
+#
+# >> create an array in persistent memory
+#
+# myShelf.x = pymm.ndarray((9,9),dtype=np.uint8)
+#
+# >> create reference to array in persistent memoty
+#
+# X = myShelf.x
+#
+# >> in place modification (zero-copy)
+#
+# X.fill(8)
+# X[1,1] = 99
+#
+# >> copy to DRAM
+#
+# c = X.copy()
+#
+# >> replication in persistent memory
+#
+# myShelf.z = X   or myshelf.z = myshelf.x
+#
+# >> remove from persistent memory
+#
+# myShelf.erase(myShelf.z)?
+# myShelf.erase(z)
+
+
+
+# APACHE ARROW
+#------------------------------------------------
+# import numpy as np
+# import pyarrow as pa
+#
+# myShelf = pymm.shelf("/mnt/pmem0/data.pm")
+#
+# >> create an array of strings builder
+#
+# myShelf.x = pymm.arrow.StringBuilder()
+#
+# X = myShelf.x
+#
+# X.append("hello")
+# X.append("world");
+#
+# X.finish();
+#
+# >> access immutable array (StringScalar type)
+#
+# print(X[0]) --> <pyarrow.StringScalar: 'hello'>
+#
+# >> create a schema ...
+#
+
