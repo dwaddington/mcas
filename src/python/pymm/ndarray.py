@@ -18,13 +18,42 @@ from numpy import uint8, ndarray, dtype, float
 
 dtypedescr = np.dtype
 
-class ndarray(np.ndarray):
+# shadow type for ndarray
+#
+class ndarray:
+    '''
+    ndarray that is stored in a memory resource
+    '''
+    def __init__(self, shape=None, dtype=float, strides=None, order='C'):
+
+        # toto check params
+        # todo check and invalidate param 'buffer'
+        # save constructor parameters and type
+        self.__p_shape = shape
+        self.__p_dtype = dtype
+        self.__p_strides = strides
+        self.__p_order = order
+
+    def make_instance(self, memory_resource: pymmcore.MemoryResource, name: str):
+        return shelved_ndarray(memory_resource,
+                               name,
+                               shape = self.__p_shape,
+                               dtype = self.__p_dtype,
+                               strides = self.__p_strides,
+                               order = self.__p_order);
+    def __str__(self):
+        print('shadow ndarray')
+        
+
+# concrete subclass for ndarray
+#
+class shelved_ndarray(np.ndarray):
     '''
     ndarray that is stored in a memory resource
     '''
     __array_priority__ = -100.0 # what does this do?
 
-    def __new__(subtype, global_name, shape=None, dtype=float, buffer=None, strides=None, order='C'):
+    def __new__(subtype, memory_resource, name, shape=None, dtype=float, strides=None, order='C'):
 
         # determine size of memory needed
         descr = dtypedescr(dtype)
@@ -39,20 +68,21 @@ class ndarray(np.ndarray):
             for k in shape:
                 size *= k
 
-        # allocate memory
-        mm = pymmcore.allocate_direct_memory(int(size*_dbytes))
+        # allocate memory - TEMPORARY
+        buffer = pymmcore.allocate_direct_memory(int(size*_dbytes))
 
         # construct array using supplied memory
         #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-        self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=mm,
+        self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=buffer,
                                   strides=strides, order=order)
 
-        self._mm = mm
-        
+        self._memory_resource = memory_resource
+        self._allocations = [buffer]
         return self
 
     def __del__(self):
         # free memory - not for persistent?
-        pymmcore.free_direct_memory(self._mm)
+        for ma in self._allocations:
+            pymmcore.free_direct_memory(ma)
 
     def __array_finalize__(self, obj): pass

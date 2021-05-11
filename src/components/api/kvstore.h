@@ -532,7 +532,7 @@ protected:
    * @return Memory handle or NULL on not supported.
    */
   memory_handle_t register_direct_memory(void* vaddr,
-                                                 size_t len) override
+                                         size_t len) override
   {
     return error_value(nullptr, vaddr, len);
   }

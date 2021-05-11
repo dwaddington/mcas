@@ -129,15 +129,51 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   return 0;
 }
 
+static PyObject * MemoryResource_get_named_memory(PyObject * self,
+                                                  PyObject * args,
+                                                  PyObject * kwds)
+{
+  static const char *kwlist[] = {"name",
+                                 NULL};
+
+  char * name = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "s|",
+                                    const_cast<char**>(kwlist),
+                                    &name)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+  
+  char * ptr = static_cast<char*>(aligned_alloc(PAGE_SIZE, nsize));
+
+  if(zero_flag)
+    memset(ptr, 0x0, nsize);
+  
+  if(ptr == NULL) {
+    PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
+    return NULL;
+  }
+
+  memset(ptr, 0xe, nsize); // temporary
+  PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
+  return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
+}
+
+
 static PyMemberDef MemoryResource_members[] =
   {
    //  {"port", T_ULONG, offsetof(MemoryResource, _port), READONLY, "Port"},
    {NULL}
   };
 
+
+//MemoryResource_get_named_memory
 static PyMethodDef MemoryResource_methods[] =
   {
-   // {"open_pool",  (PyCFunction) open_pool, METH_VARARGS | METH_KEYWORDS, open_pool_doc},
+   {"MemoryResource_get_named_memory",  (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS, "get named memory"},
    // {"create_pool",  (PyCFunction) create_pool, METH_VARARGS | METH_KEYWORDS, create_pool_doc},
    // {"delete_pool",  (PyCFunction) delete_pool, METH_VARARGS | METH_KEYWORDS, delete_pool_doc},
    // {"get_stats",  (PyCFunction) get_stats, METH_VARARGS | METH_KEYWORDS, get_stats_doc},

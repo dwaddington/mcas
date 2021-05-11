@@ -39,6 +39,15 @@ def testX():
     print("hdr=", pymm.pymmcore.ndarray_header(y))
     return None
 
+def test_shelf():
+    import pymm
+    import numpy as np
+
+    s = pymm.shelf()
+    s.x = pymm.ndarray((8,8))
+    print(s.x)
+    return s
+
 def test1():
     print('test1 running...')
     mr = MemoryResource()

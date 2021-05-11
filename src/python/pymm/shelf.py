@@ -12,15 +12,20 @@
 #
 import pymmcore
 import numpy as np
+import pymm
 
 class shelf():
     def __init__(self):
-        self._mr = pymmcore.MemoryResource()
+        print('Shelf---------------------------->');
+        self.mr = pymmcore.MemoryResource()
+        print(self.mr)
 
     def __setattr__(self, name, value):
-        if name == '_mr':
+        if isinstance(value, pymm.ndarray):
+            self.__dict__[name] = value.make_instance(self.mr, name)
             return
-        self.__dict__[name] = value
+        else:
+            self.__dict__[name] = value
 
 
 
