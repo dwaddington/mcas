@@ -1009,7 +1009,8 @@ void Shard::release_pending_rename(const void *target)
     /* we do the lock/unlock first, because there might not be a prior
        object so this will create one on demand. */
     {
-      if (! is_locked(_i_kvstore->lock(info.pool, info.to, IKVStore::STORE_LOCK_WRITE, value, value_len, keyh)))
+      size_t alignment = 0;
+      if (! is_locked(_i_kvstore->lock(info.pool, info.to, IKVStore::STORE_LOCK_WRITE, value, value_len, alignment, keyh)))
         throw Logic_exception("%s lock failed", __func__);
     }
     if (_i_kvstore->unlock(info.pool, keyh) != S_OK) /* no flush needed */
@@ -1077,7 +1078,8 @@ void Shard::io_response_get_locate(Connection_handler *handler,
   component::IKVStore::key_t key_handle;
   void *                     target     = nullptr;
   size_t                     target_len = 0;
-  status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, target, target_len, key_handle);
+  size_t                     alignment = 0;
+  status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_READ, target, target_len, alignment, key_handle);
 
   if ( ! is_locked(rc) ) { status = E_FAIL; }
 
@@ -1191,8 +1193,9 @@ void Shard::io_response_put_advance(Connection_handler *handler,
     component::IKVStore::key_t key_handle;
     void *                     target     = nullptr;
     size_t                     target_len = msg->get_value_len();
+    size_t                     alignment = 0;
     assert(target_len > 0);
-    status_t rcx = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_WRITE, target, target_len, key_handle);
+    status_t rcx = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_WRITE, target, target_len, alignment, key_handle);
 
     if ( ! is_locked(rcx) || key_handle == component::IKVStore::KEY_NONE) {
       PWRN("PUT_ADVANCE failed to lock value");
@@ -1278,10 +1281,11 @@ void Shard::io_response_put_locate(Connection_handler *handler,
     component::IKVStore::key_t key_handle;
     void *                     target     = nullptr;
     size_t                     target_len = msg->get_value_len();
+    size_t                     alignment = 0;
     assert(target_len > 0);
 
     /* The initiative to unlock lies with the caller if status returns S_OK, else it lies with us. */
-    status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_WRITE, target, target_len, key_handle);
+    status_t rc = _i_kvstore->lock(msg->pool_id(), k, IKVStore::STORE_LOCK_WRITE, target, target_len, alignment, key_handle);
 
     if ( ! is_locked(rc) ) { status = E_FAIL; }
 
@@ -1476,12 +1480,13 @@ void Shard::io_response_get(Connection_handler *handler, const protocol::Message
     ::iovec value_out{nullptr, 0};
 
     component::IKVStore::key_t key_handle;
-
+    size_t alignment = 0;
     status_t rc = _i_kvstore->lock(msg->pool_id(),
                                    k,
                                    IKVStore::STORE_LOCK_READ,
                                    value_out.iov_base,
                                    value_out.iov_len,
+                                   alignment,
                                    key_handle);
 
     if ( ! is_locked(rc) || key_handle == component::IKVStore::KEY_NONE) { /* key not found */
@@ -2016,7 +2021,8 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
         void *                     p     = nullptr;
         size_t                     p_len = 0;
         component::IKVStore::key_t key_handle;
-        status_t rc = _i_kvstore->lock(msg->pool_id(), key, component::IKVStore::STORE_LOCK_READ, p, p_len, key_handle);
+        size_t alignment = 0;
+        status_t rc = _i_kvstore->lock(msg->pool_id(), key, component::IKVStore::STORE_LOCK_READ, p, p_len, alignment, key_handle);
 
         if ( ! is_locked(rc) || key_handle == component::IKVStore::KEY_NONE) {
           response->set_status(E_FAIL);

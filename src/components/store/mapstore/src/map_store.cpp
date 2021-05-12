@@ -18,7 +18,6 @@
 #include <common/utils.h>
 #include <common/memory.h>
 #include <fcntl.h>
-//#include <nupm/rc_alloc_lb.h>
 #include <nupm/region_descriptor.h>
 #include <stdio.h>
 #include <time.h>
@@ -34,11 +33,6 @@
 #include <unordered_set>
 #include <chrono>  // seconds
 #include <thread> // sleep_for
-
-// #pragma GCC diagnostic push
-// #pragma GCC diagnostic ignored "-Wold-style-cast"
-// #include <tbb/scalable_allocator.h>
-// #pragma GCC diagnostic pop
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
@@ -265,7 +259,8 @@ public:
   status_t lock(const std::string &key,
                 IKVStore::lock_type_t type,
                 void *&out_value,
-                size_t &out_value_len,
+                size_t &inout_value_len,
+                size_t &inout_alignment,
                 IKVStore::key_t& out_key,
                 const char ** out_key_ptr);
 
@@ -583,7 +578,8 @@ status_t Pool_instance::swap_keys(const std::string key0,
 status_t Pool_instance::lock(const std::string &key,
                              IKVStore::lock_type_t type,
                              void *&out_value,
-                             size_t &out_value_len,
+                             size_t &inout_value_len,
+                             size_t &inout_alignment,
                              IKVStore::key_t& out_key,
                              const char ** out_key_ptr)
 {
@@ -601,32 +597,35 @@ status_t Pool_instance::lock(const std::string &key,
     write_touch();
 
     /* lock API has semantics of create on demand */
-    if (out_value_len == 0) {
+    if (inout_value_len == 0) {
       out_key = IKVStore::KEY_NONE;
       CPLOG(1, PREFIX "could not on-demand allocate without length:(%s) %lu",
-            key.c_str(), out_value_len);
+            key.c_str(), inout_value_len);
       return IKVStore::E_KEY_NOT_FOUND;
     }
 
 
-    CPLOG(1, PREFIX "lock is on-demand allocating:(%s) %lu", key.c_str(), out_value_len);
+    CPLOG(1, PREFIX "lock is on-demand allocating:(%s) %lu", key.c_str(), inout_value_len);
 
-    if(_mm_plugin.aligned_allocate(out_value_len, choose_alignment(out_value_len), &buffer) != S_OK)
+    if(inout_alignment == 0)
+      inout_alignment = choose_alignment(inout_value_len);
+    
+    if(_mm_plugin.aligned_allocate(inout_value_len, inout_alignment, &buffer) != S_OK)
       throw General_exception("memory plugin alloc failed");
 
     if (buffer == nullptr)
       throw General_exception("Pool_instance::lock on-demand create allocate_memory failed (len=%lu)",
-                              out_value_len);
+                              inout_value_len);
     created = true;
 
     CPLOG(1, PREFIX "creating on demand key=(%s) len=%lu",
           key.c_str(),
-          out_value_len);
+          inout_value_len);
 
     common::RWLock * p = new (aal.allocate(1)) common::RWLock();
 
     CPLOG(2, PREFIX "created RWLock at %p", reinterpret_cast<void*>(p));
-    _map->emplace(k, Value_type{buffer, out_value_len, p});
+    _map->emplace(k, Value_type{buffer, inout_value_len, p});
   }
 
   CPLOG(1, PREFIX "lock call has got key");
@@ -656,7 +655,7 @@ status_t Pool_instance::lock(const std::string &key,
   else throw API_exception("invalid lock type");
 
   out_value = (*_map)[k]._ptr;
-  out_value_len = (*_map)[k]._length;
+  inout_value_len = (*_map)[k]._length;
 
   out_key = reinterpret_cast<IKVStore::key_t>((*_map)[k]._value_lock);
 
@@ -825,12 +824,14 @@ status_t Pool_instance::resize_value(const std::string &key,
 
   /* lock KV-pair */
   void *out_value;
-  size_t out_value_len;
+  size_t inout_value_len;
   IKVStore::key_t out_key_handle = IKVStore::KEY_NONE;
+  size_t inout_alignment = 0;
   status_t s = lock(key,
                     IKVStore::STORE_LOCK_WRITE,
                     out_value,
-                    out_value_len,
+                    inout_value_len,
+                    inout_alignment,
                     out_key_handle,
                     nullptr);
 
@@ -1238,7 +1239,8 @@ status_t Map_store::lock(const pool_t pid,
                          const std::string &key,
                          lock_type_t type,
                          void *&out_value,
-                         size_t &out_value_len,
+                         size_t &inout_value_len,
+                         size_t &inout_alignment,
                          IKVStore::key_t &out_key,
                          const char ** out_key_ptr)
 {
@@ -1249,7 +1251,7 @@ status_t Map_store::lock(const pool_t pid,
     return E_FAIL; /* same as hstore, but should be E_INVAL; */
   }
 
-  auto rc = session->pool->lock(key, type, out_value, out_value_len, out_key, out_key_ptr);
+  auto rc = session->pool->lock(key, type, out_value, inout_value_len, inout_alignment, out_key, out_key_ptr);
 
   CPLOG(1, PREFIX "lock(%s, %p) rc=%d", key.c_str(), reinterpret_cast<void*>(out_key), rc);
 

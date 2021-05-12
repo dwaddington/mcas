@@ -22,6 +22,7 @@
 #define __MAP_STORE_COMPONENT_H__
 
 #include <api/kvstore_itf.h>
+#include "map_store_env.h"
 
 #define PREFIX "Map_store: "
 
@@ -121,9 +122,12 @@ public:
                              const std::string key0,
                              const std::string key1) override;
 
-  virtual status_t lock(const pool_t pool, const std::string &key,
-                        lock_type_t type, void *&out_value,
-                        size_t &out_value_len,
+  virtual status_t lock(const pool_t pool,
+                        const std::string &key,
+                        lock_type_t type,
+                        void *&out_value,
+                        size_t &inout_value_len,
+                        size_t &inout_alignment,
                         IKVStore::key_t &out_key,
                         const char ** out_key_ptr) override;
 
@@ -212,7 +216,7 @@ public:
     component::IKVStore *obj =
       static_cast<component::IKVStore *>
       (new Map_store(debug_level,
-                     mm_plugin_path_it == mc.end() ? "plugin-path-none" : mm_plugin_path_it->second,
+                     mm_plugin_path_it == mc.end() ? DEFAULT_MM_PLUGIN_PATH : mm_plugin_path_it->second,
                      owner_it == mc.end() ? "owner" : owner_it->second,
                      name_it == mc.end() ? "name" : name_it->second));
     assert(obj);
