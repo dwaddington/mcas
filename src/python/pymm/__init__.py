@@ -30,7 +30,7 @@ class CustomList(list):
             return CustomList(result)
         except TypeError:
             return result
-        
+
 def testX():
     import pymm
     import numpy as np

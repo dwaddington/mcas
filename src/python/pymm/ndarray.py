@@ -70,8 +70,8 @@ class shelved_ndarray(np.ndarray):
                 size *= k
 
         
-        # allocate memory - TEMPORARY
-        #buffer = pymmcore.allocate_direct_memory(int(size*_dbytes))
+        # allocate memory from MemoryResource
+        #
         (key_handle, buffer) = memory_resource.get_named_memory(name,
                                                                 int(size*_dbytes),
                                                                 8, # alignment
@@ -84,6 +84,7 @@ class shelved_ndarray(np.ndarray):
 
         self._memory_resource = memory_resource
         self._allocations = [buffer]
+        self.name = name
         return self
 
     def __del__(self):
