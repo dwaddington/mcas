@@ -110,7 +110,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   int size_mb = 32;
   const char * p_path = nullptr;
   const char * p_addr = nullptr;
-  int debug_level = 3;
+  int debug_level = 0;
 
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
@@ -150,7 +150,7 @@ static PyObject * MemoryResource_get_named_memory(PyObject * self,
                                                   PyObject * kwds)
 {
   using namespace component;
-  
+
   static const char *kwlist[] = {"name",
                                  "size",
                                  "alignment",
@@ -174,6 +174,11 @@ static PyObject * MemoryResource_get_named_memory(PyObject * self,
     return NULL;
   }
 
+  if (alignment > size) {
+    PyErr_SetString(PyExc_RuntimeError,"alignment greater than size");
+    return NULL;
+  }
+
   if (strlen(name) < 1) {
     PyErr_SetString(PyExc_RuntimeError,"bad name argument");
     return NULL;
@@ -185,13 +190,20 @@ static PyObject * MemoryResource_get_named_memory(PyObject * self,
   void * ptr = nullptr;
   IKVStore::key_t key_handle;
 
-  mr->_store->lock(mr->_pool,
-                   name,
-                   IKVStore::STORE_LOCK_WRITE,
-                   ptr,
-                   size,
-                   alignment,
-                   key_handle);
+  status_t s;
+
+  s = mr->_store->lock(mr->_pool,
+                       name,
+                       IKVStore::STORE_LOCK_WRITE,
+                       ptr,
+                       size,
+                       alignment,
+                       key_handle);
+
+  if (s == E_LOCKED) {
+    PyErr_SetString(PyExc_RuntimeError,"named memory already open");
+    return NULL;
+  } 
 
   PNOTICE("allocated %p", ptr);
 
@@ -220,7 +232,9 @@ static PyMemberDef MemoryResource_members[] =
 //MemoryResource_get_named_memory
 static PyMethodDef MemoryResource_methods[] =
   {
-   {"MemoryResource_get_named_memory",  (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS, "get named memory"},
+   /* single prefix makes protected */
+   {"_MemoryResource_get_named_memory",  (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_get_named_memory(name,size,alignment,zero)"},
    // {"create_pool",  (PyCFunction) create_pool, METH_VARARGS | METH_KEYWORDS, create_pool_doc},
    // {"delete_pool",  (PyCFunction) delete_pool, METH_VARARGS | METH_KEYWORDS, delete_pool_doc},
    // {"get_stats",  (PyCFunction) get_stats, METH_VARARGS | METH_KEYWORDS, get_stats_doc},
@@ -230,8 +244,8 @@ static PyMethodDef MemoryResource_methods[] =
 
 PyTypeObject MemoryResourceType = {
   PyVarObject_HEAD_INIT(NULL, 0)
-  "pymm.MemoryResource",           /* tp_name */
-  sizeof(MemoryResource)   ,      /* tp_basicsize */
+  "pymm.MemoryResource",   /* tp_name */
+  sizeof(MemoryResource),  /* tp_basicsize */
   0,                       /* tp_itemsize */
   (destructor) MemoryResource_dealloc,      /* tp_dealloc */
   0,                       /* tp_print */
@@ -249,15 +263,15 @@ PyTypeObject MemoryResourceType = {
   0,                       /* tp_setattro */
   0,                       /* tp_as_buffer */
   Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
-  "MemoryResource",              /* tp_doc */
+  "MemoryResource",        /* tp_doc */
   0,                       /* tp_traverse */
   0,                       /* tp_clear */
   0,                       /* tp_richcompare */
   0,                       /* tp_weaklistoffset */
   0,                       /* tp_iter */
   0,                       /* tp_iternext */
-  MemoryResource_methods,         /* tp_methods */
-  MemoryResource_members,         /* tp_members */
+  MemoryResource_methods,  /* tp_methods */
+  MemoryResource_members,  /* tp_members */
   0,                       /* tp_getset */
   0,                       /* tp_base */
   0,                       /* tp_dict */
