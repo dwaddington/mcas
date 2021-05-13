@@ -197,6 +197,9 @@ public:
   DECLARE_VERSION(1.0f);
   DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x21);
 
+  virtual ~Map_store_factory() {
+  }
+  
   void *query_interface(component::uuid_t &itf_uuid) override {
     if (itf_uuid == component::IKVStore_factory::iid()) {
       return static_cast<component::IKVStore_factory *>(this);
