@@ -58,7 +58,7 @@ class IKVStore_factory : public component::IBase {
     throw API_exception("IKVstore_factory::create(owner,param,param2) not implemented");
   }
 
-  virtual IKVStore* create(unsigned           debug_level,
+  virtual IKVStore* create(unsigned debug_level,
                            string_view owner,
                            string_view,
                            string_view)
