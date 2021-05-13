@@ -10,14 +10,18 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
+
 import pymmcore
-import numpy as np
 import pymm
+import numpy as np
+
+from .memoryresource import MemoryResource
+from .check import methodcheck
 
 class shelf():
     def __init__(self):
         print('Shelf---------------------------->');
-        self.mr = pymmcore.MemoryResource()
+        self.mr = MemoryResource()
         print(self.mr)
 
     def __setattr__(self, name, value):

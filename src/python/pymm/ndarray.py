@@ -10,11 +10,12 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
+
 import pymmcore
 import numpy as np
 
 from numpy import uint8, ndarray, dtype, float
-
+from .memoryresource import MemoryResource
 
 dtypedescr = np.dtype
 
@@ -34,7 +35,7 @@ class ndarray:
         self.__p_strides = strides
         self.__p_order = order
 
-    def make_instance(self, memory_resource: pymmcore.MemoryResource, name: str):
+    def make_instance(self, memory_resource: MemoryResource, name: str):
         return shelved_ndarray(memory_resource,
                                name,
                                shape = self.__p_shape,
@@ -68,8 +69,13 @@ class shelved_ndarray(np.ndarray):
             for k in shape:
                 size *= k
 
+        
         # allocate memory - TEMPORARY
-        buffer = pymmcore.allocate_direct_memory(int(size*_dbytes))
+        #buffer = pymmcore.allocate_direct_memory(int(size*_dbytes))
+        (key_handle, buffer) = memory_resource.get_named_memory(name,
+                                                                int(size*_dbytes),
+                                                                8, # alignment
+                                                                True) # zero
 
         # construct array using supplied memory
         #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
@@ -81,8 +87,9 @@ class shelved_ndarray(np.ndarray):
         return self
 
     def __del__(self):
+        pass
         # free memory - not for persistent?
-        for ma in self._allocations:
-            pymmcore.free_direct_memory(ma)
+        #        for ma in self._allocations:
+        #    pymmcore.free_direct_memory(ma)
 
     def __array_finalize__(self, obj): pass
