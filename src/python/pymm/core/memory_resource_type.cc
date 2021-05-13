@@ -65,7 +65,7 @@ static component::IKVStore * load_backend(const std::string& backend,
     comp = load_component("libcomponent-mapstore.so", mapstore_factory);
   }
   else {
-    PNOTICE("invalid backend (%s)", backend);
+    PNOTICE("invalid backend (%s)", backend.c_str());
     return nullptr;
   }
 
@@ -83,20 +83,17 @@ static component::IKVStore * load_backend(const std::string& backend,
     store = fact->create(debug_level,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-                          {+component::IKVStore_factory::k_dax_config, ss.str()} //dax_config}
+                          {+component::IKVStore_factory::k_dax_config, ss.str()}
                          });
-    
-    return store;
   }
   else {
     store = fact->create(debug_level,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-                          {+component::IKVStore_factory::k_mm_plugin_path, "TODO-PLUGIN-PATH"}
                          });
-
-    store = fact->
   }
+      
+  return store;
 }
 
 static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *kwds)
@@ -133,10 +130,10 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   if(p_addr)
     load_addr = ::strtoul(p_addr,NULL,16);
   
-  std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
-  std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
+  const std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
+  const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
-  //  self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
+  //self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
   self->_store = load_backend("mapstore", path, load_addr, debug_level);
   assert(self->_store);
 
