@@ -78,7 +78,7 @@ class Rca_AVL_internal : private common::log_source {
     const auto numa_node_u = boost::numeric_cast<unsigned>(numa_node);
     try {
       auto mr = _allocators[numa_node_u]->alloc(size, alignment);
-      SAFE_PRINT("AVL allocated: 0x%lx size=%lu", mr->addr(), size);
+      //      SAFE_PRINT("AVL allocated: 0x%lx size=%lu", mr->addr(), size);
 
       assert(mr);
       return mr->paddr();

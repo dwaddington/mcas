@@ -89,8 +89,8 @@ public:
         _reclaim_when_empty(false),
         _use_count(0)
   {
-    SAFE_PRINT("new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
-          region_ptr, region_size, object_size, _capacity);
+    //    SAFE_PRINT("new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
+    // region_ptr, region_size, object_size, _capacity);
 
     if (region_size % object_size)
       throw std::invalid_argument(
@@ -283,6 +283,8 @@ public:
 
   ~Region_map()
    {
+
+#ifdef DEBUG_REGION_STATE
      auto node_ix = 0;
      for ( const auto &node_buckets : _buckets )
      {
@@ -301,6 +303,7 @@ public:
        }
        ++node_ix;
      }
+#endif
    }
 
   void add_arena(void *arena_base, size_t arena_length, int numa_node) {
