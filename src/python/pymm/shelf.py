@@ -19,9 +19,9 @@ from .memoryresource import MemoryResource
 from .check import methodcheck
 
 class shelf():
-    def __init__(self):
-        print('Shelf---------------------------->');
-        self.mr = MemoryResource()
+    def __init__(self, name, size_mb=32):
+        self.name = name
+        self.mr = MemoryResource(name, size_mb)
         print(self.mr)
 
     def __setattr__(self, name, value):

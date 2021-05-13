@@ -38,10 +38,12 @@ MemoryResource_dealloc(MemoryResource *self)
 
   PLOG("MemoryResource: dealloc (%p)", self);
 
-  self->_store->close_pool(self->_pool);
-  
-  if(self->_store)
+  if(self->_store) {
+    if(self->_pool)
+      self->_store->close_pool(self->_pool);
+
     self->_store->release_ref();
+  }
   
   assert(self);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -106,20 +108,20 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                  NULL,
   };
 
-  const char * p_pool_name = nullptr;
+  char * p_pool_name = nullptr;
   int size_mb = 32;
-  const char * p_path = nullptr;
-  const char * p_addr = nullptr;
+  char * p_path = nullptr;
+  char * p_addr = nullptr;
   int debug_level = 0;
 
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "|sissi",
+                                    "s|issi",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
+                                    &size_mb,
                                     &p_path,
                                     &p_addr,
-                                    &size_mb,
                                     &debug_level)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
     PWRN("bad arguments or argument types to MemoryResource constructor");

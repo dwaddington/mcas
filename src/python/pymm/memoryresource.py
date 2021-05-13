@@ -20,6 +20,9 @@ class MemoryResource(pymmcore.MemoryResource):
     resources.  It is backed by an MCAS store component.
 
     '''
+    def __init__(self, name, size_mb):
+        super().__init__(pool_name=name, size_mb=size_mb)
+    
     @methodcheck(types=[str,int,int,bool])
     def get_named_memory(self, name, size, alignment=8, zero=True):
         '''

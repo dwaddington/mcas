@@ -44,8 +44,8 @@ def test_shelf():
     import pymm
     import numpy as np
 
-    s = pymm.shelf()
-    s.x = pymm.ndarray((8,8))
+    s = pymm.shelf('myShelf')
+    s.x = pymm.ndarray((8,8),dtype=np.uint8)
     print(s.x)
     return s
 
