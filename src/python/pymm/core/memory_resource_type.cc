@@ -14,7 +14,7 @@ constexpr uint64_t DEFAULT_LOAD_ADDR     = 0x900000000;
 
 typedef struct {
   PyObject_HEAD
-  component::IKVStore * _store;
+  component::IKVStore *       _store;
   component::IKVStore::pool_t _pool;
 } MemoryResource;
 
@@ -61,24 +61,42 @@ static component::IKVStore * load_backend(const std::string& backend,
   else if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
   }
-  else assert(0);
+  else if (backend == "mapstore") {
+    comp = load_component("libcomponent-mapstore.so", mapstore_factory);
+  }
+  else {
+    PNOTICE("invalid backend (%s)", backend);
+    return nullptr;
+  }
 
   IKVStore* store = nullptr;
   auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
   assert(fact);
 
-  /* TODO configure from params */
-  std::stringstream ss;
-  ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
-  //  PLOG("dax config: %s", ss.str().c_str());
-  
-  store = fact->create(debug_level,
-    {
-     {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-     {+component::IKVStore_factory::k_dax_config, ss.str()} //dax_config}
-    });
-  
-  return store;
+  if(backend == "hstore" || backend == "hstore-cc") {
+
+    /* TODO configure from params */
+    std::stringstream ss;
+    ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
+    //  PLOG("dax config: %s", ss.str().c_str());
+    
+    store = fact->create(debug_level,
+                         {
+                          {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
+                          {+component::IKVStore_factory::k_dax_config, ss.str()} //dax_config}
+                         });
+    
+    return store;
+  }
+  else {
+    store = fact->create(debug_level,
+                         {
+                          {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
+                          {+component::IKVStore_factory::k_mm_plugin_path, "TODO-PLUGIN-PATH"}
+                         });
+
+    store = fact->
+  }
 }
 
 static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *kwds)
@@ -118,7 +136,8 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
   std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
-  self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
+  //  self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
+  self->_store = load_backend("mapstore", path, load_addr, debug_level);
   assert(self->_store);
 
   if((self->_pool = self->_store->create_pool(pool_name, MiB(32))) == 0) {
@@ -133,33 +152,64 @@ static PyObject * MemoryResource_get_named_memory(PyObject * self,
                                                   PyObject * args,
                                                   PyObject * kwds)
 {
+  using namespace component;
+  
   static const char *kwlist[] = {"name",
+                                 "size",
+                                 "alignment",
+                                 "zero",
                                  NULL};
 
   char * name = nullptr;
+  size_t alignment = 0;
+  size_t size = 0;
+  int zero = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|",
+                                    "sk|kp",
                                     const_cast<char**>(kwlist),
-                                    &name)) {
+                                    &name,
+                                    &size,
+                                    &alignment,
+                                    &zero)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
   }
-  
-  char * ptr = static_cast<char*>(aligned_alloc(PAGE_SIZE, nsize));
 
-  if(zero_flag)
-    memset(ptr, 0x0, nsize);
-  
-  if(ptr == NULL) {
-    PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
+  if (strlen(name) < 1) {
+    PyErr_SetString(PyExc_RuntimeError,"bad name argument");
     return NULL;
   }
 
-  memset(ptr, 0xe, nsize); // temporary
-  PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
-  return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  /* get memory */
+  void * ptr = nullptr;
+  IKVStore::key_t key_handle;
+
+  mr->_store->lock(mr->_pool,
+                   name,
+                   IKVStore::STORE_LOCK_WRITE,
+                   ptr,
+                   size,
+                   alignment,
+                   key_handle);
+
+  PNOTICE("allocated %p", ptr);
+
+  /* optionally zero memory */
+  if(zero)
+    ::memset(ptr, 0x0, size);
+  else
+    memset(ptr, 0xe, size); // temporary
+  
+  /* build a tuple (memory view, memory handle) */
+  auto mview = PyMemoryView_FromMemory(static_cast<char*>(ptr), size, PyBUF_WRITE);
+  auto tuple = PyTuple_New(2);
+  PyTuple_SetItem(tuple, 0, PyLong_FromVoidPtr(key_handle));
+  PyTuple_SetItem(tuple, 1, mview);
+  return tuple;
 }
 
 

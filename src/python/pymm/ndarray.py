@@ -26,7 +26,7 @@ class ndarray:
     '''
     def __init__(self, shape=None, dtype=float, strides=None, order='C'):
 
-        # toto check params
+        # todo check params
         # todo check and invalidate param 'buffer'
         # save constructor parameters and type
         self.__p_shape = shape

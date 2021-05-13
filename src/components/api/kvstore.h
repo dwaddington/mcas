@@ -589,6 +589,7 @@ protected:
    *
    * @param pool Pool handle
    * @param key_handle Handle (opaque) for key used to unlock
+   * @param flags Optional unlock flags, UNLOCK_FLAGS_FLUSH
    *
    * @return S_OK, S_MORE (for async), E_INVAL or other error
    */
