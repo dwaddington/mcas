@@ -1028,8 +1028,6 @@ Map_store::Map_store(const unsigned debug_level,
 }
 
 Map_store::~Map_store() {
-  // TODO: seg faults?
-#if 0
   Std_lock_guard g(_pool_sessions_lock);
 
   for(auto& s : _pool_sessions)
@@ -1037,7 +1035,7 @@ Map_store::~Map_store() {
 
   for(auto& p : _pools)
     delete p.second;
-#endif
+  PLOG("~Map_store");
 }
 
 IKVStore::pool_t Map_store::create_pool(const std::string &name,
