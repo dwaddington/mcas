@@ -84,6 +84,7 @@ class shelved_ndarray(np.ndarray):
 
         self._memory_resource = memory_resource
         self._allocations = [buffer]
+        self._key_handle = key_handle
         self.name = name
         return self
 
