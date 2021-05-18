@@ -16,7 +16,10 @@
 #include <common/utils.h>
 #include <common/dump_utils.h>
 #include <Python.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
 #include <numpy/arrayobject.h>
+#pragma GCC diagnostic pop
 
 namespace global
 {
@@ -24,8 +27,8 @@ unsigned debug_level = 3;
 }
 
 /* forward decls */
-static PyObject * unmarshall_nparray(byte * ptr);
-static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr);  
+PyObject * unmarshall_nparray(byte * ptr);
+void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr);  
 
 PyObject * pymcas_ndarray_header_size(PyObject * self,
                                       PyObject * args,
@@ -79,7 +82,6 @@ PyObject * pymcas_ndarray_header_size(PyObject * self,
   size += sizeof(npy_intp);
 
   /* dimensions and strides */
-  npy_intp * dims = PyArray_DIMS(src_ndarray);
   size += (sizeof(npy_intp) * ndims) * 2;
 
   /* selected flags and type */
@@ -182,7 +184,7 @@ PyObject * pymcas_ndarray_from_bytes(PyObject * self,
  * Create header for array, return as string
  * 
  */
-static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str)
+void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str)
 {
   std::stringstream hdr;
 
@@ -239,11 +241,11 @@ static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_
 }
 
 
-static PyObject * unmarshall_nparray(byte * ptr)
+PyObject * unmarshall_nparray(byte * ptr)
 {
   import_array();
   
-  int ndims = *(reinterpret_cast<npy_intp*>(ptr));
+  int ndims = *(reinterpret_cast<int*>(ptr));
   ptr += sizeof(ndims);
 
   npy_intp item_size = *(reinterpret_cast<npy_intp*>(ptr));
@@ -283,7 +285,7 @@ static PyObject * unmarshall_nparray(byte * ptr)
                                   type,
                                   strides.data(),
                                   ptr, // TO DO check with header length?
-                                  item_size,
+                                  boost::numeric_cast<int>(item_size),
                                   flags,
                                   NULL);
   return nparray;
@@ -318,7 +320,7 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(bytes_memory_view);
   byte * ptr = (byte *) buffer->buf;
 
-  int ndims = *(reinterpret_cast<npy_intp*>(ptr));
+  int ndims = *(reinterpret_cast<int*>(ptr));
   ptr += sizeof(ndims);
 
   npy_intp item_size = *(reinterpret_cast<npy_intp*>(ptr));
@@ -343,7 +345,7 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
   assert(flags == 1);
 
-  unsigned short dtype_marker = *(reinterpret_cast<int*>(ptr));
+  unsigned short dtype_marker = *(reinterpret_cast<unsigned short*>(ptr));
   ptr += sizeof(dtype_marker);
 
   /* pymcas does not use this yet */
@@ -353,8 +355,6 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   std::string dtype(reinterpret_cast<const char*>(ptr), dtype_str_len);
   ptr += dtype_str_len;
 
-  PNOTICE("dtype=(%s)", dtype.c_str());
-  
   int type =  *(reinterpret_cast<int*>(ptr));
   ptr += sizeof(type);
 
