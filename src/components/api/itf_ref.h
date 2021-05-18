@@ -17,26 +17,26 @@
 
 namespace component
 {
-/* How to delete component references */
+/* deleter */
 template <typename T>
-  struct ref_delete
+struct ref_delete
+{
+  constexpr ref_delete() noexcept = default;
+  void operator() (T *t) const
   {
-    constexpr ref_delete() noexcept = default;
-    void operator() (T *t) const
-    {
-      t->release_ref();
-    }
-  };
+    t->release_ref();
+  }
+};
 
 /* despite the name, acts like a pointer, not like a reference */
 template <class I>
-  using Itf_ref = std::unique_ptr<I, ref_delete<I>>;
+using Itf_ref = std::unique_ptr<I, ref_delete<I>>;
 
 template <typename Obj>
-  Itf_ref<Obj> make_itf_ref(Obj *obj_)
-  {
-    return Itf_ref<Obj>(obj_);
-  }
+Itf_ref<Obj> make_itf_ref(Obj *obj_)
+{
+  return Itf_ref<Obj>(obj_);
+}
 
 }  // namespace component
 #endif

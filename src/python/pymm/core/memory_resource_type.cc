@@ -12,11 +12,58 @@ constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
 constexpr const char * DEFAULT_POOL_NAME = "default";
 constexpr uint64_t DEFAULT_LOAD_ADDR     = 0x900000000;
 
+using namespace component;
+
+/* Python type */
 typedef struct {
   PyObject_HEAD
-  component::IKVStore *       _store;
-  component::IKVStore::pool_t _pool;
+  IKVStore *       _store;
+  IKVStore::pool_t _pool;
 } MemoryResource;
+
+/** 
+ * Class to manage backend instance.  You can't open the same resource
+ * multiple times, so you have to share.
+ * 
+ */
+class Backend_instance_manager
+{
+public:
+  IKVStore * get(const std::string backend,
+                 const std::string path,
+                 const addr_t load_addr,
+                 const unsigned debug_level)
+  {
+    auto iter = _map.find(backend);
+    if((iter == _map.end()) ||
+       (_map[backend].find(path) == _map[backend].end()))   {
+      /* create new entry */
+      IKVStore * itf = load_backend(backend, path, load_addr, debug_level);
+      assert(itf);
+      _map[backend][path] = itf;
+      return itf;
+    }
+
+    auto itf = _map[backend][path];
+    itf->add_ref();
+    return itf;
+  }
+  
+private:
+  IKVStore * load_backend(const std::string& backend,
+                          const std::string& path,
+                          const addr_t load_addr,
+                          const unsigned debug_level);
+
+  using backend_t = std::string;
+  using path_t = std::string;
+  
+  std::map<backend_t, std::map<path_t, IKVStore*>> _map;
+  
+} g_store_map;
+
+
+
 
 static PyObject *
 MemoryResource_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -49,13 +96,11 @@ MemoryResource_dealloc(MemoryResource *self)
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static component::IKVStore * load_backend(const std::string& backend,
-                                          const std::string& path,
-                                          const uint64_t load_addr,
-                                          const unsigned debug_level)
+IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
+                                                  const std::string& path,
+                                                  const uint64_t load_addr,
+                                                  const unsigned debug_level)
 {
-  using namespace component;
-  
   IBase* comp = nullptr;
   if(backend == "hstore") {
     comp = load_component("libcomponent-hstore.so", hstore_factory);
@@ -135,8 +180,8 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   const std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
   const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
-  self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
-  //self->_store = load_backend("mapstore", path, load_addr, debug_level);
+  self->_store = g_store_map.get("hstore-cc", path, load_addr, debug_level);
+  
   assert(self->_store);
 
   if((self->_pool = self->_store->create_pool(pool_name, MiB(32))) == 0) {
@@ -161,8 +206,6 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
                                                      PyObject * args,
                                                      PyObject * kwds)
 {
-  using namespace component;
-
   static const char *kwlist[] = {"name",
                                  "size",
                                  "alignment",
@@ -254,8 +297,6 @@ static PyObject * MemoryResource_open_named_memory(PyObject * self,
                                                    PyObject * args,
                                                    PyObject * kwds)
 {
-  using namespace component;
-
   static const char *kwlist[] = {"name",
                                  NULL};
 
@@ -333,8 +374,6 @@ static PyObject * MemoryResource_release_named_memory(PyObject * self,
                                                       PyObject * args,
                                                       PyObject * kwds)
 {
-  using namespace component;
-
   static const char *kwlist[] = {"lock_handle",
                                  NULL};
 
@@ -378,8 +417,6 @@ static PyObject * MemoryResource_rename_named_memory(PyObject * self,
                                                      PyObject * args,
                                                      PyObject * kwds)
 {
-  using namespace component;
-
   static const char *kwlist[] = {"lock_handle",
                                  NULL};
 
@@ -428,9 +465,6 @@ static PyMethodDef MemoryResource_methods[] =
     "MemoryResource_open_named_memory(name,size,alignment,zero)"},   
    {"_MemoryResource_release_named_memory", (PyCFunction) MemoryResource_release_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_release_named_memory(handle)"},
-   // {"create_pool",  (PyCFunction) create_pool, METH_VARARGS | METH_KEYWORDS, create_pool_doc},
-   // {"delete_pool",  (PyCFunction) delete_pool, METH_VARARGS | METH_KEYWORDS, delete_pool_doc},
-   // {"get_stats",  (PyCFunction) get_stats, METH_VARARGS | METH_KEYWORDS, get_stats_doc},
    {NULL}
   };
 
@@ -476,3 +510,22 @@ PyTypeObject MemoryResourceType = {
   MemoryResource_new,             /* tp_new */
   0, /* tp_free */
 };
+
+
+
+// /* store smart pointer management */
+// template <typename T>
+// struct shared_ref_delete
+// {
+//   constexpr shared_ref_delete() noexcept = default;
+//   void operator() (T *t) const {  t->release_ref();  }
+// };
+
+// template <class I>
+// using shared_ref = std::shared_ptr<I>;
+
+// template <typename Obj, class Deleter = shared_ref_delete<Obj>>
+// shared_ref<Obj> make_shared_ref(Obj *obj_)
+// {
+//   return shared_ref<Obj>(obj_,Deleter());
+// }
