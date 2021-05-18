@@ -355,8 +355,6 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   std::string dtype(reinterpret_cast<const char*>(ptr), dtype_str_len);
   ptr += dtype_str_len;
 
-  PNOTICE("dtype=(%s)", dtype.c_str());
-  
   int type =  *(reinterpret_cast<int*>(ptr));
   ptr += sizeof(type);
 
