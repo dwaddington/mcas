@@ -49,7 +49,7 @@ int debug_level = 3;
 
 /* externs - from pymcas_core_module.cc */
 extern PyObject * unmarshall_nparray(byte * ptr); 
-extern void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr);
+extern void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr);
 
 
 inline void * copy_flat_buffer(FlatBufferBuilder& fbb)
