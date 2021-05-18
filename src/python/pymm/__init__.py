@@ -46,6 +46,9 @@ def test_shelf():
 
     s = pymm.shelf('myShelf')
     s.x = pymm.ndarray((8,8),dtype=np.uint8)
+
+    # implicity replace s.x (RHS constructor should succeed before existing s.x is erased)
+#    s.x = pymm.ndarray((3,3),dtype=np.uint8)
     print(s.x)
     return s
 

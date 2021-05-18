@@ -54,5 +54,19 @@ PyObject * pymcas_ndarray_from_bytes(PyObject * self,
                                      PyObject * kwargs);
 
 
+/** 
+ * Read ndarray meta data into Python dictionary
+ * 
+ * @param self 
+ * @param args 
+ * @param kwargs 
+ * 
+ * @return 
+ */
+PyObject * pymcas_ndarray_read_header(PyObject * self,
+                                      PyObject * args,
+                                      PyObject * kwargs);
+
+
 
 #endif // __NDARRAY_HELPERS_H__

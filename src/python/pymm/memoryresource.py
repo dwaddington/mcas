@@ -21,13 +21,28 @@ class MemoryResource(pymmcore.MemoryResource):
 
     '''
     def __init__(self, name, size_mb):
+        self._named_memory = {}
         super().__init__(pool_name=name, size_mb=size_mb)
     
     @methodcheck(types=[str,int,int,bool])
-    def get_named_memory(self, name, size, alignment=8, zero=True):
+    def create_named_memory(self, name, size, alignment=8, zero=True):
         '''
-        Get a contiguous piece of memory and name it
+        Create a contiguous piece of memory and name it
         '''
-        return super()._MemoryResource_get_named_memory(name, size, alignment, zero)
+        return super()._MemoryResource_create_named_memory(name, size, alignment, zero)
+
+    @methodcheck(types=[str])
+    def open_named_memory(self, name):
+        '''
+        Open existing name memory
+        '''
+        return super()._MemoryResource_open_named_memory(name)
+
+    @methodcheck(types=[int])
+    def release_named_memory(self, lock_handle):
+        '''
+        Release a contiguous piece of memory (i.e. unlock)
+        '''
+        super()._MemoryResource_release_named_memory(lock_handle)
     
 

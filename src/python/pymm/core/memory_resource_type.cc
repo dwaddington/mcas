@@ -135,8 +135,8 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   const std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
   const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
-  //self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
-  self->_store = load_backend("mapstore", path, load_addr, debug_level);
+  self->_store = load_backend("hstore-cc", path, load_addr, debug_level);
+  //self->_store = load_backend("mapstore", path, load_addr, debug_level);
   assert(self->_store);
 
   if((self->_pool = self->_store->create_pool(pool_name, MiB(32))) == 0) {
@@ -147,9 +147,19 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   return 0;
 }
 
-static PyObject * MemoryResource_get_named_memory(PyObject * self,
-                                                  PyObject * args,
-                                                  PyObject * kwds)
+/** 
+ * MemoryResource_create_named_memory - create a KV pair
+ * from the backend store (fail if already existing)
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return Tuple (key_handle, memoryview)
+ */
+static PyObject * MemoryResource_create_named_memory(PyObject * self,
+                                                     PyObject * args,
+                                                     PyObject * kwds)
 {
   using namespace component;
 
@@ -202,6 +212,12 @@ static PyObject * MemoryResource_get_named_memory(PyObject * self,
                        alignment,
                        key_handle);
 
+  if (s == S_OK) {
+    mr->_store->unlock(mr->_pool, key_handle);
+    PyErr_SetString(PyExc_RuntimeError,"named memory already exists");
+    return NULL;
+  }
+  
   if (s == E_LOCKED) {
     PyErr_SetString(PyExc_RuntimeError,"named memory already open");
     return NULL;
@@ -224,6 +240,177 @@ static PyObject * MemoryResource_get_named_memory(PyObject * self,
 }
 
 
+
+/** 
+ * Open an existing named memory resource
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return None if there is no corresponding named memory
+ */
+static PyObject * MemoryResource_open_named_memory(PyObject * self,
+                                                   PyObject * args,
+                                                   PyObject * kwds)
+{
+  using namespace component;
+
+  static const char *kwlist[] = {"name",
+                                 NULL};
+
+  char * name = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "s",
+                                    const_cast<char**>(kwlist),
+                                    &name)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  /* get memory */
+  void * ptr = nullptr;
+  IKVStore::key_t key_handle;
+  size_t value_len = 0;
+  
+  status_t s;
+
+  {
+    std::vector<uint64_t> v;
+    std::string key = name;
+    s = mr->_store->get_attribute(mr->_pool, IKVStore::Attribute::VALUE_LEN, v, &key);
+
+    if(s != S_OK) {
+      auto tuple = PyTuple_New(2);
+      PyTuple_SetItem(tuple, 0, Py_None);
+      PyTuple_SetItem(tuple, 1, Py_None);
+
+      return tuple;
+    }
+  }
+
+  s = mr->_store->lock(mr->_pool,
+                       name,
+                       IKVStore::STORE_LOCK_WRITE,
+                       ptr,
+                       value_len,
+                       0, // alignment
+                       key_handle);
+
+  if (s == E_LOCKED) {
+    PyErr_SetString(PyExc_RuntimeError,"named memory already open");
+    return NULL;
+  }
+
+  if (s != S_OK) {
+    PyErr_SetString(PyExc_RuntimeError,"failed to lock KV pair in open");
+    return NULL;
+  }
+  /* build a tuple (memory view, memory handle) */
+  auto mview = PyMemoryView_FromMemory(static_cast<char*>(ptr), value_len, PyBUF_WRITE);
+  auto tuple = PyTuple_New(2);
+  PyTuple_SetItem(tuple, 0, PyLong_FromVoidPtr(key_handle));
+  PyTuple_SetItem(tuple, 1, mview);
+  return tuple;
+}
+
+
+
+/** 
+ * Release a previously locked KV pair on the backend store
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return None
+ */
+static PyObject * MemoryResource_release_named_memory(PyObject * self,
+                                                      PyObject * args,
+                                                      PyObject * kwds)
+{
+  using namespace component;
+
+  static const char *kwlist[] = {"lock_handle",
+                                 NULL};
+
+  unsigned long handle = 0;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "k",
+                                    const_cast<char**>(kwlist),
+                                    &handle)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+  auto key_handle = reinterpret_cast<IKVStore::key_t>(handle);
+
+  status_t s;
+
+  s = mr->_store->unlock(mr->_pool, key_handle);
+
+  if (s != S_OK) {
+    PyErr_SetString(PyExc_RuntimeError,"unlock failed unexpectedly");
+    return NULL;
+  }
+
+  Py_RETURN_NONE;
+}
+
+
+/** 
+ * Rename an existing named memory
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return None
+ */
+static PyObject * MemoryResource_rename_named_memory(PyObject * self,
+                                                     PyObject * args,
+                                                     PyObject * kwds)
+{
+  using namespace component;
+
+  static const char *kwlist[] = {"lock_handle",
+                                 NULL};
+
+  unsigned long handle = 0;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "k",
+                                    const_cast<char**>(kwlist),
+                                    &handle)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+  auto key_handle = reinterpret_cast<IKVStore::key_t>(handle);
+
+  status_t s;
+
+  s = mr->_store->unlock(mr->_pool, key_handle);
+
+  if (s != S_OK) {
+    PyErr_SetString(PyExc_RuntimeError,"unlock failed unexpectedly");
+    return NULL;
+  }
+
+  Py_RETURN_NONE;
+}
+
+
+
 static PyMemberDef MemoryResource_members[] =
   {
    //  {"port", T_ULONG, offsetof(MemoryResource, _port), READONLY, "Port"},
@@ -231,12 +418,16 @@ static PyMemberDef MemoryResource_members[] =
   };
 
 
-//MemoryResource_get_named_memory
+//MemoryResource_create_named_memory
 static PyMethodDef MemoryResource_methods[] =
   {
    /* single prefix makes protected */
-   {"_MemoryResource_get_named_memory",  (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
-    "MemoryResource_get_named_memory(name,size,alignment,zero)"},
+   {"_MemoryResource_create_named_memory",  (PyCFunction) MemoryResource_create_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_create_named_memory(name,size,alignment,zero)"},
+   {"_MemoryResource_open_named_memory",  (PyCFunction) MemoryResource_open_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_open_named_memory(name,size,alignment,zero)"},   
+   {"_MemoryResource_release_named_memory", (PyCFunction) MemoryResource_release_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_release_named_memory(handle)"},
    // {"create_pool",  (PyCFunction) create_pool, METH_VARARGS | METH_KEYWORDS, create_pool_doc},
    // {"delete_pool",  (PyCFunction) delete_pool, METH_VARARGS | METH_KEYWORDS, delete_pool_doc},
    // {"get_stats",  (PyCFunction) get_stats, METH_VARARGS | METH_KEYWORDS, get_stats_doc},

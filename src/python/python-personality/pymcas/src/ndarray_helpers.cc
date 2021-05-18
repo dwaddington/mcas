@@ -25,7 +25,7 @@ unsigned debug_level = 3;
 
 /* forward decls */
 static PyObject * unmarshall_nparray(byte * ptr);
-static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr);  
+static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr);  
 
 PyObject * pymcas_ndarray_header_size(PyObject * self,
                                       PyObject * args,
@@ -87,21 +87,25 @@ PyObject * pymcas_ndarray_header_size(PyObject * self,
   return PyLong_FromUnsignedLong(size);
 }
 
+
 PyObject * pymcas_ndarray_header(PyObject * self,
                                  PyObject * args,
                                  PyObject * kwargs)
 {
   import_array();
   static const char *kwlist[] = {"source",
+                                 "dtype_str",
                                  NULL};
 
   PyObject * src_obj = nullptr;
+  const char * dtype_str = nullptr;
 
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwargs,
-                                    "O",
+                                    "O|s",
                                     const_cast<char**>(kwlist),
-                                    &src_obj)) {
+                                    &src_obj,
+                                    &dtype_str)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
   }
@@ -125,10 +129,11 @@ PyObject * pymcas_ndarray_header(PyObject * self,
   }
 
   std::string hdr;
-  create_ndarray_header(src_ndarray, hdr);
+  create_ndarray_header(src_ndarray, hdr, dtype_str);
   
   return PyByteArray_FromStringAndSize(hdr.c_str(), hdr.size());
 }
+
 
 PyObject * pymcas_ndarray_from_bytes(PyObject * self,
                                      PyObject * args,
@@ -156,7 +161,6 @@ PyObject * pymcas_ndarray_from_bytes(PyObject * self,
     return NULL;
   }
 
-
   Py_INCREF(bytes_memory_view); /* increment reference count to hold data */
 
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(bytes_memory_view);
@@ -178,7 +182,7 @@ PyObject * pymcas_ndarray_from_bytes(PyObject * self,
  * Create header for array, return as string
  * 
  */
-static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr)
+static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str)
 {
   std::stringstream hdr;
 
@@ -212,13 +216,19 @@ static void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_
 
   hdr.write(reinterpret_cast<const char*>(&select_flags), sizeof(select_flags));
 
-  /* typenum */
-  int type = PyArray_TYPE(src_ndarray);
-
-  if(global::debug_level > 1)
-    PLOG("saving type=%d (size=%lu), flags=%d", type, sizeof(type), select_flags);
-          
-  hdr.write(reinterpret_cast<const char*>(&type), sizeof(type));
+  /* dtype */
+  if(dtype_str) {
+    std::string dtype(dtype_str);
+    unsigned short dtype_marker = 0xFFFF;
+    size_t dtype_len = dtype.size();
+    hdr.write(reinterpret_cast<const char*>(&dtype_marker), sizeof(dtype_marker));
+    hdr.write(reinterpret_cast<const char*>(&dtype_len), sizeof(dtype_len));
+    hdr.write(dtype.c_str(), dtype_len);
+  }
+  else { /* for backwards compatibility with pymcas */
+    int type = PyArray_TYPE(src_ndarray);
+    hdr.write(reinterpret_cast<const char*>(&type), sizeof(type));
+  }
 
   out_hdr = hdr.str();
 
@@ -279,3 +289,157 @@ static PyObject * unmarshall_nparray(byte * ptr)
   return nparray;
 }
 
+
+PyObject * pymcas_ndarray_read_header(PyObject * self,
+                                      PyObject * args,
+                                      PyObject * kwargs)
+{
+  import_array();
+  
+  static const char *kwlist[] = {"data",
+                                 NULL};
+
+  PyObject * bytes_memory_view  = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &bytes_memory_view)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments!");
+    return NULL;
+  }
+
+  if (! PyMemoryView_Check(bytes_memory_view)) {
+    PyErr_SetString(PyExc_RuntimeError,"data should be type <memoryview>");
+    return NULL;
+  }
+
+  Py_buffer * buffer = PyMemoryView_GET_BUFFER(bytes_memory_view);
+  byte * ptr = (byte *) buffer->buf;
+
+  int ndims = *(reinterpret_cast<npy_intp*>(ptr));
+  ptr += sizeof(ndims);
+
+  npy_intp item_size = *(reinterpret_cast<npy_intp*>(ptr));
+  ptr += sizeof(item_size);
+
+  std::vector<npy_intp> dims;
+  for(int i=0; i < ndims; i++) {
+    npy_intp dim = *(reinterpret_cast<npy_intp*>(ptr));
+    ptr += sizeof(dim);
+    dims.push_back(dim);
+  }
+
+  std::vector<npy_intp> strides;
+  for(int i=0; i < ndims; i++) {
+    npy_intp stride = *(reinterpret_cast<npy_intp*>(ptr));
+    ptr += sizeof(stride);
+    strides.push_back(stride);
+  }
+
+  int flags = *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(flags);
+
+  assert(flags == 1);
+
+  unsigned short dtype_marker = *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(dtype_marker);
+
+  /* pymcas does not use this yet */
+  if(dtype_marker != 0xFFFF) throw General_exception("bad dtype marker");
+  size_t dtype_str_len = *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(dtype_str_len);
+  std::string dtype(reinterpret_cast<const char*>(ptr), dtype_str_len);
+  ptr += dtype_str_len;
+
+  PNOTICE("dtype=(%s)", dtype.c_str());
+  
+  int type =  *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(type);
+
+  if(global::debug_level > 2) {
+    PLOG("ndims=%d, flags=%d, type=%d", ndims, flags, type);
+    for(auto d: dims) PLOG("dim=%ld", d);
+    for(auto s: strides) PLOG("stride=%ld", s);
+  }
+
+  /* put attributes into a dictionary */
+  auto dict = PyDict_New();
+  PyDict_SetItemString(dict, "ndims", PyLong_FromLong(ndims));
+  PyDict_SetItemString(dict, "item_size", PyLong_FromLong(item_size));
+
+  auto dims_tuple = PyTuple_New(dims.size());
+  Py_ssize_t i=0;
+  for( auto d : dims ) {
+    PyTuple_SetItem(dims_tuple, i, PyLong_FromLong(d));
+    i++;
+  }
+  PyDict_SetItemString(dict, "shape", dims_tuple);
+
+  auto strides_tuple = PyTuple_New(strides.size());
+  i=0;
+  for( auto d : strides ) {
+    PyTuple_SetItem(strides_tuple, i, PyLong_FromLong(d));
+    i++;
+  }
+  PyDict_SetItemString(dict, "strides", strides_tuple);
+
+
+  PyDict_SetItemString(dict, "flags", PyLong_FromLong(flags));
+  PyDict_SetItemString(dict, "dtype", PyUnicode_FromString(dtype.c_str()));
+
+  return dict;
+}
+
+#if 0
+static PyObject * read_nparray_header(byte * ptr)
+{
+  import_array();
+  
+  int ndims = *(reinterpret_cast<npy_intp*>(ptr));
+  ptr += sizeof(ndims);
+
+  npy_intp item_size = *(reinterpret_cast<npy_intp*>(ptr));
+  ptr += sizeof(item_size);
+
+  std::vector<npy_intp> dims;
+  for(int i=0; i < ndims; i++) {
+    npy_intp dim = *(reinterpret_cast<npy_intp*>(ptr));
+    ptr += sizeof(dim);
+    dims.push_back(dim);
+  }
+
+  std::vector<npy_intp> strides;
+  for(int i=0; i < ndims; i++) {
+    npy_intp stride = *(reinterpret_cast<npy_intp*>(ptr));
+    ptr += sizeof(stride);
+    strides.push_back(stride);
+  }
+
+  int flags = *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(flags);
+
+  assert(flags == 1);
+  
+  int type =  *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(type);
+
+  if(global::debug_level > 2) {
+    PLOG("ndims=%d, flags=%d, type=%d", ndims, flags, type);
+    for(auto d: dims) PLOG("dim=%ld", d);
+    for(auto s: strides) PLOG("stride=%ld", s);
+  }
+
+  PyObject* nparray = PyArray_New(&PyArray_Type,
+                                  ndims,
+                                  dims.data(),
+                                  type,
+                                  strides.data(),
+                                  ptr, // TO DO check with header length?
+                                  item_size,
+                                  flags,
+                                  NULL);
+  return nparray;
+}
+#endif

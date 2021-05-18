@@ -48,6 +48,8 @@ PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
              "ndarray_header_size(array) -> Return size of memory needed for header");
 PyDoc_STRVAR(pymcas_ndarray_header_doc,
              "ndarray_header(array) -> Return ndarray persistent header");
+PyDoc_STRVAR(pymcas_ndarray_read_header_doc,
+             "ndarray_read_header(m) -> Return dictionary of ndarray header");
 PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
              "memoryview_addr(m) -> Return address of memory (for debugging)");
 
@@ -80,6 +82,8 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"ndarray_header",
     (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },
+   {"ndarray_read_header",
+    (PyCFunction) pymcas_ndarray_read_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_read_header_doc },   
    {"memoryview_addr",
     (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */

@@ -57,6 +57,7 @@ class shelved_ndarray(np.ndarray):
     def __new__(subtype, memory_resource, name, shape=None, dtype=float, strides=None, order='C'):
 
         # determine size of memory needed
+        #
         descr = dtypedescr(dtype)
         _dbytes = descr.itemsize
 
@@ -68,30 +69,54 @@ class shelved_ndarray(np.ndarray):
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
             for k in shape:
                 size *= k
+                
+        (value_handle, buffer) = memory_resource.open_named_memory(name)
 
-        
-        # allocate memory from MemoryResource
-        #
-        (key_handle, buffer) = memory_resource.get_named_memory(name,
-                                                                int(size*_dbytes),
-                                                                8, # alignment
-                                                                True) # zero
+        if value_handle == None:
+            # create a newly allocated named memory from MemoryResource
+            #
+            (value_handle, buffer) = memory_resource.create_named_memory(name,
+                                                                         int(size*_dbytes),
+                                                                         8, # alignment
+                                                                         True) # zero
+            # construct array using supplied memory
+            #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
+            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=buffer,
+                                      strides=strides, order=order)
 
-        # construct array using supplied memory
-        #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-        self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=buffer,
-                                  strides=strides, order=order)
+            # create and store metadata header
+            metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str)
+            (metadata_handle, metadata_buffer) = memory_resource.create_named_memory(name + '-meta', len(metadata), 0, False);
+            metadata_buffer[:] = metadata
+            print("Saved metadata OK ", len(metadata_buffer))
+            print("shape:", shape)
+        else:
+            # entity already exists, load metadata
+            (metadata_handle, metadata_buffer) = memory_resource.open_named_memory(name + '-meta')
+            print("Opened metadata ", len(metadata_buffer))
+            hdr = pymmcore.ndarray_read_header(metadata_buffer)
+            print("Read header:", hdr)
+            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=buffer,
+                                      strides=hdr['strides'], order=order)
+            print("Recoverd ndarray!")
 
         self._memory_resource = memory_resource
-        self._allocations = [buffer]
-        self._key_handle = key_handle
+        self._value_handle = value_handle
+        self._metadata_handle = metadata_handle
         self.name = name
         return self
 
-    def __del__(self):
+    def convert_dtype(type_num):
         pass
-        # free memory - not for persistent?
-        #        for ma in self._allocations:
-        #    pymmcore.free_direct_memory(ma)
+            
+    def __del__(self):
+        
+        # delete the object (i.e. ref count == 0) means
+        # releasing the memory - the object is not actually freed
+        #
+        self._memory_resource.release_named_memory(self._value_handle)
+        self._memory_resource.release_named_memory(self._metadata_handle)        
+
+    
 
     def __array_finalize__(self, obj): pass

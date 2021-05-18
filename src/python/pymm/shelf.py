@@ -22,14 +22,28 @@ class shelf():
     def __init__(self, name, size_mb=32):
         self.name = name
         self.mr = MemoryResource(name, size_mb)
+        # todo iterate data and check value-metadata pairs
         print(self.mr)
 
     def __setattr__(self, name, value):
+#        if name in self.__dict__:
+            # we need to explicitly delete the original shelved variable
+#            print("ALREADY THRER!!!!")
+
         if isinstance(value, pymm.ndarray):
+#            if name in self.__dict__:
+#                old_value = self.__dict__[name]
+#                tmp_name = name + 'pending'
+#                new_instance = value.make_instance(self.mr, tmp_name)
+#                
+#                self.__dict__[name] = 
+#            else:
+#                print("NEW INSTANCE")
             self.__dict__[name] = value.make_instance(self.mr, name)
             return
         else:
             self.__dict__[name] = value
+
 
 
 
