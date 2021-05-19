@@ -447,6 +447,43 @@ static PyObject * MemoryResource_rename_named_memory(PyObject * self,
 }
 
 
+/** 
+ * Erase named memory object from store
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return 
+ */
+static PyObject * MemoryResource_erase_named_memory(PyObject * self,
+                                                    PyObject * args,
+                                                    PyObject * kwds)
+{
+  static const char *kwlist[] = {"name",
+                                 NULL};
+
+  char * name = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "s",
+                                    const_cast<char**>(kwlist),
+                                    &name)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+  
+  auto status = mr->_store->erase(mr->_pool, name);
+  if(status != S_OK) {
+    PyErr_SetString(PyExc_RuntimeError,"erase failed unexpectedly");
+    return NULL;
+  }
+
+  return PyLong_FromLong(0);
+}
 
 static PyMemberDef MemoryResource_members[] =
   {
@@ -465,6 +502,8 @@ static PyMethodDef MemoryResource_methods[] =
     "MemoryResource_open_named_memory(name,size,alignment,zero)"},   
    {"_MemoryResource_release_named_memory", (PyCFunction) MemoryResource_release_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_release_named_memory(handle)"},
+   {"_MemoryResource_erase_named_memory", (PyCFunction) MemoryResource_erase_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_erase_named_memory(handle)"},   
    {NULL}
   };
 
@@ -511,21 +550,3 @@ PyTypeObject MemoryResourceType = {
   0, /* tp_free */
 };
 
-
-
-// /* store smart pointer management */
-// template <typename T>
-// struct shared_ref_delete
-// {
-//   constexpr shared_ref_delete() noexcept = default;
-//   void operator() (T *t) const {  t->release_ref();  }
-// };
-
-// template <class I>
-// using shared_ref = std::shared_ptr<I>;
-
-// template <typename Obj, class Deleter = shared_ref_delete<Obj>>
-// shared_ref<Obj> make_shared_ref(Obj *obj_)
-// {
-//   return shared_ref<Obj>(obj_,Deleter());
-// }

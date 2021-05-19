@@ -70,4 +70,10 @@ class MemoryResource(pymmcore.MemoryResource):
         '''
         super()._MemoryResource_release_named_memory(handle)
 
+    @methodcheck(types=[str])
+    def erase_named_memory(self, name):
+        '''
+        Erase a named-memory object from the memory resource
+        '''
+        super()._MemoryResource_erase_named_memory(name)
 

@@ -14,11 +14,17 @@
 import pymmcore
 import pymm
 import numpy as np
+import gc
+import sys
+import copy
 
 from .memoryresource import MemoryResource
 from .check import methodcheck
 
 class shelf():
+    '''
+    A shelf is a logical collection of variables held in CXL or persistent memory
+    '''
     def __init__(self, name, size_mb=32):
         self.name = name
         self.mr = MemoryResource(name, size_mb)
@@ -26,24 +32,40 @@ class shelf():
         print(self.mr)
 
     def __setattr__(self, name, value):
-#        if name in self.__dict__:
-            # we need to explicitly delete the original shelved variable
-#            print("ALREADY THRER!!!!")
+        # prevent implicit replacement (at least for the moment)
+        if name in self.__dict__:
+            if name == 'name' or name == 'mr':
+                raise RuntimeError('cannot change shelf attribute')
+            raise RuntimeError('cannot implicity replace object. use erase first')
 
+        # check for supported types
         if isinstance(value, pymm.ndarray):
-#            if name in self.__dict__:
-#                old_value = self.__dict__[name]
-#                tmp_name = name + 'pending'
-#                new_instance = value.make_instance(self.mr, tmp_name)
-#                
-#                self.__dict__[name] = 
-#            else:
-#                print("NEW INSTANCE")
             self.__dict__[name] = value.make_instance(self.mr, name)
             return
-        else:
+        elif name == 'name' or name == 'mr': # allow our __init__ assignments
             self.__dict__[name] = value
+        else:
+            raise RuntimeError('cannot create this type (' + str(type(value)) + ') of object on the shelf')
 
+        
+    @methodcheck(types=[str])
+    def erase(self, name):
+        '''
+        Erase and remove variable from the shelf
+        '''
+        # check the thing we are trying to erase is on the shelf
+        if not name in self.__dict__:
+            raise RuntimeError('attempting to erase something that is not on the shelf')
+
+        # sanity check
+        if sys.getrefcount(self.__dict__[name]) != 2:
+            raise RuntimeError('erase failed due to outstanding references')
+
+        self.__dict__.pop(name)
+        gc.collect() # force gc
+        
+        # then remove the named memory from the store
+        self.mr.erase_named_memory(name)
 
 
 
@@ -77,10 +99,10 @@ class shelf():
 #
 # myShelf.z = X   or myshelf.z = myshelf.x
 #
-# >> remove from persistent memory
+# >> remove from persistent memory (requires no outstanding references)
 #
-# myShelf.erase(myShelf.z)?
-# myShelf.erase(z)
+# myShelf.erase('z')
+
 
 
 
