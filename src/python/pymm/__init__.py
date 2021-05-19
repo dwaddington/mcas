@@ -52,6 +52,12 @@ def test_shelf():
     print(s.x)
     return s
 
+def test_memoryresource():
+    import pymm
+    mr = pymm.MemoryResource('zzz', 1024)
+    nm = mr.create_named_memory('zimbar', 8)
+    print(nm.handle,hex(pymm.pymmcore.memoryview_addr(nm.buffer)))
+
 def test1():
     print('test1 running...')
     mr = MemoryResource()

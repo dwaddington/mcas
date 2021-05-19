@@ -70,39 +70,40 @@ class shelved_ndarray(np.ndarray):
             for k in shape:
                 size *= k
                 
-        (value_handle, buffer) = memory_resource.open_named_memory(name)
+        value_named_memory = memory_resource.open_named_memory(name)
 
-        if value_handle == None:
+        if value_named_memory == None:
             # create a newly allocated named memory from MemoryResource
             #
-            (value_handle, buffer) = memory_resource.create_named_memory(name,
-                                                                         int(size*_dbytes),
-                                                                         8, # alignment
-                                                                         True) # zero
+            value_named_memory = memory_resource.create_named_memory(name,
+                                                                     int(size*_dbytes),
+                                                                     8, # alignment
+                                                                     True) # zero
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=buffer,
+            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
                                       strides=strides, order=order)
 
             # create and store metadata header
             metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str)
-            (metadata_handle, metadata_buffer) = memory_resource.create_named_memory(name + '-meta', len(metadata), 0, False);
-            metadata_buffer[:] = metadata
-            print("Saved metadata OK ", len(metadata_buffer))
+            
+            metadata_named_memory = memory_resource.create_named_memory(name + '-meta', len(metadata), 0, False);
+            metadata_named_memory.buffer[:] = metadata
+            print("Saved metadata OK ", len(metadata_named_memory.buffer))
             print("shape:", shape)
         else:
-            # entity already exists, load metadata
-            (metadata_handle, metadata_buffer) = memory_resource.open_named_memory(name + '-meta')
-            print("Opened metadata ", len(metadata_buffer))
+            # entity already exists, load metadata            
+            metadata_named_memory = memory_resource.open_named_memory(name + '-meta')
+            print("Opened metadata OK ", len(metadata_named_memory.buffer))
             hdr = pymmcore.ndarray_read_header(metadata_buffer)
             print("Read header:", hdr)
-            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=buffer,
+            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
                                       strides=hdr['strides'], order=order)
-            print("Recoverd ndarray!")
+            print("Recovered ndarray!")
 
         self._memory_resource = memory_resource
-        self._value_handle = value_handle
-        self._metadata_handle = metadata_handle
+        self._value_named_memory = value_named_memory
+        self._metadata_named_memory = metadata_named_memory
         self.name = name
         return self
 
@@ -110,13 +111,14 @@ class shelved_ndarray(np.ndarray):
         pass
             
     def __del__(self):
-        
+        pass
         # delete the object (i.e. ref count == 0) means
         # releasing the memory - the object is not actually freed
         #
-        self._memory_resource.release_named_memory(self._value_handle)
-        self._memory_resource.release_named_memory(self._metadata_handle)        
+        #self._memory_resource.release_named_memory(self._value_handle)
+        #self._memory_resource.release_named_memory(self._metadata_handle)        
 
     
 
-    def __array_finalize__(self, obj): pass
+    def __array_finalize__(self, obj):
+        pass

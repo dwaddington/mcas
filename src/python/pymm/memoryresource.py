@@ -14,6 +14,17 @@
 import pymmcore
 from .check import methodcheck
 
+class MemoryReference():
+    def __init__(self, internal_handle, mr, memview):
+        self.handle = internal_handle
+        self.mr = mr
+        self.buffer = memview
+
+    def __del__(self):
+        print("releasing named memory @", hex(pymmcore.memoryview_addr(self.buffer)))
+        self.mr.release_named_memory_by_handle(self.handle)
+
+        
 class MemoryResource(pymmcore.MemoryResource):
     '''
     MemoryResource represents a heap allocator and physical memory
@@ -29,20 +40,34 @@ class MemoryResource(pymmcore.MemoryResource):
         '''
         Create a contiguous piece of memory and name it
         '''
-        return super()._MemoryResource_create_named_memory(name, size, alignment, zero)
+        (handle, mem) = super()._MemoryResource_create_named_memory(name, size, alignment, zero)
+        if handle == None:
+            return None
+
+        return MemoryReference(handle,self,mem)
 
     @methodcheck(types=[str])
     def open_named_memory(self, name):
         '''
         Open existing name memory
         '''
-        return super()._MemoryResource_open_named_memory(name)
+        (handle, mem) = super()._MemoryResource_open_named_memory(name)
+        if handle == None:
+            return None
+        return MemoryReference(handle,self,mem)
 
-    @methodcheck(types=[int])
-    def release_named_memory(self, lock_handle):
+    @methodcheck(types=[MemoryReference])
+    def release_named_memory(self, ref : MemoryReference):
         '''
         Release a contiguous piece of memory (i.e. unlock)
         '''
-        super()._MemoryResource_release_named_memory(lock_handle)
-    
+        super()._MemoryResource_release_named_memory(ref.handle)
+
+    @methodcheck(types=[int])
+    def release_named_memory_by_handle(self, handle):
+        '''
+        Release a contiguous piece of memory (i.e. unlock)
+        '''
+        super()._MemoryResource_release_named_memory(handle)
+
 
