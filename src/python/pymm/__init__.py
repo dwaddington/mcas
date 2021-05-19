@@ -15,6 +15,7 @@ import pymmcore
 
 from .ndarray import ndarray
 from .shelf import shelf
+from .shelf import ShelvedCommon
 from .memoryresource import MemoryResource
 
 class CustomList(list):

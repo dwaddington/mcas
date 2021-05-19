@@ -21,6 +21,31 @@ import copy
 from .memoryresource import MemoryResource
 from .check import methodcheck
 
+# common functions for shelved types
+#
+class ShelvedCommon:
+    '''
+    Common superclass for shelved objects
+    '''
+    def value_only_transaction(self, F, *args):
+        self._value_named_memory.tx_begin()
+        result = F(*args)
+        self._value_named_memory.tx_commit()
+        return result
+
+    def __getattr__(self, name):
+        if name == 'memory':
+            return (self._value_named_memory.addr(), self._metadata_named_memory.addr())
+        else:
+            raise AttributeError()
+            
+
+class Shadow:
+    '''
+    Indicate type is a shadow type
+    '''
+    pass
+
 class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
@@ -33,15 +58,18 @@ class shelf():
 
     def __setattr__(self, name, value):
         # prevent implicit replacement (at least for the moment)
-        if name in self.__dict__:
-            if name == 'name' or name == 'mr':
-                raise RuntimeError('cannot change shelf attribute')
-            raise RuntimeError('cannot implicity replace object. use erase first')
+        print('setattr: ', name)
+#        if name in self.__dict__:
+#            if name == 'name' or name == 'mr':
+#                raise RuntimeError('cannot change shelf attribute')
+#            raise RuntimeError('cannot implicity replace object. use erase first')
 
         # check for supported types
         if isinstance(value, pymm.ndarray):
             self.__dict__[name] = value.make_instance(self.mr, name)
             return
+        elif issubclass(type(value), pymm.ShelvedCommon):
+            pass
         elif name == 'name' or name == 'mr': # allow our __init__ assignments
             self.__dict__[name] = value
         else:

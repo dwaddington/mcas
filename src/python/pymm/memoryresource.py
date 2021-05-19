@@ -24,6 +24,31 @@ class MemoryReference():
         print("releasing named memory @", hex(pymmcore.memoryview_addr(self.buffer)))
         self.mr.release_named_memory_by_handle(self.handle)
 
+    def addr(self):
+        '''
+        For debugging. Get address of memory view
+        '''
+        return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
+
+    def tx_begin(self):
+        '''
+        Start consistent transaction
+        '''
+        print('tx_begin')
+
+    def tx_commit(self):
+        '''
+        Commit consistent transaction
+        '''
+        print('tx_commit')
+        
+    def persist(self):
+        '''
+        Flush any cached memory (normally for persistence)
+        '''
+        self.mr._MemoryResource_persist_memory_view(self.buffer)
+
+
         
 class MemoryResource(pymmcore.MemoryResource):
     '''

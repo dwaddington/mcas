@@ -16,12 +16,14 @@ import numpy as np
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
+from .shelf import Shadow
+from .shelf import ShelvedCommon
 
 dtypedescr = np.dtype
-
+    
 # shadow type for ndarray
 #
-class ndarray:
+class ndarray(Shadow):
     '''
     ndarray that is stored in a memory resource
     '''
@@ -44,11 +46,18 @@ class ndarray:
                                order = self.__p_order);
     def __str__(self):
         print('shadow ndarray')
-        
 
+
+# decorator to redirect and flush
+def redirect_and_flush(F):
+    def wrapper(*args):
+        print(*args)
+        return wrapper
+
+        
 # concrete subclass for ndarray
 #
-class shelved_ndarray(np.ndarray):
+class shelved_ndarray(np.ndarray, ShelvedCommon):
     '''
     ndarray that is stored in a memory resource
     '''
@@ -95,7 +104,7 @@ class shelved_ndarray(np.ndarray):
             # entity already exists, load metadata            
             metadata_named_memory = memory_resource.open_named_memory(name + '-meta')
             print("Opened metadata OK ", len(metadata_named_memory.buffer))
-            hdr = pymmcore.ndarray_read_header(metadata_buffer)
+            hdr = pymmcore.ndarray_read_header(metadata_named_memory.buffer)
             print("Read header:", hdr)
             self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
                                       strides=hdr['strides'], order=order)
@@ -107,9 +116,23 @@ class shelved_ndarray(np.ndarray):
         self.name = name
         return self
 
-    def convert_dtype(type_num):
-        pass
-            
+
+    # in-place methods need to be transactional
+    def fill(self, value):
+        return super().value_only_transaction(super().fill, value)
+
+    def byteswap(self, inplace):
+        if inplace == True:
+            return super().value_only_transaction(super().byteswap, True)
+        else:
+            return super().byteswap(False)
+
+
+    # in-place addition
+    def __iadd__(self, value):
+        print('iadd')
+        return super().value_only_transaction(super().__iadd__, value)
+        
     def __del__(self):
         pass
         # delete the object (i.e. ref count == 0) means

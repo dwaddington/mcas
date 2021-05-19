@@ -6,6 +6,7 @@
 #include <api/kvstore_itf.h>
 #include <Python.h>
 #include <structmember.h>
+#include <libpmem.h>
 
 /* defaults */
 constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
@@ -485,6 +486,40 @@ static PyObject * MemoryResource_erase_named_memory(PyObject * self,
   return PyLong_FromLong(0);
 }
 
+
+static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"memoryview",
+                                 NULL,
+  };
+
+  PyObject * mview = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &mview)) {
+    PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+    return NULL;
+  }
+
+  if (! PyMemoryView_Check(mview)) {
+    PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+    return NULL;
+  }
+
+  Py_buffer * pybuffer = PyMemoryView_GET_BUFFER(mview);
+
+  PNOTICE("persisting %p %lu", pybuffer->buf, pybuffer->len);
+  pmem_persist(pybuffer->buf, pybuffer->len); /* part of libpmem */
+  
+  return PyLong_FromLong(0);
+}
+
+
+
+
 static PyMemberDef MemoryResource_members[] =
   {
    //  {"port", T_ULONG, offsetof(MemoryResource, _port), READONLY, "Port"},
@@ -503,7 +538,9 @@ static PyMethodDef MemoryResource_methods[] =
    {"_MemoryResource_release_named_memory", (PyCFunction) MemoryResource_release_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_release_named_memory(handle)"},
    {"_MemoryResource_erase_named_memory", (PyCFunction) MemoryResource_erase_named_memory, METH_VARARGS | METH_KEYWORDS,
-    "MemoryResource_erase_named_memory(handle)"},   
+    "MemoryResource_erase_named_memory(handle)"},
+   {"_MemoryResource_persist_memory_view", (PyCFunction) MemoryResource_persist_memory_view, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_persist_memory_view(memview)"},
    {NULL}
   };
 
