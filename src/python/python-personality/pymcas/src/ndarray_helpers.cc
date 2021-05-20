@@ -206,8 +206,10 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
 
   if(global::debug_level > 1) {
     PLOG("saving ndims=%d", ndims);
-    for(int d=0; d < ndims; d++)
+    for(int d=0; d < ndims; d++) {
       PLOG("dim=%ld", dims[d]);
+      PLOG("stride=%ld", strides[d]);
+    }
   }
 
   /* selected flags */

@@ -435,9 +435,7 @@ static PyObject * MemoryResource_rename_named_memory(PyObject * self,
   auto mr = reinterpret_cast<MemoryResource *>(self);
   auto key_handle = reinterpret_cast<IKVStore::key_t>(handle);
 
-  status_t s;
-
-  s = mr->_store->unlock(mr->_pool, key_handle);
+  status_t s = mr->_store->unlock(mr->_pool, key_handle);
 
   if (s != S_OK) {
     PyErr_SetString(PyExc_RuntimeError,"unlock failed unexpectedly");
@@ -486,7 +484,102 @@ static PyObject * MemoryResource_erase_named_memory(PyObject * self,
   return PyLong_FromLong(0);
 }
 
+/** 
+ * Copy-based crash-consistent put of a value
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return 
+ */
+static PyObject * MemoryResource_put_named_memory(MemoryResource *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"name",
+                                 "data",
+                                 NULL};
 
+  char * name = nullptr;
+  PyObject * data = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "sO",
+                                    const_cast<char**>(kwlist),
+                                    &name,
+                                    &data)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  if (! PyByteArray_Check(data)) {
+    PyErr_SetString(PyExc_RuntimeError,"data parameter should be bytearray type");
+    return NULL;
+  }
+
+  auto data_len = PyByteArray_Size(data);
+  if(data_len == 0) {
+    PyErr_SetString(PyExc_RuntimeError,"data bytearray should not be empty");
+    return NULL;
+  }
+    
+  auto data_ptr = PyByteArray_AsString(data);
+  assert(data_ptr);
+  
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  /* overwrites existing values */
+  /* we might have to create another and swap keys - then we have a backup
+     to tie to the metadata+value composite transaction */
+  status_t s = mr->_store->put(mr->_pool,
+                               name,
+                               data_ptr,
+                               data_len);
+  
+  return PyLong_FromLong(s);
+}
+
+
+static PyObject * MemoryResource_get_named_memory(MemoryResource *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"name",
+                                 NULL};
+
+  char * name = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "s",
+                                    const_cast<char**>(kwlist),
+                                    &name)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  void * data_ptr = nullptr;
+  size_t data_len = 0;
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  status_t s = mr->_store->get(mr->_pool,
+                               name,
+                               data_ptr,
+                               data_len);
+
+  auto result = PyByteArray_FromStringAndSize(static_cast<const char *>(data_ptr), data_len);
+  //  ::free(data_ptr);
+  
+  return result;
+}
+
+/** 
+ * Persist a memory view with libpmem
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return 
+ */
 static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObject *args, PyObject *kwds)
 {
   static const char *kwlist[] = {"memoryview",
@@ -541,6 +634,10 @@ static PyMethodDef MemoryResource_methods[] =
     "MemoryResource_erase_named_memory(handle)"},
    {"_MemoryResource_persist_memory_view", (PyCFunction) MemoryResource_persist_memory_view, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_persist_memory_view(memview)"},
+   {"_MemoryResource_put_named_memory", (PyCFunction) MemoryResource_put_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_put_named_memory(data)"},
+   {"_MemoryResource_get_named_memory", (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_get_named_memory(data)"},   
    {NULL}
   };
 

@@ -12,6 +12,8 @@
 #
 
 import pymmcore
+import pickle
+
 from .check import methodcheck
 
 class MemoryReference():
@@ -58,7 +60,7 @@ class MemoryResource(pymmcore.MemoryResource):
     '''
     def __init__(self, name, size_mb):
         self._named_memory = {}
-        super().__init__(pool_name=name, size_mb=size_mb)
+        super().__init__(pool_name=name, size_mb=size_mb)        
     
     @methodcheck(types=[str,int,int,bool])
     def create_named_memory(self, name, size, alignment=8, zero=True):
@@ -101,4 +103,22 @@ class MemoryResource(pymmcore.MemoryResource):
         Erase a named-memory object from the memory resource
         '''
         super()._MemoryResource_erase_named_memory(name)
+
+    def put_named_memory(self, name, value):
+        '''
+        Copy-based crash-consistent put of named memory value
+        '''
+        if not isinstance(value, bytearray):
+            raise RuntimeError('put_named_memory requires bytearray data')
+            
+        super()._MemoryResource_put_named_memory(name, value)
+
+    @methodcheck(types=[str])
+    def get_named_memory(self, name):
+        '''
+        Copy-based get of named memory value
+        '''
+        return super()._MemoryResource_get_named_memory(name)
+
+    
 

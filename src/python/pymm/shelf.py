@@ -28,16 +28,19 @@ class ShelvedCommon:
     Common superclass for shelved objects
     '''
     def value_only_transaction(self, F, *args):
-        self._value_named_memory.tx_begin()
-        result = F(*args)
-        self._value_named_memory.tx_commit()
-        return result
+        
+        if self._value_named_memory != None:
+            self._value_named_memory.tx_begin()
+            result = F(*args)
+            self._value_named_memory.tx_commit()
+        else:
+            return F(*args)
 
     def __getattr__(self, name):
         if name == 'memory':
-            return (self._value_named_memory.addr(), self._metadata_named_memory.addr())
-        else:
-            raise AttributeError()
+            return self._value_named_memory.addr()
+#        else:
+#            raise AttributeError()
             
 
 class Shadow:
@@ -58,18 +61,19 @@ class shelf():
 
     def __setattr__(self, name, value):
         # prevent implicit replacement (at least for the moment)
-        print('setattr: ', name)
-#        if name in self.__dict__:
-#            if name == 'name' or name == 'mr':
-#                raise RuntimeError('cannot change shelf attribute')
-#            raise RuntimeError('cannot implicity replace object. use erase first')
+        if name in self.__dict__:
+            if issubclass(type(value), pymm.ShelvedCommon):
+                # this happens when an in-place __iadd__ or like operation occurs.  I'm not
+                # quite sure why it happens?
+                return
+            elif name == 'name' or name == 'mr':
+                raise RuntimeError('cannot change shelf attribute')
+            raise RuntimeError('cannot implicity replace object. use erase first')
 
         # check for supported types
         if isinstance(value, pymm.ndarray):
             self.__dict__[name] = value.make_instance(self.mr, name)
             return
-        elif issubclass(type(value), pymm.ShelvedCommon):
-            pass
         elif name == 'name' or name == 'mr': # allow our __init__ assignments
             self.__dict__[name] = value
         else:

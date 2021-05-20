@@ -13,6 +13,7 @@
 
 import pymmcore
 import numpy as np
+import copy
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
@@ -80,6 +81,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                 size *= k
                 
         value_named_memory = memory_resource.open_named_memory(name)
+        metadata_key = name + '-meta'
 
         if value_named_memory == None:
             # create a newly allocated named memory from MemoryResource
@@ -95,16 +97,16 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
             # create and store metadata header
             metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str)
-            
-            metadata_named_memory = memory_resource.create_named_memory(name + '-meta', len(metadata), 0, False);
-            metadata_named_memory.buffer[:] = metadata
-            print("Saved metadata OK ", len(metadata_named_memory.buffer))
+            memory_resource.put_named_memory(metadata_key, metadata)
+
+            print("Saved metadata OK ", len(metadata))
             print("shape:", shape)
         else:
             # entity already exists, load metadata            
-            metadata_named_memory = memory_resource.open_named_memory(name + '-meta')
-            print("Opened metadata OK ", len(metadata_named_memory.buffer))
-            hdr = pymmcore.ndarray_read_header(metadata_named_memory.buffer)
+            #metadata_named_memory = memory_resource.open_named_memory(name + '-meta')
+            metadata = memory_resource.get_named_memory(metadata_key)
+            print("Opened metadata OK ", len(metadata))
+            hdr = pymmcore.ndarray_read_header(memoryview(metadata))
             print("Read header:", hdr)
             self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
                                       strides=hdr['strides'], order=order)
@@ -112,10 +114,19 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
         self._memory_resource = memory_resource
         self._value_named_memory = value_named_memory
-        self._metadata_named_memory = metadata_named_memory
+        self._metadata_key = metadata_key
         self.name = name
         return self
 
+    def update_metadata(self, array):
+        print("updating metadata...")
+        metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str)
+        self._memory_resource.put_named_memory(self._metadata_key, metadata)
+        
+
+    #
+    # reference: https://numpy.org/doc/stable/reference/routines.array-manipulation.html
+    #
 
     # in-place methods need to be transactional
     def fill(self, value):
@@ -125,13 +136,32 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         if inplace == True:
             return super().value_only_transaction(super().byteswap, True)
         else:
-            return super().byteswap(False)
+            return super().byteswap(False)    
 
-
-    # in-place addition
+    # in-place arithmetic
     def __iadd__(self, value):
-        print('iadd')
         return super().value_only_transaction(super().__iadd__, value)
+
+    def __imul__(self, value):
+        return super().value_only_transaction(super().__imul__, value)
+
+    def __isub__(self, value):
+        return super().value_only_transaction(super().__isub__, value)
+    # TODO... more
+
+    # set item, e.g. x[2] = 2
+    def __setitem__(self, position, x):
+        return super().value_only_transaction(super().__setitem__, position, x)
+
+    def flip(self, m, axis=None):
+        return super().value_only_transaction(super().flip, m, axis)
+
+
+    # operations that return new views on same data.  we want to change
+    # the behavior to give a normal volatile version
+    def reshape(self, shape, order='C'):
+        x = np.array(self) # copy constructor
+        return x.reshape(shape)
         
     def __del__(self):
         pass
