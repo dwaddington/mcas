@@ -123,7 +123,6 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
 
   if(backend == "hstore" || backend == "hstore-cc") {
 
-    /* TODO configure from params */
     std::stringstream ss;
     ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
     //  PLOG("dax config: %s", ss.str().c_str());
@@ -565,6 +564,12 @@ static PyObject * MemoryResource_get_named_memory(MemoryResource *self, PyObject
                                data_ptr,
                                data_len);
 
+  if(s != S_OK) {
+    PyErr_SetString(PyExc_RuntimeError,"store->get failed unexpectedly");
+    return NULL;
+  }
+
+
   auto result = PyByteArray_FromStringAndSize(static_cast<const char *>(data_ptr), data_len);
   //  ::free(data_ptr);
   
@@ -610,6 +615,45 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
   return PyLong_FromLong(0);
 }
 
+/** 
+ * Get list of named memory items (keys) belonging to resource (pool)
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return List of names
+ */
+static PyObject * MemoryResource_get_named_memory_list(MemoryResource *self, PyObject *args)
+{
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  auto pool = mr->_pool;
+  auto pi = mr->_store->open_pool_iterator(pool);
+
+  status_t s = S_OK;
+  PyObject* result = PyList_New(0);
+  
+  do {
+    bool time_match;
+    KVStore::pool_reference_t pool_ref;
+
+    s = mr->_store->deref_pool_iterator(pool, pi, 0, 0, pool_ref, time_match, true);
+
+    if(s != S_OK) break;
+
+    PyObject * strobj = PyUnicode_FromString(pool_ref.get_key().c_str());
+    if(PyList_Append(result, strobj))
+      throw General_exception("PyList_Append failed unexpectedly");    
+
+  }
+  while(s == S_OK);
+
+  mr->_store->close_pool_iterator(pool, pi);
+  
+  return result;
+}
+
 
 
 
@@ -637,7 +681,10 @@ static PyMethodDef MemoryResource_methods[] =
    {"_MemoryResource_put_named_memory", (PyCFunction) MemoryResource_put_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_put_named_memory(data)"},
    {"_MemoryResource_get_named_memory", (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
-    "MemoryResource_get_named_memory(data)"},   
+    "MemoryResource_get_named_memory(data)"},
+   {"_MemoryResource_get_named_memory_list", (PyCFunction) MemoryResource_get_named_memory_list, METH_NOARGS,
+    "MemoryResource_get_named_memory_list()"},   
+   
    {NULL}
   };
 

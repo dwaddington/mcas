@@ -58,9 +58,14 @@ class MemoryResource(pymmcore.MemoryResource):
     resources.  It is backed by an MCAS store component.
 
     '''
-    def __init__(self, name, size_mb):
+    def __init__(self, name, size_mb, pmem_path='/dev/dax0.0'):
         self._named_memory = {}
-        super().__init__(pool_name=name, size_mb=size_mb)        
+        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path)
+
+    @methodcheck(types=[])        
+    def list_items(self):
+        all_items = super()._MemoryResource_get_named_memory_list()
+        return [val for val in all_items if not val.endswith('-meta')]
     
     @methodcheck(types=[str,int,int,bool])
     def create_named_memory(self, name, size, alignment=8, zero=True):

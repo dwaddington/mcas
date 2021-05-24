@@ -12,6 +12,7 @@
 #
 
 import pymmcore
+import numpy as np
 
 from .ndarray import ndarray
 from .shelf import shelf

@@ -39,12 +39,30 @@ class ndarray(Shadow):
         self.__p_order = order
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
+        '''
+        Create a concrete instance from the shadow
+        '''
         return shelved_ndarray(memory_resource,
                                name,
                                shape = self.__p_shape,
                                dtype = self.__p_dtype,
                                strides = self.__p_strides,
                                order = self.__p_order);
+
+    def existing_instance(memory_resource: MemoryResource, name: str):
+        '''
+        Determine if an persistent named memory object corresponds to this type
+        '''
+        metadata = memory_resource.get_named_memory(name + '-meta')
+        if metadata is None:
+            return None
+
+        pymmcore.ndarray_read_header(memoryview(metadata))
+
+        return shelved_ndarray(memory_resource,
+                               name,
+                               shape = None)
+
     def __str__(self):
         print('shadow ndarray')
 
@@ -55,7 +73,8 @@ def redirect_and_flush(F):
         print(*args)
         return wrapper
 
-        
+
+    
 # concrete subclass for ndarray
 #
 class shelved_ndarray(np.ndarray, ShelvedCommon):
@@ -71,9 +90,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         descr = dtypedescr(dtype)
         _dbytes = descr.itemsize
 
-        if shape is None:
-            raise ValueError("don't know how to handle no shape")
-        else:
+        if not shape is None:
             if not isinstance(shape, tuple):
                 shape = (shape,)
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
@@ -83,7 +100,8 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         value_named_memory = memory_resource.open_named_memory(name)
         metadata_key = name + '-meta'
 
-        if value_named_memory == None:
+        if value_named_memory == None: # does not exist yet
+            #
             # create a newly allocated named memory from MemoryResource
             #
             value_named_memory = memory_resource.create_named_memory(name,
@@ -103,7 +121,6 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             print("shape:", shape)
         else:
             # entity already exists, load metadata            
-            #metadata_named_memory = memory_resource.open_named_memory(name + '-meta')
             metadata = memory_resource.get_named_memory(metadata_key)
             print("Opened metadata OK ", len(metadata))
             hdr = pymmcore.ndarray_read_header(memoryview(metadata))

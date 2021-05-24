@@ -13,7 +13,6 @@
 
 import pymmcore
 import pymm
-import numpy as np
 import gc
 import sys
 import copy
@@ -57,7 +56,14 @@ class shelf():
         self.name = name
         self.mr = MemoryResource(name, size_mb)
         # todo iterate data and check value-metadata pairs
-        print(self.mr)
+        items = self.mr.list_items()
+        for name in items:
+            if not name in self.__dict__:
+                # for each supported type
+                existing = pymm.ndarray.existing_instance(self.mr, name)
+                if not type(existing) is None:
+                    self.__dict__[name] = existing
+                    print("Value '{}' has been reloaded OK!".format(name))
 
     def __setattr__(self, name, value):
         # prevent implicit replacement (at least for the moment)
@@ -79,6 +85,17 @@ class shelf():
         else:
             raise RuntimeError('cannot create this type (' + str(type(value)) + ') of object on the shelf')
 
+    @methodcheck(types=[])
+    def get_item_names(self):
+        '''
+        Get names of items on the shelf
+        '''
+        items = []
+        for s in self.__dict__:
+            if issubclass(type(self.__dict__[s]), pymm.ShelvedCommon):
+                items.append(s) # or to add object itself...self.__dict__[s]
+        return items
+            
         
     @methodcheck(types=[str])
     def erase(self, name):
