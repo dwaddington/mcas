@@ -57,16 +57,19 @@ class shelf():
         self.mr = MemoryResource(name, size_mb)
         # todo iterate data and check value-metadata pairs
         items = self.mr.list_items()
-        for name in items:
-            if not name in self.__dict__:
+        for varname in items:
+            if not varname in self.__dict__:
                 # for each supported type
-                existing = pymm.ndarray.existing_instance(self.mr, name)
+                existing = pymm.ndarray.existing_instance(self.mr, varname)
                 if not type(existing) is None:
-                    self.__dict__[name] = existing
-                    print("Value '{}' has been reloaded OK!".format(name))
+                    self.__dict__[varname] = existing
+                    print("Value '{}' has been reloaded OK from shelf '{}'!".format(varname, name))
 
     def __setattr__(self, name, value):
         # prevent implicit replacement (at least for the moment)
+        if value == None: # why this?
+            return
+        
         if name in self.__dict__:
             if issubclass(type(value), pymm.ShelvedCommon):
                 # this happens when an in-place __iadd__ or like operation occurs.  I'm not
@@ -74,7 +77,7 @@ class shelf():
                 return
             elif name == 'name' or name == 'mr':
                 raise RuntimeError('cannot change shelf attribute')
-            raise RuntimeError('cannot implicity replace object. use erase first')
+            raise RuntimeError('cannot implicity replace object. use erase first. name={} type={}'.format(name,type(value)))
 
         # check for supported types
         if isinstance(value, pymm.ndarray):
