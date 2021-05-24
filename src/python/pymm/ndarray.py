@@ -11,6 +11,8 @@
 #    limitations under the License.
 #
 
+#    Notes: not all methods hooked.
+
 import pymmcore
 import numpy as np
 import copy
@@ -136,7 +138,14 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         print("updating metadata...")
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str)
         self._memory_resource.put_named_memory(self._metadata_key, metadata)
-        
+
+    # each type will handle its own transaction methodology.  this
+    # is because metadata may be dealt with differently
+    #
+    def _value_only_transaction(self, F, *args):
+        self._value_named_memory.tx_begin()
+        result = F(*args)
+        self._value_named_memory.tx_commit()
 
     #
     # reference: https://numpy.org/doc/stable/reference/routines.array-manipulation.html
@@ -144,31 +153,31 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
     # in-place methods need to be transactional
     def fill(self, value):
-        return super().value_only_transaction(super().fill, value)
+        return self._value_only_transaction(super().fill, value)
 
     def byteswap(self, inplace):
         if inplace == True:
-            return super().value_only_transaction(super().byteswap, True)
+            return self._value_only_transaction(super().byteswap, True)
         else:
             return super().byteswap(False)    
 
     # in-place arithmetic
     def __iadd__(self, value):
-        return super().value_only_transaction(super().__iadd__, value)
+        return self._value_only_transaction(super().__iadd__, value)
 
     def __imul__(self, value):
-        return super().value_only_transaction(super().__imul__, value)
+        return self._value_only_transaction(super().__imul__, value)
 
     def __isub__(self, value):
-        return super().value_only_transaction(super().__isub__, value)
+        return self._value_only_transaction(super().__isub__, value)
     # TODO... more
 
     # set item, e.g. x[2] = 2
     def __setitem__(self, position, x):
-        return super().value_only_transaction(super().__setitem__, position, x)
+        return self._value_only_transaction(super().__setitem__, position, x)
 
     def flip(self, m, axis=None):
-        return super().value_only_transaction(super().flip, m, axis)
+        return self._value_only_transaction(super().flip, m, axis)
 
 
     # operations that return new views on same data.  we want to change
@@ -182,7 +191,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         # delete the object (i.e. ref count == 0) means
         # releasing the memory - the object is not actually freed
         #
-        #self._memory_resource.release_named_memory(self._value_handle)
+        #self._memory_resource.release_named_memory(self.self._value_handle)
         #self._memory_resource.release_named_memory(self._metadata_handle)        
 
     
