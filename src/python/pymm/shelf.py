@@ -58,10 +58,9 @@ class shelf():
                     print("Value '{}' has been reloaded OK from shelf '{}'!".format(varname, name))
 
     def __setattr__(self, name, value):
-        # prevent implicit replacement (at least for the moment)
-        #if value == None: # why this?
-        #    return
-        
+        '''
+        Handle attribute assignment
+        '''
         if name in self.__dict__:
             if issubclass(type(value), pymm.ShelvedCommon):
                 # this happens when an in-place __iadd__ or like operation occurs.  I'm not
@@ -75,11 +74,7 @@ class shelf():
             self.__dict__[name] = value.make_instance(self.mr, name)
         else:
             self.__dict__[name] = value
-        # elif name == 'name' or name == 'mr': # allow our __init__ assignments
-        #     self.__dict__[name] = value
-        # else:
-        #     raise RuntimeError('cannot create this type (' + str(type(value)) + ') of object on the shelf')
-
+            
     @methodcheck(types=[])
     def get_item_names(self):
         '''
