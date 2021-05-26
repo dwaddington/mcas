@@ -49,7 +49,7 @@ class ndarray(Shadow):
                                shape = self.__p_shape,
                                dtype = self.__p_dtype,
                                strides = self.__p_strides,
-                               order = self.__p_order);
+                               order = self.__p_order)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -64,6 +64,17 @@ class ndarray(Shadow):
 
     def __str__(self):
         print('shadow ndarray')
+
+
+    def build_from_copy(memory_resource: MemoryResource, name, array):
+        new_array = shelved_ndarray(memory_resource,
+                                    name,
+                                    shape = array.shape,
+                                    dtype = array.dtype,
+                                    strides = array.strides)
+        # now copy the data
+        new_array[:] = array
+        return new_array
 
 
 # decorator to redirect and flush

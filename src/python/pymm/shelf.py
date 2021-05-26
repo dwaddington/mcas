@@ -16,6 +16,7 @@ import pymm
 import gc
 import sys
 import copy
+import numpy
 
 from .memoryresource import MemoryResource
 from .check import methodcheck
@@ -40,27 +41,51 @@ class Shadow:
     '''
     pass
 
+
+def _shelf__of_supported_shadow_type(value):
+    '''
+    Helper function to return True if value is of a shadow type
+    '''
+    return isinstance(value, pymm.ndarray)
+
+def _shelf__of_supported_concrete_type(value):
+    return isinstance(value, numpy.ndarray)
+
 class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
     '''
-    def __init__(self, name, size_mb=32):
+    def __init__(self, name, size_mb=32, pmem_path='/dev/dax0.0',force_new=False):
         self.name = name
-        self.mr = MemoryResource(name, size_mb)
+        self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, force_new=force_new)
+        if self.mr == None:
+            raise RuntimeError('shelf initialization failed')
+        
         # todo iterate data and check value-metadata pairs
         items = self.mr.list_items()
         for varname in items:
             if not varname in self.__dict__:
-                # for each supported type
+                # extend for each supported type
                 existing = pymm.ndarray.existing_instance(self.mr, varname)
                 if not type(existing) is None:
                     self.__dict__[varname] = existing
-                    print("Value '{}' has been reloaded OK from shelf '{}'!".format(varname, name))
+                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
 
     def __setattr__(self, name, value):
         '''
         Handle attribute assignment
         '''
+#        print('setattr {} = {}'.format(name, type(value)))
+
+        # constant members
+        if self.mr and name is 'mr':
+            raise RuntimeError('invalid assignment')
+
+        # selective pass through
+        if name in ['items','name','mr']:
+            self.__dict__[name] = value
+            return
+            
         if name in self.__dict__:
             if issubclass(type(value), pymm.ShelvedCommon):
                 # this happens when an in-place __iadd__ or like operation occurs.  I'm not
@@ -69,11 +94,23 @@ class shelf():
             elif name == 'name' or name == 'mr':
                 raise RuntimeError('cannot change shelf attribute')
 
-        # check for supported types
-        if isinstance(value, pymm.ndarray):
-            self.__dict__[name] = value.make_instance(self.mr, name)
+        # check for supported shadow types
+        if __of_supported_shadow_type(value):
+            # create instance from shadow type
+            self.__dict__[name] = value.make_instance(self.mr, name)            
+        elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
+            self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
+        elif issubclass(type(value), pymm.ShelvedCommon):
+            raise RuntimeError('persistent reference not yet supported - use a volatile one!')        
         else:
-            self.__dict__[name] = value
+            raise RuntimeError('non-pymm type ({}, {}) cannot be put on the shelf'.format(name,type(value)))
+
+    def __getattr__(self, name):
+        '''
+        Handle attribute access
+        '''
+        if name == 'items':
+            return self.get_item_names()
             
     @methodcheck(types=[])
     def get_item_names(self):

@@ -150,6 +150,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                  "pmem_path",
                                  "load_addr",
                                  "debug",
+                                 "force_new",
                                  NULL,
   };
 
@@ -158,16 +159,18 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   char * p_path = nullptr;
   char * p_addr = nullptr;
   int debug_level = 0;
-
+  int force_new = 0;
+  
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|issi",
+                                    "s|issip",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
                                     &size_mb,
                                     &p_path,
                                     &p_addr,
-                                    &debug_level)) {
+                                    &debug_level,
+                                    &force_new)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
     PWRN("bad arguments or argument types to MemoryResource constructor");
     return -1;
@@ -184,7 +187,12 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   
   assert(self->_store);
 
-  if((self->_pool = self->_store->create_pool(pool_name, MiB(32))) == 0) {
+  if(force_new) {
+    PLOG("forcing new.");
+    self->_pool = self->_store->delete_pool(pool_name);
+  }
+    
+  if((self->_pool = self->_store->create_pool(pool_name, MiB(size_mb))) == 0) {
     PyErr_SetString(PyExc_RuntimeError, "unable to create/open pool");
     return -1;
   }
