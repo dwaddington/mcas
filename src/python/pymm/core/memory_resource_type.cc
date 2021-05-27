@@ -84,14 +84,14 @@ MemoryResource_dealloc(MemoryResource *self)
 {
   assert(self);
 
-  PLOG("MemoryResource: dealloc (%p)", self);
-
   if(self->_store) {
     if(self->_pool)
       self->_store->close_pool(self->_pool);
 
     self->_store->release_ref();
   }
+
+  PLOG("MemoryResource: closed (%p)", self);
   
   assert(self);
   Py_TYPE(self)->tp_free((PyObject*)self);

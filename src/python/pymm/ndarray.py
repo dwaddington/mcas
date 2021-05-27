@@ -30,7 +30,7 @@ class ndarray(Shadow):
     '''
     ndarray that is stored in a memory resource
     '''
-    def __init__(self, shape=None, dtype=float, strides=None, order='C'):
+    def __init__(self, shape, dtype=float, strides=None, order='C'):
 
         # todo check params
         # todo check and invalidate param 'buffer'
@@ -66,22 +66,18 @@ class ndarray(Shadow):
         print('shadow ndarray')
 
 
-    def build_from_copy(memory_resource: MemoryResource, name, array):
+    def build_from_copy(memory_resource: MemoryResource, name: str, array):
         new_array = shelved_ndarray(memory_resource,
                                     name,
                                     shape = array.shape,
                                     dtype = array.dtype,
                                     strides = array.strides)
+
         # now copy the data
-        new_array[:] = array
+        #new_array[:] = array
+        np.copyto(new_array, array, casting='no')
         return new_array
 
-
-# decorator to redirect and flush
-def redirect_and_flush(F):
-    def wrapper(*args):
-        print(*args)
-        return wrapper
 
 
     
@@ -93,7 +89,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     '''
     __array_priority__ = -100.0 # what does this do?
 
-    def __new__(subtype, memory_resource, name, shape=None, dtype=float, strides=None, order='C'):
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
 
         # determine size of memory needed
         #
@@ -145,6 +141,32 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self.name = name
         return self
 
+    def __del__(self):
+        pass
+        # delete the object (i.e. ref count == 0) means
+        # releasing the memory - the object is not actually freed
+        #
+        #self._memory_resource.release_named_memory(self.self._value_handle)
+        #self._memory_resource.release_named_memory(self._metadata_handle)        
+
+    def __array_wrap__(self, out_arr, context=None):
+        # Handle scalars so as not to break ndimage.
+        # See http://stackoverflow.com/a/794812/1221924
+#        print("?{} {} ".format(out_arr.ndim, context))
+        if out_arr.ndim == 0:
+            return out_arr[()]
+        return np.ndarray.__array_wrap__(self, out_arr, context)
+
+    def __getattr__(self, name):
+        print('--- pymm.ndarray.getattr {}'.format(name))
+        if name not in super().__dict__:
+            raise AttributeError("'{}' object has no attribute '{}'".format(type(self),name))
+        else:
+            return super().__dict__[name]
+
+    def asndarray(self):
+        return self.view(np.ndarray)
+    
     def update_metadata(self, array):
         print("updating metadata...")
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str)
@@ -157,7 +179,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._value_named_memory.tx_begin()
         result = F(*args)
         self._value_named_memory.tx_commit()
-
+    
     #
     # reference: https://numpy.org/doc/stable/reference/routines.array-manipulation.html
     #
@@ -197,15 +219,35 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         x = np.array(self) # copy constructor
         return x.reshape(shape)
         
-    def __del__(self):
-        pass
-        # delete the object (i.e. ref count == 0) means
-        # releasing the memory - the object is not actually freed
-        #
-        #self._memory_resource.release_named_memory(self.self._value_handle)
-        #self._memory_resource.release_named_memory(self._metadata_handle)        
 
-    
+    # def __array_finalize__(self, obj):
+    #     # ``self`` is a new object resulting from
+    #     # ndarray.__new__(InfoArray, ...), therefore it only has
+    #     # attributes that the ndarray.__new__ constructor gave it -
+    #     # i.e. those of a standard ndarray.
+    #     #
+    #     # We could have got to the ndarray.__new__ call in 3 ways:
+    #     # From an explicit constructor - e.g. InfoArray():
+    #     #    obj is None
+    #     #    (we're in the middle of the InfoArray.__new__
+    #     #    constructor, and self.info will be set when we return to
+    #     #    InfoArray.__new__)
+    #     if obj is None: return
+    #     # From view casting - e.g arr.view(InfoArray):
+    #     #    obj is arr
+    #     #    (type(obj) can be InfoArray)
+    #     # From new-from-template - e.g infoarr[:3]
+    #     #    type(obj) is InfoArray
+    #     #
+    #     # Note that it is here, rather than in the __new__ method,
+    #     # that we set the default value for 'info', because this
+    #     # method sees all creation of default objects - with the
+    #     # InfoArray.__new__ constructor, but also with
+    #     # arr.view(InfoArray).
+    #     self.info = getattr(obj, 'info', None)
+    #     self._memory_resource = getattr(obj, 'memory_resource', None)
+    #     self._value_named_memory = getattr(obj, 'value_named_memory', None)
+    #     self._metadata_key = getattr(obj, 'metadata_key', None)
+    #     self.name = getattr(obj, 'name', None)
 
-    def __array_finalize__(self, obj):
-        pass
+    #     # We do not need to return anything

@@ -17,9 +17,16 @@ import gc
 import sys
 import copy
 import numpy
+import weakref
 
 from .memoryresource import MemoryResource
 from .check import methodcheck
+
+def colored(r, g, b, text):
+    return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
+
+def print_error(*args):
+    print(colored(255,0,0,*args))
 
 # common functions for shelved types
 #
@@ -71,11 +78,24 @@ class shelf():
                     self.__dict__[varname] = existing
                     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
 
+    def __del__(self):
+        gc.collect()
+        for i in self.__dict__:
+            if i == 'mr':
+                continue
+            this_id = id(self.__dict__[i])
+            for j in gc.get_objects():                
+                if id(j) == this_id:
+                    if sys.getrefcount(j) > 4:
+                        #raise RuntimeError('trying to delete shelf with outstanding references to contents')
+                        print_error('WARNING: deleting shelf with outstanding reference {}-->>{}'.format(i,sys.getrefcount(j)))
+        
+
     def __setattr__(self, name, value):
         '''
         Handle attribute assignment
         '''
-#        print('setattr {} = {}'.format(name, type(value)))
+        print('setattr {} = {}'.format(name, type(value)))
 
         # constant members
         if self.mr and name is 'mr':
@@ -101,7 +121,9 @@ class shelf():
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
-            raise RuntimeError('persistent reference not yet supported - use a volatile one!')        
+            raise RuntimeError('persistent reference not yet supported - use a volatile one!')
+        elif type(value) == type(None):
+            pass
         else:
             raise RuntimeError('non-pymm type ({}, {}) cannot be put on the shelf'.format(name,type(value)))
 
@@ -109,8 +131,18 @@ class shelf():
         '''
         Handle attribute access
         '''
+        print('--- getattr {}'.format(name))
         if name == 'items':
             return self.get_item_names()
+        if name in ['mr']:
+            if not name in self.__dict__:
+                return None
+            return self.__dict__[name]
+        if not name in self.__dict__:
+            raise RuntimeError('invalid member {}'.format(name))
+        else:
+            print('returning weak ref to ',name)
+            return weakref.ref(self.__dict__[name])
             
     @methodcheck(types=[])
     def get_item_names(self):
@@ -134,6 +166,7 @@ class shelf():
             raise RuntimeError('attempting to erase something that is not on the shelf')
 
         # sanity check
+        gc.collect() # force gc
         if sys.getrefcount(self.__dict__[name]) != 2:
             raise RuntimeError('erase failed due to outstanding references')
 

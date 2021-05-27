@@ -10,7 +10,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
-
+import pymm
 import pymmcore
 import numpy as np
 
@@ -19,25 +19,14 @@ from .shelf import shelf
 from .shelf import ShelvedCommon
 from .memoryresource import MemoryResource
 
-class CustomList(list):
-    def __getslice__(self,i,j):
-        return CustomList(list.__getslice__(self, i, j))
-    def __add__(self,rhs):
-        return CustomList(list.__add__(self,rhs))
-    def __mul__(self,rhs):
-        return CustomList(list.__mul__(self,rhs))
-    def __getitem__(self, item):
-        result = list.__getitem__(self, item)
-        try:
-            return CustomList(result)
-        except TypeError:
-            return result
-
 
 def demo(force_new=True):
+    '''
+    Demonstration of pymm features
+    '''
     import pymm
     import numpy as np
-
+  
     # create new shelf (override any existing myShelf)
     #
     s = pymm.shelf('myShelf',1024,pmem_path='/mnt/pmem0',force_new=force_new)
@@ -48,17 +37,71 @@ def demo(force_new=True):
     if s.x.shape != (1000,1000):
         raise RuntimeException('demo: s.x.shape check failed')
 
-    # load data into DRAM
-    from skimage import data, io
+    # perform in-place (on-shelf) operations
+    s.x.fill(3)
+    s.x += 2
+    x_checksum = sum(s.x.tobytes()) # get checksum
+
+    # write binary array data to file
+    dfile = open("array.dat","wb")
+    dfile.write(s.x.tobytes())
+    dfile.close()
+
+    # create new instance
+    s.z = np.ndarray((1000,1000),dtype=np.float)
+
+    # zero-copy read into instance from file
+    with open("array.dat", "rb") as source:
+        source.readinto(memoryview(s.z))
+    z_checksum = sum(s.z.tobytes()) # get checksum
+    if z_checksum != x_checksum:
+        raise RuntimeError('data checksum mismatch')
 
     # this will create a persistent memory copy from RHS DRAM/volatile instance
-    s.y = data.hubble_deep_field()
+    # the right hand side will be garbage collected
+    from skimage import data, io
 
-    io.imshow(s.y)
+    s.i = data.camera()
+    s.j = data.brick()
+
+    s.blended = s.i + (0.5 * s.j)
+    io.imshow(s.blended)
     io.show()
-    
-    return s
 
+    # remove objects from shelf
+    for item in s.items:
+        s.erase(item)
+    
+    return
+
+
+
+def test_shelf_dtor():
+    import pymm
+    import gc
+    import sys
+    
+    s = pymm.shelf('myShelf',32,pmem_path='/mnt/pmem0',force_new=True)
+    print(type(s))
+    s.x = pymm.ndarray((1000,1000),dtype=np.float)
+    s.y = pymm.ndarray((1000,1000),dtype=np.float)
+    print(s.items)
+    t = s.x
+#    u = s.x
+#    v = s.x
+
+    del s
+#    t.fill(8)
+#    print(t)
+#    del s
+#    gc.collect()
+    
+
+    print('Shelf deleted explicitly')
+
+#    print('refcnt(t)=', sys.getrefcount(t))
+#    print('refcnt(u)=', sys.getrefcount(u))
+#    print(t)
     
     
 # def testX():
