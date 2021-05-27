@@ -75,7 +75,7 @@ class ndarray(Shadow):
 
         # now copy the data
         #new_array[:] = array
-        np.copyto(new_array, array, casting='no')
+        np.copyto(new_array, array, casting='yes')
         return new_array
 
 
@@ -113,7 +113,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             value_named_memory = memory_resource.create_named_memory(name,
                                                                      int(size*_dbytes),
                                                                      8, # alignment
-                                                                     True) # zero
+                                                                     False) # zero
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
             self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
@@ -141,24 +141,18 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self.name = name
         return self
 
-    def __del__(self):
-        pass
-        # delete the object (i.e. ref count == 0) means
-        # releasing the memory - the object is not actually freed
-        #
-        #self._memory_resource.release_named_memory(self.self._value_handle)
-        #self._memory_resource.release_named_memory(self._metadata_handle)        
+    def __delete__(self, instance):
+        raise RuntimeError('cannot delete item: use shelf erase')
 
     def __array_wrap__(self, out_arr, context=None):
         # Handle scalars so as not to break ndimage.
         # See http://stackoverflow.com/a/794812/1221924
-#        print("?{} {} ".format(out_arr.ndim, context))
+        print(">--> {} {} ".format(out_arr.ndim, context))
         if out_arr.ndim == 0:
             return out_arr[()]
         return np.ndarray.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
-        print('--- pymm.ndarray.getattr {}'.format(name))
         if name not in super().__dict__:
             raise AttributeError("'{}' object has no attribute '{}'".format(type(self),name))
         else:

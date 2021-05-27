@@ -155,7 +155,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   };
 
   char * p_pool_name = nullptr;
-  int size_mb = 32;
+  uint64_t size_mb = 32;
   char * p_path = nullptr;
   char * p_addr = nullptr;
   int debug_level = 0;
@@ -163,7 +163,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|issip",
+                                    "s|nssip",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
                                     &size_mb,
@@ -183,7 +183,8 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   const std::string pool_name = p_pool_name ? p_pool_name : DEFAULT_POOL_NAME;
   const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
-  self->_store = g_store_map.get("hstore-cc", path, load_addr, debug_level);
+  //  self->_store = g_store_map.get("hstore-cc", path, load_addr, debug_level);
+  self->_store = g_store_map.get("hstore", path, load_addr, debug_level);
   
   assert(self->_store);
 
@@ -191,7 +192,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
     PLOG("forcing new.");
     self->_pool = self->_store->delete_pool(pool_name);
   }
-    
+
   if((self->_pool = self->_store->create_pool(pool_name, MiB(size_mb))) == 0) {
     PyErr_SetString(PyExc_RuntimeError, "unable to create/open pool");
     return -1;
@@ -270,7 +271,7 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
   }
   
   if (s == E_LOCKED) {
-    PyErr_SetString(PyExc_RuntimeError,"named memory already open");
+    PyErr_SetString(PyExc_RuntimeError,"variable already assigned");
     return NULL;
   } 
 
@@ -279,8 +280,6 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
   /* optionally zero memory */
   if(zero)
     ::memset(ptr, 0x0, size);
-  else
-    memset(ptr, 0xe, size); // temporary
   
   /* build a tuple (memory view, memory handle) */
   auto mview = PyMemoryView_FromMemory(static_cast<char*>(ptr), size, PyBUF_WRITE);
@@ -402,47 +401,6 @@ static PyObject * MemoryResource_release_named_memory(PyObject * self,
   status_t s;
 
   s = mr->_store->unlock(mr->_pool, key_handle);
-
-  if (s != S_OK) {
-    PyErr_SetString(PyExc_RuntimeError,"unlock failed unexpectedly");
-    return NULL;
-  }
-
-  Py_RETURN_NONE;
-}
-
-
-/** 
- * Rename an existing named memory
- * 
- * @param self 
- * @param args 
- * @param kwds 
- * 
- * @return None
- */
-static PyObject * MemoryResource_rename_named_memory(PyObject * self,
-                                                     PyObject * args,
-                                                     PyObject * kwds)
-{
-  static const char *kwlist[] = {"lock_handle",
-                                 NULL};
-
-  unsigned long handle = 0;
-  
-  if (! PyArg_ParseTupleAndKeywords(args,
-                                    kwds,
-                                    "k",
-                                    const_cast<char**>(kwlist),
-                                    &handle)) {
-    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
-    return NULL;
-  }
-
-  auto mr = reinterpret_cast<MemoryResource *>(self);
-  auto key_handle = reinterpret_cast<IKVStore::key_t>(handle);
-
-  status_t s = mr->_store->unlock(mr->_pool, key_handle);
 
   if (s != S_OK) {
     PyErr_SetString(PyExc_RuntimeError,"unlock failed unexpectedly");
@@ -630,7 +588,6 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
  * 
  * @param self 
  * @param args 
- * @param kwds 
  * 
  * @return List of names
  */
@@ -665,6 +622,30 @@ static PyObject * MemoryResource_get_named_memory_list(MemoryResource *self, PyO
 }
 
 
+/** 
+ * Get percent used of memory resource
+ * 
+ * @param self 
+ * @param args 
+ * 
+ * @return Percent used
+ */
+static PyObject * MemoryResource_get_percent_used(MemoryResource *self, PyObject *args)
+{
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  auto pool = mr->_pool;
+
+  std::vector<uint64_t> value;
+  auto status = mr->_store->get_attribute(pool, IKVStore::Attribute::PERCENT_USED, value);
+  if(status != S_OK) {
+    PyErr_SetString(PyExc_RuntimeError,"get attribute percent used failed");
+    return NULL;
+  }
+  assert(value.size() > 0);
+  return PyLong_FromUnsignedLong(value[0]);
+}
+
 
 
 static PyMemberDef MemoryResource_members[] =
@@ -693,7 +674,10 @@ static PyMethodDef MemoryResource_methods[] =
    {"_MemoryResource_get_named_memory", (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_get_named_memory(data)"},
    {"_MemoryResource_get_named_memory_list", (PyCFunction) MemoryResource_get_named_memory_list, METH_NOARGS,
-    "MemoryResource_get_named_memory_list()"},   
+    "MemoryResource_get_named_memory_list()"},
+   {"_MemoryResource_get_percent_used", (PyCFunction) MemoryResource_get_percent_used, METH_NOARGS,
+    "MemoryResource_get_percent_used()"},   
+
    
    {NULL}
   };

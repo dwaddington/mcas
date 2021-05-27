@@ -95,8 +95,6 @@ class shelf():
         '''
         Handle attribute assignment
         '''
-        print('setattr {} = {}'.format(name, type(value)))
-
         # constant members
         if self.mr and name is 'mr':
             raise RuntimeError('invalid assignment')
@@ -131,9 +129,10 @@ class shelf():
         '''
         Handle attribute access
         '''
-        print('--- getattr {}'.format(name))
         if name == 'items':
             return self.get_item_names()
+        elif name == 'used':
+            return self.mr.get_percent_used()
         if name in ['mr']:
             if not name in self.__dict__:
                 return None
@@ -167,8 +166,9 @@ class shelf():
 
         # sanity check
         gc.collect() # force gc
-        if sys.getrefcount(self.__dict__[name]) != 2:
-            raise RuntimeError('erase failed due to outstanding references')
+        count = sys.getrefcount(self.__dict__[name])
+        if count != 2:
+            raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
 
         self.__dict__.pop(name)
         gc.collect() # force gc
@@ -176,7 +176,9 @@ class shelf():
         # then remove the named memory from the store
         self.mr.erase_named_memory(name)
 
-
+    @methodcheck(types=[])
+    def get_percent_used(self):
+        return self.mr.get_percent_used()
 
 # NUMPY
 #

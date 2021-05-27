@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 
 project(pymm CXX)
 
-option(BUILD_PYMM_NOPACKAGE "do not build a python package" ON)
+option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
 
 if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
@@ -37,38 +37,41 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
   configure_file(${SETUP_PY_IN} ${SETUP_PY})
 
-  file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
+  file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
+  file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py)
   # copy python files to build
 
   file(MAKE_DIRECTORY ${PKG_SOURCE_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
-  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py DESTINATION ${PKG_SOURCE_DIR})
+  file(COPY ${PACKAGE_SOURCE_FILES} DESTINATION ${PKG_SOURCE_DIR})
 
   if(BUILD_PYMM_NOPACKAGE)
+    message("-- Building Pymm WITHOUT package (development only)")
     add_custom_target(${PROJECT_NAME} ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
       COMMAND ${PYTHON} ${SETUP_PY} build
-      DEPENDS ${PACKAGE_SOURCE_FILES} 
+      DEPENDS ${ALL_PACKAGE_SOURCE_FILES} 
       )    
   else()
-    add_custom_command(
-      OUTPUT build.stamp
-      COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
-      COMMAND cmake -E touch build.stamp
-      DEPENDS ${PACKAGE_SOURCE_FILES} 
-      )
+    message("-- Building Pymm with site package")
 
     add_custom_target(${PROJECT_NAME} ALL
       DEPENDS build.stamp
       )
     
+    add_custom_command(
+      OUTPUT build.stamp
+      COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
+      COMMAND cmake -E touch build.stamp
+      DEPENDS ${ALL_PACKAGE_SOURCE_FILES} 
+      )
+
+    # install as a site-package
+    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")
   endif()
 
-  
-    
+  unset(BUILD_PYMM_NOPACKAGE)
 
-  # install as a site-package
-  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")
   
 endif()
 

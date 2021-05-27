@@ -33,7 +33,9 @@ class MemoryReference():
         '''
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
-    def tx_begin(self): self.__tx_begin_swcopy()
+    def tx_begin(self):
+        # disable - self.__tx_begin_swcopy()
+        pass
         
     def __tx_begin_swcopy(self):
         '''
@@ -47,7 +49,10 @@ class MemoryReference():
         self.mr._MemoryResource_persist_memory_view(mem)
         print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
 
-    def tx_commit(self): self.__tx_commit_swcopy()
+    def tx_commit(self):
+        # disable - self.__tx_commit_swcopy()
+        pass
+    
     def __tx_commit_swcopy(self):
         '''
         Commit consistent transaction
@@ -72,7 +77,7 @@ class MemoryResource(pymmcore.MemoryResource):
     '''
     def __init__(self, name, size_mb, pmem_path, force_new=False):
         self._named_memory = {}
-        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path,force_new=force_new)
+        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path, force_new=force_new)
         # todo check for outstanding transactions
         all_items = super()._MemoryResource_get_named_memory_list()
         recoveries = [val for val in all_items if val.endswith('-tx')]
@@ -86,7 +91,7 @@ class MemoryResource(pymmcore.MemoryResource):
         return [val for val in all_items if not val.endswith('-meta')]
     
     @methodcheck(types=[str,int,int,bool])
-    def create_named_memory(self, name, size, alignment=8, zero=True):
+    def create_named_memory(self, name, size, alignment=8, zero=False):
         '''
         Create a contiguous piece of memory and name it
         '''
@@ -141,8 +146,13 @@ class MemoryResource(pymmcore.MemoryResource):
         '''
         Copy-based get of named memory value
         '''
-        print('>', name)
         return super()._MemoryResource_get_named_memory(name)
 
     
+    def get_percent_used(self):
+        '''
+        Get percentage of memory used in memory resource
+        '''
+        return super()._MemoryResource_get_percent_used()
+
 

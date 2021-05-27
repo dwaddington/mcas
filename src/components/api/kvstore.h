@@ -132,6 +132,7 @@ protected:
   enum {
     MEMORY_TYPE_DRAM        = 0x1,
     MEMORY_TYPE_PMEM_DEVDAX = 0x2,
+    MEMORY_TYPE_PMEM_FSDAX  = 0x3,
     MEMORY_TYPE_UNKNOWN     = 0xFF,
   };
 
