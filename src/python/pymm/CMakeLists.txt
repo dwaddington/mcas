@@ -36,6 +36,7 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   set(PYTHON_SITE_NUMPY_INCLUDES "${PYTHON_SITE_PACKAGES}/numpy/core/include")
 
   configure_file(${SETUP_PY_IN} ${SETUP_PY})
+  configure_file(core/pymm_config.h.in core/pymm_config.h)
 
   file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
   file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py)

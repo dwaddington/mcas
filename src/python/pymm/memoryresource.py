@@ -12,7 +12,7 @@
 #
 
 import pymmcore
-import pickle
+import os
 
 from .check import methodcheck
 
@@ -22,9 +22,14 @@ class MemoryReference():
         self.mr = memory_resource
         self.buffer = memview
         self.varname = name
+        if os.getenv('PYMM_DEBUG') != None:
+            self._debug_level = int(os.getenv('PYMM_DEBUG'))
+        else:
+            self._debug_level = 0
 
     def __del__(self):
-        print("releasing named memory {} @ {}".format(self.varname, hex(pymmcore.memoryview_addr(self.buffer))))
+        if self._debug_level > 0:
+            print("releasing named memory {} @ {}".format(self.varname, hex(pymmcore.memoryview_addr(self.buffer))))
         self.mr.release_named_memory_by_handle(self.handle)
 
     def addr(self):
@@ -47,7 +52,8 @@ class MemoryReference():
         # copy data, then persist
         mem[:]= self.buffer;
         self.mr._MemoryResource_persist_memory_view(mem)
-        print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
+        if self._debug_level > 0:
+            print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
 
     def tx_commit(self):
         # disable - self.__tx_commit_swcopy()
@@ -59,7 +65,8 @@ class MemoryReference():
         '''
         self.mr.release_named_memory_by_handle(self.tx_handle)
         self.mr.erase_named_memory(self.varname + '-tx')
-        print('tx_commit OK!')
+        if self._debug_level > 0:
+            print('tx_commit OK!')
         
     def persist(self):
         '''
@@ -81,7 +88,7 @@ class MemoryResource(pymmcore.MemoryResource):
         # todo check for outstanding transactions
         all_items = super()._MemoryResource_get_named_memory_list()
         recoveries = [val for val in all_items if val.endswith('-tx')]
-        print(recoveries)
+        
         if len(recoveries) > 0:
             raise RuntimeError('detected outstanding undo log condition: recovery not implemented')
 

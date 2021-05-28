@@ -33,6 +33,7 @@
 #include <list>
 #include <common/logging.h>
 #include "ndarray_helpers.h"
+#include "pymm_config.h"
 
 // forward declaration of custom types
 //
@@ -105,7 +106,14 @@ PyInit_pymmcore(void)
 {  
   PyObject *m;
 
-  PLOG("Init Pymm extension");
+
+  if(::getenv("PYMM_DEBUG"))
+    globals::debug_level = std::stoul(::getenv("PYMM_DEBUG"));
+  else
+    globals::debug_level = 0;
+
+  if(globals::debug_level > 0)
+    PLOG("Pymm extension");
 
   import_array();
 

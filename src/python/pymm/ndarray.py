@@ -75,7 +75,7 @@ class ndarray(Shadow):
 
         # now copy the data
         #new_array[:] = array
-        np.copyto(new_array, array, casting='yes')
+        np.copyto(new_array, array)
         return new_array
 
 
@@ -123,17 +123,12 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str)
             memory_resource.put_named_memory(metadata_key, metadata)
 
-            print("Saved metadata OK ", len(metadata))
-            print("shape:", shape)
         else:
             # entity already exists, load metadata            
             metadata = memory_resource.get_named_memory(metadata_key)
-            print("Opened metadata OK ", len(metadata))
             hdr = pymmcore.ndarray_read_header(memoryview(metadata))
-            print("Read header:", hdr)
             self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
                                       strides=hdr['strides'], order=order)
-            print("Recovered ndarray!")
 
         self._memory_resource = memory_resource
         self._value_named_memory = value_named_memory
@@ -147,7 +142,6 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def __array_wrap__(self, out_arr, context=None):
         # Handle scalars so as not to break ndimage.
         # See http://stackoverflow.com/a/794812/1221924
-        print(">--> {} {} ".format(out_arr.ndim, context))
         if out_arr.ndim == 0:
             return out_arr[()]
         return np.ndarray.__array_wrap__(self, out_arr, context)
@@ -162,7 +156,6 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         return self.view(np.ndarray)
     
     def update_metadata(self, array):
-        print("updating metadata...")
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str)
         self._memory_resource.put_named_memory(self._metadata_key, metadata)
 

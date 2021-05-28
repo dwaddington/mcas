@@ -40,8 +40,6 @@ Python 3.6.8 (default, Aug 18 2020, 08:33:21)
 [GCC 8.3.1 20191121 (Red Hat 8.3.1-5)] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import pymm
-[LOG]: Tsc: clock frequency 2500.00 mhz 
-[LOG]: Init Pymm extension 
 >>>
 ```
 
@@ -223,8 +221,6 @@ Python 3.6.8 (default, Aug 18 2020, 08:33:21)
 [GCC 8.3.1 20191121 (Red Hat 8.3.1-5)] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import pymm
-[LOG]: Tsc: clock frequency 2500.00 mhz 
-[LOG]: Init Pymm extension 
 >>> pymm.demo(True)
 ```
 
@@ -258,34 +254,9 @@ Python 3.6.8 (default, Aug 18 2020, 08:33:21)
 [GCC 8.3.1 20191121 (Red Hat 8.3.1-5)] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import pymm
-[LOG]: Tsc: clock frequency 2500.00 mhz 
-[LOG]: Init Pymm extension 
 >>> import numpy as np
 >>> s = pymm.shelf('myShelf',1024*512,pmem_path='/mnt/pmem0',force_new=True)
-[WRN]: make_arena_fs arena /mnt/pmem0 is a directory but On Demand Paging is disabled. Run with USE_ODP=1 to enable ODP 
-[LOG]: forcing new. 
-[]
 >>> s.x = pymm.ndarray((1000,1000,1000,500),dtype=np.uint8)
-NOTICE: allocated 0x10000300018 
-[LOG]: saving ndims=4 
-[LOG]: dim=1000 
-[LOG]: stride=500000000 
-[LOG]: dim=1000 
-[LOG]: stride=500000 
-[LOG]: dim=1000 
-[LOG]: stride=500 
-[LOG]: dim=500 
-[LOG]: stride=1 
-[LOG]: ndarray with metadata header: 
-HEXDUMP-(0x562feb1d8160)---------------------------------------------
-0x0:	04 00 00 00 01 00 00 00 00 00 00 00 e8 03 00 00 
-0x10:	00 00 00 00 e8 03 00 00 00 00 00 00 e8 03 00 00 
-0x20:	00 00 00 00 f4 01 00 00 00 00 00 00 00 65 cd 1d 
-0x30:	00 00 00 00 20 a1 07 00 00 00 00 00 f4 01 00 00 
-0x40:	00 00 00 00 01 00 00 00 00 00 00 00 01 00 00 00 
-0x50:	ff ff 03 00 00 00 00 00 00 00 7c 75 31 
-Saved metadata OK  93
-shape: (1000, 1000, 1000, 500)
 >>> s.used
 90
 ```

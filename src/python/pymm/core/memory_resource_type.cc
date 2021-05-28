@@ -8,6 +8,8 @@
 #include <structmember.h>
 #include <libpmem.h>
 
+#include "pymm_config.h"
+
 /* defaults */
 constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
 constexpr const char * DEFAULT_POOL_NAME = "default";
@@ -91,7 +93,8 @@ MemoryResource_dealloc(MemoryResource *self)
     self->_store->release_ref();
   }
 
-  PLOG("MemoryResource: closed (%p)", self);
+  if(globals::debug_level > 0)
+    PLOG("MemoryResource: closed (%p)", self);
   
   assert(self);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -149,7 +152,6 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                  "size_mb",
                                  "pmem_path",
                                  "load_addr",
-                                 "debug",
                                  "force_new",
                                  NULL,
   };
@@ -158,18 +160,16 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   uint64_t size_mb = 32;
   char * p_path = nullptr;
   char * p_addr = nullptr;
-  int debug_level = 0;
   int force_new = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|nssip",
+                                    "s|nssp",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
                                     &size_mb,
                                     &p_path,
                                     &p_addr,
-                                    &debug_level,
                                     &force_new)) {
     PyErr_SetString(PyExc_RuntimeError, "bad arguments");
     PWRN("bad arguments or argument types to MemoryResource constructor");
@@ -184,12 +184,13 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
   //  self->_store = g_store_map.get("hstore-cc", path, load_addr, debug_level);
-  self->_store = g_store_map.get("hstore", path, load_addr, debug_level);
+  self->_store = g_store_map.get("hstore", path, load_addr, globals::debug_level);
   
   assert(self->_store);
 
   if(force_new) {
-    PLOG("forcing new.");
+    if(globals::debug_level > 0)
+      PLOG("forcing new.");
     self->_pool = self->_store->delete_pool(pool_name);
   }
 

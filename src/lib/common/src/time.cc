@@ -135,8 +135,7 @@ static common::epoch_time_t Tsc_initialize()
 {
   /* establish time datum */
   float freq_MHZ = common::get_rdtsc_frequency_mhz();
-  PLOG("Tsc: clock frequency %.2f mhz", freq_MHZ);
-
+  
   tsc_static::_ticks_per_second = static_cast<uint64_t>(freq_MHZ * 1000000.0f);
   tsc_static::_ticks_per_nanosecond = static_cast<double>(freq_MHZ) / 1000.0f;
 
