@@ -132,6 +132,7 @@ protected:
   enum {
     MEMORY_TYPE_DRAM        = 0x1,
     MEMORY_TYPE_PMEM_DEVDAX = 0x2,
+    MEMORY_TYPE_PMEM_FSDAX  = 0x3,
     MEMORY_TYPE_UNKNOWN     = 0xFF,
   };
 
@@ -532,7 +533,7 @@ protected:
    * @return Memory handle or NULL on not supported.
    */
   memory_handle_t register_direct_memory(void* vaddr,
-                                                 size_t len) override
+                                         size_t len) override
   {
     return error_value(nullptr, vaddr, len);
   }
@@ -589,6 +590,7 @@ protected:
    *
    * @param pool Pool handle
    * @param key_handle Handle (opaque) for key used to unlock
+   * @param flags Optional unlock flags, UNLOCK_FLAGS_FLUSH
    *
    * @return S_OK, S_MORE (for async), E_INVAL or other error
    */

@@ -27,7 +27,7 @@
 
 namespace global
 {
-unsigned debug_level = 3;
+unsigned debug_level = 0;
 }
 
 /* forward decls */
@@ -172,7 +172,7 @@ PyObject * pymcas_ndarray_from_bytes(PyObject * self,
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(bytes_memory_view);
   byte * ptr = (byte *) buffer->buf;
 
-  if(global::debug_level > 1) {
+  if(global::debug_level > 2) {
     PLOG("header_length = %lu", header_length);
     hexdump(ptr, header_length);
   }
@@ -210,8 +210,10 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
 
   if(global::debug_level > 1) {
     PLOG("saving ndims=%d", ndims);
-    for(int d=0; d < ndims; d++)
+    for(int d=0; d < ndims; d++) {
       PLOG("dim=%ld", dims[d]);
+      PLOG("stride=%ld", strides[d]);
+    }
   }
 
   /* selected flags */
@@ -238,7 +240,7 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
 
   out_hdr = hdr.str();
 
-  if(global::debug_level > 1) {
+  if(global::debug_level > 2) {
     PLOG("ndarray with metadata header:");
     hexdump(out_hdr.c_str(), out_hdr.length());
   }
@@ -395,4 +397,3 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
   return dict;
 }
-

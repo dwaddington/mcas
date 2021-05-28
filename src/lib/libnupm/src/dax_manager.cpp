@@ -53,7 +53,7 @@ namespace
 	{
 		/* env variable USE_ODP to indicate On Demand Paging */
 		char* p = ::getenv("USE_ODP");
-		bool odp = false;
+		bool odp = true;
 		if ( p != nullptr )
 		{
 			errno = 0;

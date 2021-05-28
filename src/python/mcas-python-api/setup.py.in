@@ -59,7 +59,7 @@ setup (name = 'McasApiPackage',
        author_email='daniel.waddington@ibm.com',
        description='MCAS API library',
        package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
-       packages=setuptools.find_packages(),
+       packages=['mcas_pkg'],
        ext_modules=[module_core],
        python_requires='>=3.5',
 )
