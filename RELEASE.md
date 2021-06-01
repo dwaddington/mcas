@@ -1,5 +1,6 @@
 # Release v0.7
 
+* PyMM - Micro MCAS local deployment
 * New Python ADO Personality
 
 # Release v0.6
