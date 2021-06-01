@@ -19,6 +19,7 @@ from .shelf import shelf
 from .shelf import ShelvedCommon
 from .memoryresource import MemoryResource
 from .demo import demo
+from .test import test_0
 
 def test_shelf_dtor():
     import pymm
