@@ -32,6 +32,3 @@ def test_0():
         raise('Test 0: failure')
 
     print('Test 0 OK!')
-
-    
-

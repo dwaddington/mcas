@@ -221,4 +221,3 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._value_named_memory = getattr(obj, '_value_named_memory', None)
         self._metadata_key = getattr(obj, '_metadata_key', None)
         self.name = getattr(obj, 'name', None)
-
