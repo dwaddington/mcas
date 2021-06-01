@@ -260,3 +260,10 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> s.used
 90
 ```
+
+
+Debugging:
+
+```bash
+PYMM_DEBUG=3 python3
+```

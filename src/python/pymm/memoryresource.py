@@ -39,7 +39,8 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-        # disable - self.__tx_begin_swcopy()
+        # disable -
+        self.__tx_begin_swcopy()
         pass
         
     def __tx_begin_swcopy(self):
@@ -56,7 +57,8 @@ class MemoryReference():
             print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
 
     def tx_commit(self):
-        # disable - self.__tx_commit_swcopy()
+        # disable -
+        self.__tx_commit_swcopy()
         pass
     
     def __tx_commit_swcopy(self):

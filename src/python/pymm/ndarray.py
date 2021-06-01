@@ -168,7 +168,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._value_named_memory.tx_begin()
         result = F(*args)
         self._value_named_memory.tx_commit()
-    
+
+    # all methods that perform writes are implicitly used to define transaction
+    # boundaries (at least most fine-grained)
     #
     # reference: https://numpy.org/doc/stable/reference/routines.array-manipulation.html
     #
@@ -184,14 +186,41 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             return super().byteswap(False)    
 
     # in-place arithmetic
-    def __iadd__(self, value):
+    def __iadd__(self, value): # +=
         return self._value_only_transaction(super().__iadd__, value)
 
-    def __imul__(self, value):
+    def __imul__(self, value): # *=
         return self._value_only_transaction(super().__imul__, value)
 
-    def __isub__(self, value):
+    def __isub__(self, value): # -=
         return self._value_only_transaction(super().__isub__, value)
+
+    def __idiv__(self, value): # /=
+        return self._value_only_transaction(super().__idiv__, value)
+
+    def __imod__(self, value): # %=
+        return self._value_only_transaction(super().__imod__, value)
+
+    def __ipow__(self, value): # **=
+        return self._value_only_transaction(super().__ipow__, value)
+
+    def __ilshift__(self, value): # <<=
+        return self._value_only_transaction(super().__ilshift__, value)
+
+    def __irshift__(self, value): # >>=
+        return self._value_only_transaction(super().__irshift__, value)
+
+    def __iand__(self, value): # &=
+        return self._value_only_transaction(super().__iand__, value)
+
+    def __ixor__(self, value): # ^=
+        return self._value_only_transaction(super().__ixor__, value)
+
+    def __ior__(self, value): # |=
+        return self._value_only_transaction(super().__ior__, value)
+
+    
+
     # TODO... more
 
     # set item, e.g. x[2] = 2
