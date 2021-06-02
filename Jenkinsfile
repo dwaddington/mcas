@@ -72,7 +72,7 @@ pipeline {
 	  post {
 		    success {
 		        cleanWs(cleanWhenNotBuilt: false,
-                    deleteDirs: true,
+                    deleteDirs: false,
                     disableDeferredWipeout: true,
                     notFailBuild: true,
                     patterns: [[pattern: '**/*.log', type: 'EXCLUDE']])
@@ -80,7 +80,7 @@ pipeline {
 		    }
 		    failure {
             cleanWs(cleanWhenNotBuilt: false,
-                    deleteDirs: true,
+                    deleteDirs: false,
                     disableDeferredWipeout: true,
                     notFailBuild: true,
                     patterns: [[pattern: '**/*.log', type: 'EXCLUDE']])
