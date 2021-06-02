@@ -71,7 +71,7 @@ pipeline {
 	}
 	post {
 		success {
-		   	cleanWs(cleanWhenNotBuilt: false,
+		        cleanWs(cleanWhenNotBuilt: false,
                     		deleteDirs: true,
                     		disableDeferredWipeout: true,
                     		notFailBuild: true,
@@ -79,7 +79,13 @@ pipeline {
         		githubNotify(status: 'SUCCESS', description: 'Jenkins build OK')
 		}
 		failure {
-			githubNotify(status: 'FAILURE', description: 'Jenkins build failed')
+            cleanWs(cleanWhenNotBuilt: false,
+                    		deleteDirs: true,
+                    		disableDeferredWipeout: true,
+                    		notFailBuild: true,
+                    		patterns: [[pattern: '.gitignore', type: 'INCLUDE'],[pattern: '.propsfile', type: 'EXCLUDE']])
+
+            githubNotify(status: 'FAILURE', description: 'Jenkins build failed')
 		}
 	}
 }
