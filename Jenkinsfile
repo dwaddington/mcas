@@ -75,7 +75,7 @@ pipeline {
                     deleteDirs: true,
                     disableDeferredWipeout: true,
                     notFailBuild: true,
-                    patterns: [[pattern: '.gitignore', type: 'INCLUDE'],[pattern: '.propsfile', type: 'EXCLUDE']])
+                    patterns: [[pattern: '**/*.log', type: 'EXCLUDE']])
         		githubNotify(status: 'SUCCESS', description: 'Jenkins build OK')
 		    }
 		    failure {
@@ -83,7 +83,7 @@ pipeline {
                     deleteDirs: true,
                     disableDeferredWipeout: true,
                     notFailBuild: true,
-                    patterns: [[pattern: '.gitignore', type: 'INCLUDE'],[pattern: '.propsfile', type: 'EXCLUDE']])
+                    patterns: [[pattern: '**/*.log', type: 'EXCLUDE']])
 
             githubNotify(status: 'FAILURE', description: 'Jenkins build failed')
 		    }
