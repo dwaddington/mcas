@@ -7,7 +7,11 @@ can download the image and simply run!  Furthermore, the container is not bloate
 complete MCAS distribution, which is not needed if you are only using PyMM.
 
 First, you need to ensure you have a pmem mounted partition (e.g., /mnt/pmem0).  Make
-sure it has suitable permissions.
+sure it has suitable permissions (see https://www.redhat.com/sysadmin/supplemental-groups-podman-containers).
+
+```bash
+sudo chcon -t container_file_t /mnt/pmem0
+```
 
 ## Starting container from existing Dockerhub image
 
@@ -15,7 +19,7 @@ There are Ubuntu 18 and Fedora Core 32 based images available on docker hub.  Th
 is needed to pass through the persistent memory mount to the container.
 
 ```bash
-$ docker run -it -v /mnt/pmem0:/mnt/pmem0 dwaddington/pymm:ubuntu18
+$ docker run -it -v /mnt/pmem0:/mnt/pmem0 --annotation run.oci.keep_original_groups=1 dwaddington/pymm:ubuntu18
 
 mcasuser@ce09291b91a0:~$ python3 -i sample.py 
 Created shelf OK.
