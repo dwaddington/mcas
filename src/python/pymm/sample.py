@@ -13,23 +13,24 @@
 import pymm
 import numpy as np
 
-from numpy.random import Generator, PCG64
-
 # create new shelf (override any existing myShelf)
 #
-s = pymm.shelf('myShelf',32,pmem_path='/mnt/pmem0',force_new=True)
+s = pymm.shelf('myShelf',1024,pmem_path='/mnt/pmem0',force_new=True)
+print("Created shelf OK.")
 
 # create variable x on shelf (using shadow type)
-s.x = pymm.ndarray((1000000),dtype=np.float)
+s.x = np.random.uniform(low=-1.0, high=1.0, size=100000000)
+print("Created array 'x' on shelf OK. Data at {}".format(s.x.addr))
 
 # in-place random initialization (could be faster with vectorize + copy)
-rng = Generator(PCG64())
-
-for i in range(len(s)):
-    s.x[i] = rng.random()
+print(s.x)
 
 # sort in-place
 s.x.sort()
+print("Sorted array 'x' on shelf OK. Data at {}".format(s.x.addr))
+print(s.x)
+
+print("Use s and s.x to access shelf...")
 
 
 

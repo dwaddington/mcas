@@ -147,7 +147,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         return np.ndarray.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
-        if name not in super().__dict__:
+        if name == 'addr':
+            return self._value_named_memory.addr()
+        elif name not in super().__dict__:
             raise AttributeError("'{}' object has no attribute '{}'".format(type(self),name))
         else:
             return super().__dict__[name]
