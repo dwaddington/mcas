@@ -9,6 +9,7 @@ WORKDIR /home/mcasuser/mcas/src
 RUN git clone https://github.com/IBM/mcas.git
 WORKDIR /home/mcasuser/mcas/src/mcas
 RUN git submodule update --init --recursive
+RUN cp /home/mcasuser/mcas/src/mcas/src/python/pymm/sample.py /home/mcasuser
 USER root
 RUN deps/install-apts-ubuntu-18.sh
 USER mcasuser
@@ -26,6 +27,5 @@ RUN cmake -DBUILD_KERNEL_SUPPORT=OFF \
 -DCMAKE_INSTALL_PREFIX:PATH=/home/mcasuser/mcas/ ..
 RUN make bootstrap
 RUN make -j install
-
 WORKDIR /home/mcasuser
 CMD ["/bin/bash"]
