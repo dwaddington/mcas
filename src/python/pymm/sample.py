@@ -12,23 +12,19 @@
 #
 import pymm
 import numpy as np
-    
+
+from numpy.random import Generator, PCG64
+
 # create new shelf (override any existing myShelf)
 #
 s = pymm.shelf('myShelf',32,pmem_path='/mnt/pmem0',force_new=True)
 
 # create variable x on shelf (using shadow type)
-s.x = pymm.ndarray((1000,1000),dtype=np.float)
+s.x = pymm.ndarray((1000000),dtype=np.float)
 
-# perform in-place (on-shelf) operations
-s.x.fill(3)
-x_checksum = sum(s.x.tobytes()) # get checksum
+# in-place random initialization
+rng = Generator(PCG64())
 
-# copy persistent to persistent
-s.z = s.x
 
-# remove objects from shelf
-for item in s.items:
-    s.erase(item)
-        
+
 

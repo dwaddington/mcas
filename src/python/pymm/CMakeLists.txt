@@ -10,7 +10,7 @@ if (BUILD_PYTHON_SUPPORT)
   #
   set(PKG_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pymm")
   
-  find_program(PYTHON NAMES "python3.7" "python3.6" "python3.5")
+  find_program(PYTHON NAMES "python3.8" "python3.7" "python3.6" "python3.5")
   
   get_filename_component(PYTHON_FILENAME ${PYTHON} NAME)
   # get python locations
