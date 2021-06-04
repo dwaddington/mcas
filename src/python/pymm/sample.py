@@ -22,9 +22,14 @@ s = pymm.shelf('myShelf',32,pmem_path='/mnt/pmem0',force_new=True)
 # create variable x on shelf (using shadow type)
 s.x = pymm.ndarray((1000000),dtype=np.float)
 
-# in-place random initialization
+# in-place random initialization (could be faster with vectorize + copy)
 rng = Generator(PCG64())
 
+for i in range(len(s)):
+    s.x[i] = rng.random()
+
+# sort in-place
+s.x.sort()
 
 
 
