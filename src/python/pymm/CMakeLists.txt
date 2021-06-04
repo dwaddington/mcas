@@ -4,7 +4,7 @@ project(pymm CXX)
 
 option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
 
-if (PYTHON AND BUILD_PYTHON_SUPPORT)
+if (BUILD_PYTHON_SUPPORT)
 
   # this is the directory for where the package will be constructed
   #
