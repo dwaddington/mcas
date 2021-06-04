@@ -1,0 +1,31 @@
+FROM ubuntu:18.04 AS ubuntu18
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt-get install -y linux-headers-4.15.0-96-generic wget gnupg git emacs vim
+RUN useradd -ms /bin/bash mcasuser
+USER mcasuser
+WORKDIR /home/mcasuser
+RUN mkdir -p ~/mcas/src
+WORKDIR /home/mcasuser/mcas/src
+RUN git clone https://github.com/IBM/mcas.git
+WORKDIR /home/mcasuser/mcas/src/mcas
+RUN git submodule update --init --recursive
+USER root
+RUN deps/install-apts-ubuntu-18.sh
+USER mcasuser
+RUN src/python/install-python-deps.sh
+RUN rm -rf build && mkdir -p build
+WORKDIR /home/mcasuser/mcas/src/mcas/build
+RUN cmake -DBUILD_KERNEL_SUPPORT=OFF \
+-DBUILD_MCAS_SERVER=OFF \
+-DBUILD_MCAS_CLIENT=OFF \
+-DBUILD_EXAMPLES_PMDK=OFF \
+-DBUILD_RUST=OFF \
+-DBUILD_PYTHON_SUPPORT=ON \
+-DBUILD_MPI_APPS=OFF \
+-DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_INSTALL_PREFIX:PATH=/home/mcasuser/mcas/ ..
+RUN make bootstrap
+RUN make -j install
+
+WORKDIR /home/mcasuser
+CMD ["/bin/bash"]
