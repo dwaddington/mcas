@@ -43,11 +43,14 @@ endif()
   configure_file(${SETUP_PY_IN} ${SETUP_PY})
   configure_file(core/pymm_config.h.in core/pymm_config.h)
 
-  file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
+  file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
   file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py)
   # copy python files to build
 
   file(MAKE_DIRECTORY ${PKG_SOURCE_DIR})
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/pymm/PyMM/Meta)
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${PACKAGE_SOURCE_FILES} DESTINATION ${PKG_SOURCE_DIR})
 
@@ -55,14 +58,13 @@ endif()
   add_custom_command(
     OUTPUT ${GENERATED}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND ${FLATC} --cpp --python -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND touch ${GENERATED}
+    COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND ${FLATC} --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
     )
 
   add_custom_target(${PROJECT_NAME}-meta ALL
     DEPENDS ${GENERATED}
     )
-
 
   if(BUILD_PYMM_NOPACKAGE)
     message("-- Building Pymm WITHOUT package (development only)")
@@ -75,7 +77,7 @@ endif()
     message("-- Building Pymm with site package")
 
     add_custom_target(${PROJECT_NAME} ALL
-      DEPENDS build.stamp
+#      DEPENDS build.stamp
       )
     
     add_custom_command(

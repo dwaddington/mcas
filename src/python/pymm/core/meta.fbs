@@ -1,4 +1,4 @@
-namespace Meta;
+namespace PyMM.Meta;
 
 enum DataType : uint16 {
   Unknown = 0,

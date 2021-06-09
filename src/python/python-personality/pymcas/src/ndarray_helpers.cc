@@ -29,7 +29,7 @@
 /* for PyMM we do things slightly different to the Python Personality.
    we'd like to unify PP and PyMM eventually */
 #ifdef PYMM
-#include "../generated/meta_generated.h"
+#include "meta_generated.h"
 #endif
 
 namespace global
@@ -200,10 +200,10 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   std::stringstream hdr;
 
 #ifdef PYMM
-  Meta::Header meta_hdr(Meta::Constants_Magic, Meta::DataType_NumPyArray, Meta::Constants_Version, 0);
+  PyMM::Meta::Header meta_hdr(PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version, 0);
   hdr.write(reinterpret_cast<const char*>(&meta_hdr), sizeof(meta_hdr));
 
-  printf("added Meta::Header..\n");
+  printf("added PyMM::Meta::Header..\n");
   hexdump(&meta_hdr, sizeof(meta_hdr));
 #endif
 
@@ -345,13 +345,13 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   // length check
   if(buffer->len < 73) Py_RETURN_NONE;
 
-  auto meta_header = reinterpret_cast<Meta::Header*>(ptr);
-  if(meta_header->magic() != Meta::Constants_Magic ||
-     meta_header->type() != Meta::DataType_NumPyArray) {
+  auto meta_header = reinterpret_cast<PyMM::Meta::Header*>(ptr);
+  if(meta_header->magic() != PyMM::Meta::Constants_Magic ||
+     meta_header->type() != PyMM::Meta::DataType_NumPyArray) {
     Py_RETURN_NONE;
   }
 
-  ptr += sizeof(Meta::Header);
+  ptr += sizeof(PyMM::Meta::Header);
 #endif
 
   int ndims = *(reinterpret_cast<int*>(ptr));

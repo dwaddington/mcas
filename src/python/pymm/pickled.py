@@ -13,7 +13,7 @@
 
 import pymmcore
 import pickle
-
+import PyMM.Meta.Header as Header
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
@@ -44,11 +44,13 @@ class shelved_pickled(ShelvedCommon):
         if root == None:
             # create new entry
             pickstr = pickle.dumps(obj)
-            root_memref = memory_resource.create_named_memory(name, len(pickstr),value_len, 8, False)
-            print("len-->", value_len)
-            # prefix used for values corresponding to pickled items
-            member_prefix = "__pickled_" + str(root_memref.addr()[0]) + "__" + name + "_"
-            print(member_prefix)
+            value_len = 0
+            print("value_len-->", value_len)
+#            root_memref = memory_resource.create_named_memory(name, len(pickstr),value_len, 8, False)
+#            print("len-->", value_len)
+#            # prefix used for values corresponding to pickled items
+#            member_prefix = "__pickled_" + str(root_memref.addr()[0]) + "__" + name + "_"
+#            print(member_prefix)
         else:
             print("pickled already exists!!")
     

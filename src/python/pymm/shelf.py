@@ -53,10 +53,8 @@ def _shelf__of_supported_shadow_type(value):
     '''
     Helper function to return True if value is of a shadow type
     '''
-    return isinstance(value, pymm.ndarray)
+    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.pickled)
 
-def _shelf__of_supported_concrete_type(value):
-    return isinstance(value, numpy.ndarray)
 
 class shelf():
     '''
@@ -72,13 +70,15 @@ class shelf():
         items = self.mr.list_items()
         for varname in items:
             if not varname in self.__dict__:
-                # extend for each supported type
-                existing = pymm.ndarray.existing_instance(self.mr, varname)
-                if type(existing) == type(None) and existing == None:
-                    print("Value '{}' is unknown type!".format(varname))
-                else:
-                    self.__dict__[varname] = existing
+                # check if metadata corresponds to a given type; extend for each supported type
+                (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
+                if existing == True:
+                    self.__dict__[varname] = value
                     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                    continue
+
+                print("Value '{}' is unknown type!".format(varname))
+
 
     def __del__(self):
         gc.collect()
