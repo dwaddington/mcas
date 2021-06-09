@@ -62,7 +62,7 @@ class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
     '''
-    def __init__(self, name, size_mb=32, pmem_path='/dev/dax0.0',force_new=False):
+    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, force_new=False):
         self.name = name
         self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, force_new=force_new)
         if self.mr == None:
@@ -74,7 +74,9 @@ class shelf():
             if not varname in self.__dict__:
                 # extend for each supported type
                 existing = pymm.ndarray.existing_instance(self.mr, varname)
-                if not type(existing) is None:
+                if type(existing) == type(None) and existing == None:
+                    print("Value '{}' is unknown type!".format(varname))
+                else:
                     self.__dict__[varname] = existing
                     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
 
@@ -140,7 +142,7 @@ class shelf():
         if not name in self.__dict__:
             raise RuntimeError('invalid member {}'.format(name))
         else:
-            print('returning weak ref to ',name)
+            print("returning weak ref...")
             return weakref.ref(self.__dict__[name])
             
     @methodcheck(types=[])

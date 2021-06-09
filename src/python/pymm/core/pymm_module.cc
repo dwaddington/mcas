@@ -45,14 +45,20 @@ PyDoc_STRVAR(pymmcore_allocate_direct_memory_doc,
              "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
 PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
+PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
+             "memoryview_addr(m) -> Return address of memory (for debugging)");
+
 PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
              "ndarray_header_size(array) -> Return size of memory needed for header");
 PyDoc_STRVAR(pymcas_ndarray_header_doc,
              "ndarray_header(array) -> Return ndarray persistent header");
 PyDoc_STRVAR(pymcas_ndarray_read_header_doc,
              "ndarray_read_header(m) -> Return dictionary of ndarray header");
-PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
-             "memoryview_addr(m) -> Return address of memory (for debugging)");
+PyDoc_STRVAR(pymcas_ndarray_rng_init_doc,
+             "pymcas_ndarray_rng_init(seed) -> Set seed for random number generation");
+PyDoc_STRVAR(pymcas_ndarray_rng_set_doc,
+             "pymcas_ndarray_rng_set(array|memoryview) -> Set random values in memory region");
+
 
 static PyObject * pymmcore_version(PyObject * self,
                                    PyObject * args,
@@ -75,18 +81,22 @@ static PyMethodDef pymmcore_methods[] =
   {
    {"version",
     (PyCFunction) pymmcore_version, METH_NOARGS, pymmcore_version_doc },
-   {"allocate_direct_memory",
+   {"allocate direct memory",
     (PyCFunction) pymmcore_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_allocate_direct_memory_doc },
-   {"free_direct_memory",
+   {"free direct memory",
     (PyCFunction) pymmcore_free_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_free_direct_memory_doc },
    {"ndarray_header_size",
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
+   {"memoryview_addr",
+    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },   
    {"ndarray_header",
     (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },
    {"ndarray_read_header",
-    (PyCFunction) pymcas_ndarray_read_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_read_header_doc },   
-   {"memoryview_addr",
-    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
+    (PyCFunction) pymcas_ndarray_read_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_read_header_doc },
+   {"initialize_rng_init",
+    (PyCFunction) pymcas_ndarray_rng_init, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_rng_init_doc },
+   {"pymcas_ndarray_rng_set",
+    (PyCFunction) pymcas_ndarray_rng_set, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_rng_set_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 

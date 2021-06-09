@@ -19,11 +19,18 @@
 
 #include <common/utils.h>
 #include <common/dump_utils.h>
+#include <common/rand.h> /* user-level PRNG */
 #include <Python.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
 #include <numpy/arrayobject.h>
 #pragma GCC diagnostic pop
+
+/* for PyMM we do things slightly different to the Python Personality.
+   we'd like to unify PP and PyMM eventually */
+#ifdef PYMM
+#include "../generated/meta_generated.h"
+#endif
 
 namespace global
 {
@@ -192,6 +199,14 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
 {
   std::stringstream hdr;
 
+#ifdef PYMM
+  Meta::Header meta_hdr(Meta::Constants_Magic, Meta::DataType_NumPyArray, Meta::Constants_Version, 0);
+  hdr.write(reinterpret_cast<const char*>(&meta_hdr), sizeof(meta_hdr));
+
+  printf("added Meta::Header..\n");
+  hexdump(&meta_hdr, sizeof(meta_hdr));
+#endif
+
   /* number of dimensions */
   int ndims = PyArray_NDIM(src_ndarray);
   hdr.write(reinterpret_cast<const char*>(&ndims), sizeof(ndims));
@@ -241,7 +256,7 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   out_hdr = hdr.str();
 
   if(global::debug_level > 2) {
-    PLOG("ndarray with metadata header:");
+    PLOG("ndarray with metadata header: len=%lu", out_hdr.length());
     hexdump(out_hdr.c_str(), out_hdr.length());
   }
 }
@@ -325,6 +340,19 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(bytes_memory_view);
   byte * ptr = (byte *) buffer->buf;
+  
+#ifdef PYMM
+  // length check
+  if(buffer->len < 73) Py_RETURN_NONE;
+
+  auto meta_header = reinterpret_cast<Meta::Header*>(ptr);
+  if(meta_header->magic() != Meta::Constants_Magic ||
+     meta_header->type() != Meta::DataType_NumPyArray) {
+    Py_RETURN_NONE;
+  }
+
+  ptr += sizeof(Meta::Header);
+#endif
 
   int ndims = *(reinterpret_cast<int*>(ptr));
   ptr += sizeof(ndims);
@@ -396,4 +424,110 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   PyDict_SetItemString(dict, "dtype", PyUnicode_FromString(dtype.c_str()));
 
   return dict;
+}
+
+
+PyObject * pymcas_ndarray_rng_init(PyObject * self,
+                                   PyObject * args,
+                                   PyObject * kwargs)
+{
+  static const char *kwlist[] = {"seed",
+                                 NULL};
+
+  unsigned long long seed = 0xc0ffee;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "|K",
+                                    const_cast<char**>(kwlist),
+                                    &seed)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments!");
+    return NULL;
+  }
+  
+  init_genrand64(seed);
+                 
+  return PyLong_FromUnsignedLong(0);
+}
+
+PyObject * pymcas_ndarray_rng_set(PyObject * self,
+                                  PyObject * args,
+                                  PyObject * kwargs)
+{
+  import_array();
+    
+  static const char *kwlist[] = {"array",
+                                 NULL};
+
+  PyObject * tgt_array = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &tgt_array)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+  
+  if (! PyArray_Check(tgt_array)) {
+    PyErr_SetString(PyExc_RuntimeError,"target array not ndarray type");
+    return NULL;
+  }
+
+  PyArrayObject * array = reinterpret_cast<PyArrayObject *>(tgt_array);
+
+  NpyIter* iter;
+  NpyIter_IterNextFunc *iternext;
+  char** dataptr;
+  npy_intp* strideptr,* innersizeptr;
+
+  /* handle zero-sized arrays specially */
+  if (PyArray_SIZE(array) == 0)
+    return NULL;
+
+  iter = NpyIter_New(array, 
+                     NPY_ITER_READWRITE | NPY_ITER_EXTERNAL_LOOP | NPY_ITER_REFS_OK,
+                     NPY_ANYORDER,
+                     NPY_NO_CASTING,
+                     NULL);
+  if (iter == NULL) {
+    PyErr_SetString(PyExc_RuntimeError,"internal error setting up new array iterator");
+    return NULL;
+  }
+
+  iternext = NpyIter_GetIterNext(iter, NULL);
+  if (iternext == NULL) {
+    PyErr_SetString(PyExc_RuntimeError,"internal error setting up array iterator");
+    NpyIter_Deallocate(iter);
+    return NULL;
+  }
+  /* location of the data pointer which the iterator may update */
+  dataptr = NpyIter_GetDataPtrArray(iter);
+  /* location of the stride which the iterator may update */
+  strideptr = NpyIter_GetInnerStrideArray(iter);
+  /* location of the inner loop size which the iterator may update */
+  innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+
+  unsigned long rval = 0;
+  do {
+    /* get the inner loop data/stride/count values */
+    char* data = *dataptr;
+    npy_intp stride = *strideptr;
+    npy_intp count = *innersizeptr;
+
+    assert(stride <= 8);
+    
+    /* this is a typical inner loop for NPY_ITER_EXTERNAL_LOOP */
+    while (count--) {
+      unsigned long long r = genrand64_int64();
+      __builtin_memcpy(data, static_cast<const void*>(&r), stride);
+      data += stride;      
+      rval++;
+    }
+    
+    /* increment the iterator to the next inner loop */
+  } while(iternext(iter));
+
+  Py_RETURN_NONE;
 }

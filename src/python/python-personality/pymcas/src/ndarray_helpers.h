@@ -69,4 +69,33 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
 
 
+/** 
+ * Initialize seed for random number generation
+ * 
+ * @param self 
+ * @param args 
+ * @param kwargs 
+ * 
+ * @return 
+ */
+PyObject * pymcas_ndarray_rng_init(PyObject * self,
+                                   PyObject * args,
+                                   PyObject * kwargs);
+
+/** 
+ * Set array elements (ndarray or memory view) with random
+ * values
+ * 
+ * @param self 
+ * @param args 
+ * @param kwargs 
+ * 
+ * @return 
+ */
+PyObject * pymcas_ndarray_rng_set(PyObject * self,
+                                  PyObject * args,
+                                  PyObject * kwargs);
+
+
+
 #endif // __NDARRAY_HELPERS_H__
