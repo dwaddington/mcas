@@ -13,7 +13,11 @@
 
 import pymmcore
 import pickle
+import flatbuffers
 import PyMM.Meta.Header as Header
+import PyMM.Meta.Constants as Constants
+import PyMM.Meta.DataType as DataType
+
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
@@ -32,6 +36,25 @@ class pickled(Shadow):
         '''
         return shelved_pickled(memory_resource, name, self.obj)
 
+    def existing_instance(memory_resource: MemoryResource, name: str):
+        '''
+        Determine if an persistent named memory object corresponds to this type
+        '''
+        buffer = memory_resource.get_named_memory(name)
+        if buffer is None:
+            return (False, None)
+
+        print("recovered...")
+        print(list(buffer))
+
+        root = Header.Header()
+        print(dir(root))
+        root.Init(buffer, 0)
+        print("Here!")
+        print(root.Magic())
+        print(root.Type())
+        return (False, None)
+
 
 class shelved_pickled(ShelvedCommon):
     def __new__(subtype, memory_resource, name, obj):
@@ -42,15 +65,26 @@ class shelved_pickled(ShelvedCommon):
         root = memory_resource.open_named_memory(name)
 
         if root == None:
-            # create new entry
+            # create new value
             pickstr = pickle.dumps(obj)
-            value_len = 0
-            print("value_len-->", value_len)
-#            root_memref = memory_resource.create_named_memory(name, len(pickstr),value_len, 8, False)
-#            print("len-->", value_len)
-#            # prefix used for values corresponding to pickled items
-#            member_prefix = "__pickled_" + str(root_memref.addr()[0]) + "__" + name + "_"
-#            print(member_prefix)
+            builder = flatbuffers.Builder(128)
+            # create header
+            hdr = Header.CreateHeader(builder,
+                                      Constants.Constants().Magic,
+                                      DataType.DataType().Pickled,
+                                      Constants.Constants().Version,
+                                      len(pickstr))
+            builder.Finish(hdr)
+            hdr_ba = builder.Output()
+            # allocate memory
+            
+            value_len = len(hdr_ba) + len(pickstr)
+            hdr_len = len(hdr_ba)
+            memref = memory_resource.create_named_memory(name, value_len, 8, False)
+            # copy into memory resource
+            memref.buffer[0:hdr_len] = hdr_ba
+            memref.buffer[hdr_len:] = pickstr
+            print(list(memref.buffer))
         else:
             print("pickled already exists!!")
     

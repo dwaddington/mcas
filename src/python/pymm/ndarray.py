@@ -57,7 +57,7 @@ class ndarray(Shadow):
         '''
         metadata = memory_resource.get_named_memory(name + '-meta')
         if metadata is None:
-            return None
+            return (False, None)
         
         if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
             return (False, None)
