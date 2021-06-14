@@ -135,11 +135,13 @@ namespace ccpm
 	struct alignas(uint64_t) area_ctl
 		: public list_item
 	{
-		/* arbitrary number of atomic words (containing allocation status) which
-		 * cover an area) */
+	private:
 		using index_t = unsigned;
 		using level_ix_t = std::uint8_t;
 		using byte_span = common::byte_span;
+	public:
+		/* arbitrary number of atomic words (containing allocation status) which
+		 * cover an area) */
 #if 1
 		static constexpr index_t ct_atomic_words = 1;
 #define USE_PADDING 56
