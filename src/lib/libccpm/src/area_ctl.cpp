@@ -794,7 +794,7 @@ void ccpm::area_ctl::allocate(
 	assert(pr + bytes_ <= element_void(_element_count));
 
 	/* index of first element to allocate */
-	const index_t ix_begin = index_t(index_t(pr - p0) / sub_size());
+	const index_t ix_begin = index_t((pr - p0) / sub_size());
 	/* Note whether the allocation aligns with the start of an element.
 	 * Remember that for deallocation sanity check.
 	 */
@@ -802,7 +802,7 @@ void ccpm::area_ctl::allocate(
 	/* end of allocation range */
 	const auto pr_end = pr + bytes_;
 	/* index past last element to allocate */
-	const auto ix_end = div_round_up(index_t(pr_end - p0), sub_size());
+	const auto ix_end = index_t(div_round_up((pr_end - p0), sub_size()));
 	/* under no circumstance should the end of the result go beyond the end of the
 	 * run found by el_find_n_free
 	 */
