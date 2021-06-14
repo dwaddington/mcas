@@ -1,0 +1,20 @@
+namespace Meta;
+
+enum DataType : uint16 {
+  Unknown = 0,
+  Opaque = 1,
+  NumPyArray = 2,
+  Pickled = 3,
+}
+
+enum Constants : uint32 {
+  Version = 1,
+  Magic = 4009738240,
+}
+
+struct Header {
+  magic   : uint32;
+  type    : DataType;
+  version : uint16;
+  resvd   : uint16;
+}

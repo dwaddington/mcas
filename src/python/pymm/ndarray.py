@@ -59,8 +59,10 @@ class ndarray(Shadow):
         if metadata is None:
             return None
         
-        pymmcore.ndarray_read_header(memoryview(metadata))
-        return shelved_ndarray(memory_resource, name, shape = None)
+        if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
+            return None
+        else:
+            return shelved_ndarray(memory_resource, name, shape = None)
 
     def __str__(self):
         print('shadow ndarray')

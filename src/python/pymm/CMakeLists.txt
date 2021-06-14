@@ -11,7 +11,12 @@ if (BUILD_PYTHON_SUPPORT)
   set(PKG_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pymm")
   
   find_program(PYTHON NAMES "python3.8" "python3.7" "python3.6" "python3.5")
-  
+  find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
+
+if (NOT FLATC)
+  message(FATAL_ERROR ": Flatc compiler not found")
+endif()
+
   get_filename_component(PYTHON_FILENAME ${PYTHON} NAME)
   # get python locations
   execute_process ( COMMAND ${PYTHON} -m site --user-site OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -46,12 +51,25 @@ if (BUILD_PYTHON_SUPPORT)
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${PACKAGE_SOURCE_FILES} DESTINATION ${PKG_SOURCE_DIR})
 
+  set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated/meta_generated.h)
+  add_custom_command(
+    OUTPUT ${GENERATED}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND ${FLATC} --cpp --python -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND touch ${GENERATED}
+    )
+
+  add_custom_target(${PROJECT_NAME}-meta ALL
+    DEPENDS ${GENERATED}
+    )
+
+
   if(BUILD_PYMM_NOPACKAGE)
     message("-- Building Pymm WITHOUT package (development only)")
     add_custom_target(${PROJECT_NAME} ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
       COMMAND ${PYTHON} ${SETUP_PY} build
-      DEPENDS ${ALL_PACKAGE_SOURCE_FILES} 
+      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES}  
       )    
   else()
     message("-- Building Pymm with site package")
@@ -64,7 +82,7 @@ if (BUILD_PYTHON_SUPPORT)
       OUTPUT build.stamp
       COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
       COMMAND cmake -E touch build.stamp
-      DEPENDS ${ALL_PACKAGE_SOURCE_FILES} 
+      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} 
       )
 
     # install as a site-package

@@ -5,9 +5,9 @@ then
     REGIONS=`ndctl list -R | egrep -oh 'region[0-9]+' | egrep -oh '[0-9]+'`
     echo "Creating namespaces... this will take a while!"
     # region 0
-	  for p in {0..27}
+	  for p in {0..19}
 	  do
-	      sudo ndctl create-namespace -m devdax --align 2M -r region0 -s 96G
+	      sudo ndctl create-namespace -m devdax --align 2M -r region1 -s 32G
 	  done
     # region 1
     sudo ndctl create-namespace -m devdax --align 2M -r region1 -s 2688G
