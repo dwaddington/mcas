@@ -53,7 +53,7 @@ def _shelf__of_supported_shadow_type(value):
     '''
     Helper function to return True if value is of a shadow type
     '''
-    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.pickled)
+    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) #or isinstance(value, pymm.pickled)
 
 
 class shelf():
@@ -77,11 +77,17 @@ class shelf():
                     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                     continue
 
-                (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
+                (existing, value) = pymm.string.existing_instance(self.mr, varname)
                 if existing == True:
                     self.__dict__[varname] = value
                     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                     continue
+
+                # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
+                # if existing == True:
+                #     self.__dict__[varname] = value
+                #     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                #     continue
 
                 print("Value '{}' is unknown type!".format(varname))
 
@@ -173,13 +179,15 @@ class shelf():
             raise RuntimeError('attempting to erase something that is not on the shelf')
 
         # sanity check
-        gc.collect() # force gc
-        count = sys.getrefcount(self.__dict__[name])
-        if count != 2:
-            raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
-
-        self.__dict__.pop(name)
-        gc.collect() # force gc
+        if gc.is_tracked(self.__dict__[name]):
+            gc.collect() # force gc        
+            count = sys.getrefcount(self.__dict__[name])
+            if count != 2: 
+                print(">>>>", )
+                raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
+            
+            self.__dict__.pop(name)
+            gc.collect() # force gc
         
         # then remove the named memory from the store
         self.mr.erase_named_memory(name)

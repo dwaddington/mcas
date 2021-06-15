@@ -200,11 +200,12 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   std::stringstream hdr;
 
 #ifdef PYMM
-  PyMM::Meta::Header meta_hdr(PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version, 0);
-  hdr.write(reinterpret_cast<const char*>(&meta_hdr), sizeof(meta_hdr));
-
-  printf("added PyMM::Meta::Header..\n");
-  hexdump(&meta_hdr, sizeof(meta_hdr));
+  flatbuffers::FlatBufferBuilder builder;
+  auto mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version);
+  FinishSizePrefixedHeaderBuffer(builder, mloc); /* include size prefix */
+  auto meta_hdr = builder.GetBufferPointer();
+  auto meta_hdr_len = builder.GetSize();
+  hdr.write(reinterpret_cast<const char*>(meta_hdr), meta_hdr_len);
 #endif
 
   /* number of dimensions */
@@ -342,16 +343,23 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   byte * ptr = (byte *) buffer->buf;
   
 #ifdef PYMM
-  // length check
-  if(buffer->len < 73) Py_RETURN_NONE;
+  auto total_len = *reinterpret_cast<uint32_t*>(ptr) + sizeof(uint32_t);
+  assert(buffer->len > total_len);
 
-  auto meta_header = reinterpret_cast<PyMM::Meta::Header*>(ptr);
-  if(meta_header->magic() != PyMM::Meta::Constants_Magic ||
-     meta_header->type() != PyMM::Meta::DataType_NumPyArray) {
-    Py_RETURN_NONE;
+  try {
+    auto meta_header = PyMM::Meta::GetSizePrefixedHeader(ptr);
+    
+    if(!meta_header ||
+       meta_header->magic() != PyMM::Meta::Constants_Magic ||
+       meta_header->type() != PyMM::Meta::DataType_NumPyArray) {
+      Py_RETURN_NONE;
+    }
+  }
+  catch(...) {
+    PERR("PyMM::Meta::GetHeader failed");
   }
 
-  ptr += sizeof(PyMM::Meta::Header);
+  ptr += total_len;
 #endif
 
   int ndims = *(reinterpret_cast<int*>(ptr));

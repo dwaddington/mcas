@@ -4,7 +4,8 @@ enum DataType : uint16 {
   Unknown = 0,
   Opaque = 1,
   NumPyArray = 2,
-  Pickled = 3,
+  Utf8String = 3,
+  ThisIsPyMM = 100,
 }
 
 enum Constants : uint32 {
@@ -18,3 +19,5 @@ table Header {
   version : uint16;
   resvd   : uint16;
 }
+
+root_type Header;

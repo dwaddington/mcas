@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 project(pymm CXX)
 
 option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
+set(BUILD_PYMM_NOPACKAGE ON)
 
 if (BUILD_PYTHON_SUPPORT)
 
@@ -31,7 +32,7 @@ endif()
   message("-- Building Python support.")
   set(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in")
   set(SETUP_PY "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
-  set(DEPS "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py")
+  set(DEPS "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py ${CMAKE_CURRENT_SOURCE_DIR}/pickled.py")
   set(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/timestamp")
   
   string(REGEX REPLACE  "^.*python" "" PYTHON_VERSION ${PYTHON})
@@ -46,6 +47,7 @@ endif()
   file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
+
   file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py)
   # copy python files to build
 
@@ -54,12 +56,13 @@ endif()
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${PACKAGE_SOURCE_FILES} DESTINATION ${PKG_SOURCE_DIR})
 
-  set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated/meta_generated.h)
+  set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/meta_generated.h)
   add_custom_command(
     OUTPUT ${GENERATED}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
     COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
     COMMAND ${FLATC} --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND touch ${GENERATED}
     )
 
   add_custom_target(${PROJECT_NAME}-meta ALL
@@ -68,16 +71,20 @@ endif()
 
   if(BUILD_PYMM_NOPACKAGE)
     message("-- Building Pymm WITHOUT package (development only)")
-    add_custom_target(${PROJECT_NAME} ALL
+    add_custom_target(${PROJECT_NAME}-np ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
       COMMAND ${PYTHON} ${SETUP_PY} build
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES}  
-      )    
+      )
+    add_custom_target(${PROJECT_NAME} ALL
+      DEPENDS build.stamp
+      )
+    
   else()
     message("-- Building Pymm with site package")
 
     add_custom_target(${PROJECT_NAME} ALL
-#      DEPENDS build.stamp
+      DEPENDS build.stamp
       )
     
     add_custom_command(
