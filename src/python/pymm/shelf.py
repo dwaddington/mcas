@@ -17,6 +17,7 @@ import gc
 import sys
 import copy
 import numpy
+import torch
 import weakref
 
 from .memoryresource import MemoryResource
@@ -38,6 +39,8 @@ class ShelvedCommon:
     def __getattr__(self, name):
         if name == 'memory':
             return self._value_named_memory.addr()
+        if name == 'namedmemory':
+            return self._value_named_memory        
 #        else:
 #            raise AttributeError()
             
@@ -53,7 +56,7 @@ def _shelf__of_supported_shadow_type(value):
     '''
     Helper function to return True if value is of a shadow type
     '''
-    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) #or isinstance(value, pymm.pickled)
+    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) or isinstance(value, pymm.torch_tensor)
 
 
 class shelf():
@@ -71,6 +74,12 @@ class shelf():
         for varname in items:
             if not varname in self.__dict__:
                 # check if metadata corresponds to a given type; extend for each supported type
+                (existing, value) = pymm.torch_tensor.existing_instance(self.mr, varname)
+                if existing == True:
+                    self.__dict__[varname] = value
+                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                    continue
+
                 (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
                 if existing == True:
                     self.__dict__[varname] = value
@@ -129,7 +138,8 @@ class shelf():
         # check for supported shadow types
         if __of_supported_shadow_type(value):
             # create instance from shadow type
-            self.__dict__[name] = value.make_instance(self.mr, name)            
+            self.__dict__[name] = value.make_instance(self.mr, name)
+            print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
@@ -166,6 +176,9 @@ class shelf():
         for s in self.__dict__:
             if issubclass(type(self.__dict__[s]), pymm.ShelvedCommon):
                 items.append(s) # or to add object itself...self.__dict__[s]
+            elif issubclass(type(self.__dict__[s]), torch.Tensor):
+                items.append(s)
+                
         return items
             
         
@@ -183,7 +196,6 @@ class shelf():
             gc.collect() # force gc        
             count = sys.getrefcount(self.__dict__[name])
             if count != 2: 
-                print(">>>>", )
                 raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
             
             self.__dict__.pop(name)

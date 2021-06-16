@@ -39,7 +39,7 @@ unsigned debug_level = 0;
 
 /* forward decls */
 PyObject * unmarshall_nparray(byte * ptr);
-void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr);  
+void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr, int type = 0);  
 
 PyObject * pymcas_ndarray_header_size(PyObject * self,
                                       PyObject * args,
@@ -108,17 +108,20 @@ PyObject * pymcas_ndarray_header(PyObject * self,
   import_array();
   static const char *kwlist[] = {"source",
                                  "dtype_str",
+                                 "type",
                                  NULL};
 
   PyObject * src_obj = nullptr;
   const char * dtype_str = nullptr;
+  int type = 0;
 
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwargs,
-                                    "O|s",
+                                    "O|si",
                                     const_cast<char**>(kwlist),
                                     &src_obj,
-                                    &dtype_str)) {
+                                    &dtype_str,
+                                    &type)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
   }
@@ -142,7 +145,7 @@ PyObject * pymcas_ndarray_header(PyObject * self,
   }
 
   std::string hdr;
-  create_ndarray_header(src_ndarray, hdr, dtype_str);
+  create_ndarray_header(src_ndarray, hdr, dtype_str, type);
   
   return PyByteArray_FromStringAndSize(hdr.c_str(), hdr.size());
 }
@@ -195,13 +198,25 @@ PyObject * pymcas_ndarray_from_bytes(PyObject * self,
  * Create header for array, return as string
  * 
  */
-void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str)
+void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str, int type)
 {
   std::stringstream hdr;
 
 #ifdef PYMM
   flatbuffers::FlatBufferBuilder builder;
-  auto mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version);
+  
+  flatbuffers::Offset<PyMM::Meta::Header> mloc;
+  switch(type) {
+  case 0:
+    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version);
+    break;
+  case 1:
+    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_TorchTensor, PyMM::Meta::Constants_Version);
+    break;
+  default:
+    throw General_exception("bad type");
+  }
+  
   FinishSizePrefixedHeaderBuffer(builder, mloc); /* include size prefix */
   auto meta_hdr = builder.GetBufferPointer();
   auto meta_hdr_len = builder.GetSize();
@@ -321,15 +336,18 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   import_array();
   
   static const char *kwlist[] = {"data",
+                                 "type",
                                  NULL};
 
   PyObject * bytes_memory_view  = nullptr;
-
+  int type = 0;
+  
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwargs,
-                                    "O",
+                                    "O|i",
                                     const_cast<char**>(kwlist),
-                                    &bytes_memory_view)) {
+                                    &bytes_memory_view,
+                                    &type)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments!");
     return NULL;
   }
@@ -346,12 +364,25 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   auto total_len = *reinterpret_cast<uint32_t*>(ptr) + sizeof(uint32_t);
   assert(buffer->len > total_len);
 
+  int expected_type;
+  switch(type) {
+  case 0:
+    expected_type = PyMM::Meta::DataType_NumPyArray;
+    break;
+  case 1:
+    expected_type = PyMM::Meta::DataType_TorchTensor;
+    break;
+  default:
+    throw General_exception("bad type");
+  }
+
   try {
     auto meta_header = PyMM::Meta::GetSizePrefixedHeader(ptr);
+
     
     if(!meta_header ||
        meta_header->magic() != PyMM::Meta::Constants_Magic ||
-       meta_header->type() != PyMM::Meta::DataType_NumPyArray) {
+       meta_header->type() != expected_type) {
       Py_RETURN_NONE;
     }
   }
@@ -397,11 +428,11 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   std::string dtype(reinterpret_cast<const char*>(ptr), dtype_str_len);
   ptr += dtype_str_len;
 
-  int type =  *(reinterpret_cast<int*>(ptr));
-  ptr += sizeof(type);
+  int checktype =  *(reinterpret_cast<int*>(ptr));
+  ptr += sizeof(checktype);
 
   if(global::debug_level > 2) {
-    PLOG("ndims=%d, flags=%d, type=%d", ndims, flags, type);
+    PLOG("ndims=%d, flags=%d, type=%d", ndims, flags, checktype);
     for(auto d: dims) PLOG("dim=%ld", d);
     for(auto s: strides) PLOG("stride=%ld", s);
   }

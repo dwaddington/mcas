@@ -11,24 +11,26 @@
 #    limitations under the License.
 #
 
-#    Notes: not all methods hooked.
+#    Notes: highly experimental and likely defective
 
+import torch
 import pymmcore
 import numpy as np
 import copy
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
+from .ndarray import ndarray, shelved_ndarray
 from .shelf import Shadow
 from .shelf import ShelvedCommon
 
 dtypedescr = np.dtype
     
-# shadow type for ndarray
+# shadow type for torch_tensor
 #
-class ndarray(Shadow):
+class torch_tensor(Shadow):
     '''
-    ndarray that is stored in a memory resource
+    PyTorch tensor that is stored in a memory resource
     '''
     def __init__(self, shape, dtype=float, strides=None, order='C'):
 
@@ -44,36 +46,37 @@ class ndarray(Shadow):
         '''
         Create a concrete instance from the shadow
         '''
-        return shelved_ndarray(memory_resource,
-                               name,
-                               shape = self.__p_shape,
-                               dtype = self.__p_dtype,
-                               strides = self.__p_strides,
-                               order = self.__p_order)
+        return shelved_torch_tensor(memory_resource,
+                                    name,
+                                    shape = self.__p_shape,
+                                    dtype = self.__p_dtype,
+                                    strides = self.__p_strides,
+                                    order = self.__p_order)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
         Determine if an persistent named memory object corresponds to this type
         '''
+        print('tensor existing instance...')
         metadata = memory_resource.get_named_memory(name + '-meta')
         if metadata is None:
             return (False, None)
         
-        if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
+        if pymmcore.ndarray_read_header(memoryview(metadata),type=1) == None:
             return (False, None)
         else:
-            return (True, shelved_ndarray(memory_resource, name, shape = None))
+            return (True, shelved_torch_tensor(memory_resource, name, shape = None))
 
     def __str__(self):
-        print('shadow ndarray')
+        print('shadow torch_tensor')
 
 
     def build_from_copy(memory_resource: MemoryResource, name: str, array):
-        new_array = shelved_ndarray(memory_resource,
-                                    name,
-                                    shape = array.shape,
-                                    dtype = array.dtype,
-                                    strides = array.strides)
+        new_array = shelved_torch_tensor(memory_resource,
+                                         name,
+                                         shape = array.shape,
+                                         dtype = array.dtype,
+                                         strides = array.strides)
 
         # now copy the data
         #new_array[:] = array
@@ -83,19 +86,34 @@ class ndarray(Shadow):
 
 
     
-# concrete subclass for ndarray
+# concrete subclass for torch tensor
 #
-class shelved_ndarray(np.ndarray, ShelvedCommon):
+class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''
-    ndarray that is stored in a memory resource
+    torch tensor that is stored in a memory resource
     '''
-    __array_priority__ = -100.0 # what does this do?
+#    __array_priority__ = -100.0 # what does this do?
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', type=0):
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
+
+        torch_to_numpy_dtype_dict = {
+            torch.bool  : np.bool,
+            torch.uint8 : np.uint8,
+            torch.int8  : np.int8,
+            torch.int16 : np.int16,
+            torch.int32 : np.int32,
+            torch.int64 : np.int64,
+            torch.float16 : np.float16,
+            torch.float32 : np.float32,
+            torch.float64 : np.float64,
+            torch.complex64 : np.complex64,
+            torch.complex128 : np.complex128,
+        }
+        np_dtype = torch_to_numpy_dtype_dict.get(dtype,None)
 
         # determine size of memory needed
         #
-        descr = dtypedescr(dtype)
+        descr = dtypedescr(np_dtype)
         _dbytes = descr.itemsize
 
         if not shape is None:
@@ -109,35 +127,30 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         metadata_key = name + '-meta'
 
         if value_named_memory == None: # does not exist yet
-            #
-            # create a newly allocated named memory from MemoryResource
-            #
-            value_named_memory = memory_resource.create_named_memory(name,
-                                                                     int(size*_dbytes),
-                                                                     8, # alignment
-                                                                     False) # zero
-            print('created value named memory!!')
-            # construct array using supplied memory
-            #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
-                                      strides=strides, order=order)
+
+            # use shelved_ndarray under the hood and make a subclass from it
+            base_ndarray = shelved_ndarray(memory_resource, name=name, shape=shape, dtype=np_dtype, type=1)
 
             # create and store metadata header
-            metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str, type=type)
+            metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1) # type=1 indicate torch_tensor
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
-            # entity already exists, load metadata            
+            # entity already exists, load metadata
+            del value_named_memory # the shelved_ndarray ctor will need to reopen it
             metadata = memory_resource.get_named_memory(metadata_key)
-            hdr = pymmcore.ndarray_read_header(memoryview(metadata),type=type)
-            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
-                                      strides=hdr['strides'], order=order)
+            hdr = pymmcore.ndarray_read_header(memoryview(metadata), type=1) # type=1 indicate torch_tensor
+
+            base_ndarray = shelved_ndarray(memory_resource, name=name, dtype=hdr['dtype'], shape=hdr['shape'],
+                                           strides=hdr['strides'], order=order, type=1)
+            
+        self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
+        self._value_named_memory = base_ndarray._value_named_memory
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = value_named_memory
         self._metadata_key = metadata_key
-        self.name = name
+        self.name_on_shelf = name
         return self
 
     def __delete__(self, instance):
@@ -148,9 +161,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         # See http://stackoverflow.com/a/794812/1221924
         if out_arr.ndim == 0:
             return out_arr[()]
-        return np.ndarray.__array_wrap__(self, out_arr, context)
+        return torch.tensor.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
+        print('getattr--> ',name)
         if name == 'addr':
             return self._value_named_memory.addr()
         elif name not in super().__dict__:
@@ -162,7 +176,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         return self.view(np.ndarray)
     
     def update_metadata(self, array):
-        metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str)
+        metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str, type=1)
         self._memory_resource.put_named_memory(self._metadata_key, metadata)
 
     # each type will handle its own transaction methodology.  this
@@ -171,9 +185,11 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def _value_only_transaction(self, F, *args):
         if self is None:
             return
-        self._value_named_memory.tx_begin()
+
+        # TO FIX
+        #self._value_named_memory.tx_begin()
         result = F(*args)
-        self._value_named_memory.tx_commit()
+        #self._value_named_memory.tx_commit()
 
     # all methods that perform writes are implicitly used to define transaction
     # boundaries (at least most fine-grained)
@@ -183,14 +199,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
     # in-place methods need to be transactional
     def fill(self, value):
-        return self._value_only_transaction(super().fill, value)
+        return self._value_only_transaction(super().fill_, value)
 
-    def byteswap(self, inplace):
-        if inplace == True:
-            return self._value_only_transaction(super().byteswap, True)
-        else:
-            return super().byteswap(False)    
-
+    # TODO! ....
+    
     # in-place arithmetic
     def __iadd__(self, value): # +=
         return self._value_only_transaction(super().__iadd__, value)
@@ -233,14 +245,28 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def __setitem__(self, position, x):
         return self._value_only_transaction(super().__setitem__, position, x)
 
+    # def __getitem__(self, key):
+    #     '''
+    #     Magic method for slice handling
+    #     '''
+    #     print('!!!! get item !!!!')
+    #     if isinstance(key, int):
+    #         return [key]
+    #     if isinstance(key, slice):
+    #         return s.__getitem__(key)
+    #     else:
+    #         raise TypeError
+
+
     def flip(self, m, axis=None):
         return self._value_only_transaction(super().flip, m, axis)
 
 
     # operations that return new views on same data.  we want to change
     # the behavior to give a normal volatile version
+    
     def reshape(self, shape, order='C'):
-        x = np.array(self) # copy constructor
+        x = self.clone() # copy
         return x.reshape(shape)
         
 
@@ -256,3 +282,4 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._value_named_memory = getattr(obj, '_value_named_memory', None)
         self._metadata_key = getattr(obj, '_metadata_key', None)
         self.name = getattr(obj, 'name', None)
+

@@ -5,6 +5,7 @@ enum DataType : uint16 {
   Opaque = 1,
   NumPyArray = 2,
   Utf8String = 3,
+  TorchTensor = 4,
   ThisIsPyMM = 100,
 }
 
