@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -25,8 +25,6 @@
 
 #include <cstddef> /* size_t, ptrdiff_t */
 
-struct heap_cc;
-
 template <typename T, typename Persister>
 	struct allocator_cc;
 
@@ -51,11 +49,12 @@ template <typename T, typename Persister = persister>
 		: public deallocator_cc<T, Persister>
 	{
 		using deallocator_type = deallocator_cc<T, Persister>;
+		using heap_type = typename deallocator_type::heap_type;
 		using typename deallocator_type::size_type;
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::pointer_type;
 
-		allocator_cc(const heap_access<heap_cc> &pool_, Persister p_ = Persister()) noexcept
+		allocator_cc(const heap_access<heap_type> &pool_, Persister p_ = Persister()) noexcept
 			: deallocator_cc<T, Persister>(pool_, (p_))
 		{}
 
@@ -94,7 +93,7 @@ template <typename T, typename Persister = persister>
 			}
 		}
 
-		/* allocate and remember the allocation. heap_access<heap_cc> does this for every allocation */
+		/* allocate and remember the allocation. heap_access<heap_type> does this for every allocation */
 		void allocate_tracked(
 			AK_ACTUAL
 			pointer_type & p_

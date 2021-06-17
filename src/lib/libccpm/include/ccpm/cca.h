@@ -1,5 +1,5 @@
 /*
-   Copyright [2019,2020] [IBM Corporation]
+   Copyright [2019,2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -36,14 +36,14 @@ namespace ccpm
 		explicit cca();
 
 		void init(
-			const region_vector_t &regions
+			region_span regions
 			, ownership_callback_t resolver
-			, const bool force_init
+			, bool force_init
 		);
 	public:
-		explicit cca(const region_vector_t &regions, ownership_callback_t resolver);
+		explicit cca(const region_span regions, ownership_callback_t resolver);
 
-		explicit cca(const region_vector_t &regions);
+		explicit cca(const region_span regions);
 
 		~cca();
 
@@ -51,9 +51,9 @@ namespace ccpm
 		const cca& operator=(const cca &) = delete;
 
 		bool reconstitute(
-			const region_vector_t &regions
+			region_span regions
 			, ownership_callback_t resolver
-			, const bool force_init
+			, bool force_init
 		) override;
 
 		status_t allocate(
@@ -83,7 +83,7 @@ namespace ccpm
 		) override;
 
 		void add_regions(
-			const region_vector_t &
+			region_span
 		) override;
 
 		bool includes(

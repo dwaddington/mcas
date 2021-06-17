@@ -69,6 +69,9 @@ template <
     region(
       AK_ACTUAL
       unsigned debug_level
+#if HEAP_MM
+			, common::string_view plugin_path
+#endif
       , std::uint64_t uuid_
       , std::size_t size_
       , std::size_t expected_obj_count
@@ -80,7 +83,10 @@ template <
       , _uuid(uuid_)
       , _heap(
         debug_level
-#if USE_CC_HEAP == 4
+#if HEAP_MM
+			, plugin_path
+#endif
+#if HEAP_CONSISTENT
         , &_persist_data.ase()
         , (&_persist_data.aspd())
         , (&_persist_data.aspk())
@@ -109,6 +115,9 @@ template <
 #pragma GCC diagnostic ignored "-Wuninitialized"
     region(
       unsigned debug_level
+#if HEAP_MM
+			, common::string_view plugin_path
+#endif
       , const std::unique_ptr<dax_manager> & dax_manager_
       , string_view id_
       , string_view backing_file_
@@ -119,12 +128,15 @@ template <
       , _uuid(this->_uuid)
       , _heap(
         debug_level
+#if HEAP_MM
+				, plugin_path
+#endif
         , dax_manager_
         , id_
         , backing_file_
         , iov_addl_first_
         , iov_addl_last_
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
         , &this->_persist_data.ase()
         , &this->_persist_data.aspd()
         , &this->_persist_data.aspk()
@@ -135,7 +147,7 @@ template <
     {
       magic = magic_value;
       persister_nupm::persist(this, sizeof *this);
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
       /* any old values in the allocation states have been queried, as needed, by
        * the crash-consistent allocator. Reset all allocation states.
        */

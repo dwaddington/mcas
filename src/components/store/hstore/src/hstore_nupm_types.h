@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -17,8 +17,8 @@
 
 #include "hstore_config.h"
 
-#if USE_CC_HEAP == 3
-#elif USE_CC_HEAP == 4
+#if HEAP_RECONSTITUTE
+#elif HEAP_CONSISTENT
 #else
 #error USE_CC_HEAP type incompatible with nupm
 #endif

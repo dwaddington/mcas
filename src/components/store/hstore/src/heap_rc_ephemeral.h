@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 #ifndef MCAS_HSTORE_HEAP_RC_EPHEMERAL_H
 #define MCAS_HSTORE_HEAP_RC_EPHEMERAL_H
 
-#include <common/logging.h>
+#include <common/logging.h> /* log_source */
 
 #include "hstore_config.h"
 #include "histogram_log2.h"
@@ -27,9 +27,8 @@
 #include <nupm/rc_alloc_lb.h> /* Rca_LB */
 #include <nupm/region_descriptor.h>
 
-#include <algorithm> /* mini, swap */
+#include <algorithm> /* min, swap */
 #include <cstddef> /* size_t */
-#include <string>
 
 struct heap_rc_ephemeral
 	: private common::log_source

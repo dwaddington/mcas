@@ -1,5 +1,5 @@
 /*
-   Copyright [2019, 2020] [IBM Corporation]
+   Copyright [2019, 2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -35,13 +35,13 @@ ccpm::cca::cca()
 	, _last_top_free(0)
 {}
 
-ccpm::cca::cca(const region_vector_t &regions, ownership_callback_t resolver)
+ccpm::cca::cca(const region_span regions, ownership_callback_t resolver)
 	: cca()
 {
 	init(regions, resolver, false);
 }
 
-ccpm::cca::cca(const region_vector_t &regions)
+ccpm::cca::cca(const region_span regions)
 	: cca()
 {
 	init(regions, nullptr, true);
@@ -52,7 +52,7 @@ ccpm::cca::~cca()
 }
 
 bool ccpm::cca::reconstitute(
-	const region_vector_t &regions_
+	const region_span regions_
 	, ownership_callback_t resolver_
 	, const bool force_init_
 )
@@ -63,7 +63,7 @@ bool ccpm::cca::reconstitute(
 }
 
 void ccpm::cca::init(
-	const region_vector_t &regions_
+	const region_span regions_
 	, ownership_callback_t resolver_
 	, const bool force_init_
 )
@@ -83,7 +83,7 @@ void ccpm::cca::init(
 	}
 }
 
-void ccpm::cca::add_regions(const region_vector_t &regions_)
+void ccpm::cca::add_regions(const region_span regions_)
 {
 	for ( const auto & r : regions_ )
 	{

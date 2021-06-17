@@ -27,7 +27,7 @@ public:
   using size_type = typename list_type::size_type;
   using iterator = typename list_type::iterator;
 
-  explicit Immutable_list(const ccpm::region_vector_t& regions, bool force_init = false)
+  explicit Immutable_list(const ccpm::region_span regions, bool force_init = false)
     : _allocator_base(regions, nullptr, force_init),
       _allocator(&_allocator_base)
   {

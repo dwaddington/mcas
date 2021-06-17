@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2020] [IBM Corporation]
+  Copyright [2017-2021] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -343,7 +343,7 @@ auto make_schema_shard()
           ( config::default_backend
             , json::object
             ( json::member(schema::description, "Key/value store implementation to use.")
-              , json::member(schema::examples, json::array("hstore", "hstore-cc", "mapstore"))
+              , json::member(schema::examples, json::array("hstore", "hstore-cc", "hstore-mc", "mapstore"))
               , json::member(schema::type, schema::string)
               , json::member(schema::type, schema::string)
               )

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -17,26 +17,30 @@
 
 #include "hstore_config.h"
 
-#if USE_CC_HEAP == 2
+#if HEAP_OID
 #include "allocator_co.h"
-#elif USE_CC_HEAP == 3
+#elif HEAP_RECONSTITUTE
 #include "allocator_rc.h"
-#elif USE_CC_HEAP == 4
+#elif HEAP_CONSISTENT
 #include "allocator_cc.h"
 #endif
 
 template <typename Persister>
 	struct hstore_alloc_type
 	{
-#if USE_CC_HEAP == 2
+#if HEAP_OID
 		using alloc_type = allocator_co<char, Persister>;
 		using heap_alloc_type = heap_co;
-#elif USE_CC_HEAP == 3
+#elif HEAP_RECONSTITUTE
 		using alloc_type = allocator_rc<char, Persister>;
 		using heap_alloc_shared_type = heap_rc;
-#elif USE_CC_HEAP == 4
+#elif HEAP_CONSISTENT
 		using alloc_type = allocator_cc<char, Persister>;
-		using heap_alloc_shared_type = heap_cc;
+#if HEAP_MM
+		using heap_alloc_shared_type = typename alloc_type::heap_type;
+#else
+		using heap_alloc_shared_type = typename alloc_type::heap_type;
+#endif
 #endif
 		using heap_alloc_access_type = heap_access<heap_alloc_shared_type>;
 	};

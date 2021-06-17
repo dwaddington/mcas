@@ -111,7 +111,15 @@ public:
    * Constructor
    *
    */
-  hstore(unsigned debug_level, const string_view owner, const string_view name, std::unique_ptr<dax_manager> &&mgr);
+  hstore(
+		unsigned debug_level
+#if HEAP_MM
+		, string_view mm_plugin_path
+#endif
+		, string_view owner
+		, string_view name
+		, std::unique_ptr<dax_manager> &&mgr
+	);
 
   /**
    * Destructor

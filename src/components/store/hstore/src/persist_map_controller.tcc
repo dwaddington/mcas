@@ -38,7 +38,7 @@ template <typename Allocator>
 		const Allocator &av_
 		, persist_data_t *persist_
 		, construction_mode
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 			mode_
 #endif
 	)
@@ -54,7 +54,7 @@ template <typename Allocator>
 		{
 			_persist->do_initial_allocation(AK_REF this);
 		}
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 		if ( mode_ == construction_mode::reconstitute )
 		{
 			_persist->reconstitute(av_);
@@ -200,7 +200,7 @@ template <typename Allocator>
 		persistent_t<typename std::allocator_traits<bucket_allocator_t>::pointer> ptr = nullptr;
 
 		{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 			monitor_extend<Allocator> m(bucket_allocator_t{*this});
 #endif
 			bucket_allocator_t(*this).allocate(

@@ -22,9 +22,6 @@
 #include "monitor_emplace.h"
 #include "monitor_pin.h"
 #include <common/perf/tm.h>
-#if 0
-#include <common/to_string.h>
-#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -48,7 +45,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 	template <typename OID, typename Persist>
 		session<Handle, Allocator, Table, LockType>::session(
 			OID
-#if USE_CC_HEAP == 2
+#if HEAP_OID
 				heap_oid_
 #endif
 			, Handle &&pop_
@@ -58,13 +55,13 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		: session_base<Handle>(std::move(pop_), debug_level_)
 		, _heap(
 			Allocator(
-#if USE_CC_HEAP == 2
+#if HEAP_OID
 				*new
 					(pmemobj_direct(heap_oid_))
 					heap_co(heap_oid_)
-#elif USE_CC_HEAP == 3 || USE_CC_HEAP == 4
+#else
 				this->pool() /* not used */
-#endif /* USE_CC_HEAP */
+#endif
 			)
 		)
 		, _pin_seq(undo_redo_pin_data(_heap) || undo_redo_pin_key(_heap))
@@ -98,7 +95,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 template <typename Handle, typename Allocator, typename Table, typename LockType>
 	session<Handle, Allocator, Table, LockType>::~session()
 	{
-#if USE_CC_HEAP == 3 || USE_CC_HEAP == 4
+#if ! HEAP_OID
 		this->pool()->quiesce();
 #endif
 	}
@@ -119,11 +116,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		allocator_type heap_
 	)
 	{
-#if USE_CC_HEAP == 3
-		AK_REF_VOID;
-		(void) (heap_);
-		return true;
-#elif USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 		auto &aspd = heap_.pool()->aspd();
 		auto armed = aspd.is_armed();
 		if ( armed )
@@ -162,6 +155,10 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			/* S_unarmed: do nothing */
 		}
 		return armed;
+#else
+		AK_REF_VOID;
+		(void) (heap_);
+		return true;
 #endif
 	}
 
@@ -171,11 +168,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		allocator_type heap_
 	)
 	{
-#if USE_CC_HEAP == 3
-		AK_REF_VOID;
-		(void) (heap_);
-		return true;
-#elif USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 		auto &aspk = heap_.pool()->aspk();
 		auto armed = aspk.is_armed();
 		if ( armed )
@@ -214,6 +207,10 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			/* S_unarmed: do nothing */
 		}
 		return armed;
+#else
+		AK_REF_VOID;
+		(void) (heap_);
+		return true;
 #endif
 	}
 
@@ -248,7 +245,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto & map = locate_map(key);
 		auto cvalue = static_cast<const char *>(value);
 
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 		/* Start of an emplace. Storage allocated by this->allocator()
 		 * is to be disclaimed upon a restart unless
 		 *  (1) verified in-use by the map (i.e., owner bit bit set to 1), or later
@@ -437,7 +434,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 	) -> lock_result
 	{
 		auto & map = locate_map(key);
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 		monitor_emplace<Allocator> me(this->allocator());
 #endif
 		auto it = map.find(TM_REF key);
@@ -624,7 +621,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			auto &d = std::get<0>(m);
 			if ( ! d.is_locked() )
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				monitor_emplace<Allocator> me(this->allocator());
 #endif
 				++this->_writes;
@@ -818,7 +815,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 	)
 	{
 		persistent_t<char *> p = static_cast<char *>(const_cast<void *>(addr));
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 		/* ERROR: leaks memory on a crash */
 #endif
 		allocator().deallocate_tracked(p, size);

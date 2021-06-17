@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -19,6 +19,7 @@
  *   USE_CC_HEAP 2: simple allocation using offsets from a large region obtained from dax_map (NOT TESTED)
  *   USE_CC_HEAP 3: AVL-based allocation using actual addresses from a large region obtained from dax_map
  *   USE_CC_HEAP 4: bitmap-based allocation from a large region; crash-consistent
+ *   USE_CC_HEAP 5: pluggable allocator
  *
  */
 
@@ -26,6 +27,24 @@
 #define USE_CC_HEAP MCAS_HSTORE_USE_CC_HEAP
 #else
 #define USE_CC_HEAP 3
+#endif
+
+#if USE_CC_HEAP == 3
+#define HEAP_MM 0
+#define HEAP_RECONSTITUTE 1
+#define HEAP_CONSISTENT 0
+#elif USE_CC_HEAP == 4
+#define HEAP_MM 0
+#define HEAP_RECONSTITUTE 0
+#define HEAP_CONSISTENT 1
+#elif USE_CC_HEAP == 5
+#define HEAP_MM 1
+#define HEAP_RECONSTITUTE 0
+#define HEAP_CONSISTENT 1
+#else
+#define HEAP_MM 0
+#define HEAP_RECONSTITUTE 0
+#define HEAP_CONSISTENT 0
 #endif
 
 #define THREAD_SAFE_HASH 0

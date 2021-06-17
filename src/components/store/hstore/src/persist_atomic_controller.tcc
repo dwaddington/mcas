@@ -40,7 +40,7 @@ template <typename Table>
 		{
 			if ( mode_ == construction_mode::reconstitute )
 			{
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 				/* reconstitute allocated memory */
 				_persist->mod_key.reconstitute(allocator_type(*this));
 				_persist->mod_mapped.reconstitute(allocator_type(*this));
@@ -92,7 +92,7 @@ template <typename Table>
 		monitor_emplace<allocator_type> m(*this);
 
 		/* Identify the element owner for the allocations to be freed */
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 		{
 			auto pe = static_cast<allocator_type *>(this);
 			_persist->ase().em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);
@@ -270,7 +270,7 @@ template <typename Table>
 		_persist->mod_owner = 0;
 		{
 			monitor_emplace<allocator_type> m(*this);
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 			{
 				auto pe = static_cast<allocator_type *>(this);
 				_persist->ase().em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);

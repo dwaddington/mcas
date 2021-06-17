@@ -37,7 +37,7 @@ public:
   // _root is not initialized
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
-  Immutable_allocator_base(region_vector_t regions,
+  Immutable_allocator_base(const region_span regions,
                            ccpm::ownership_callback_t callback,
                            bool force_init)
   {
@@ -48,8 +48,7 @@ public:
 
   explicit Immutable_allocator_base(common::byte_span & region)
   {
-    region_vector_t regions;
-    regions.push_back(region);
+    common::byte_span regions[1] = { region };
     reconstitute(regions, nullptr, true /* this is new - force initialization */);
     assert(_root);
   }
@@ -86,7 +85,7 @@ public:
    *
    * @return : True iff re-initialization took place
    **/
-  bool reconstitute(const region_vector_t &regions,
+  bool reconstitute(const region_span regions,
                     ccpm::ownership_callback_t callback,
                     const bool force_init) override
   {
@@ -113,10 +112,8 @@ public:
       _root->slab_end = static_cast<byte*>(buffer) + size;
       _root->next_free = static_cast<byte*>(buffer) + sizeof(struct Immutable_slab);
       if(regions.size() > 1) {
-        auto copy_regions = regions;
-        copy_regions.erase(copy_regions.begin());
         /* recurse through regions */
-        _root->linked_slab = new Immutable_allocator_base(copy_regions, callback, force_init);
+        _root->linked_slab = new Immutable_allocator_base(region_span(&regions.front() + 1, &regions.back() + 1), callback, force_init);
       }
       else {
         _root->linked_slab = nullptr; /* no more linked regions */

@@ -91,7 +91,7 @@ template <typename Allocator>
 		{
 			if ( _segment_count.actual().value() == 0 )
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				/*
 				 * (1) save enough information to know when the allocated pointer is hardened. In this case, the address and new value of the length of the segment table
 				 *
@@ -130,7 +130,7 @@ template <typename Allocator>
 			for ( auto ix = _segment_count.actual().value(); ix != _segment_count.specified(); ++ix )
 			{
 				auto segment_size = base_segment_size<<(ix-1U);
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 // 				tas_type tas(bucket_allocator_t(av), &_asc.extend);
 				monitor_extend<Allocator> m{bucket_allocator_t(av)};
 				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
@@ -155,7 +155,7 @@ template <typename Allocator>
 template <typename Allocator>
 	void impl::persist_map<Allocator>::reconstitute(Allocator av_)
 	{
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 		auto av = bucket_allocator_t(av_);
 		if ( ! _segment_count.actual().is_stable() || _segment_count.actual().value() != 0 )
 		{
@@ -177,7 +177,8 @@ template <typename Allocator>
 			}
 
 		}
-#elif USE_CC_HEAP == 4
+#endif
+#if HEAP_CONSISTENT
 		/* */
 		/* manifest constant 4 is number of possible emplace/erase deallocations (though 2 is the maximum expected) */
 		for ( auto i = 0; i != 4; ++i )
