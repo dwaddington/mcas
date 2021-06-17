@@ -494,12 +494,12 @@ auto dax_manager::create_region(
   }
   catch ( const General_exception &e )
   {
-    PLOG("%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
+    CPLOG(2,"%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
     return region_descriptor();
   }
   catch ( const std::exception &e )
   {
-    PLOG("%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
+    CPLOG(2,"%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
     return region_descriptor();
   }
 }

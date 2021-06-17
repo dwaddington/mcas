@@ -28,7 +28,7 @@ run_hstore() {
   prefix
   FLUSH_ENABLE=0 GOAL=2400 FORCE_DIRECT=1 ELEMENT_COUNT=6000 VALUE_LENGTH=2000000 $DIR/mcas-hstore-put_direct-0.sh $1
   prefix
-  GOAL=3100 FORCE_DIRECT=1 ELEMENT_COUNT=6000 VALUE_LENGTH=2000000 $DIR/mcas-hstore-get_direct-0.sh $1
+  GOAL=3000 FORCE_DIRECT=1 ELEMENT_COUNT=6000 VALUE_LENGTH=2000000 $DIR/mcas-hstore-get_direct-0.sh $1
   prefix
   # includes async_put, async_erase, async_put_direct
   $DIR/mcas-hstore-cc-kvtest-0.sh $1

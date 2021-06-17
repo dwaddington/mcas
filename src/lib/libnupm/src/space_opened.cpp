@@ -53,6 +53,11 @@ namespace fs = std::experimental::filesystem;
 
 std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::vector<common::memory_mapped> &&iovm_)
 {
+
+  /* MCAS-86: we don't want this restriction, because different processes could be
+     using the same virtual load address. */
+
+#ifdef TEMPORARY_FIX
 	using AC = boost::icl::interval_set<byte *>;
 	AC this_coverage;
 	for ( const auto &e : iovm_ )
@@ -69,6 +74,7 @@ std::vector<common::memory_mapped> nupm::range_use::address_coverage_check(std::
 	}
 	_dm->_address_coverage += this_coverage;
 	_dm->_address_fs_available -= this_coverage;
+#endif
 
 	return std::move(iovm_);
 }
