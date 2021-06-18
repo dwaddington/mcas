@@ -24,6 +24,9 @@ from .ndarray import ndarray, shelved_ndarray
 from .shelf import Shadow
 from .shelf import ShelvedCommon
 
+def colored(r, g, b, text):
+    return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
+
 dtypedescr = np.dtype
     
 # shadow type for torch_tensor
@@ -34,6 +37,7 @@ class torch_tensor(Shadow):
     '''
     def __init__(self, shape, dtype=float, strides=None, order='C'):
 
+        print(colored(255,0,0, 'WARNING: torch_tensor is experimental and unstable!'))
         # todo check params
         # todo check and invalidate param 'buffer'
         # save constructor parameters and type
@@ -71,19 +75,15 @@ class torch_tensor(Shadow):
         print('shadow torch_tensor')
 
 
-    def build_from_copy(memory_resource: MemoryResource, name: str, array):
-        new_array = shelved_torch_tensor(memory_resource,
-                                         name,
-                                         shape = array.shape,
-                                         dtype = array.dtype,
-                                         strides = array.strides)
-
+    def build_from_copy(memory_resource: MemoryResource, name: str, tensor):
+        new_tensor = shelved_torch_tensor(memory_resource,
+                                          name,
+                                          shape = tensor.shape,
+                                          dtype = tensor.dtype)
+        
         # now copy the data
-        #new_array[:] = array
-        np.copyto(new_array, array)
-        return new_array
-
-
+        new_tensor[:] = tensor
+        return new_tensor
 
     
 # concrete subclass for torch tensor
@@ -92,7 +92,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''
     torch tensor that is stored in a memory resource
     '''
-#    __array_priority__ = -100.0 # what does this do?
+    __array_priority__ = -100.0 # what does this do?
 
     def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
 
@@ -145,6 +145,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
                                            strides=hdr['strides'], order=order, type=1)
             
         self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
+        self._base_ndarray = base_ndarray
         self._value_named_memory = base_ndarray._value_named_memory
 
         # hold a reference to the memory resource
@@ -164,16 +165,21 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         return torch.tensor.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
-        print('getattr--> ',name)
         if name == 'addr':
             return self._value_named_memory.addr()
-        elif name not in super().__dict__:
-            raise AttributeError("'{}' object has no attribute '{}'".format(type(self),name))
         else:
             return super().__dict__[name]
 
+    # def __array_ufunc__(ufunc, method, *inputs, **kwargs):
+    #     print('__array_ufunc__')
+    #     return super().__array_ufunc__(ufunc, method, *inputs, **kwargs)
+        
+
     def asndarray(self):
         return self.view(np.ndarray)
+
+    def astensor(self):
+        return super()
     
     def update_metadata(self, array):
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str, type=1)
@@ -185,11 +191,15 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     def _value_only_transaction(self, F, *args):
         if self is None:
             return
-
-        # TO FIX
-        #self._value_named_memory.tx_begin()
+        self._value_named_memory.tx_begin()
         result = F(*args)
-        #self._value_named_memory.tx_commit()
+        self._value_named_memory.tx_commit()
+
+    def _tx_begin(self):
+        self._value_named_memory.tx_begin()
+
+    def _tx_commit(self):
+        self._value_named_memory.tx_commit()
 
     # all methods that perform writes are implicitly used to define transaction
     # boundaries (at least most fine-grained)
@@ -200,8 +210,6 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     # in-place methods need to be transactional
     def fill(self, value):
         return self._value_only_transaction(super().fill_, value)
-
-    # TODO! ....
     
     # in-place arithmetic
     def __iadd__(self, value): # +=
@@ -241,25 +249,22 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
     # TODO... more
 
-    # set item, e.g. x[2] = 2
+    # set item, e.g. x[2] = 2    
     def __setitem__(self, position, x):
         return self._value_only_transaction(super().__setitem__, position, x)
 
-    # def __getitem__(self, key):
-    #     '''
-    #     Magic method for slice handling
-    #     '''
-    #     print('!!!! get item !!!!')
-    #     if isinstance(key, int):
-    #         return [key]
-    #     if isinstance(key, slice):
-    #         return s.__getitem__(key)
-    #     else:
-    #         raise TypeError
 
-
-    def flip(self, m, axis=None):
-        return self._value_only_transaction(super().flip, m, axis)
+    def __getitem__(self, key):
+        '''
+        Magic method for slice handling. Pytorch tensor does something strange
+        with the slicing, the self (object id) changes, so we have to hand
+        off the base ndarray
+        '''
+        try:
+            # there may be things that tensor allows that ndarray does not?
+            return torch.as_tensor(self._base_ndarray.__getitem__(key))
+        except AttributeError:
+            return super().__getitem__(key)
 
 
     # operations that return new views on same data.  we want to change
@@ -283,3 +288,50 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         self._metadata_key = getattr(obj, '_metadata_key', None)
         self.name = getattr(obj, 'name', None)
 
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs=None):
+        # NOTE: Logging calls Tensor.__repr__, so we can't log __repr__ without infinite recursion
+        if func is not torch.Tensor.__repr__:
+            return super().__torch_function__(func, types, args, kwargs)
+#            print(f"func: {func.__name__}, args: {args!r}, kwargs: {kwargs!r}")
+            
+        if kwargs is None:
+            kwargs = {}
+        
+        r = super().__torch_function__(func, types, args, kwargs)
+        return r
+
+    # out-of-place we need to convert back to torch tensor because
+    # the variable (result) is escaping the shelf
+    def __add__(self, value):
+        return super().__add__(value).as_subclass(torch.Tensor)
+
+    def __mul__(self, value):
+        return super().__mul__(value).as_subclass(torch.Tensor)
+
+    def __sub__(self, value):
+        return super().__sub__(value).as_subclass(torch.Tensor)
+
+    def __div__(self, value):
+        return super().__div__(value).as_subclass(torch.Tensor)
+
+    def __mod__(self, value):
+        return super().__mod__(value).as_subclass(torch.Tensor)
+
+    def __pow__(self, value):
+        return super().__pow__(value).as_subclass(torch.Tensor)
+
+    def __lshift__(self, value):
+        return super().__lshift__(value).as_subclass(torch.Tensor)
+
+    def __rshift__(self, value):
+        return super().__rshift__(value).as_subclass(torch.Tensor)
+
+    def __and__(self, value):
+        return super().__and__(value).as_subclass(torch.Tensor)
+
+    def __or__(self, value):
+        return super().__or__(value).as_subclass(torch.Tensor)
+    
+    def __xor__(self, value):
+        return super().__xor__(value).as_subclass(torch.Tensor)

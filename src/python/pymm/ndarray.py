@@ -116,7 +116,6 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                                                                      int(size*_dbytes),
                                                                      8, # alignment
                                                                      False) # zero
-            print('created value named memory!!')
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
             self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
@@ -160,6 +159,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
     def asndarray(self):
         return self.view(np.ndarray)
+
+    def dim(self):
+        return len(super().shape)
     
     def update_metadata(self, array):
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str)
@@ -189,7 +191,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         if inplace == True:
             return self._value_only_transaction(super().byteswap, True)
         else:
-            return super().byteswap(False)    
+            return super().byteswap(False)
 
     # in-place arithmetic
     def __iadd__(self, value): # +=
@@ -226,6 +228,40 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         return self._value_only_transaction(super().__ior__, value)
 
     
+    # out-of-place we need to convert back to ndarray
+    def __add__(self, value):
+        return super().__add__(value).asndarray()
+
+    def __mul__(self, value):
+        return super().__mul__(value).asndarray()
+
+    def __sub__(self, value):
+        return super().__sub__(value).asndarray()
+
+    def __div__(self, value):
+        return super().__div__(value).asndarray()
+
+    def __mod__(self, value):
+        return super().__mod__(value).asndarray()
+
+    def __pow__(self, value):
+        return super().__pow__(value).asndarray()
+
+    def __lshift__(self, value):
+        return super().__lshift__(value).asndarray()
+
+    def __rshift__(self, value):
+        return super().__rshift__(value).asndarray()
+
+    def __and__(self, value):
+        return super().__and__(value).asndarray()
+
+    def __or__(self, value):
+        return super().__or__(value).asndarray()
+    
+    def __xor__(self, value):
+        return super().__xor__(value).asndarray()
+
 
     # TODO... more
 
