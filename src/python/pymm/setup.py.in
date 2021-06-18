@@ -12,6 +12,7 @@ include_dir = '/usr/include/${PYTHON_FILENAME}'
 
 
 for key, value in cfg_vars.items():
+#    print("config var: {} {}".format(key, value))
     if(key == 'OPT'):
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
         cfg_vars[key] = value.replace("-O0", "-O2")
@@ -19,6 +20,13 @@ for key, value in cfg_vars.items():
     elif(key == 'Py_DEBUG'):
         if(value == 1):
             include_dir = '/usr/include/${PYTHON_FILENAME}'
+
+extra_compile_flags = ['-fPIC','-std=c++17','-g','-O2','-DPYMM']
+flag_build_pymm_valgrind = os.environ.get('BUILD_PYMM_VALGRIND', None)
+if flag_build_pymm_valgrind != None:
+    extra_compile_flags.append("-DBUILD_PYMM_VALGRIND")
+
+print(">>", extra_compile_flags)
 
 pymm_module_core = Extension('pymmcore',
                         define_macros = [('MAJOR_VERSION', '1'),
@@ -44,7 +52,7 @@ pymm_module_core = Extension('pymmcore',
                                    '${CMAKE_CURRENT_SOURCE_DIR}/core/memory_resource_type.cc',
                                    '${CMAKE_CURRENT_SOURCE_DIR}/core/ndarray_helpers.cc',
                         ],
-                        extra_compile_args = ['-fPIC','-std=c++17','-g','-O2','-DPYMM'], # '-DCONFIG_DEBUG',
+                        extra_compile_args = extra_compile_flags,
                         runtime_library_dirs = ['/usr/lib/${PYTHON_FILENAME}/',
                                                 '${CMAKE_INSTALL_PREFIX}/lib',
                                                 '${CMAKE_INSTALL_PREFIX}/lib64',

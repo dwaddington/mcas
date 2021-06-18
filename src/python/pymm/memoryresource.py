@@ -41,6 +41,7 @@ class MemoryReference():
     def tx_begin(self):
         # disable -
         print('tx_begin')
+        pymmcore.valgrind_trigger(1)
         self.__tx_begin_swcopy()
         pass
         
@@ -60,6 +61,7 @@ class MemoryReference():
     def tx_commit(self):
         # disable -
         print('tx_commit')
+        pymmcore.valgrind_trigger(2)
         self.__tx_commit_swcopy()
         pass
     

@@ -3,7 +3,10 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 project(pymm CXX)
 
 option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
+option(BUILD_PYMM_VALGRIND "build support for valgrind triggers" ON)
+
 set(BUILD_PYMM_NOPACKAGE ON)
+set(BUILD_PYMM_VALGRIND ON)
 
 if (BUILD_PYTHON_SUPPORT)
 
@@ -69,11 +72,17 @@ endif()
     DEPENDS ${GENERATED}
     )
 
+  if(BUILD_PYMM_VALGRIND)
+    message("-- Building Pymm with Valgrind support")
+  else()
+    message("-- Building Pymm without Valgrind support")
+  endif()
+
   if(BUILD_PYMM_NOPACKAGE)
     message("-- Building Pymm WITHOUT package (development only)")
     add_custom_target(${PROJECT_NAME}-np ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
-      COMMAND ${PYTHON} ${SETUP_PY} build
+      COMMAND BUILD_PYMM_VALGRIND=${BUILD_PYMM_VALGRIND} ${PYTHON} ${SETUP_PY} build
       COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES}  
       )
@@ -90,7 +99,7 @@ endif()
     
     add_custom_command(
       OUTPUT build.stamp
-      COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
+      COMMAND BUILD_PYMM_VALGRIND=${BUILD_PYMM_VALGRIND} ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
       COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} 
       )
