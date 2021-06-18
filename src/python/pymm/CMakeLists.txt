@@ -74,6 +74,7 @@ endif()
     add_custom_target(${PROJECT_NAME}-np ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
       COMMAND ${PYTHON} ${SETUP_PY} build
+      COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES}  
       )
     add_custom_target(${PROJECT_NAME} ALL

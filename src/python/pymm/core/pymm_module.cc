@@ -47,6 +47,8 @@ PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
 PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
              "memoryview_addr(m) -> Return address of memory (for debugging)");
+PyDoc_STRVAR(pymmcore_valgrind_trigger_doc,
+             "valgrind_trigger(i) -> Used to trigger/mark event in Valgrind");
 
 PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
              "ndarray_header_size(array) -> Return size of memory needed for header");
@@ -77,6 +79,12 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
                                            PyObject * kwargs);
 
 
+static PyObject * pymmcore_valgrind_trigger(PyObject * self,
+                                            PyObject * args,
+                                            PyObject * kwargs);
+
+
+
 static PyMethodDef pymmcore_methods[] =
   {
    {"version",
@@ -88,7 +96,9 @@ static PyMethodDef pymmcore_methods[] =
    {"ndarray_header_size",
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"memoryview_addr",
-    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },   
+    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
+   {"valgrind_trigger",
+    (PyCFunction) pymmcore_valgrind_trigger, METH_VARARGS | METH_KEYWORDS, pymmcore_valgrind_trigger_doc },
    {"ndarray_header",
     (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },
    {"ndarray_read_header",
@@ -274,4 +284,42 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(p_memoryview);
   
   return PyLong_FromUnsignedLong(reinterpret_cast<unsigned long>(buffer->buf));
+}
+
+
+static void __valgrind_trigger_event(int event)
+{
+}
+
+static PyObject * pymmcore_valgrind_trigger(PyObject * self,
+                                            PyObject * args,
+                                            PyObject * kwargs)
+{
+  static const char *kwlist[] = {"event",
+                                 NULL};
+
+  int event = 0;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "i",
+                                    const_cast<char**>(kwlist),
+                                    &event)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  __valgrind_trigger_event(event);
+  Py_RETURN_NONE;
+}
+
+
+#include <stdio.h>
+#include <valgrind/valgrind.h>
+void I_WRAP_SONAME_FNNAME_ZU(NONE, __valgrind_trigger_event)( int e )
+{
+   OrigFn fn;
+   VALGRIND_GET_ORIG_FN(fn);
+   printf("TRIGGER: args %d\n", e);
+   CALL_FN_v_W(fn, e);
 }
