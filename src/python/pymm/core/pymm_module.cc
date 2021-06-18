@@ -287,7 +287,7 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
 }
 
 
-static void __valgrind_trigger_event(int event)
+extern "C" void __valgrind_trigger_event(int event)
 {
 }
 
@@ -316,7 +316,7 @@ static PyObject * pymmcore_valgrind_trigger(PyObject * self,
 
 #include <stdio.h>
 #include <valgrind/valgrind.h>
-void I_WRAP_SONAME_FNNAME_ZU(NONE, __valgrind_trigger_event)( int e )
+void I_WRAP_SONAME_FNNAME_ZU(ZapymmcoreZdcpythonZa, __valgrind_trigger_event)( int e )
 {
    OrigFn fn;
    VALGRIND_GET_ORIG_FN(fn);
