@@ -59,7 +59,7 @@ setuptools.setup(
     author='Daniel Waddington',
     author_email='daniel.waddington@ibm.com',
     description='Micro MCAS API library',
-    package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}', 'PyMM.Meta':'./pymm/PyMM/Meta' },
+    package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}', 'PyMM.Meta':'${CMAKE_CURRENT_BINARY_DIR}/PyMM/Meta' },
     ext_modules=[pymm_module_core],
     packages=['pymm','PyMM.Meta'],
     classifiers=[
