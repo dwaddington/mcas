@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2019] [IBM Corporation]
+  Copyright [2017-2021] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -23,6 +23,7 @@
 #include <common/stack.h>
 #include <common/types.h>
 #include <common/utils.h>
+#include <gsl/pointers>
 #include <iostream>
 #include <vector>
 #include <cstdlib> // exit
@@ -404,7 +405,7 @@ public:
    *
    * @return Pointer to
    */
-  Memory_region* alloc(size_t size, size_t alignment = 0)
+  gsl::not_null<Memory_region*> alloc(size_t size, size_t alignment = 0)
   {
     try {
 
@@ -413,7 +414,7 @@ public:
 #endif
 
       /* look for fitting region that is aligned */
-      Memory_region* root = static_cast<Memory_region*>(&**(_tree->root()));
+      gsl::not_null<Memory_region*> root = static_cast<Memory_region*>(&**(_tree->root()));
       Memory_region* aligned_region = root->find_free_region(root, size, alignment);
 
       if (aligned_region) {
@@ -457,7 +458,7 @@ public:
 
         Memory_region* region = root->find_free_region(root, size);
         if (region == nullptr) {
-          return nullptr; /* no candidate */
+          throw General_exception("AVL_range_allocator: failed to allocate %ld (no free region)", size);
         }
 
         assert(region->_free == true);

@@ -19,9 +19,6 @@
 #include "clean_align.h"
 #include "dax_manager.h"
 #include "heap_mc_ephemeral.h"
-#if 0
-#include <ccpm/cca.h>
-#endif
 #include <common/pointer_cast.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>

@@ -112,9 +112,10 @@ static std::string default_mm_plugin(const Config_file& /*config_file*/,
                                      const std::string& backend)
 {
   if(backend == "mapstore") return DEFAULT_MAPSTORE_MM_PLUGIN_PATH;
-  else if(backend == "hstore") return DEFAULT_HSTORE_MM_PLUGIN_PATH;
-  else if(backend == "hstore-cc") return DEFAULT_HSTORE_CC_MM_PLUGIN_PATH;
-  else if(backend == "hstore-mc") return DEFAULT_HSTORE_CC_MM_PLUGIN_PATH;
+  else if(backend == "hstore") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
+  else if(backend == "hstore-mr") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
+  else if(backend == "hstore-cc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
+  else if(backend == "hstore-mc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
   else throw Logic_exception("invalid store: %s", backend.c_str());
 }
 
@@ -682,9 +683,6 @@ void Shard::process_message_pool_request(Connection_handler *handler,
             for (auto &r : regions.address_map()) {
               CPLOG(2, "region: %p %lu MiB", ::base(r), REDUCE_MB(::size(r)));
               /* pre-register memory region with RDMA */
-#if 0
-              handler->ondemand_register(r.iov_base, r.iov_len);
-#endif
               handler->ondemand_register(common::make_const_byte_span(r));
             }
           }

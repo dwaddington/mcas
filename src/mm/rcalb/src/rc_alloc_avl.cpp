@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -80,7 +80,6 @@ class Rca_AVL_internal : private common::log_source {
       auto mr = _allocators[numa_node_u]->alloc(size, alignment);
       //      SAFE_PRINT("AVL allocated: 0x%lx size=%lu", mr->addr(), size);
 
-      assert(mr);
       return mr->paddr();
     }
     catch(...) {

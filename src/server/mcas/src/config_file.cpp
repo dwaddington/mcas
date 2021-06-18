@@ -343,7 +343,7 @@ auto make_schema_shard()
           ( config::default_backend
             , json::object
             ( json::member(schema::description, "Key/value store implementation to use.")
-              , json::member(schema::examples, json::array("hstore", "hstore-cc", "hstore-mc", "mapstore"))
+              , json::member(schema::examples, json::array("hstore", "hstore-cc", "hstore-mc", "hstore-mr", "mapstore"))
               , json::member(schema::type, schema::string)
               , json::member(schema::type, schema::string)
               )

@@ -47,6 +47,7 @@ template <typename T, typename Persister = persister>
 	struct deallocator_cc
 		: public Persister
 	{
+/* Note: make this a template parameter */
 #if HEAP_MM
 		using heap_type = heap_mc;
 #else

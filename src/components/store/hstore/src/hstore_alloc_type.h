@@ -33,14 +33,14 @@ template <typename Persister>
 		using heap_alloc_type = heap_co;
 #elif HEAP_RECONSTITUTE
 		using alloc_type = allocator_rc<char, Persister>;
+#if HEAP_MM
+		using heap_alloc_shared_type = heap_mr;
+#else
 		using heap_alloc_shared_type = heap_rc;
+#endif
 #elif HEAP_CONSISTENT
 		using alloc_type = allocator_cc<char, Persister>;
-#if HEAP_MM
 		using heap_alloc_shared_type = typename alloc_type::heap_type;
-#else
-		using heap_alloc_shared_type = typename alloc_type::heap_type;
-#endif
 #endif
 		using heap_alloc_access_type = heap_access<heap_alloc_shared_type>;
 	};

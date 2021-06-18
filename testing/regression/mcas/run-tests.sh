@@ -35,6 +35,8 @@ run_hstore() {
   prefix
   $DIR/mcas-hstore-mc-kvtest-0.sh $1
   prefix
+  $DIR/mcas-hstore-mr-kvtest-0.sh $1
+  prefix
   $DIR/mcas-hstore-cc-put-0.sh $1
   prefix
   $DIR/mcas-hstore-cc-get-0.sh $1

@@ -316,6 +316,7 @@ public:
     LOAD_SYMBOL(mm_plugin_usable_size);
     LOAD_SYMBOL(mm_plugin_debug);
     LOAD_SYMBOL(mm_plugin_destroy);
+    LOAD_SYMBOL(mm_plugin_inject_allocation);
 
     //      dlclose(_module);
       

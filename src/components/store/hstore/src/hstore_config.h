@@ -19,7 +19,8 @@
  *   USE_CC_HEAP 2: simple allocation using offsets from a large region obtained from dax_map (NOT TESTED)
  *   USE_CC_HEAP 3: AVL-based allocation using actual addresses from a large region obtained from dax_map
  *   USE_CC_HEAP 4: bitmap-based allocation from a large region; crash-consistent
- *   USE_CC_HEAP 5: pluggable allocator
+ *   USE_CC_HEAP 5: pluggable allocator (ccpm)
+ *   USE_CC_HEAP 6: pluggable allocator (rcalb)
  *
  */
 
@@ -41,6 +42,10 @@
 #define HEAP_MM 1
 #define HEAP_RECONSTITUTE 0
 #define HEAP_CONSISTENT 1
+#elif USE_CC_HEAP == 6
+#define HEAP_MM 1
+#define HEAP_RECONSTITUTE 1
+#define HEAP_CONSISTENT 0
 #else
 #define HEAP_MM 0
 #define HEAP_RECONSTITUTE 0

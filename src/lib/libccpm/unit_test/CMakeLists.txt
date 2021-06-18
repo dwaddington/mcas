@@ -22,7 +22,7 @@ link_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/)
 link_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/)
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
-link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64) # gtest
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
   set(GTEST_LIB gtest)

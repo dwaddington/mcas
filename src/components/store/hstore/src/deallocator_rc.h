@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,8 +15,13 @@
 #ifndef COMANCHE_HSTORE_DEALLOCATOR_RC_H
 #define COMANCHE_HSTORE_DEALLOCATOR_RC_H
 
+#include "hstore_config.h"
 #include "heap_access.h"
+#if HEAP_MM
+#include "heap_mr.h"
+#else
 #include "heap_rc.h"
+#endif
 #include "persister_cc.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
@@ -40,8 +45,14 @@ template <typename T, typename Persister = persister>
 	struct deallocator_rc
 		: public Persister
 	{
+/* Note: make this a template parameter */
+#if HEAP_MM
+		using heap_type = heap_mr;
+#else
+		using heap_type = heap_rc;
+#endif
 	private:
-		heap_access<heap_rc> _pool;
+		heap_access<heap_type> _pool;
 	public:
 		using value_type = T;
 		using size_type = std::size_t;
@@ -51,7 +62,7 @@ template <typename T, typename Persister = persister>
 			, _pool(area_)
 		{}
 #endif
-		explicit deallocator_rc(const heap_access<heap_rc> &pool_, Persister p_ = Persister()) noexcept
+		explicit deallocator_rc(const heap_access<heap_type> &pool_, Persister p_ = Persister()) noexcept
 			: Persister(p_)
 			, _pool(pool_)
 		{}

@@ -11,8 +11,8 @@
    limitations under the License.
 */
 
-#ifndef MCAS_HSTORE_HEAP_CC_EPHEMERAL_H
-#define MCAS_HSTORE_HEAP_CC_EPHEMERAL_H
+#ifndef MCAS_HSTORE_HEAP_MC_EPHEMERAL_H
+#define MCAS_HSTORE_HEAP_MC_EPHEMERAL_H
 
 #include <common/logging.h> /* log_source */
 

@@ -16,11 +16,7 @@
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
-#if 0
-#include <ccpm/cca.h>
-#else
 #include "mm_plugin_itf.h"
-#endif
 #include <common/errors.h> /* S_OK */
 #include <cassert>
 #include <cstdlib> /* getenv */
@@ -118,14 +114,14 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
 	, impl::allocation_state_extend *asx_
-	, std::unique_ptr<ccpm::IHeap_expandable> p
+	, std::unique_ptr<ccpm::IHeap_expandable> p_
 	, string_view id_
 	, string_view backing_file_
 	, const std::vector<byte_span> rv_full_
 	, const byte_span pool0_heap_
 )
 	: common::log_source(debug_level_)
-	, _heap(std::move(p))
+	, _heap(std::move(p_))
 	, _managed_regions((_heap->add_regions(ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)), id_), backing_file_, rv_full_)
 	, _capacity(
 		::size(pool0_heap_)

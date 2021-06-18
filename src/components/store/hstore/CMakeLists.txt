@@ -163,12 +163,19 @@ target_link_libraries(${PROJECT_NAME}-cc-pe-tr common pthread numa dl rt boost_s
 add_dependencies(${PROJECT_NAME}-cc-pe-tr common nupm)
 set_target_properties(${PROJECT_NAME}-cc-pe-tr PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}:${CMAKE_INSTALL_PREFIX}/lib)
 
-# pluggable allocator version
-add_library(${PROJECT_NAME}-mc SHARED src/heap_mc.cpp src/heap_mc_ephemeral.cpp ${SOURCES})
+# pluggable allocator (ccpm) version
+add_library(${PROJECT_NAME}-mc SHARED ${SOURCES} src/heap_mc.cpp src/heap_mc_ephemeral.cpp)
 target_compile_options(${PROJECT_NAME}-mc PUBLIC "-fPIC" "$<$<BOOL:${TEST_HSTORE_PERISHABLE}>:-DMCAS_HSTORE_TEST_PERISHABLE=1>" "-DMCAS_HSTORE_USE_CC_HEAP=5")
 target_link_libraries(${PROJECT_NAME}-mc common pthread numa dl rt boost_system boost_filesystem tbb nupm cityhash)
 add_dependencies(${PROJECT_NAME}-mc common nupm)
 set_target_properties(${PROJECT_NAME}-mc PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}:${CMAKE_INSTALL_PREFIX}/lib)
+
+# pluggable allocator (rcalb) version
+add_library(${PROJECT_NAME}-mr SHARED ${SOURCES} src/heap_mr.cpp src/heap_mr_ephemeral.cpp src/tracked_header.cpp)
+target_compile_options(${PROJECT_NAME}-mr PUBLIC "-fPIC" "$<$<BOOL:${TEST_HSTORE_PERISHABLE}>:-DMCAS_HSTORE_TEST_PERISHABLE=1>" "-DMCAS_HSTORE_USE_CC_HEAP=6")
+target_link_libraries(${PROJECT_NAME}-mr common pthread numa dl rt boost_system boost_filesystem tbb nupm cityhash)
+add_dependencies(${PROJECT_NAME}-mr common nupm)
+set_target_properties(${PROJECT_NAME}-mr PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}:${CMAKE_INSTALL_PREFIX}/lib)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-nt LIBRARY DESTINATION lib)
@@ -176,3 +183,4 @@ install(TARGETS ${PROJECT_NAME}-cc LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-cc-pe LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-cc-pe-tr LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-mc LIBRARY DESTINATION lib)
+install(TARGETS ${PROJECT_NAME}-mr LIBRARY DESTINATION lib)

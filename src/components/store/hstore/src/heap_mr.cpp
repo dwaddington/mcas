@@ -11,11 +11,11 @@
    limitations under the License.
 */
 
-#include "heap_rc.h"
+#include "heap_mr.h"
 
 #include "clean_align.h"
 #include "dax_manager.h"
-#include "heap_rc_ephemeral.h"
+#include "heap_mr_ephemeral.h"
 #include "hstore_config.h"
 #include "tracked_header.h"
 #include "valgrind_memcheck.h"
@@ -31,8 +31,14 @@
  * 4 KiB alignment sometimes produces a disagreement between server and ADO mappings,
  * which manifests as incorrect key and data values as seen on the ADO side.
  */
-heap_rc::heap_rc(
-	unsigned debug_level_, byte_span pool0_full_, byte_span pool0_heap_, unsigned numa_node_, const string_view id_, const string_view backing_file_
+heap_mr::heap_mr(
+	unsigned debug_level_
+	, const string_view plugin_path_
+	, byte_span pool0_full_
+	, byte_span pool0_heap_
+	, unsigned numa_node_
+	, const string_view id_
+	, const string_view backing_file_
 )
 	: _pool0_full(pool0_full_)
 	, _pool0_heap(pool0_heap_)
@@ -40,7 +46,7 @@ heap_rc::heap_rc(
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _tracked_anchor(debug_level_, &_tracked_anchor, &_tracked_anchor, sizeof(_tracked_anchor), sizeof(_tracked_anchor))
-	, _eph(std::make_unique<heap_rc_ephemeral>(debug_level_, id_, backing_file_))
+	, _eph(std::make_unique<heap_mr_ephemeral>(debug_level_, plugin_path_, id_, backing_file_))
 {
 	void *last = ::end(pool0_heap_);
 	if ( 0 < debug_level_ )
@@ -65,8 +71,9 @@ heap_rc::heap_rc(
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
-heap_rc::heap_rc(
+heap_mr::heap_mr(
 	unsigned debug_level_
+	, const string_view plugin_path_
 	, const std::unique_ptr<dax_manager> &dax_manager_
 	, const string_view id_
     , const string_view backing_file_
@@ -79,7 +86,7 @@ heap_rc::heap_rc(
 	, _more_region_uuids_size(this->_more_region_uuids_size)
 	, _more_region_uuids(this->_more_region_uuids)
 	, _tracked_anchor(this->_tracked_anchor)
-	, _eph(std::make_unique<heap_rc_ephemeral>(debug_level_, id_, backing_file_))
+	, _eph(std::make_unique<heap_mr_ephemeral>(debug_level_, plugin_path_, id_, backing_file_))
 {
 	_eph->add_managed_region(_pool0_full, _pool0_heap, _numa_node);
 	hop_hash_log<trace_heap_summary>::write(
@@ -108,12 +115,12 @@ heap_rc::heap_rc(
 }
 #pragma GCC diagnostic pop
 
-heap_rc::~heap_rc()
+heap_mr::~heap_mr()
 {
 	quiesce();
 }
 
-auto heap_rc::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_) -> byte_span
+auto heap_mr::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_) -> byte_span
 {
 	auto & iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_).address_map();
 	if ( iovs.size() != 1 )
@@ -123,7 +130,7 @@ auto heap_rc::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std:
 	return iovs.front();
 }
 
-auto heap_rc::regions() const -> nupm::region_descriptor
+auto heap_mr::regions() const -> nupm::region_descriptor
 {
 	return _eph->get_managed_regions();
 }
@@ -146,7 +153,7 @@ namespace
 	}
 }
 
-auto heap_rc::grow(
+auto heap_mr::grow(
 	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
@@ -245,7 +252,7 @@ auto heap_rc::grow(
 	return _eph->capacity();
 }
 
-void heap_rc::quiesce()
+void heap_mr::quiesce()
 {
 	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap), " allocated ", _eph->allocated());
 	_eph->write_hist<trace_heap_summary>(_pool0_heap);
@@ -273,7 +280,7 @@ namespace
 	}
 }
 
-void *heap_rc::alloc(const std::size_t sz_, const std::size_t align_)
+void *heap_mr::alloc(const std::size_t sz_, const std::size_t align_)
 {
 	auto align = clean_align(align_, sizeof(void *));
 
@@ -323,7 +330,7 @@ void *heap_rc::alloc(const std::size_t sz_, const std::size_t align_)
 	}
 }
 
-void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
+void *heap_mr::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 {
 	/* alignment: enough for tracked_header prefix, and a power of 2 */
 	auto align = clp2(std::max(clean_align(align_), sizeof(tracked_header)));
@@ -379,7 +386,7 @@ void *heap_rc::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 	}
 }
 
-void heap_rc::inject_allocation(const void * p, std::size_t sz_)
+void heap_mr::inject_allocation(const void * p, std::size_t sz_)
 {
 	auto alignment = sizeof(void *);
 	sz_ = std::max(sz_, alignment);
@@ -390,7 +397,7 @@ void heap_rc::inject_allocation(const void * p, std::size_t sz_)
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p, " size ", sz);
 }
 
-void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
+void heap_mr::free(void *p_, std::size_t sz_, std::size_t alignment_)
 {
 	auto align = clean_align(alignment_, sizeof(void *));
 	sz_ = std::max(sz_, align);
@@ -400,7 +407,7 @@ void heap_rc::free(void *p_, std::size_t sz_, std::size_t alignment_)
 	return _eph->free(p_, sz, _numa_node);
 }
 
-void heap_rc::free_tracked(
+void heap_mr::free_tracked(
 	void *p_
 	, std::size_t sz_
 	, std::size_t // align_
@@ -433,12 +440,12 @@ void heap_rc::free_tracked(
 	return _eph->free(p, sz, _numa_node);
 }
 
-unsigned heap_rc::percent_used() const
+unsigned heap_mr::percent_used() const
 {
     return _eph->capacity() == 0 ? 0xFFFFU : unsigned(_eph->allocated() * 100U / _eph->capacity());
 }
 
-bool heap_rc::is_reconstituted(const void * p_) const
+bool heap_mr::is_reconstituted(const void * p_) const
 {
 	return _eph->is_reconstituted(p_);
 }

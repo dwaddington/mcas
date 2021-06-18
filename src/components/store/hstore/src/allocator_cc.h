@@ -49,7 +49,7 @@ template <typename T, typename Persister = persister>
 		: public deallocator_cc<T, Persister>
 	{
 		using deallocator_type = deallocator_cc<T, Persister>;
-		using heap_type = typename deallocator_type::heap_type;
+		using typename deallocator_type::heap_type;
 		using typename deallocator_type::size_type;
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::pointer_type;
