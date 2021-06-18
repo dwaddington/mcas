@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -165,7 +165,8 @@ TEST_F(Log_test, CCBitset)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	ccpm::cca mr(ccpm::region_vector_t(heap_area, heap_size));
+	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
+	ccpm::cca mr(rs);
 	auto ccv = new (bitset_area) cc_bitset(mr);
 
 	(*ccv->container)[3] = true;
@@ -273,13 +274,8 @@ TEST_F(Log_test, CCVectorOfComposite)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	ccpm::cca mr(
-		ccpm::region_vector_t(
-			ccpm::region_vector_t::value_type(
-				common::make_byte_span(heap_area, heap_size)
-			)
-		)
-	);
+	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
+	ccpm::cca mr(rs);
 	auto ccv = new (vector_area) cc_vector(mr);
 
 	const auto c2 = std::make_shared<int>(2);
@@ -425,13 +421,8 @@ TEST_F(Log_test, CCVector)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	ccpm::cca mr(
-		ccpm::region_vector_t(
-			ccpm::region_vector_t::value_type(
-				common::make_byte_span(heap_area, heap_size)
-			)
-		)
-	);
+	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
+	ccpm::cca mr(rs);
 	auto ccv = new (vector_area) cc_vector(mr);
 
 	std::vector<int> original{3, 4, 5};
@@ -564,13 +555,8 @@ TEST_F(Log_test, CCList)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	ccpm::cca mr(
-		ccpm::region_vector_t(
-			ccpm::region_vector_t::value_type(
-				common::make_byte_span(heap_area, heap_size)
-			)
-		)
-	);
+	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
+	ccpm::cca mr(rs);
 	auto ccl = new (list_area) cc_list(mr);
 
 	std::vector<int> original{3, 4, 5};
@@ -696,13 +682,8 @@ TEST_F(Log_test, CCListOfPointer)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	ccpm::cca mr(
-		ccpm::region_vector_t(
-			ccpm::region_vector_t::value_type(
-				common::make_byte_span(heap_area, heap_size)
-			)
-		)
-	);
+	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
+	ccpm::cca mr(rs);
 	auto ccl = new (list_area) cc_list(mr);
 
 	int *p2 = new int(2);
@@ -834,13 +815,8 @@ TEST_F(Log_test, CCListOfSharedPointer)
 		ASSERT_EQ(S_OK_CREATED, r);
 	}
 
-	ccpm::cca mr(
-		ccpm::region_vector_t(
-			ccpm::region_vector_t::value_type(
-				common::make_byte_span(heap_area, heap_size)
-			)
-		)
-	);
+	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
+	ccpm::cca mr(rs);
 	auto ccl = new (list_area) cc_list(mr);
 
 	auto p2 = std::make_shared<int>(2);

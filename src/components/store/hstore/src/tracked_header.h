@@ -1,5 +1,5 @@
 /*
-   Copyright [2020] [IBM Corporation]
+   Copyright [2020-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -16,7 +16,7 @@
 
 #include <cstddef> /* size_t, ptrdiff_t */
 
-struct heap_rc_ephemeral;
+struct injectee;
 
 /* The layout of tracked storage:
  *
@@ -37,7 +37,7 @@ struct tracked_header
 	std::size_t _align;
 
 	explicit tracked_header(unsigned debug_level, tracked_header *prev, tracked_header *next, std::size_t size, std::size_t align);
-	void recover(unsigned debug_level, heap_rc_ephemeral *, unsigned numa_node);
+	void recover(unsigned debug_level, injectee *, unsigned numa_node);
 };
 
 #endif

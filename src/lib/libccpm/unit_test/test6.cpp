@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -172,13 +172,8 @@ TEST_F(Log_test, CCVectorOfPointer)
 
 	common::profiler pr("test6-vp-cpu-" + store_map::impl->name + ".profile");
 	{
-		ccpm::cca mr(
-          ccpm::region_vector_t(
-            ccpm::region_vector_t::value_type(
-              common::make_byte_span(heap_area, heap_size)
-            )
-          )
-        );
+		ccpm::region_span::value_type v[1] = { common::make_byte_span(heap_area, heap_size) };
+		ccpm::cca mr(v);
 		auto ccv = new (vector_area) cc_vector(mr);
 
 		for ( int i = 0; i != 1000000; ++i )

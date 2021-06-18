@@ -1,5 +1,5 @@
 /*
-   Copyright [2019] [IBM Corporation]
+   Copyright [2019-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -58,6 +58,7 @@ inline bool accept_all(const void *) { return true; }
  */
 struct region_vector_t : public std::vector<common::byte_span>
 {
+	using base = std::vector<common::byte_span>;
   explicit region_vector_t(void * ptr_, std::size_t size_)
     : region_vector_t(common::make_byte_span(static_cast<common::byte *>(ptr_), size_))
   {}
@@ -66,7 +67,10 @@ struct region_vector_t : public std::vector<common::byte_span>
   }
   region_vector_t() {
   }
+	const base &cbase() const { return *this; }
 };
+
+using region_span = gsl::span<common::byte_span>;
 
 enum class Type_id : int64_t
   {
@@ -93,7 +97,7 @@ public:
    *
    * @return : True if memory was reset to empty
    **/
-  virtual bool reconstitute(const region_vector_t &regions,
+  virtual bool reconstitute(const region_span regions,
                             ownership_callback_t resolver = nullptr,
                             const bool force_init = false) = 0;
 
@@ -184,7 +188,7 @@ public:
   /* Add an additional regions to the heap
    * @param regions Pointer/length regions of contiguous memory
    **/
-  virtual void add_regions(const region_vector_t &regions) = 0;
+  virtual void add_regions(const region_span regions) = 0;
 
   /** Test whether an address is in any heap region
    * @param addr the address to test

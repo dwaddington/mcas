@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -10,7 +10,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
 
 #include "hstore.h"
 
@@ -61,6 +60,9 @@ auto hstore_factory::create(
 ) -> component::IKVStore *
 {
   auto debug_it = mc.find(+k_debug);
+#if HEAP_MM
+  auto plugin_path_it = mc.find(+k_mm_plugin_path);
+#endif
   auto owner_it = mc.find(+k_owner);
   auto name_it = mc.find(+k_name);
   auto dax_config_it = mc.find(+k_dax_config);
@@ -73,6 +75,9 @@ auto hstore_factory::create(
   component::IKVStore *obj =
     new hstore(
       effective_debug_level
+#if HEAP_MM
+      , plugin_path_it == mc.end() ? string_view{} : string_view(plugin_path_it->second)
+#endif
       , owner_it == mc.end() ? string_view{} : string_view(owner_it->second)
       , name_it == mc.end() ? string_view{} : string_view(name_it->second)
       , std::make_unique<dax_manager>(

@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -48,6 +48,7 @@ template <typename T, typename Persister = persister>
 		: public deallocator_rc<T, Persister>
 	{
 		using deallocator_type = deallocator_rc<T, Persister>;
+		using typename deallocator_type::heap_type;
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::size_type;
 
@@ -59,7 +60,7 @@ template <typename T, typename Persister = persister>
 			: deallocator_rc<T, Persister>(area_, p_)
 		{}
 
-		allocator_rc(const heap_access<heap_rc> &pool_, Persister p_ = Persister()) noexcept
+		allocator_rc(const heap_access<heap_type> &pool_, Persister p_ = Persister()) noexcept
 			: deallocator_rc<T, Persister>(pool_, (p_))
 		{}
 

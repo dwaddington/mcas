@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,8 +15,13 @@
 #ifndef MCAS_HSTORE_DEALLOCATOR_CC_H
 #define MCAS_HSTORE_DEALLOCATOR_CC_H
 
+#include "hstore_config.h"
 #include "heap_access.h"
+#if HEAP_MM
+#include "heap_mc.h"
+#else
 #include "heap_cc.h"
+#endif
 #include "persistent.h"
 #include "persister_cc.h"
 
@@ -42,8 +47,14 @@ template <typename T, typename Persister = persister>
 	struct deallocator_cc
 		: public Persister
 	{
+/* Note: make this a template parameter */
+#if HEAP_MM
+		using heap_type = heap_mc;
+#else
+		using heap_type = heap_cc;
+#endif
 	private:
-		heap_access<heap_cc> _pool;
+		heap_access<heap_type> _pool;
 	public:
 		using value_type = T;
 		using persister_type = Persister;
@@ -52,7 +63,7 @@ template <typename T, typename Persister = persister>
 		using propagate_on_container_move_assignment = std::true_type;
 		using is_always_equal = std::false_type;
 
-		explicit deallocator_cc(const heap_access<heap_cc> &pool_, Persister p_ = Persister()) noexcept
+		explicit deallocator_cc(const heap_access<heap_type> &pool_, Persister p_ = Persister()) noexcept
 			: Persister(p_)
 			, _pool(pool_)
 		{}

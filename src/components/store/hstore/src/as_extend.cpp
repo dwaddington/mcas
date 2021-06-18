@@ -39,7 +39,7 @@ bool impl::allocation_state_extend::is_in_use(const void *const ptr_)
 {
 	auto in_use =
 		ptr_ != nullptr
-#if USE_CC_HEAP == 4
+#if HEAP_RECONSTITUTE
 		&&
 		ptr_ == _ptr
 		&&

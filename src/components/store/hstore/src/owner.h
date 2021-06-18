@@ -109,12 +109,12 @@ namespace impl
 				, const index_type p_
 				, bucket_unique_ref<Bucket, Referent, SharedMutex>
 				, PersistController *
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				pc_
 #endif
 			)
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				/* includes setting of doubt type to emplace */
 				pc_->em_record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
 #endif
@@ -125,12 +125,12 @@ namespace impl
 				index_type p_
 				, bucket_unique_ref<Bucket, Referent, SharedMutex>
 				, PersistController *
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				pc_
 #endif
 			)
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				/* includes setting of doubt type to emplace */
 				pc_->er_record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
 #endif

@@ -35,7 +35,8 @@ target_compile_options(${PROJECT_NAME} PUBLIC "-fPIC")
 target_compile_options(${PROJECT_NAME}-static PUBLIC "-fPIC")
 
 #target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} stdc++fs common numa pthread ${LIB_NDCTL} dl gcov)
+#target_link_libraries(${PROJECT_NAME} stdc++fs common numa pthread ${LIB_NDCTL} dl gcov)
+target_link_libraries(${PROJECT_NAME} common numa pthread ${LIB_NDCTL} dl gcov)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(TARGETS ${PROJECT_NAME}-static ARCHIVE DESTINATION lib)

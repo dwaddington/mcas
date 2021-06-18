@@ -1,5 +1,5 @@
 /*
-   Copyright [2020] [IBM Corporation]
+   Copyright [2020-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,7 +13,7 @@
 
 #include "tracked_header.h"
 
-#include "heap_rc_ephemeral.h"
+#include "injectee.h"
 #include <common/logging.h>
 #include <common/pointer_cast.h>
 
@@ -38,7 +38,7 @@ tracked_header::tracked_header(unsigned debug_level_, tracked_header *prev_, tra
 	}
 }
 
-void tracked_header::recover(unsigned debug_level_, heap_rc_ephemeral *eph_, unsigned numa_node_)
+void tracked_header::recover(unsigned debug_level_, injectee *eph_, unsigned numa_node_)
 {
 	/* _next ptrs must be a consistent circular list.
 	 * Fix up _prev ptrs so that they are consistent with next.

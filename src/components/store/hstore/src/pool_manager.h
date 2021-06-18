@@ -39,7 +39,11 @@ template <typename Pool>
     : protected common::log_source
   {
     using string_view = common::string_view;
-    pool_manager(unsigned debug_level_) : common::log_source(debug_level_) {}
+    pool_manager(
+			unsigned debug_level_
+	) : common::log_source(debug_level_)
+    {}
+
     virtual ~pool_manager() {}
 
     virtual void pool_create_check(const std::size_t size_) = 0;

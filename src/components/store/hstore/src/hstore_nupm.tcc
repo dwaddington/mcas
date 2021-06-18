@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2020] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -50,8 +50,21 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   }
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
-  hstore_nupm<Region, Table, Allocator, LockType>::hstore_nupm(unsigned debug_level_, const common::string_view, const common::string_view name_, std::unique_ptr<dax_manager> mgr_)
-    : pool_manager<::open_pool<non_owner<region_type>>>(debug_level_)
+	hstore_nupm<Region, Table, Allocator, LockType>::hstore_nupm(
+		unsigned debug_level_
+#if HEAP_MM
+		, const common::string_view plugin_path_
+#endif
+		, const common::string_view // owner_
+		, const common::string_view name_
+		, std::unique_ptr<dax_manager> mgr_
+	)
+    : pool_manager<::open_pool<non_owner<region_type>>>(
+		debug_level_
+	)
+#if HEAP_MM
+		, _plugin_path(plugin_path_)
+#endif
     , _dax_manager(std::move(mgr_))
     , _numa_node(name_to_numa_node(name_))
   {}
@@ -74,7 +87,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   {
     auto size = size_;
 
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
     /* The first part of pool space is the header, which is described by a Region.
      * In order to give the heap a well-aligned space, the size actually allocated
      * to a heap may be as little as 3/4 of the area provided to the heap.
@@ -142,6 +155,9 @@ template <typename Region, typename Table, typename Allocator, typename LockType
         new (::base(rac_.address_map().front()))
         region_type(
           AK_REF this->debug_level()
+#if HEAP_MM
+					, _plugin_path	
+#endif
           /* Note: Consider moving dax_uuid_hash computation to the callee */
           , CityHash64(rac_.id().data(), rac_.id().size())
           , ::size(rac_.address_map().front())
@@ -203,6 +219,9 @@ template <typename Region, typename Table, typename Allocator, typename LockType
         new (::base(ra_.address_map().front()))
           region_type(
             this->debug_level()
+#if HEAP_MM
+						, _plugin_path	
+#endif
             , _dax_manager
             , ra_.id()
             , ra_.data_file()

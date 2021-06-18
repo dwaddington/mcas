@@ -89,7 +89,7 @@ namespace impl
 
 			void deconstitute()
 			{
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 				for ( auto it = _buckets; it != _buckets_end; ++it )
 				{
 					typename bucket_type::owner_type &w = *it;

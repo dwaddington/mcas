@@ -1,5 +1,5 @@
 /*
-   Copyright [2019-2020] [IBM Corporation]
+   Copyright [2019-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 #ifndef MCAS_MONITOR_PIN_H
 #define MCAS_MONITOR_PIN_H
 
-#include "hstore_config.h" /* USE_CC_HEAP */
+#include "hstore_config.h" /* HEAP_CONSISTENT */
 #include "logging.h"
 #include "perishable_expiry.h"
 #include "test_flags.h"
@@ -25,8 +25,7 @@ template <typename Pool>
 	{
 	private:
 		Pool _p;
-#if USE_CC_HEAP == 4
-#else
+#if ! HEAP_CONSISTENT
 		char *_old_cptr;
 		monitor_pin_data(const monitor_pin_data &) = delete;
 		monitor_pin_data &operator=(const monitor_pin_data &) = delete;
@@ -35,19 +34,18 @@ template <typename Pool>
 		template <typename Value>
 			monitor_pin_data(Value &v_, const Pool &p_)
 				: _p(p_)
-#if USE_CC_HEAP == 4
-#else
+#if ! HEAP_CONSISTENT
 				, _old_cptr(v_.get_cptr().P)
 #endif
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				_p->pin_data_arm(v_.get_cptr());
 #endif
 			}
 
 		char *get_cptr() const
 		{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 			return _p->pin_data_get_cptr();
 #else
 			return _old_cptr;
@@ -58,7 +56,7 @@ template <typename Pool>
 		{
 			if ( ! perishable_expiry::is_current() )
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				_p->pin_data_disarm();
 #endif
 			}
@@ -69,8 +67,7 @@ template <typename Pool>
 	struct monitor_pin_key
 	{
 		Pool _p;
-#if USE_CC_HEAP == 4
-#else
+#if ! HEAP_CONSISTENT
 		char *_old_cptr;
 		monitor_pin_key(const monitor_pin_key &) = delete;
 		monitor_pin_key &operator=(const monitor_pin_key &) = delete;
@@ -79,19 +76,18 @@ template <typename Pool>
 		template <typename Value>
 			monitor_pin_key(Value &v_, const Pool &p_)
 				: _p(p_)
-#if USE_CC_HEAP == 4
-#else
+#if ! HEAP_CONSISTENT
 				, _old_cptr(v_.get_cptr().P)
 #endif
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				_p->pin_key_arm(v_.get_cptr());
 #endif
 			}
 
 		char *get_cptr() const
 		{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 			return _p->pin_key_get_cptr();
 #else
 			return _old_cptr;
@@ -102,7 +98,7 @@ template <typename Pool>
 		{
 			if ( ! perishable_expiry::is_current() )
 			{
-#if USE_CC_HEAP == 4
+#if HEAP_CONSISTENT
 				_p->pin_key_disarm();
 #endif
 			}

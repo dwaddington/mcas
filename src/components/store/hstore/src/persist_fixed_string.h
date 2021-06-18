@@ -612,7 +612,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		void deconstitute() const
 		{
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 			if ( ! is_inline() )
 			{
 				/* used only by the table_base destructor, at which time
@@ -638,7 +638,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					 * it would not need restoration. Arrange that.
 					 */
 					new (&const_cast<persist_fixed_string *>(this)->_outline.al()) allocator_char_type(al_);
-#if USE_CC_HEAP == 3
+#if HEAP_RECONSTITUTE
 					using reallocator_char_type =
 						typename std::allocator_traits<AL>::template rebind_alloc<char>;
 					auto alr = reallocator_char_type(al_);

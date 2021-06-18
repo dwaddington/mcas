@@ -16,7 +16,7 @@ prefix()
 run_hstore() {
   typeset ado_prereq="$1"
   shift
- # run each test
+  # run each test
   prefix
   GOAL=140000 ELEMENT_COUNT=2000000 STORE=hstore PERFTEST=put $DIR/mcas-hstore-put-0.sh $1
   prefix
@@ -32,6 +32,10 @@ run_hstore() {
   prefix
   # includes async_put, async_erase, async_put_direct
   $DIR/mcas-hstore-cc-kvtest-0.sh $1
+  prefix
+  $DIR/mcas-hstore-mc-kvtest-0.sh $1
+  prefix
+  $DIR/mcas-hstore-mr-kvtest-0.sh $1
   prefix
   $DIR/mcas-hstore-cc-put-0.sh $1
   prefix

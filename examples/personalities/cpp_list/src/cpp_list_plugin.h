@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -89,11 +89,11 @@ public:
 private:
 
   status_t process_putvar_command(const structured_ADO_protocol::PutVariable * command,
-                                  const ccpm::region_vector_t& regions);
+                                  const ccpm::region_span regions);
 
 
   status_t process_invoke_command(const structured_ADO_protocol::Invoke * command,
-                                  const ccpm::region_vector_t& regions,
+                                  const ccpm::region_span regions,
                                   byte_span & out_work_response);
 
 };

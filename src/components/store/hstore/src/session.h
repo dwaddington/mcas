@@ -80,7 +80,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		template <typename OID, typename Persist>
 			explicit session(
 				OID
-#if USE_CC_HEAP == 2
+#if ! HEAP_RECONSTITUTE && ! HEAP_CONSISTENT
 					heap_oid_
 #endif
 				, handle_type &&pop_

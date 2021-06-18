@@ -5,7 +5,7 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
-STORETYPE=hstore-cc
+STORETYPE=hstore-mr
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
 
 # parameters for MCAS server and client
@@ -22,9 +22,9 @@ sleep 3
 
 # launch client
 CLIENT_LOG="test$TESTID-client.log"
-# OBJECT_COUNT=5531 is experimental limit for PoolCapacity test using hstore-cc allocator
+# OBJECT_COUNT=3326 is experimental limit for PoolCapacity test using hstore-mr allocator
 [ 0 -lt $DEBUG ] && echo OBJECT_COUNT=5500 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --debug $DEBUG
-OBJECT_COUNT=5500 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --debug $DEBUG &> $CLIENT_LOG &
+OBJECT_COUNT=3200 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --debug $DEBUG &> $CLIENT_LOG &
 CLIENT_PID=$!
 
 # arm cleanup

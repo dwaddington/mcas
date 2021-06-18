@@ -13,37 +13,34 @@ include(../../../mk/clang-dev-tools.cmake)
 # find_library(LIB_JEMALLOC libjemalloc.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 find_library(LIB_NDCTL libndctl.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 
-include_directories(./include)
-include_directories(${CMAKE_SOURCE_DIR}/src/components)
+include_directories(${CMAKE_SOURCE_DIR}/src/components) # immutable_allocator
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libccpm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/EASTL/include)
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
-include_directories("../common/include")
-include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
-
-link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
-link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include/)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/EASTL/include) # immutable_allocator
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fopenmp")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
 add_definitions(-DCONFIG_DEBUG) # P{LOG,DEG,INF,WRN,ERR} control
 
-set(CCPM_SOURCES src/area_ctl.cpp src/area_top.cpp src/atomic_word.cpp src/cca.cpp src/ccpm.cpp src/doubt.cpp src/log.cpp src/tracker_log.cpp src/value_tracked.cpp src/container_cc.cpp)
-add_library(ccpm SHARED ${CCPM_SOURCES})
+set(SOURCES src/area_ctl.cpp src/area_top.cpp src/atomic_word.cpp src/cca.cpp src/ccpm.cpp src/doubt.cpp src/log.cpp src/tracker_log.cpp src/value_tracked.cpp src/container_cc.cpp)
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+add_library(${PROJECT_NAME}-static STATIC ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} stdc++fs common numa ${LIB_NDCTL} dl tbb tbbmalloc pmem gcov)
+target_compile_options(${PROJECT_NAME}-static PUBLIC "$<$<CONFIG:Debug>:-O0>" "-fPIC")
+target_link_libraries(${PROJECT_NAME} dl pmem)
+target_link_libraries(${PROJECT_NAME}-static dl pmem)
 
 add_subdirectory(unit_test)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
+install(TARGETS ${PROJECT_NAME}-static ARCHIVE DESTINATION lib)
 install(DIRECTORY "src/" DESTINATION "include/ccpm" FILES_MATCHING PATTERN "./include/ccpm/*")
-#install(DIRECTORY "include/ccpm" DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 # # force early install because others depend on this.  this seems a hack. is there
 # # a better way?

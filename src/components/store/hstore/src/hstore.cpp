@@ -54,7 +54,7 @@ template<typename T>
 
 template<> struct type_number<char> { static constexpr uint64_t value = 2; };
 
-#if USE_CC_HEAP == 3 /* reconstituting allocator */
+#if HEAP_RECONSTITUTE /* reconstituting allocator */
 template<> struct type_number<impl::mod_control> { static constexpr std::uint64_t value = 4; };
 #endif /* USE_CC_HEAP */
 
@@ -102,9 +102,25 @@ auto hstore::move_pool(const pool_t p) -> std::shared_ptr<open_pool_type>
   return s2;
 }
 
-hstore::hstore(unsigned debug_level_, const string_view owner_, const string_view name_, std::unique_ptr<dax_manager> &&mgr_)
+hstore::hstore(
+	unsigned debug_level_
+#if HEAP_MM
+	, const string_view mm_plugin_path_
+#endif
+	, const string_view owner_
+	, const string_view name_
+	, std::unique_ptr<dax_manager> &&mgr_
+	)
   : common::log_source(debug_level_)
-  , _pool_manager(std::make_shared<pm_type>(debug_level(), owner_, name_, std::move(mgr_)))
+  , _pool_manager(std::make_shared<pm_type>(
+		debug_level()
+#if HEAP_MM
+		, mm_plugin_path_
+#endif
+		, owner_
+		, name_
+		, std::move(mgr_))
+	)
   , _pools_mutex{}
   , _pools{}
 {

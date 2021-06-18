@@ -11,15 +11,14 @@
    limitations under the License.
 */
 
-#include "heap_cc.h"
+#include "heap_mc.h"
 
 #include "as_pin.h"
 #include "as_emplace.h"
 #include "as_extend.h"
 #include "clean_align.h"
 #include "dax_manager.h"
-#include "heap_cc_ephemeral.h"
-#include <ccpm/cca.h>
+#include "heap_mc_ephemeral.h"
 #include <common/pointer_cast.h>
 #include <common/utils.h> /* round_up */
 #include <algorithm>
@@ -92,8 +91,9 @@ namespace
  * 4 KiB produces sometimes produces a disagreement between server and AOo mappings
  * which manifest as incorrect key and data values as seen on the ADO side.
  */
-heap_cc::heap_cc(
+heap_mc::heap_mc(
 	const unsigned debug_level_
+	, const common::string_view plugin_path_
 	, impl::allocation_state_emplace *const ase_
 	, impl::allocation_state_pin *const aspd_
 	, impl::allocation_state_pin *const aspk_
@@ -111,8 +111,9 @@ heap_cc::heap_cc(
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _eph(
-		std::make_unique<heap_cc_ephemeral>(
+		std::make_unique<heap_mc_ephemeral>(
 			debug_level_
+			, plugin_path_
 			, ase_
 			, aspd_
 			, aspk_
@@ -137,8 +138,9 @@ heap_cc::heap_cc(
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winit-self"
 #pragma GCC diagnostic ignored "-Wuninitialized"
-heap_cc::heap_cc(
+heap_mc::heap_mc(
 	const unsigned debug_level_
+	, const common::string_view plugin_path_
 	, const std::unique_ptr<dax_manager> &dax_manager_
 	, const string_view id_
 	, const string_view backing_file_
@@ -155,8 +157,9 @@ heap_cc::heap_cc(
 	, _more_region_uuids_size(this->_more_region_uuids_size)
 	, _more_region_uuids(this->_more_region_uuids)
 	, _eph(
-		std::make_unique<heap_cc_ephemeral>(
+		std::make_unique<heap_mc_ephemeral>(
 			debug_level_
+			, plugin_path_
 			, ase_
 			, aspd_
 			, aspk_
@@ -197,12 +200,12 @@ heap_cc::heap_cc(
 }
 #pragma GCC diagnostic pop
 
-heap_cc::~heap_cc()
+heap_mc::~heap_mc()
 {
 	quiesce();
 }
 
-auto heap_cc::regions() const -> nupm::region_descriptor
+auto heap_mc::regions() const -> nupm::region_descriptor
 {
 	return _eph->get_managed_regions();
 }
@@ -224,7 +227,7 @@ namespace
 	}
 }
 
-auto heap_cc::grow(
+auto heap_mc::grow(
 	const std::unique_ptr<dax_manager> & dax_manager_
 	, std::uint64_t uuid_
 	, std::size_t increment_
@@ -323,16 +326,20 @@ auto heap_cc::grow(
 	return _eph->_capacity;
 }
 
-void heap_cc::quiesce()
+void heap_mc::quiesce()
 {
-	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap), " allocated ", _eph->_allocated);
+	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap)
+#if 0
+		, " allocated ", _eph->allocated
+#endif
+	);
 	VALGRIND_DESTROY_MEMPOOL(::base(_pool0_heap));
 	VALGRIND_MAKE_MEM_UNDEFINED(::base(_pool0_heap), ::size(_pool0_heap));
 	_eph->write_hist<trace_heap_summary>(_pool0_heap);
 	_eph.reset(nullptr);
 }
 
-void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align_)
+void heap_mc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align_)
 {
 	auto align = clean_align(align_, sizeof(void *));
 
@@ -376,7 +383,9 @@ void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align
 		VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p_, sz);
 		/* size grows twice: once for aligment, and possibly once more in allocation */
 		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p_, " size ", sz_, "->", sz);
+#if 0
 		_eph->_allocated += sz;
+#endif
 		_eph->_hist_alloc.enter(sz);
 	}
 	catch ( const std::bad_alloc & )
@@ -387,40 +396,45 @@ void heap_cc::alloc(persistent_t<void *> *p_, std::size_t sz_, std::size_t align
 	}
 }
 
-void heap_cc::free(persistent_t<void *> *p_, std::size_t sz_)
+void heap_mc::free(persistent_t<void *> *p_, std::size_t sz_)
 {
 	VALGRIND_MEMPOOL_FREE(::base(_pool0_heap), p_);
 	auto sz = _eph->free(p_, sz_);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p_, " size ", sz_, "->", sz);
 }
 
-unsigned heap_cc::percent_used() const
+unsigned heap_mc::percent_used() const
 {
 	return
+#if 0
 		unsigned(
 			_eph->_capacity
 			? _eph->_allocated * 100U / _eph->_capacity
 			: 100U
-		);
+		)
+#else
+		0 /* MM does not support allocation query */
+#endif
+		;
 }
 
-void heap_cc::extend_arm() const
+void heap_mc::extend_arm() const
 {
 	_eph->_asx->arm(persister_nupm());
 }
 
-void heap_cc::extend_disarm() const
+void heap_mc::extend_disarm() const
 {
 	_eph->_asx->disarm(persister_nupm());
 }
 
-void heap_cc::emplace_arm() const { _eph->_ase->arm(persister_nupm()); }
-void heap_cc::emplace_disarm() const { _eph->_ase->disarm(persister_nupm()); }
+void heap_mc::emplace_arm() const { _eph->_ase->arm(persister_nupm()); }
+void heap_mc::emplace_disarm() const { _eph->_ase->disarm(persister_nupm()); }
 
-impl::allocation_state_pin &heap_cc::aspd() const { return *_eph->_aspd; }
-impl::allocation_state_pin &heap_cc::aspk() const { return *_eph->_aspk; }
+impl::allocation_state_pin &heap_mc::aspd() const { return *_eph->_aspd; }
+impl::allocation_state_pin &heap_mc::aspk() const { return *_eph->_aspk; }
 
-void heap_cc::pin_data_arm(
+void heap_mc::pin_data_arm(
 	cptr &cptr_
 ) const
 {
@@ -431,7 +445,7 @@ void heap_cc::pin_data_arm(
 #endif
 }
 
-void heap_cc::pin_key_arm(
+void heap_mc::pin_key_arm(
 	cptr &cptr_
 ) const
 {
@@ -442,7 +456,7 @@ void heap_cc::pin_key_arm(
 #endif
 }
 
-char *heap_cc::pin_data_get_cptr() const
+char *heap_mc::pin_data_get_cptr() const
 {
 #if HEAP_CONSISTENT
 	assert(_eph->_aspd->is_armed());
@@ -451,7 +465,7 @@ char *heap_cc::pin_data_get_cptr() const
 	return nullptr;
 #endif
 }
-char *heap_cc::pin_key_get_cptr() const
+char *heap_mc::pin_key_get_cptr() const
 {
 #if HEAP_CONSISTENT
 	assert(_eph->_aspk->is_armed());
@@ -461,12 +475,12 @@ char *heap_cc::pin_key_get_cptr() const
 #endif
 }
 
-void heap_cc::pin_data_disarm() const
+void heap_mc::pin_data_disarm() const
 {
 	_eph->_aspd->disarm(persister_nupm());
 }
 
-void heap_cc::pin_key_disarm() const
+void heap_mc::pin_key_disarm() const
 {
 	_eph->_aspk->disarm(persister_nupm());
 }

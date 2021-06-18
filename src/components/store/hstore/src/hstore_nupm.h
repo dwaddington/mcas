@@ -56,12 +56,23 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     using open_pool_handle = ::open_pool<non_owner<region_type>>;
     using base = pool_manager<open_pool_handle>;
   private:
+#if HEAP_MM
+		std::string _plugin_path;
+#endif
     std::unique_ptr<dax_manager> _dax_manager;
     unsigned _numa_node;
 
     static unsigned name_to_numa_node(const string_view name);
   public:
-    hstore_nupm(unsigned debug_level_, const string_view, const string_view name_, std::unique_ptr<dax_manager> mgr_);
+    hstore_nupm(
+			unsigned debug_level
+#if HEAP_MM
+			, const string_view plugin_path
+#endif
+			, const string_view owner
+			, const string_view name
+			, std::unique_ptr<dax_manager> mgr
+		);
 
     virtual ~hstore_nupm();
 
@@ -69,8 +80,8 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     void pool_create_check(std::size_t) override;
 
     auto pool_create_1(
-      const pool_path &path_
-      , std::size_t size_
+      const pool_path &path
+      , std::size_t size
     ) -> nupm::region_descriptor override;
 
     auto pool_create_2(
@@ -81,13 +92,13 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     ) -> std::unique_ptr<open_pool_handle> override;
 
     nupm::region_descriptor pool_open_1(
-      const pool_path &path_
+      const pool_path &path
     ) override;
 
     auto pool_open_2(
       AK_FORMAL
-      const nupm::region_descriptor & v_
-      , component::IKVStore::flags_t flags_
+      const nupm::region_descriptor & v
+      , component::IKVStore::flags_t flags
     ) -> std::unique_ptr<open_pool_handle> override;
 
     void pool_close_check(const string_view) override;

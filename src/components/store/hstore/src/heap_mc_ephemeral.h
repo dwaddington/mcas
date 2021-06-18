@@ -11,14 +11,15 @@
    limitations under the License.
 */
 
-#ifndef MCAS_HSTORE_HEAP_CC_EPHEMERAL_H
-#define MCAS_HSTORE_HEAP_CC_EPHEMERAL_H
+#ifndef MCAS_HSTORE_HEAP_MC_EPHEMERAL_H
+#define MCAS_HSTORE_HEAP_MC_EPHEMERAL_H
 
 #include <common/logging.h> /* log_source */
 
 #include "hstore_config.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
+#include <mm_plugin_itf.h>
 #include "persistent.h"
 
 #include <ccpm/interfaces.h> /* ownership_callback, (IHeap_expandable, region_vector_t) */
@@ -38,7 +39,39 @@ namespace impl
 	struct allocation_state_extend;
 }
 
-struct heap_cc_ephemeral
+struct heap_mc_shim
+	: public ccpm::IHeap_expandable
+{
+private:
+	MM_plugin_wrapper _mm;
+public:
+	heap_mc_shim(common::string_view path);
+
+	bool reconstitute(
+		ccpm::region_span regions
+		, ccpm::ownership_callback_t resolver
+		, bool force_init
+	) override;
+
+	status_t allocate(void * & ptr
+		, std::size_t bytes
+		, std::size_t alignment
+	) override;
+
+	status_t free(void * & ptr
+		, std::size_t bytes
+	) override;
+
+	status_t remaining(std::size_t& out_size) const override;
+
+	ccpm::region_vector_t get_regions() const override;
+
+	void add_regions(ccpm::region_span regions) override;
+
+	bool includes(const void *ptr) const override;
+};
+
+struct heap_mc_ephemeral
   : private common::log_source
 {
 private:
@@ -47,7 +80,9 @@ private:
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
 	nupm::region_descriptor _managed_regions;
 	std::size_t _capacity;
+#if 0 // MM does not support allocation query
 	std::size_t _allocated;
+#endif
 	impl::allocation_state_emplace *_ase;
 	impl::allocation_state_pin *_aspd;
 	impl::allocation_state_pin *_aspk;
@@ -62,7 +97,7 @@ private:
 	static_assert(sizeof(void *) == 1U << log_min_alignment, "log_min_alignment does not match sizeof(void *)");
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
-	explicit heap_cc_ephemeral(
+	explicit heap_mc_ephemeral(
 		unsigned debug_level_
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
@@ -71,8 +106,8 @@ private:
 		, std::unique_ptr<ccpm::IHeap_expandable> p
 		, string_view id
 		, string_view backing_file
-		, const std::vector<byte_span> &rv_full
-		, const byte_span &pool0_heap
+		, const std::vector<byte_span> rv_full
+		, const byte_span pool0_heap
 	);
 	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
 	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n)
@@ -83,7 +118,7 @@ private:
 	}
 
 	template <bool B>
-		void write_hist(const byte_span & pool_) const
+		void write_hist(const byte_span pool_) const
 		{
 			static bool suppress = false;
 			if ( ! suppress )
@@ -105,36 +140,38 @@ private:
 			}
 		}
 public:
-	friend struct heap_cc;
+	friend struct heap_mc;
 
 	using common::log_source::debug_level;
-	explicit heap_cc_ephemeral(
+	explicit heap_mc_ephemeral(
 		unsigned debug_level
+		, common::string_view plugin_path
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, string_view id
 		, string_view backing_file
-		, const std::vector<byte_span> &rv_full
-		, const byte_span &pool0_heap_
+		, const std::vector<byte_span> rv_full
+		, byte_span pool0_heap_
 	);
-	explicit heap_cc_ephemeral(
+	explicit heap_mc_ephemeral(
 		unsigned debug_level
+		, common::string_view plugin_path
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
 		, impl::allocation_state_extend *asx
 		, string_view id
 		, string_view backing_file
-		, const std::vector<byte_span> &rv_full
-		, const byte_span &pool0_heap
+		, const std::vector<byte_span> rv_full
+		, byte_span pool0_heap
 		, ccpm::ownership_callback_t f
 	);
 	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
-	heap_cc_ephemeral(const heap_cc_ephemeral &) = delete;
-	heap_cc_ephemeral& operator=(const heap_cc_ephemeral &) = delete;
-	void add_managed_region(const byte_span &r_full, const byte_span &r_heap, unsigned numa_node);
+	heap_mc_ephemeral(const heap_mc_ephemeral &) = delete;
+	heap_mc_ephemeral& operator=(const heap_mc_ephemeral &) = delete;
+	void add_managed_region(const byte_span r_full, const byte_span r_heap, unsigned numa_node);
 };
 
 #endif

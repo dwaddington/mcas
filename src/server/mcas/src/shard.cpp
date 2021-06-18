@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2020] [IBM Corporation]
+  Copyright [2017-2021] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -112,9 +112,11 @@ static std::string default_mm_plugin(const Config_file& /*config_file*/,
                                      const std::string& backend)
 {
   if(backend == "mapstore") return DEFAULT_MAPSTORE_MM_PLUGIN_PATH;
-  else if(backend == "hstore") return DEFAULT_HSTORE_MM_PLUGIN_PATH;
-  else if(backend == "hstore-cc") return DEFAULT_HSTORE_CC_MM_PLUGIN_PATH;
-  else throw Logic_exception("invalid store");
+  else if(backend == "hstore") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
+  else if(backend == "hstore-mr") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
+  else if(backend == "hstore-cc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
+  else if(backend == "hstore-mc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
+  else throw Logic_exception("invalid store: %s", backend.c_str());
 }
 
 Shard::Shard(const Config_file &config_file,
@@ -255,10 +257,8 @@ void Shard::initialize_components(const std::string &backend,
 
     if (backend == "mapstore")
       comp = load_component("libcomponent-mapstore.so", mapstore_factory);
-    else if (backend == "hstore")
-      comp = load_component("libcomponent-hstore.so", hstore_factory);
-    else if (backend == "hstore-cc")
-      comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
+    else if ( backend.rfind("hstore", 0) == 0 )
+      comp = load_component(("libcomponent-" + backend + ".so").c_str(), hstore_factory);
     else
       throw General_exception("unrecognized backend (%s)", backend.c_str());
 
@@ -269,13 +269,15 @@ void Shard::initialize_components(const std::string &backend,
     auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
     assert(fact);
 
-    if (backend == "hstore" || backend == "hstore-cc") {
-      if (dax_config.empty()) throw General_exception("hstore backend requires dax configuration");
+    if ( backend.rfind("hstore", 0) == 0 )
+    {
+      if (dax_config.empty()) throw General_exception("backend \"%s\" requires dax configuration", backend.c_str());
 
       _i_kvstore.reset(fact->create(debug_level,
                                     {
                                      {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-                                     {+component::IKVStore_factory::k_dax_config, dax_config}
+                                     {+component::IKVStore_factory::k_dax_config, dax_config},
+                                     {+component::IKVStore_factory::k_mm_plugin_path, mm_plugin_path},
                                     }
                                     ));
     }
@@ -681,9 +683,6 @@ void Shard::process_message_pool_request(Connection_handler *handler,
             for (auto &r : regions.address_map()) {
               CPLOG(2, "region: %p %lu MiB", ::base(r), REDUCE_MB(::size(r)));
               /* pre-register memory region with RDMA */
-#if 0
-              handler->ondemand_register(r.iov_base, r.iov_len);
-#endif
               handler->ondemand_register(common::make_const_byte_span(r));
             }
           }
