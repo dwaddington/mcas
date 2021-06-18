@@ -17,6 +17,7 @@ import gc
 import sys
 import copy
 import numpy
+import torch
 import weakref
 
 from .memoryresource import MemoryResource
@@ -38,6 +39,8 @@ class ShelvedCommon:
     def __getattr__(self, name):
         if name == 'memory':
             return self._value_named_memory.addr()
+        if name == 'namedmemory':
+            return self._value_named_memory        
 #        else:
 #            raise AttributeError()
             
@@ -53,10 +56,8 @@ def _shelf__of_supported_shadow_type(value):
     '''
     Helper function to return True if value is of a shadow type
     '''
-    return isinstance(value, pymm.ndarray)
+    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) or isinstance(value, pymm.torch_tensor)
 
-def _shelf__of_supported_concrete_type(value):
-    return isinstance(value, numpy.ndarray)
 
 class shelf():
     '''
@@ -72,13 +73,33 @@ class shelf():
         items = self.mr.list_items()
         for varname in items:
             if not varname in self.__dict__:
-                # extend for each supported type
-                existing = pymm.ndarray.existing_instance(self.mr, varname)
-                if type(existing) == type(None) and existing == None:
-                    print("Value '{}' is unknown type!".format(varname))
-                else:
-                    self.__dict__[varname] = existing
+                # check if metadata corresponds to a given type; extend for each supported type
+                (existing, value) = pymm.torch_tensor.existing_instance(self.mr, varname)
+                if existing == True:
+                    self.__dict__[varname] = value
                     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                    continue
+
+                (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
+                if existing == True:
+                    self.__dict__[varname] = value
+                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                    continue
+
+                (existing, value) = pymm.string.existing_instance(self.mr, varname)
+                if existing == True:
+                    self.__dict__[varname] = value
+                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                    continue
+
+                # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
+                # if existing == True:
+                #     self.__dict__[varname] = value
+                #     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                #     continue
+
+                print("Value '{}' is unknown type!".format(varname))
+
 
     def __del__(self):
         gc.collect()
@@ -117,9 +138,12 @@ class shelf():
         # check for supported shadow types
         if __of_supported_shadow_type(value):
             # create instance from shadow type
-            self.__dict__[name] = value.make_instance(self.mr, name)            
+            self.__dict__[name] = value.make_instance(self.mr, name)
+            print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
+        elif isinstance(value, torch.Tensor): # perform a copy instantiation (ndarray)
+            self.__dict__[name] = pymm.torch_tensor.build_from_copy(self.mr, name, value)            
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')
         elif type(value) == type(None):
@@ -154,6 +178,9 @@ class shelf():
         for s in self.__dict__:
             if issubclass(type(self.__dict__[s]), pymm.ShelvedCommon):
                 items.append(s) # or to add object itself...self.__dict__[s]
+            elif issubclass(type(self.__dict__[s]), torch.Tensor):
+                items.append(s)
+                
         return items
             
         
@@ -167,13 +194,14 @@ class shelf():
             raise RuntimeError('attempting to erase something that is not on the shelf')
 
         # sanity check
-        gc.collect() # force gc
-        count = sys.getrefcount(self.__dict__[name])
-        if count != 2:
-            raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
-
-        self.__dict__.pop(name)
-        gc.collect() # force gc
+        if gc.is_tracked(self.__dict__[name]):
+            gc.collect() # force gc        
+            count = sys.getrefcount(self.__dict__[name])
+            if count != 2: 
+                raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
+            
+            self.__dict__.pop(name)
+            gc.collect() # force gc
         
         # then remove the named memory from the store
         self.mr.erase_named_memory(name)

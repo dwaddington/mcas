@@ -532,10 +532,7 @@ static PyObject * MemoryResource_get_named_memory(MemoryResource *self, PyObject
                                data_len);
 
   if(s != S_OK) {
-    std::stringstream ss;
-    ss << "store->get failed unexpectedly: " << name;
-    PyErr_SetString(PyExc_RuntimeError,ss.str().c_str());
-    return NULL;
+    Py_RETURN_NONE;
   }
 
 
