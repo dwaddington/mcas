@@ -24,50 +24,42 @@
 
 #include <cstddef> /* size_t, ptrdiff_t */
 
-template <typename T, typename Persister>
+template <typename T, typename Heap, typename Persister>
 	struct allocator_rc;
 
-template <>
-	struct allocator_rc<void, persister>
-		: public deallocator_rc<void, persister>
+template <typename Heap, typename Persister>
+	struct allocator_rc<void, Heap, Persister>
+		: public deallocator_rc<void, Heap, Persister>
 	{
-		using deallocator_type = deallocator_rc<void, persister>;
+		using deallocator_type = deallocator_rc<void,Heap,  Persister>;
 		using typename deallocator_type::value_type;
 	};
 
-template <typename Persister>
-	struct allocator_rc<void, Persister>
-		: public deallocator_rc<void, Persister>
-	{
-		using deallocator_type = deallocator_rc<void, Persister>;
-		using typename deallocator_type::value_type;
-	};
-
-template <typename T, typename Persister = persister>
+template <typename T, typename Heap, typename Persister = persister>
 	struct allocator_rc
-		: public deallocator_rc<T, Persister>
+		: public deallocator_rc<T, Heap, Persister>
 	{
-		using deallocator_type = deallocator_rc<T, Persister>;
+		using deallocator_type = deallocator_rc<T, Heap, Persister>;
 		using typename deallocator_type::heap_type;
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::size_type;
 
 		explicit allocator_rc(void *area_, std::size_t size_, Persister p_ = Persister())
-			: deallocator_rc<T, Persister>(area_, size_, p_)
+			: deallocator_type(area_, size_, p_)
 		{}
 
 		explicit allocator_rc(void *area_, Persister p_ = Persister())
-			: deallocator_rc<T, Persister>(area_, p_)
+			: deallocator_type(area_, p_)
 		{}
 
 		allocator_rc(const heap_access<heap_type> &pool_, Persister p_ = Persister()) noexcept
-			: deallocator_rc<T, Persister>(pool_, (p_))
+			: deallocator_type(pool_, (p_))
 		{}
 
 		allocator_rc(const allocator_rc &a_) noexcept = default;
 
 		template <typename U, typename P>
-			allocator_rc(const allocator_rc<U, P> &a_) noexcept
+			allocator_rc(const allocator_rc<U, Heap, P> &a_) noexcept
 				: allocator_rc(a_.pool())
 			{}
 

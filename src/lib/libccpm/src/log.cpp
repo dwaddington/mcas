@@ -14,18 +14,12 @@
 #include <ccpm/log.h>
 
 #include <common/pointer_cast.h>
-#include <libpmem.h>
+#include <gsl/pointers>
 #include <cstring>
 #include <iostream>
 #include <new> // bad_alloc
 
-void ccpm::persist(
-	const void *a
-	, std::size_t len
-)
-{
-	::pmem_persist(a, sizeof len);
-}
+#define PERSIST(pf, x) ((pf)->persist(common::make_byte_span(&(x), sizeof (x))))
 
 struct bad_alloc_log
 	: public std::bad_alloc
@@ -148,6 +142,7 @@ namespace ccpm
 {
 	struct block_header
 	{
+		using persister_type = gsl::not_null<ccpm::persister *>;
 	private:
 		/* A block_header is followed by "block space". A variable number of "elements"
 		 * grow up from the end of the block header, and "data space" (for saved bytes
@@ -208,22 +203,22 @@ namespace ccpm
 		{
 			return std::size_t(_data_space_end - common::pointer_cast<const char>(this));
 		}
-		void rollback(IHeap_expandable *heap_)
+		void rollback(persister_type persist_, IHeap_expandable *heap_)
 		{
 			while ( _element_count != 0 )
 			{
 				element_back()->rollback(heap_);
 				--_element_count;
-				persist(*this);
+				PERSIST(persist_, *this);
 			}
 		}
-		void commit(IHeap_expandable *heap_)
+		void commit(persister_type persist_, IHeap_expandable *heap_)
 		{
 			while ( _element_count != 0 )
 			{
 				element_back()->commit(heap_);
 				--_element_count;
-				persist(*this);
+				PERSIST(persist_, *this);
 			}
 		}
 		bool fits_data(std::size_t size) const
@@ -240,20 +235,20 @@ namespace ccpm
 			return common::pointer_cast<const char>(element_last() + 1) <= data_space_current();
 		}
 
-		void add(char *begin, std::size_t size)
+		void add(persister_type persist_, char *begin, std::size_t size)
 		{
 			if ( 0 != size )
 			{
 				/* save the data */
 				auto dst = data_space_current() - size;
 				std::memcpy(dst, begin, size);
-				persist(dst, size);
+				persist_->persist(common::make_byte_span(dst, size));
 				/* save the element */
 				new (element_last()) element(begin, size, dst);
-				persist(element_last());
+				PERSIST(persist_, *element_last());
 				/* modifies _data_space_current() and element_last(), in one operation */
 				++_element_count;
-				persist(*this);
+				PERSIST(persist_, *this);
 			}
 			else
 			{
@@ -261,16 +256,16 @@ namespace ccpm
 			}
 		}
 
-		void allocated(void *&p, std::size_t size)
+		void allocated(persister_type persist_, void *&p, std::size_t size)
 		{
 			if ( 0 != size )
 			{
 				/* save the element */
 				new (element_last()) element(element::tag::ALLOC, p, size, data_space_current());
-				persist(element_last());
+				PERSIST(persist_, *element_last());
 				/* modifies _data_space_current() and element_last(), in one operation */
 				++_element_count;
-				persist(*this);
+				PERSIST(persist_, *this);
 			}
 			else
 			{
@@ -278,16 +273,16 @@ namespace ccpm
 			}
 		}
 
-		void freed(void *&p, std::size_t size)
+		void freed(persister_type persist_, void *&p, std::size_t size)
 		{
 			if ( 0 != size )
 			{
 				/* save the element */
 				new (element_last()) element(element::tag::FREE, p, size, data_space_current());
-				persist(element_last());
+				PERSIST(persist_, *element_last());
 				/* modifies _data_space_current() and element_last(), in one operation */
 				++_element_count;
-				persist(*this);
+				PERSIST(persist_, *this);
 			}
 			else
 			{
@@ -304,8 +299,9 @@ namespace ccpm
 		_mr->free(r, s);
 	}
 
-	log::log(IHeap_expandable *mr_)
-		: _mr(mr_)
+	log::log(persister_type persister_, heap_type mr_)
+		: _persister(persister_)
+		, _mr(mr_)
 		, _root(nullptr)
 	{
 	}
@@ -340,7 +336,7 @@ namespace ccpm
 			extend(size);
 		}
 
-		_root->add(static_cast<char *>(begin), size);
+		_root->add(_persister, static_cast<char *>(begin), size);
 	}
 
 	/*
@@ -353,7 +349,7 @@ namespace ccpm
 			extend(size);
 		}
 
-		_root->allocated(pl, size);
+		_root->allocated(_persister, pl, size);
 	}
 
 	/*
@@ -366,7 +362,7 @@ namespace ccpm
 			extend(size);
 		}
 
-		_root->freed(pl, size);
+		_root->freed(_persister, pl, size);
 		pl = nullptr;
 	}
 	/*
@@ -376,7 +372,7 @@ namespace ccpm
 	{
 		while ( _root )
 		{
-			_root->commit(_mr);
+			_root->commit(_persister, _mr);
 			clear_top();
 		}
 	}
@@ -388,7 +384,7 @@ namespace ccpm
 	{
 		while ( _root )
 		{
-			_root->rollback(_mr);
+			_root->rollback(_persister, _mr);
 			clear_top();
 		}
 	}

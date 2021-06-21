@@ -14,7 +14,9 @@
 #ifndef CCPM_DOUBT_H
 #define CCPM_DOUBT_H
 
+#include <ccpm/interfaces.h>
 #include <common/logging.h>
+#include <gsl/pointers>
 #include <cstddef>
 
 namespace ccpm
@@ -29,6 +31,7 @@ namespace ccpm
 	 */
 	struct doubt
 	{
+		using persist_type = gsl::not_null<ccpm::persister *>;
 	private:
 		std::size_t _bytes;
 		void *_in_doubt;
@@ -38,11 +41,11 @@ namespace ccpm
 			, _in_doubt()
 		{}
 
-		void set(const char *fn, void *p, std::size_t bytes);
+		void set(persist_type persist, const char *fn, void *p, std::size_t bytes);
 
-		void clear(const char *fn)
+		void clear(persist_type persist_, const char *fn)
 		{
-			set(fn, nullptr, 0);
+			set(persist_, fn, nullptr, 0);
 		}
 
 		void *get() const;

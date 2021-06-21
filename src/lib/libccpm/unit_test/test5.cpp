@@ -32,6 +32,7 @@
 #include <EASTL/vector.h>
 #pragma GCC diagnostic pop
 #include <api/kvstore_itf.h>
+#include <libpmem.h>
 
 #include <algorithm> // equal, reverse
 #include <cstddef> // size_t
@@ -40,13 +41,25 @@
 #include <memory> // shared_ptr
 #include <string> // string
 
-#include <ccpm/container_cc.h>
-
 using namespace component;
 
 using logged_int = ccpm::value_tracked<int, ccpm::tracker_log>;
 using logged_ptr_to_int = ccpm::value_tracked<int *, ccpm::tracker_log>;
 using logged_shared_ptr_to_int = ccpm::value_tracked<std::shared_ptr<int>, ccpm::tracker_log>;
+
+struct persister final
+	: public ccpm::persister
+{
+	void persist(common::byte_span s) override
+	{
+		::pmem_persist(::base(s), ::size(s));
+	}
+};
+
+namespace
+{
+	persister p5{};
+}
 
 // The fixture for testing class Foo.
 class Log_test : public ::testing::Test
@@ -166,8 +179,8 @@ TEST_F(Log_test, CCBitset)
 	}
 
 	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
-	ccpm::cca mr(rs);
-	auto ccv = new (bitset_area) cc_bitset(mr);
+	ccpm::cca mr(&p5, rs);
+	auto ccv = new (bitset_area) cc_bitset(&p5, mr);
 
 	(*ccv->container)[3] = true;
 	(*ccv->container)[4] = true;
@@ -275,8 +288,8 @@ TEST_F(Log_test, CCVectorOfComposite)
 	}
 
 	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
-	ccpm::cca mr(rs);
-	auto ccv = new (vector_area) cc_vector(mr);
+	ccpm::cca mr(&p5, rs);
+	auto ccv = new (vector_area) cc_vector(&p5, mr);
 
 	const auto c2 = std::make_shared<int>(2);
 	const auto c3 = std::make_shared<int>(3);
@@ -422,8 +435,8 @@ TEST_F(Log_test, CCVector)
 	}
 
 	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
-	ccpm::cca mr(rs);
-	auto ccv = new (vector_area) cc_vector(mr);
+	ccpm::cca mr(&p5, rs);
+	auto ccv = new (vector_area) cc_vector(&p5, mr);
 
 	std::vector<int> original{3, 4, 5};
 
@@ -556,8 +569,8 @@ TEST_F(Log_test, CCList)
 	}
 
 	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
-	ccpm::cca mr(rs);
-	auto ccl = new (list_area) cc_list(mr);
+	ccpm::cca mr(&p5, rs);
+	auto ccl = new (list_area) cc_list(&p5, mr);
 
 	std::vector<int> original{3, 4, 5};
 	std::copy(original.begin(), original.end(), eastl::back_inserter(*ccl->container));
@@ -683,8 +696,8 @@ TEST_F(Log_test, CCListOfPointer)
 	}
 
 	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
-	ccpm::cca mr(rs);
-	auto ccl = new (list_area) cc_list(mr);
+	ccpm::cca mr(&p5, rs);
+	auto ccl = new (list_area) cc_list(&p5, mr);
 
 	int *p2 = new int(2);
 	int *p3 = new int(3);
@@ -816,8 +829,8 @@ TEST_F(Log_test, CCListOfSharedPointer)
 	}
 
 	ccpm::region_span::value_type rs[1] = { common::make_byte_span(heap_area, heap_size) };
-	ccpm::cca mr(rs);
-	auto ccl = new (list_area) cc_list(mr);
+	ccpm::cca mr(&p5, rs);
+	auto ccl = new (list_area) cc_list(&p5, mr);
 
 	auto p2 = std::make_shared<int>(2);
 	auto p3 = std::make_shared<int>(3);

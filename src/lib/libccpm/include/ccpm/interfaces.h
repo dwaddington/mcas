@@ -16,12 +16,20 @@
 
 #include <common/byte_span.h>
 #include <common/types.h>
+#include <gsl/pointers>
 #include <cstddef>
 #include <functional>
 #include <vector>
 
 namespace ccpm
 {
+	struct persister
+	{
+		using byte_span = common::byte_span;
+		virtual void persist(byte_span span) = 0;
+	protected:
+		~persister() {}
+	};
 
 /*
  * Ownership callback can resolve the ambiguity about area

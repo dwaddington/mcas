@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_POBJ_BAD_ALLOC_H
-#define _COMANCHE_HSTORE_POBJ_BAD_ALLOC_H
+#ifndef MCAS_HSTORE_POBJ_BAD_ALLOC_H
+#define MCAS_HSTORE_POBJ_BAD_ALLOC_H
 
 #include <cstring>
 #include <stdexcept>

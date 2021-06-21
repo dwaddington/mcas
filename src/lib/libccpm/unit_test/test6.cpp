@@ -19,8 +19,8 @@
 #include <gtest/gtest.h>
 #pragma GCC diagnostic pop
 
-#include <ccpm/value_tracked.h>
 #include <ccpm/container_cc.h>
+#include <ccpm/value_tracked.h>
 #include <common/profiler.h>
 #include <common/utils.h>
 #pragma GCC diagnostic push
@@ -32,6 +32,7 @@
 #include <EASTL/vector.h>
 #pragma GCC diagnostic pop
 #include <api/kvstore_itf.h>
+#include <libpmem.h>
 
 #include <algorithm> // equal, reverse
 #include <cstddef> // size_t
@@ -40,13 +41,27 @@
 #include <memory> // shared_ptr
 #include <string> // string
 
-#include <ccpm/container_cc.h>
 
 using namespace component;
 
 using logged_int = ccpm::value_tracked<int, ccpm::tracker_log>;
 using logged_ptr_to_int = ccpm::value_tracked<int *, ccpm::tracker_log>;
 using logged_shared_ptr_to_int = ccpm::value_tracked<std::shared_ptr<int>, ccpm::tracker_log>;
+
+struct persister final
+	: public ccpm::persister
+{
+	void persist(common::byte_span s) override
+	{
+		::pmem_persist(::base(s), ::size(s));
+	}
+};
+
+namespace
+{
+	persister p6{};
+}
+
 
 // The fixture for testing class Foo.
 class Log_test : public ::testing::Test
@@ -173,8 +188,8 @@ TEST_F(Log_test, CCVectorOfPointer)
 	common::profiler pr("test6-vp-cpu-" + store_map::impl->name + ".profile");
 	{
 		ccpm::region_span::value_type v[1] = { common::make_byte_span(heap_area, heap_size) };
-		ccpm::cca mr(v);
-		auto ccv = new (vector_area) cc_vector(mr);
+		ccpm::cca mr(&p6, v);
+		auto ccv = new (vector_area) cc_vector(&p6, mr);
 
 		for ( int i = 0; i != 1000000; ++i )
 		{
