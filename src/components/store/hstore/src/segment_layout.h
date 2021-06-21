@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_SEGMENT_LAYOUT_H
-#define _COMANCHE_HSTORE_SEGMENT_LAYOUT_H
+#ifndef MCAS_HSTORE_SEGMENT_LAYOUT_H
+#define MCAS_HSTORE_SEGMENT_LAYOUT_H
 
 #include <cstddef> /* size_t */
 #include <limits> /* numeric_limits */

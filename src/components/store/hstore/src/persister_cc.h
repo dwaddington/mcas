@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_PERSISTER_H
-#define COMANCHE_HSTORE_PERSISTER_H
+#ifndef MCAS_HSTORE_PERSISTER_H
+#define MCAS_HSTORE_PERSISTER_H
 
 #include <cstddef> /* size_t */
 

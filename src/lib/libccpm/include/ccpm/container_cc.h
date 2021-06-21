@@ -46,11 +46,11 @@ namespace ccpm
 			const cca &mr() const { return static_cast<const cca &>(*this); }
 			log &lr() { return static_cast<log &>(*this); }
 		public:
-			container_cc(cca& cca_ /* void *ptr, std::size_t size */)
+			container_cc(log::persister_type persister_, cca& cca_ /* void *ptr, std::size_t size */)
 				/* Note: region_vector_t has a std::vector as a public base class.
 				 * Best to avoid it.
 				 */
-				: log(&cca_)
+				: log(persister_, &cca_)
 				, _cca(&cca_)
 				, _allocator(&mr(), &lr())
 				, container(new (_allocator.allocate(sizeof *container)) Container(_allocator))

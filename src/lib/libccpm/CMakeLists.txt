@@ -11,14 +11,11 @@ add_compile_options("$<$<CONFIG:Debug>:-O0>")
 include(../../../mk/clang-dev-tools.cmake)
 
 # find_library(LIB_JEMALLOC libjemalloc.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
-find_library(LIB_NDCTL libndctl.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
+#find_library(LIB_NDCTL libndctl.so HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components) # immutable_allocator
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libccpm/include)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/EASTL/include) # immutable_allocator
 
@@ -33,8 +30,7 @@ add_library(${PROJECT_NAME}-static STATIC ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(${PROJECT_NAME}-static PUBLIC "$<$<CONFIG:Debug>:-O0>" "-fPIC")
-target_link_libraries(${PROJECT_NAME} dl pmem)
-target_link_libraries(${PROJECT_NAME}-static dl pmem)
+target_link_libraries(${PROJECT_NAME} dl)
 
 add_subdirectory(unit_test)
 

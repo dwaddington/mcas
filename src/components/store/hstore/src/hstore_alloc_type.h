@@ -20,9 +20,19 @@
 #if HEAP_OID
 #include "allocator_co.h"
 #elif HEAP_RECONSTITUTE
-#include "allocator_rc.h"
+ #include "allocator_rc.h"
+ #if HEAP_MM
+  #include "heap_mr.h"
+ #else
+  #include "heap_rc.h"
+ #endif
 #elif HEAP_CONSISTENT
 #include "allocator_cc.h"
+ #if HEAP_MM
+  #include "heap_mc.h"
+ #else
+  #include "heap_cc.h"
+ #endif
 #endif
 
 template <typename Persister>
@@ -32,16 +42,21 @@ template <typename Persister>
 		using alloc_type = allocator_co<char, Persister>;
 		using heap_alloc_type = heap_co;
 #elif HEAP_RECONSTITUTE
-		using alloc_type = allocator_rc<char, Persister>;
 #if HEAP_MM
 		using heap_alloc_shared_type = heap_mr;
 #else
 		using heap_alloc_shared_type = heap_rc;
 #endif
+		using alloc_type = allocator_rc<char, heap_alloc_shared_type, Persister>;
 #elif HEAP_CONSISTENT
-		using alloc_type = allocator_cc<char, Persister>;
-		using heap_alloc_shared_type = typename alloc_type::heap_type;
+#if HEAP_MM
+		using heap_alloc_shared_type = heap_mc;
+#else
+		using heap_alloc_shared_type = heap_cc;
 #endif
+		using alloc_type = allocator_cc<char, heap_alloc_shared_type, Persister>;
+#endif
+
 		using heap_alloc_access_type = heap_access<heap_alloc_shared_type>;
 	};
 

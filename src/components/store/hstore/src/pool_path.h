@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_POOL_PATH_H
-#define COMANCHE_HSTORE_POOL_PATH_H
+#ifndef MCAS_HSTORE_POOL_PATH_H
+#define MCAS_HSTORE_POOL_PATH_H
 
 #include <string>
 

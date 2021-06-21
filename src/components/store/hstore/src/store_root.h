@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_ROOT_H
-#define _COMANCHE_HSTORE_ROOT_H
+#ifndef MCAS_HSTORE_ROOT_H
+#define MCAS_HSTORE_ROOT_H
 
 #include <libpmemobj.h> /* PMEMoid */
 

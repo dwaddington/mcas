@@ -12,8 +12,8 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_DAX_MANAGER_H
-#define COMANCHE_HSTORE_DAX_MANAGER_H
+#ifndef MCAS_HSTORE_DAX_MANAGER_H
+#define MCAS_HSTORE_DAX_MANAGER_H
 
 #include <nupm/dax_manager.h>
 

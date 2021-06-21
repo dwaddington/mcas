@@ -22,6 +22,7 @@
 #include "element_state.h"
 #include <common/byte_span.h>
 #include <common/pointer_cast.h>
+#include <gsl/pointers>
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -139,6 +140,7 @@ namespace ccpm
 		using index_t = unsigned;
 		using level_ix_t = std::uint8_t;
 		using byte_span = common::byte_span;
+		using persist_type = gsl::not_null<ccpm::persister *>;
 	public:
 		/* arbitrary number of atomic words (containing allocation status) which
 		 * cover an area) */
@@ -154,7 +156,7 @@ namespace ccpm
 #endif
 		static constexpr std::size_t min_alloc_size = 8;
 
-    void set_root(const byte_span & iov);
+    void set_root(const byte_span & iov, persist_type persist);
     byte_span get_root() const;
 
 	private:
@@ -198,7 +200,8 @@ namespace ccpm
 		 * full_height: The number of levels in the full tree.
 		 */
 		area_ctl(
-			level_ix_t level
+			persist_type persist
+			, level_ix_t level
 			, index_t element_count
 			, level_ix_t header_ct
 			, level_ix_t full_height
@@ -206,7 +209,10 @@ namespace ccpm
 		/* Simple constructor. Used, if necessary, to create area_ctl at offset 0
 		 * in the region
 		 */
-		area_ctl(level_ix_t full_height);
+		area_ctl(
+			persist_type persist
+			, level_ix_t full_height
+		);
 
 		area_ctl *area_prev() { return static_cast<area_ctl *>(this->prev()); }
 		area_ctl *area_next() { return static_cast<area_ctl *>(this->next()); }
@@ -217,10 +223,19 @@ namespace ccpm
 		/* functions prefixed "el" operate on one or more of all elements in the
 		 * element state array
 		 */
-		void el_set_alloc(index_t ix, bool alloc_state);
+		void el_set_alloc(
+			persist_type persist
+			, index_t ix, bool alloc_state
+		);
 
-		index_t el_fill_state_range(index_t first, index_t last, sub_state s);
-		index_t el_fill_alloc_range(index_t first, index_t last, bool alloc);
+		index_t el_fill_state_range(
+			persist_type persist
+			, index_t first, index_t last, sub_state s
+		);
+		index_t el_fill_alloc_range(
+			persist_type persist
+			, index_t first, index_t last, bool alloc
+		);
 
 		bool el_alloc_value(index_t ix) const;
 		sub_state el_state_value(index_t ix) const;
@@ -287,9 +302,16 @@ namespace ccpm
 
 		/* in the atomic word at ix, replace 0s with the the client allocated indicators
 		*/
-		auto el_allocate_n(index_t ix, index_t n, sub_state s) -> atomic_word &;
+		auto el_allocate_n(
+			persist_type persist
+			, index_t ix, index_t n
+			, sub_state s
+		) -> atomic_word &;
 		auto el_deallocate_n(index_t ix , index_t n) -> atomic_word &;
-		void el_reserve_range(index_t first_, index_t last);
+		void el_reserve_range(
+			persist_type persist
+			, index_t first_, index_t last
+		);
 
 		sub_state &element_state(index_t ix_)
 		{
@@ -363,23 +385,24 @@ namespace ccpm
 			-> element_location;
 
 		void deallocate_local(
-			area_top *top
+			persist_type persist
+			, area_top *top
 			, doubt &dt
 			, void * & ptr
 			, index_t element_ix
 			, std::size_t bytes
 		);
 
-		void set_allocated_local(index_t ix, std::size_t bytes, bool aligned);
-		void set_deallocated_local(index_t ix, std::size_t bytes);
+		void set_allocated_local(persist_type persist, index_t ix, std::size_t bytes, bool aligned);
+		void set_deallocated_local(persist_type persist, index_t ix, std::size_t bytes);
 
 	public:
 		level_ix_t full_height() const { return _full_height; }
 		bool is_valid() const { return _magic == magic; }
 		static level_ix_t height(std::size_t bytes);
 		static auto commission(
-			void *start
-			, std::size_t size
+			persist_type persist
+			, byte_span span_
 		) -> area_ctl *;
 		bool includes(const void *ptr) const;
 
@@ -394,17 +417,22 @@ namespace ccpm
 			return element_byte(0) <= pc && pc < element_byte(_element_count);
 		}
 
-		void deallocate(area_top *top, void * & ptr, std::size_t bytes);
+		void deallocate(
+			persist_type persist
+			, area_top *top
+			, void * & ptr, std::size_t bytes
+		);
 
 		void allocate(
-			doubt &dt
+			persist_type persist
+			, doubt &dt
 			, void * & ptr
 			, std::size_t bytes
 			, std::size_t alignment
 			, index_t run_length
 		);
 
-		auto new_subdivision(level_ix_t header_ct) -> area_ctl *;
+		auto new_subdivision(persist_type persist, level_ix_t header_ct) -> area_ctl *;
 
 		/* Restore this area_ctl and all subdivisions to their area_top chains.
 		 *
@@ -418,9 +446,9 @@ namespace ccpm
 
 		void print(std::ostream &o_, level_ix_t level_, std::ios_base::fmtflags size_format_) const;
 
-		void set_allocated(void *p, std::size_t bytes);
-		void set_deallocated(void *p, std::size_t bytes);
-		auto restore(const ownership_callback_t &resolver_) -> area_ctl &;
+		void set_allocated(persist_type persist, byte_span span);
+		void set_deallocated(persist_type persist, byte_span span);
+		auto restore(persist_type persist, const ownership_callback_t &resolver_) -> area_ctl &;
 		level_ix_t level() const;
 
 		index_t el_max_free_run() const

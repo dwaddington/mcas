@@ -2,6 +2,7 @@
 #define __CCPM_VALUE_H__
 
 #include <common/cycles.h>
+#include <common/utils.h>
 
 namespace ccpm
 {

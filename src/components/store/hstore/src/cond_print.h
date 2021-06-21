@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_COND_PRINT_H_
-#define _COMANCHE_HSTORE_COND_PRINT_H_
+#ifndef MCAS_HSTORE_COND_PRINT_H_
+#define MCAS_HSTORE_COND_PRINT_H_
 
 /*
  * cond_print: Convert a value to a printable string, if possible,

@@ -41,6 +41,6 @@ target_compile_options(libccpm-test5 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test6 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 
 target_link_libraries(libccpm-test1 ${ASAN_LIB} ${GTEST_LIB} nupm) # add profiler for google profiler
-target_link_libraries(libccpm-test2 ${ASAN_LIB} ${GTEST_LIB} ccpm) # add profiler for google profiler
-target_link_libraries(libccpm-test5 ${ASAN_LIB} ${GTEST_LIB} ccpm)
-target_link_libraries(libccpm-test6 ${ASAN_LIB} ${GTEST_LIB} ccpm profiler)
+target_link_libraries(libccpm-test2 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem) # add profiler for google profiler
+target_link_libraries(libccpm-test5 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem)
+target_link_libraries(libccpm-test6 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem profiler)
