@@ -39,12 +39,20 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-        # disable -
         print('tx_begin')
         pymmcore.valgrind_trigger(1)
-        self.__tx_begin_swcopy()
+        # disable SW copy
+        #self.__tx_begin_swcopy()
         pass
-        
+
+    def tx_commit(self):
+        print('tx_commit')
+        pymmcore.valgrind_trigger(2)
+        # disable SW copy 
+        #self.__tx_commit_swcopy()
+        pass
+    
+
     def __tx_begin_swcopy(self):
         '''
         Start consistent transaction (very basic copy-off undo-log)
@@ -58,13 +66,6 @@ class MemoryReference():
         if self._debug_level > 0:
             print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
 
-    def tx_commit(self):
-        # disable -
-        print('tx_commit')
-        pymmcore.valgrind_trigger(2)
-        self.__tx_commit_swcopy()
-        pass
-    
     def __tx_commit_swcopy(self):
         '''
         Commit consistent transaction

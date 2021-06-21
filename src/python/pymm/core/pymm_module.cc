@@ -341,10 +341,23 @@ static PyObject * pymmcore_valgrind_trigger(PyObject * self,
 
 extern "C" void I_WRAP_SONAME_FNNAME_ZU(NONE, valgrind_trigger)( int e )
 {
-   OrigFn fn;
-   VALGRIND_GET_ORIG_FN(fn);
-   printf("TRIGGER: %lu %d\n", rdtsc(), e);
-   CALL_FN_v_W(fn, e);
+  // No need to call function - it does nothing
+  //
+  // OrigFn fn;
+  // VALGRIND_GET_ORIG_FN(fn);
+  // CALL_FN_v_W(fn, e);
+  if(e == 1) {
+    VALGRIND_PRINTF("TX BEGIN: %lu %d\n", rdtsc(), e);
+    VALGRIND_MONITOR_COMMAND("trace:on");
+  }
+  else if(e == 2) {
+    VALGRIND_MONITOR_COMMAND("trace:off");
+    VALGRIND_PRINTF("TX END: %lu %d\n", rdtsc(), e);
+  }
+  else {
+    VALGRIND_PRINTF("TRIGGER EVENT: %lu %d\n", rdtsc(), e);
+  }
 }
+
 
 #endif
