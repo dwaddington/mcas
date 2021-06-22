@@ -15,6 +15,17 @@ PUBLIC status_t mm_plugin_init()
   return S_OK;
 }
 
+namespace
+{
+	struct persister final
+		: public ccpm::persister
+	{
+		/* no support for persist here. */
+		void persist(common::byte_span) override {}
+	};
+	persister mm_persister;
+}
+
 PUBLIC status_t mm_plugin_create(
 	const char * params
 	, void * root_ptr
@@ -23,7 +34,7 @@ PUBLIC status_t mm_plugin_create(
 {
 	PLOG("%s (%s)", __func__, params);
 	if (out_heap == nullptr) { return E_INVAL; }
-	*out_heap = new Heap(ccpm::region_span());
+	*out_heap = new Heap(&mm_persister, ccpm::region_span());
 	return S_OK;
 }
 
@@ -69,18 +80,21 @@ PUBLIC status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap
 PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
   PLOG("%s (%lu)",__func__, n);
-  return static_cast<Heap *>(heap)->allocate(*out_ptr, n, 0);
+  *out_ptr = nullptr;
+  return static_cast<Heap *>(heap)->allocate(*out_ptr, n, 1);
 }
 
 PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size_t alignment, void ** out_ptr)
 {
   PLOG("%s (%lu,%lu)",__func__, n, alignment);
+  *out_ptr = nullptr;
   return static_cast<Heap *>(heap)->allocate(*out_ptr, n, alignment);
 }
 
 PUBLIC status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t n, size_t alignment, size_t offset, void ** out_ptr)
 {
   asm("int3");  
+  *out_ptr = nullptr;
   return E_NOT_IMPL;
 }
 
@@ -92,7 +106,10 @@ PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t)
 PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
 {
   PLOG("%s (%p)",__func__, ptr);
+  if ( ptr )
+  {
 	static_cast<Heap*>(heap)->free(ptr, 0);
+  }
   return S_OK;
 }
 

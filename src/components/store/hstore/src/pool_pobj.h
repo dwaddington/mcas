@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_POOL_POBJ_H
-#define _COMANCHE_HSTORE_POOL_POBJ_H
+#ifndef MCAS_HSTORE_POOL_POBJ_H
+#define MCAS_HSTORE_POOL_POBJ_H
 
 #pragma GCC diagnostic push
 #if defined __clang__

@@ -120,18 +120,22 @@ ccpm::area_top::~area_top()
 }
 
 /* Initial area_ctl */
-ccpm::area_top::area_top(const byte_span iov_, const unsigned trace_level_, std::ostream &o_)
-	: area_top(area_ctl::commission(::base(iov_), ::size(iov_)), trace_level_, iov_, o_)
+ccpm::area_top::area_top(persist_type persist_, const byte_span iov_, const unsigned trace_level_, std::ostream &o_)
+	: area_top(
+	//	persist_,
+		area_ctl::commission(persist_, iov_), trace_level_, iov_, o_
+	)
 {}
 
 /* Restored area_ctl */
 ccpm::area_top::area_top(
-	const byte_span iov_
+	persist_type persist_
+	, const byte_span iov_
 	, const ownership_callback_t &resolver_
 	, const unsigned trace_level_
 	, std::ostream &o_
 )
-	: area_top(&area_ctl::root(::base(iov_))->restore(resolver_), trace_level_, iov_, o_)
+	: area_top(&area_ctl::root(::base(iov_))->restore(persist_, resolver_), trace_level_, iov_, o_)
 {
 }
 
@@ -247,7 +251,8 @@ void ccpm::area_top::restore_to_chain(
 
 /* Part 1: allocate from an existing chain */
 void ccpm::area_top::allocate_strategy_1(
-	void * & ptr_
+	persist_type persist_
+	, void * & ptr_
 	, const size_t bytes_
 	, const size_t alignment_
 	, const level_hints_vec::iterator level_
@@ -267,7 +272,7 @@ void ccpm::area_top::allocate_strategy_1(
 
 		/* A viable allocation exists at free_ctl. Use it. */
 		auto viable = static_cast<area_ctl *>(free_ctl.next());
-		viable->allocate(_ctl->get_doubt(), ptr_, bytes_, alignment_, run_length_);
+		viable->allocate(persist_, _ctl->get_doubt(), ptr_, bytes_, alignment_, run_length_);
 		/* The ctl may have a new, shorter longest run.
 		 * If so, move it to a new chain within the level object */
 		auto longest_run = viable->el_max_free_run();
@@ -333,7 +338,8 @@ bool ccpm::area_top::allocate_recovery_1()
  * until we have allocated a subdivision for the target level.
  */
 bool ccpm::area_top::allocate_recovery_2(
-	const level_hints_vec::iterator level_
+	persist_type persist_
+	, const level_hints_vec::iterator level_
 )
 {
 	auto parent_level = level_ + 1;
@@ -373,7 +379,7 @@ bool ccpm::area_top::allocate_recovery_2(
 			 */
 			assert(parent);
 			/* carve out a new area_ptr from viable */
-			auto child = parent->new_subdivision(1U);
+			auto child = parent->new_subdivision(persist_, 1U);
 			++level->_ct_subdivision;
 			/* The parent may have a new, shorter longest run.
 			 * If so, move it to a new chain within the level object */
@@ -409,7 +415,8 @@ bool ccpm::area_top::allocate_recovery_2(
 }
 
 void ccpm::area_top::allocate(
-	void * & ptr_
+	persist_type persist_
+	, void * & ptr_
 	, const std::size_t bytes_
 	, const std::size_t alignment_
 )
@@ -516,7 +523,8 @@ RETRY:
 			}
 
 			allocate_strategy_1(
-				ptr_
+				persist_
+				, ptr_
 				, bytes
 				, alignment_
 				, level_it
@@ -536,12 +544,13 @@ RETRY:
 					allocate_recovery_1()
 					||
 					/* Recovery 2: make a new subdivision */
-					allocate_recovery_2(level_it)
+					allocate_recovery_2(persist_, level_it)
 				)
 			)
 			{
 				allocate_strategy_1(
-					ptr_
+					persist_
+					, ptr_
 					, bytes
 					, alignment_
 					, level_it
@@ -563,12 +572,15 @@ RETRY:
 	}
 }
 
-void ccpm::area_top::deallocate(void * & ptr_, std::size_t bytes_)
+void ccpm::area_top::deallocate(
+	persist_type persist_
+	, void * & ptr_, std::size_t bytes_
+)
 {
 	if ( _ctl )
 	{
 		auto bytes = std::max(bytes_, area_ctl::min_alloc_size);
-		_ctl->deallocate(this, ptr_, bytes);
+		_ctl->deallocate(persist_, this, ptr_, bytes);
 	}
 
 }
@@ -616,9 +628,9 @@ bool ccpm::area_top::contains(const void *p) const
 	return _ctl && _ctl->contains(p);
 }
 
-void ccpm::area_top::set_root(const byte_span& iov)
+void ccpm::area_top::set_root(const byte_span& iov, persist_type persist_)
 {
-  _ctl->set_root(iov);
+  _ctl->set_root(iov, persist_);
 }
 
 auto ccpm::area_top::get_root() const -> byte_span

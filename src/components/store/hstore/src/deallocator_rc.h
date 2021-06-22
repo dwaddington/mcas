@@ -12,45 +12,29 @@
 */
 
 
-#ifndef COMANCHE_HSTORE_DEALLOCATOR_RC_H
-#define COMANCHE_HSTORE_DEALLOCATOR_RC_H
+#ifndef MCAS_HSTORE_DEALLOCATOR_RC_H
+#define MCAS_HSTORE_DEALLOCATOR_RC_H
 
 #include "hstore_config.h"
 #include "heap_access.h"
-#if HEAP_MM
-#include "heap_mr.h"
-#else
-#include "heap_rc.h"
-#endif
 #include "persister_cc.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
 
-template <typename T, typename Persister>
+template <typename T, typename Heap, typename Persister>
 	struct deallocator_rc;
 
-template <>
-	struct deallocator_rc<void, persister>
+template <typename Heap, typename Persister>
+	struct deallocator_rc<void, Heap, Persister>
 	{
 		using value_type = void;
 	};
 
-template <typename Persister>
-	struct deallocator_rc<void, Persister>
-	{
-		using value_type = void;
-	};
-
-template <typename T, typename Persister = persister>
+template <typename T, typename Heap, typename Persister = persister>
 	struct deallocator_rc
 		: public Persister
 	{
-/* Note: make this a template parameter */
-#if HEAP_MM
-		using heap_type = heap_mr;
-#else
-		using heap_type = heap_rc;
-#endif
+		using heap_type = Heap;
 	private:
 		heap_access<heap_type> _pool;
 	public:
@@ -70,7 +54,7 @@ template <typename T, typename Persister = persister>
 		explicit deallocator_rc(const deallocator_rc &) noexcept = default;
 
 		template <typename U, typename P>
-			explicit deallocator_rc(const deallocator_rc<U, P> &d_) noexcept
+			explicit deallocator_rc(const deallocator_rc<U, Heap, P> &d_) noexcept
 				: deallocator_rc(d_.pool())
 			{}
 

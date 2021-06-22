@@ -28,14 +28,15 @@ class string(Shadow):
     string object that is stored in the memory resource.  because
     the object is string, read/write access is expected to be slow
     '''
-    def __init__(self, string_value):
+    def __init__(self, string_value, encoding='utf-8'):
         self.string_value = string_value
+        self.encoding = encoding
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
         Create a concrete instance from the shadow
         '''
-        return shelved_string(memory_resource, name, self.string_value)
+        return shelved_string(memory_resource, name, string_value=self.string_value, encoding=self.encoding)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -51,19 +52,28 @@ class string(Shadow):
 
         root = Header.Header()
         hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-        print("detected 'string' type - magic:{}, hdrsize:{}".format(hex(int(hdr.Magic())),hdr_size))
+        print("detected 'string' type - magic:{}, hdrsize:{} type:{}".format(hex(int(hdr.Magic())), hdr_size, hdr.Type()))
         
         if(hdr.Magic() != Constants.Constants().Magic):
             return (False, None)
 
-        if(hdr.Type() != DataType.DataType().Utf8String):
-            return (False, None)
+        stype = hdr.Type()
         
-        return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:]))
+        if stype == DataType.DataType().AsciiString:
+            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
+        elif stype == DataType.DataType().Utf8String:
+            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-8'))
+        elif stype == DataType.DataType().Utf16String:
+            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-16'))
+        elif stype == DataType.DataType().Latin1String:
+            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'latin-1'))
+
+        # not a string
+        return (False, None)
 
 
 class shelved_string(ShelvedCommon):
-    def __init__(self, memory_resource, name, string_value):
+    def __init__(self, memory_resource, name, string_value, encoding):
 
         if not isinstance(name, str):
             raise RuntimeException("invalid name type")
@@ -77,7 +87,18 @@ class shelved_string(ShelvedCommon):
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
             Header.HeaderAddVersion(builder, Constants.Constants().Version)
-            Header.HeaderAddType(builder, DataType.DataType().Utf8String)
+
+            if encoding == 'ascii':
+                Header.HeaderAddType(builder, DataType.DataType().AsciiString)
+            elif encoding == 'utf-8':
+                Header.HeaderAddType(builder, DataType.DataType().Utf8String)
+            elif encoding == 'utf-16':
+                Header.HeaderAddType(builder, DataType.DataType().Utf16String)
+            elif encoding == 'latin-1':
+                Header.HeaderAddType(builder, DataType.DataType().Latin1String)
+            else:
+                raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
+                    
             hdr = Header.HeaderEnd(builder)
             builder.FinishSizePrefixed(hdr)
             hdr_ba = builder.Output()
@@ -89,7 +110,7 @@ class shelved_string(ShelvedCommon):
             memref = memory_resource.create_named_memory(name, value_len, 1, False)
             # copy into memory resource
             memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = bytes(string_value, 'utf-8')
+            memref.buffer[hdr_len:] = bytes(string_value)
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
@@ -98,10 +119,11 @@ class shelved_string(ShelvedCommon):
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
         self._value_named_memory = memref
+        self._encoding = encoding
 
     def __repr__(self):
         # TODO - some how this is keeping a reference? gc.collect() clears it.
-        return str(self.view,'utf-8')
+        return str(self.view,self._encoding)
     
     def __len__(self):
         return len(self.view)

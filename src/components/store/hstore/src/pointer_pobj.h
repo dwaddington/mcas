@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_POINTER_POBJ_H
-#define _COMANCHE_HSTORE_POINTER_POBJ_H
+#ifndef MCAS_HSTORE_POINTER_POBJ_H
+#define MCAS_HSTORE_POINTER_POBJ_H
 
 #pragma GCC diagnostic push
 #if defined __clang__

@@ -12,8 +12,8 @@
 */
 
 
-#ifndef _COMANCHE_HSTORE_BUCKET_ALIGNED_H
-#define _COMANCHE_HSTORE_BUCKET_ALIGNED_H
+#ifndef MCAS_HSTORE_BUCKET_ALIGNED_H
+#define MCAS_HSTORE_BUCKET_ALIGNED_H
 
 /*
  * A 64-byte aligned holder for data.

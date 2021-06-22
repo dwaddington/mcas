@@ -16,12 +16,27 @@
 #ifdef GPERF_TOOLS
 #include <gperftools/profiler.h>
 #endif
+#include <libpmem.h>
 #include <cstdlib> // alligned_alloc
 #include <string> // stoull
 
 struct {
   uint64_t uuid;
 } Options;
+
+namespace
+{
+	struct persister_test2 final
+		: public ccpm::persister
+	{
+		void persist(common::byte_span s) override
+		{
+			::pmem_persist(::base(s), ::size(s));
+		}
+	};
+
+	persister_test2 p2{};
+}
 
 // The fixture for testing class Foo.
 class Libccpm_test : public ::testing::Test {
@@ -57,7 +72,7 @@ TEST_F(Libccpm_test, ccpm_cca_scenario_A)
     )
   );
   {
-    ccpm::cca ccheap(rv);
+    ccpm::cca ccheap(&p2, rv);
 
     void  * p = nullptr;
 
@@ -98,7 +113,7 @@ TEST_F(Libccpm_test, ccpm_cca)
   );
   {
   int r = S_OK;
-  ccpm::cca bt(rv);
+  ccpm::cca bt(&p2, rv);
   auto remain_cb = [&] () {
       std::size_t remain;
       r = bt.remaining(remain);
@@ -145,7 +160,7 @@ TEST_F(Libccpm_test, ccpm_cca)
   EXPECT_LE(remain3, remain4);
   }
   {
-    ccpm::cca bt(rv, [] (const void *) -> bool { return true; } );
+    ccpm::cca bt(&p2, rv, [] (const void *) -> bool { return true; } );
   }
   {
     ccpm::region_vector_t rv_bad(
@@ -155,7 +170,7 @@ TEST_F(Libccpm_test, ccpm_cca)
     );
     try
     {
-      ccpm::cca bt(rv_bad, [] (const void *) -> bool { return true; } );
+      ccpm::cca bt(&p2, rv_bad, [] (const void *) -> bool { return true; } );
       EXPECT_EQ(0, 1);
     }
     catch ( const std::domain_error &e )

@@ -14,7 +14,6 @@
 #include "doubt.h"
 
 #include "logging.h"
-#include <libpmem.h>
 #include <cstddef>
 #include <cstdlib> // getenv
 
@@ -23,19 +22,11 @@ namespace
 	auto doubt_fine_trace = std::getenv("CCA_DOUBT_FINE_TRACE");
 }
 
-template <typename P>
-	void persist(
-		const P & p
-	)
-	{
-		::pmem_persist(&p, sizeof p);
-	}
-
-#define PERSIST(x) do { persist(x); } while (0)
-#define PERSIST_N(p, ct) do { ::pmem_persist(p, (sizeof *p) * ct); } while (0)
+#define PERSIST(pf, x) ((pf)->persist(common::make_byte_span(&(x), sizeof (x))))
 
 void ccpm::doubt::set(
-	const char *fn
+	persist_type persist_
+	, const char *fn
 	, void *p_
 	, std::size_t bytes_
 )
@@ -46,7 +37,7 @@ void ccpm::doubt::set(
 	}
 	_bytes = bytes_;
 	_in_doubt = p_;
-	PERSIST(*this);
+	PERSIST(persist_, *this);
 }
 
 void *ccpm::doubt::get() const

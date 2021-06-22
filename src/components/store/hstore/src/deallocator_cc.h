@@ -17,42 +17,26 @@
 
 #include "hstore_config.h"
 #include "heap_access.h"
-#if HEAP_MM
-#include "heap_mc.h"
-#else
-#include "heap_cc.h"
-#endif
 #include "persistent.h"
 #include "persister_cc.h"
 
 #include <cstddef> /* size_t, ptrdiff_t */
 #include <type_traits> /* true_type, false_type */
 
-template <typename T, typename Persister>
+template <typename T, typename Heap, typename Persister>
 	struct deallocator_cc;
 
-template <>
-	struct deallocator_cc<void, persister>
+template <typename Heap, typename Persister>
+	struct deallocator_cc<void, Heap, Persister>
 	{
 		using value_type = void;
 	};
 
-template <typename Persister>
-	struct deallocator_cc<void, Persister>
-	{
-		using value_type = void;
-	};
-
-template <typename T, typename Persister = persister>
+template <typename T, typename Heap, typename Persister = persister>
 	struct deallocator_cc
 		: public Persister
 	{
-/* Note: make this a template parameter */
-#if HEAP_MM
-		using heap_type = heap_mc;
-#else
-		using heap_type = heap_cc;
-#endif
+		using heap_type = Heap;
 	private:
 		heap_access<heap_type> _pool;
 	public:
@@ -71,7 +55,7 @@ template <typename T, typename Persister = persister>
 		explicit deallocator_cc(const deallocator_cc &) noexcept = default;
 
 		template <typename U, typename P>
-			explicit deallocator_cc(const deallocator_cc<U, P> &d_) noexcept
+			explicit deallocator_cc(const deallocator_cc<U, Heap, P> &d_) noexcept
 				: deallocator_cc(d_.pool())
 			{}
 

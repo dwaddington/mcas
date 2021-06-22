@@ -18,6 +18,7 @@
 #include "list_item.h"
 #include <ccpm/interfaces.h>
 #include <common/byte_span.h>
+#include <gsl/pointers>
 #include <array>
 #include <cstddef>
 #include <ios> // ios_base::fmtflags, ostream
@@ -101,7 +102,7 @@ namespace ccpm
 	struct area_ctl;
 
 	/*
-	 * Location of non-persisted items for a single "region" managed bu the crash-consistent allocator.
+	 * Location of non-persisted items for a single "region" managed by the crash-consistent allocator.
 	 * Persisted items are keps in an area_ctl, which is in persistent memory.
 	 */
 	struct area_top
@@ -109,6 +110,7 @@ namespace ccpm
 	private:
 		using level_ix_t = std::uint8_t;
 		using byte_span = common::byte_span;
+		using persist_type = gsl::not_null<ccpm::persister *>;
 		area_ctl *_ctl;
 		std::size_t _bytes_free;
 		bool _all_restored;
@@ -119,12 +121,19 @@ namespace ccpm
 		unsigned _ct_allocation;
 		byte_span _region; /* for get_region only */
 
-		area_top(area_ctl *ctl, unsigned trace_level, byte_span iov, std::ostream &o);
+		area_top(
+			// persist_type persist
+			area_ctl *ctl
+			, unsigned trace_level
+			, byte_span iov
+			, std::ostream &o
+		);
 		area_top(const area_top &) = delete;
 		area_top &operator=(const area_top &) = delete;
 
 		void allocate_strategy_1(
-			void * & ptr_
+			persist_type persist_
+			, void * & ptr_
 			, std::size_t bytes
 			, std::size_t alignment
 			, level_hints_vec::iterator level_
@@ -132,20 +141,22 @@ namespace ccpm
 		);
 
 		bool allocate_recovery_1();
-		bool allocate_recovery_2(level_hints_vec::iterator level);
+		bool allocate_recovery_2(persist_type persist, level_hints_vec::iterator level);
 		bool trace_coarse() const { return 0 < _trace_level; }
 		bool trace_fine() const { return 1 < _trace_level; }
 
 	public:
 		/* Initial area_ctl */
 		explicit area_top(
-			byte_span iov
+			persist_type persist
+			, byte_span iov
 			, unsigned trace_level
 			, std::ostream &o
 		);
 		/* Restored area_ctl */
 		explicit area_top(
-			byte_span iov
+			persist_type persist
+			, byte_span iov
 			, const ownership_callback_t &resolver
 			, unsigned trace_level
 			, std::ostream &o
@@ -160,11 +171,15 @@ namespace ccpm
 		byte_span get_region() const { return _region; }
 
 		void allocate(
-			void * & ptr, std::size_t bytes
+			persist_type persist
+			, void * & ptr, std::size_t bytes
 			, std::size_t alignment
 		);
 
-		void deallocate(void * & ptr, std::size_t bytes);
+		void deallocate(
+			persist_type persist
+			, void * & ptr, std::size_t bytes
+		);
 
 		void print(
 			std::ostream &o
@@ -178,7 +193,7 @@ namespace ccpm
 
     level_ix_t height() const { return level_ix_t(_level.size()); }
 
-    void set_root(const byte_span & iov);
+    void set_root(const byte_span & iov, persist_type persist);
     byte_span get_root() const;
 
 		/*

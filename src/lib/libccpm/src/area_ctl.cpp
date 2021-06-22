@@ -17,7 +17,6 @@
 #include "logging.h"
 #include <common/pointer_cast.h>
 #include <common/utils.h>
-#include <libpmem.h>
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -48,16 +47,9 @@ static_assert(sizeof(ccpm::area_ctl) % 8 == 0, "area_ctl is not 8-byte aligned")
 /*
  * TODO:
  */
-template <typename P>
-	void persist(
-		const P & p
-	)
-	{
-		::pmem_persist(&p, sizeof p);
-	}
 
-#define PERSIST(x) do { persist(x); } while (0)
-#define PERSIST_N(p, ct) do { ::pmem_persist(p, (sizeof *p) * ct); } while (0)
+#define PERSIST(pf, x) ((pf)->persist(common::make_byte_span(&(x), sizeof (x))))
+#define PERSIST_N(pf, p, ct) ((pf)->persist(common::make_byte_span((p), (sizeof *(p)) * (ct))))
 
 struct verifier
 {
@@ -83,7 +75,10 @@ constexpr std::size_t ccpm::area_ctl::min_alloc_size;
 /* Constructor for just enough of an area_ctl to hold _full_height
  * Also used as the simplified area_ctl constructior for the possibly most-common case: level 0, header_ct_ 0, element_count max_elements
  */
-ccpm::area_ctl::area_ctl(level_ix_t full_height_)
+ccpm::area_ctl::area_ctl(
+	persist_type persist_
+	, level_ix_t full_height_
+)
 	: _full_height(full_height_)
 	, _level(0)
 	, _element_count(max_elements)
@@ -102,11 +97,12 @@ ccpm::area_ctl::area_ctl(level_ix_t full_height_)
 #if USE_PADDING
 	(void)_padding; // unused
 #endif
-	persist(*this);
+	PERSIST(persist_, *this);
 }
 
 ccpm::area_ctl::area_ctl(
-	level_ix_t level_
+	persist_type persist_
+	, level_ix_t level_
 	, index_t element_count_
 	, level_ix_t header_ct_
 	, level_ix_t full_height_
@@ -137,7 +133,7 @@ ccpm::area_ctl::area_ctl(
 	/* Elements in the range [element_count_ .. max_elements) are permanently
 	 * marked "allocated, reserved" because they are past end of storage
 	 */
-	el_reserve_range(element_count_, max_elements);
+	el_reserve_range(persist_, element_count_, max_elements);
 
 	/* If we are at the lowest level, or allocation at a lower level would cause
 	 * the space for area_ctls to exceed one atomic word, mark the bitmap elements
@@ -152,7 +148,7 @@ ccpm::area_ctl::area_ctl(
 	)
 	{
 		/* These are permanently "allocated" to instances of area_ctl */
-		el_reserve_range(0, front_pad_count(level_ix_t(header_ct_ + _level)));
+		el_reserve_range(persist_, 0, front_pad_count(level_ix_t(header_ct_ + _level)));
 
 		/* If not at lowest level, and in case we are constructing the initial
 		 * area_ctl, the origin needs an area_ctl with at least _full_height field
@@ -160,13 +156,13 @@ ccpm::area_ctl::area_ctl(
 		 */
 		if ( _level != 0 )
 		{
-			new (element_void(0)) area_ctl(full_height_);
-			persist(*static_cast<area_ctl *>(element_void(0)));
+			new (element_void(0)) area_ctl(persist_, full_height_);
+			PERSIST(persist_, *static_cast<area_ctl *>(element_void(0)));
 		}
 	}
 	else
 	{
-		new_subdivision(level_ix_t(header_ct_ + 1));
+		new_subdivision(persist_, level_ix_t(header_ct_ + 1));
 	}
 
 	/* elements are uninitialized. The allocator perhaps ought to zero them on
@@ -175,7 +171,7 @@ ccpm::area_ctl::area_ctl(
 #if USE_MAGIC
 	_magic = magic;
 #endif
-	persist(*this);
+	PERSIST(persist_, *this);
 }
 
 auto ccpm::area_ctl::sub_size(level_ix_t level) -> std::size_t
@@ -189,19 +185,20 @@ auto ccpm::area_ctl::sub_size() const -> std::size_t
 }
 
 auto ccpm::area_ctl::commission(
-	void *start_
-	, std::size_t size_
+	persist_type persist_
+	, byte_span span_
 ) -> area_ctl *
 {
-	auto h = height(size_);
+	auto h = height(::size(span_));
 	auto top_level = level_ix_t(h - 1);
-	auto pos = static_cast<area_ctl *>(start_) + top_level;
+	auto pos = static_cast<area_ctl *>(::base(span_)) + top_level;
 	return
 		new
 			(pos)
 			area_ctl(
-				top_level
-				, index_t(size_ / sub_size(top_level))
+				persist_
+				, top_level
+				, index_t(::size(span_) / sub_size(top_level))
 				, 1
 				, h
 			)
@@ -220,7 +217,10 @@ bool ccpm::area_ctl::includes(const void *ptr) const
 /* Precondition: this area has a run of ct_atomic_words empty slots
  *
  */
-auto ccpm::area_ctl::new_subdivision(level_ix_t header_ct_) -> area_ctl *
+auto ccpm::area_ctl::new_subdivision(
+	persist_type persist_
+	, level_ix_t header_ct_
+) -> area_ctl *
 {
 	verifier v(this);
 	const auto ix = el_find_n_free(ct_atomic_words);
@@ -247,7 +247,7 @@ auto ccpm::area_ctl::new_subdivision(level_ix_t header_ct_) -> area_ctl *
 	const auto pac =
 		( _level == 1 && header_ct_ == 0 )
 		/* possibly-common case fast path */
-		? new (element_byte(ix)) area_ctl(_full_height)
+		? new (element_byte(ix)) area_ctl(persist_, _full_height)
 		/* slow path */
 		: new
 			/* An area_ctl at _level is (_level * sizeof *this) bytes past
@@ -255,14 +255,15 @@ auto ccpm::area_ctl::new_subdivision(level_ix_t header_ct_) -> area_ctl *
 			 */
 			(element_byte(ix) + (_level-1) * (sizeof *this))
 			area_ctl(
-				level_ix_t(_level - 1)
+				persist_
+				, level_ix_t(_level - 1)
 				, element_count
 				, header_ct_
 				, _full_height
 			)
 		;
-	auto &aw = el_allocate_n(ix, ct_atomic_words, sub_state::subdivision);
-	PERSIST(aw);
+	auto &aw = el_allocate_n(persist_, ix, ct_atomic_words, sub_state::subdivision);
+	PERSIST(persist_, aw);
 
 	return pac;
 }
@@ -289,7 +290,11 @@ auto ccpm::area_ctl::height(std::size_t bytes_) -> level_ix_t
 /* functions prefixed "el" operate on one or more of all elements in the element
  * state array
  */
-void ccpm::area_ctl::el_set_alloc(index_t ix, bool alloc_state)
+void ccpm::area_ctl::el_set_alloc(
+	persist_type persist_
+	, index_t ix
+	, bool alloc_state
+)
 {
 	verifier v(this);
 	const auto outer_offset = ix / alloc_states_per_word;
@@ -299,26 +304,27 @@ void ccpm::area_ctl::el_set_alloc(index_t ix, bool alloc_state)
 		( aw & ~(atomic_word(1U) << inner_offset) )
 		| (atomic_word(alloc_state) << inner_offset)
 		;
-	PERSIST(aw);
+	PERSIST(persist_, aw);
 }
 
 auto ccpm::area_ctl::el_fill_state_range(
-	const index_t first_, const index_t last_, const sub_state s
+	persist_type persist_
+	, const index_t first_, const index_t last_, const sub_state s
 ) -> index_t
 {
 	verifier v(this);
 	std::fill(&_element_state[first_], &_element_state[last_], s);
-	PERSIST_N(&_element_state[first_], last_ - first_);
+	PERSIST_N(persist_, &_element_state[first_], last_ - first_);
 	return last_;
 }
 
-auto ccpm::area_ctl::el_fill_alloc_range(index_t first_, index_t last_, bool alloc)
+auto ccpm::area_ctl::el_fill_alloc_range(persist_type persist_, index_t first_, index_t last_, bool alloc)
 	-> index_t
 {
 	verifier v(this);
 	for ( ; first_ != last_; ++first_ )
 	{
-		el_set_alloc(first_, alloc);
+		el_set_alloc(persist_, first_, alloc);
 	}
 	return last_;
 }
@@ -423,7 +429,8 @@ auto ccpm::area_ctl::el_subdivision_run_at(const index_t ix) const -> index_t
  * (Must affect not more than one single atomic_word.)
  */
 auto ccpm::area_ctl::el_allocate_n(
-	const index_t ix
+	persist_type persist_
+	, const index_t ix
 	, const index_t n
 	, const sub_state s
 ) -> atomic_word &
@@ -436,14 +443,14 @@ auto ccpm::area_ctl::el_allocate_n(
 	/* Since this allocation is single threaded, it is okay to write the states
 	 * before changing alloc bits. If this were a thread-safe allocator, with
 	 * alloc bits arbitrating ownership among threads, we would have to
-	 * (1) mark the area "in doubt"i, and persist that
+	 * (1) mark the area "in doubt", and persist that
 	 * (2) set and persist the alloc bits
 	 * (3) set and persist the states
 	 * (4) remove the "in doubt" marker.
 	 */
 
 	_element_state[ix] = s;
-	el_fill_state_range(ix+1, ix+n, sub_state::continued);
+	el_fill_state_range(persist_, ix+1, ix+n, sub_state::continued);
 	/* the bit mask to add */
 	atomic_word res = (atomic_word(1U) << n) - 1U;
 
@@ -453,7 +460,8 @@ auto ccpm::area_ctl::el_allocate_n(
 }
 
 void ccpm::area_ctl::el_reserve_range(
-	index_t first_
+	persist_type persist_
+	, index_t first_
 	, const index_t last_
 )
 {
@@ -461,8 +469,8 @@ void ccpm::area_ctl::el_reserve_range(
 
 	if ( first_ != last_ )
 	{
-		el_fill_state_range(first_, first_ + 1, sub_state::reserved);
-		el_fill_state_range(first_ + 1, last_, sub_state::continued);
+		el_fill_state_range(persist_, first_, first_ + 1, sub_state::reserved);
+		el_fill_state_range(persist_, first_ + 1, last_, sub_state::continued);
 	}
 
 	for ( ; first_ != last_; ++first_ )
@@ -476,7 +484,7 @@ void ccpm::area_ctl::el_reserve_range(
 		auto &aw = _alloc_bits[outer_offset];
 		aw |= res;
 	}
-	PERSIST(_alloc_bits);
+	PERSIST(persist_, _alloc_bits);
 }
 
 auto ccpm::area_ctl::el_deallocate_n(
@@ -654,7 +662,8 @@ auto ccpm::area_ctl::locate_element(
 }
 
 void ccpm::area_ctl::deallocate_local(
-	area_top *const top_
+	persist_type persist_
+	, area_top *const top_
 	, doubt &dt_
 	, void * & ptr_
 	, const index_t element_ix_
@@ -684,19 +693,19 @@ void ccpm::area_ctl::deallocate_local(
 	 * (1) reclaim space,
 	 * (2) tell client that we have reclaimed the space
 	 */
-	dt_.set(__func__, ptr_, bytes_);
+	dt_.set(persist_, __func__, ptr_, bytes_);
 	auto &aw = el_deallocate_n(element_ix_, run_size);
-	PERSIST(aw);
+	PERSIST(persist_, aw);
 	/* Should not be necessary, as elements with alloc_state free and elements
 	 * "in doubt" should have their state examined
 	 */
 #if 0
 	fill_state(element_ix_, run_size, sub_state::free);
-	PERSIST_N(&_element_state[element_ix_], run_size);
+	PERSIST_N(&persist_, _element_state[element_ix_], run_size);
 #endif
 	ptr_ = nullptr;
-	PERSIST(ptr_);
-	dt_.clear(__func__);
+	PERSIST(persist_, ptr_);
+	dt_.clear(persist_, __func__);
 	/* Need to move or add this area in the chains, but do not know whether the
 	 * element is currently in a chain. Remove if it is in a chain, then add.
 	 */
@@ -710,12 +719,13 @@ void ccpm::area_ctl::deallocate_local(
 	}
 }
 
-void ccpm::area_ctl::deallocate(area_top *const top_, void * & ptr_, const std::size_t bytes_)
+void ccpm::area_ctl::deallocate(persist_type persist_, area_top *const top_, void * & ptr_, const std::size_t bytes_)
 {
 	verifier v(this);
 	const auto loc = locate_element(ptr_);
 	loc.ctl->deallocate_local(
-		top_
+		persist_
+		, top_
 		, _dt
 		, ptr_
 		, loc.element_ix
@@ -723,39 +733,54 @@ void ccpm::area_ctl::deallocate(area_top *const top_, void * & ptr_, const std::
 	);
 }
 
-void ccpm::area_ctl::set_allocated(void *const p_, const std::size_t bytes_)
+void ccpm::area_ctl::set_allocated(
+	persist_type persist_
+	, byte_span span_
+)
 {
 	verifier v(this);
-	const auto loc = locate_element(p_);
-	loc.ctl->set_allocated_local(loc.element_ix, bytes_, loc.is_aligned);
+	const auto loc = locate_element(::base(span_));
+	loc.ctl->set_allocated_local(persist_, loc.element_ix, ::size(span_), loc.is_aligned);
 }
 
-void ccpm::area_ctl::set_allocated_local(const index_t ix_, const std::size_t bytes_, const bool aligned_)
+void ccpm::area_ctl::set_allocated_local(
+	persist_type persist_
+	, const index_t ix_, const std::size_t bytes_, const bool aligned_
+)
 {
 	verifier v(this);
 	el_allocate_n(
-		ix_
+		persist_
+		, ix_
 		, index_t(div_round_up(bytes_, sub_size()))
 		, aligned_ ? sub_state::client_aligned : sub_state::client_unaligned
 	);
 }
 
-void ccpm::area_ctl::set_deallocated(void *const p_, const std::size_t bytes_)
+void ccpm::area_ctl::set_deallocated(
+	persist_type persist_
+	, const byte_span span_
+)
 {
 	verifier v(this);
-	const auto loc = locate_element(p_);
-	loc.ctl->set_deallocated_local(loc.element_ix, bytes_);
+	const auto loc = locate_element(::base(span_));
+	loc.ctl->set_deallocated_local(persist_, loc.element_ix, ::size(span_));
 }
 
-void ccpm::area_ctl::set_deallocated_local(const index_t ix_, const std::size_t bytes_)
+void ccpm::area_ctl::set_deallocated_local(
+	persist_type persist_
+	, const index_t ix_
+	, const std::size_t bytes_
+)
 {
 	verifier v(this);
 	auto &aw = el_deallocate_n(ix_, index_t(div_round_up(bytes_, sub_size())));
-	PERSIST(aw);
+	PERSIST(persist_, aw);
 }
 
 void ccpm::area_ctl::allocate(
-	doubt &dt_
+	persist_type persist_
+	, doubt &dt_
 	, void * & ptr_
 	, const std::size_t bytes_
 	, const std::size_t alignment_
@@ -810,19 +835,20 @@ void ccpm::area_ctl::allocate(
 	const auto run_length_as_aligned = ix_end - ix_begin;
 
 	/* two-step release: (1) tell client about the space, (2) release the space */
-	dt_.set(__func__, pr, run_length_as_aligned * sub_size());
+	dt_.set(persist_, __func__, pr, run_length_as_aligned * sub_size());
 	ptr_ = pr;
-	PERSIST(ptr_);
+	PERSIST(persist_, ptr_);
 	auto &aw =
 		el_allocate_n(
-			ix_begin
+			persist_
+			, ix_begin
 			, run_length_as_aligned
 			, is_element_aligned
 				? sub_state::client_aligned
 				: sub_state::client_unaligned
 			);
-	PERSIST(aw);
-	dt_.clear(__func__);
+	PERSIST(persist_, aw);
+	dt_.clear(persist_, __func__);
 }
 
 /* restore_at and restore_to did not work too well, too many calls.
@@ -944,7 +970,7 @@ void ccpm::area_ctl::print(std::ostream &o_, level_ix_t indent_, std::ios_base::
 	o_ << si << "area_ctl end\n";
 }
 
-auto ccpm::area_ctl::restore(const ownership_callback_t &resolver_) -> area_ctl &
+auto ccpm::area_ctl::restore(persist_type persist_, const ownership_callback_t &resolver_) -> area_ctl &
 {
 	PLOG(PREFIX "restore", LOCATION);
 	verifier v(this);
@@ -963,8 +989,8 @@ auto ccpm::area_ctl::restore(const ownership_callback_t &resolver_) -> area_ctl 
 			 * p is free. Find the memory range for p and mark the range
 			 * "client allocated."
 			 */
-			set_allocated(p, _dt.bytes());
-			_dt.clear(__func__);
+			set_allocated(persist_, common::make_byte_span(p, _dt.bytes()));
+			_dt.clear(persist_, __func__);
 		}
 		else
 		{
@@ -972,8 +998,8 @@ auto ccpm::area_ctl::restore(const ownership_callback_t &resolver_) -> area_ctl 
 			 * indicate that the p is allocated. Find the memory range
 			 * for p and mark the range "free"
 			 */
-			set_deallocated(p, _dt.bytes());
-			_dt.clear(__func__);
+			set_deallocated(persist_, common::make_byte_span(p, _dt.bytes()));
+			_dt.clear(persist_, __func__);
 		}
 	}
 	return *this;
@@ -1024,9 +1050,9 @@ auto ccpm::area_ctl::root(void *const ptr_) -> area_ctl *
 	return &ctl0[ctl0->full_height()-1];
 }
 
-void ccpm::area_ctl::set_root(const byte_span & iov) {
+void ccpm::area_ctl::set_root(const byte_span & iov, persist_type persist_) {
   _root = iov;
-  persist(&_root);
+  persist_->persist(common::make_byte_span(&_root, sizeof _root));
 }
 
 auto ccpm::area_ctl::get_root() const -> byte_span

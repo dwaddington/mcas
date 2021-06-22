@@ -33,6 +33,19 @@ using namespace flatbuffers;
 constexpr const uint64_t CANARY = 0xCAFEF001;
 int debug_level = 3;
 
+struct persister final
+	: public ccpm::persister
+{
+	void persist(common::byte_span s) override
+	{
+		::pmem_persist(::base(s), ::size(s));
+	}
+};
+
+namespace
+{
+	persister pe{};
+}
 
 struct Record {
   uint64_t canary;
@@ -92,8 +105,8 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   /* new_root == true indicates this is a "fresh" key and therefore needs initializing */
   ccpm::region_vector_t rv(common::make_byte_span(value, value_len));
   if(new_root) {
-    ccaptr = new ccpm::cca(rv);
-    ccv = new (ccaptr->allocate_root(sizeof(cc_vector))) cc_vector(*ccaptr);
+    ccaptr = new ccpm::cca(&pe, rv);
+    ccv = new (ccaptr->allocate_root(sizeof(cc_vector))) cc_vector(&pe, *ccaptr);
     /* initialize vector */
     ccv->container->push_back(-1.0);
     ccv->container->push_back(-1.0);
@@ -102,7 +115,7 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
     ccv->commit();
   }
   else {
-    ccaptr = new ccpm::cca(rv, ccpm::accept_all);
+    ccaptr = new ccpm::cca(&pe, rv, ccpm::accept_all);
     ccv = reinterpret_cast<cc_vector*>(::base(ccaptr->get_root()));
     ccv->rollback(); /* in case we're recovering from crash */
   }

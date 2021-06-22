@@ -15,25 +15,30 @@
 #define __CCPM_CRASH_CONSISTENT_ALLOCATOR_H__
 
 #include <ccpm/interfaces.h>
+#include <common/exceptions.h>
+#include <gsl/pointers>
 #include <iosfwd>
 #include <memory>
 #include <string>
 #include <vector>
-#include <common/exceptions.h>
 
 namespace ccpm
 {
 	struct area_top;
+
 	struct cca
 		: public IHeap_expandable
 	{
+		using byte_span = common::byte_span;
+		using persist_type = gsl::not_null<persister *>;
 	private:
 		using top_vec_t = std::vector<std::unique_ptr<area_top>>;
-		using byte_span = common::byte_span;
 		top_vec_t _top;
 		top_vec_t::difference_type _last_top_allocate;
 		top_vec_t::difference_type _last_top_free;
-		explicit cca();
+		persist_type _persist;
+
+		explicit cca(persist_type persist);
 
 		void init(
 			region_span regions
@@ -41,9 +46,9 @@ namespace ccpm
 			, bool force_init
 		);
 	public:
-		explicit cca(const region_span regions, ownership_callback_t resolver);
+		explicit cca(persist_type persist, region_span regions, ownership_callback_t resolver);
 
-		explicit cca(const region_span regions);
+		explicit cca(persist_type persist, region_span regions);
 
 		~cca();
 
