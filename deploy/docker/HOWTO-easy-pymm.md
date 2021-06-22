@@ -18,6 +18,8 @@ sudo chcon -t container_file_t /mnt/pmem0
 There are Ubuntu 18 and Fedora Core 32 based images available on docker hub.  The '-v' option
 is needed to pass through the persistent memory mount to the container.
 
+You may not need the --annotation option.
+
 ```bash
 $ docker run -it -v /mnt/pmem0:/mnt/pmem0 --annotation run.oci.keep_original_groups=1 dwaddington/pymm:ubuntu18
 
@@ -57,6 +59,7 @@ docker build -t <your-docker-username>/pymm:ubuntu18 -f Dockerfile.pymm-ubuntu-1
 - (Optional) Push image to Docker Hub, e.g.:
 
 ```bash
-docker login
+docker login docker.io
 docker push <your-docker-username>/pymm:ubuntu18
 ```
+282101ba-daca-4def-9080-2bf6b4c83644
