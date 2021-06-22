@@ -6,7 +6,7 @@ libnuma-dev libboost-system-dev libboost-iostreams-dev libboost-program-options-
 libboost-filesystem-dev libboost-date-time-dev \
 libudev-dev libboost-python-dev libkmod-dev libjson-c-dev \
 libelf-dev libgoogle-perftools-dev libcurl4-openssl-dev \
-uuid-dev gnutls-dev libgnutls30 \
+uuid-dev gnutls-dev libgnutls30 valgrind \
 lcov libzmq5-dev libczmq-dev \
 python3-setuptools python3-pip \
 libc6-dev libstdc++-6-dev
@@ -32,6 +32,7 @@ RUN cmake -DBUILD_KERNEL_SUPPORT=OFF \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_INSTALL_PREFIX:PATH=/home/mcasuser/mcas/ ..
 RUN make bootstrap
-RUN make -j install
+RUN make
+RUN make install
 WORKDIR /home/mcasuser
 CMD ["/bin/bash"]
