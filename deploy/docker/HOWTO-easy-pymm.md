@@ -43,20 +43,15 @@ or [Fedora install instructions](https://docs.docker.com/engine/install/fedora/)
 - Add your user id into the docker group for non-root execution.
 
 
-## Building your own container
+## Building your own container (you should not need to do this)
 
-Use the provided Dockerfile.pymm-ubuntu-18 to build your own container.
-
+Use the provided Dockerfile (e.g. Dockerfile.pymm-ubuntu-18) to build your own container.
 
 On Docker Hub (https://hub.docker.com/) create an account and a registry.
 
 - Build image (e.g.):
 ```bash
 docker build -t <your-docker-username>/pymm:ubuntu18 -f Dockerfile.pymm-ubuntu-18 .
-```
-
-```bash
-docker build -f $MCAS_HOME/deploy/docker/Dockerfile.mcas-fc-27 -t <your-docker-username>/ibm-mcas-runtime:fc27 .
 ```
 
 - (Optional) Push image to Docker Hub, e.g.:

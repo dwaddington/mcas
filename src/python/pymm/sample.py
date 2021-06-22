@@ -15,7 +15,7 @@ import numpy as np
 
 # create new shelf (override any existing myShelf)
 #
-s = pymm.shelf('myShelf',1024,pmem_path='/mnt/pmem0',force_new=True)
+s = pymm.shelf('myShelf','/mnt/pmem0',1024, force_new=True)
 print("Created shelf OK.")
 
 # create variable x on shelf (using shadow type)
