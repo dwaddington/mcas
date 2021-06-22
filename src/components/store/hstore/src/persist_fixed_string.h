@@ -31,6 +31,7 @@
 #include <cstddef> /* size_t */
 #include <cstring> /* memcpy */
 #include <memory> /* allocator_traits */
+#include <tuple> /* make_from_tuple */
 
 struct fixed_data_location_t {};
 constexpr fixed_data_location_t fixed_data_location = fixed_data_location_t();
@@ -339,6 +340,14 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		 * forward_as_tuple, and the string is an element of a tuple, and std::tuple
 		 * (unlike pair) does not support piecewise_construct.
 		 */
+#if 0 && 201703L <= __cplusplus /* this may work, some day */
+		template <typename Tuple>
+			persist_fixed_string(
+				Tuple &&t
+			);
+			: persist_fixed_string(std::make_from_tuple<persist_fixed_string<T, SmallLimit, Allocator>>(std::move(t)))
+		{}
+#else
 		template <typename IT, typename AL>
 			persist_fixed_string(
 				std::tuple<AK_FORMAL IT&, IT&&, lock_state &&, AL>&& p_
@@ -358,6 +367,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 		 * forward_as_tuple, and the string is an element of a tuple, and std::tuple
 		 * (unlike pair) does not support piecewise_construct.
 		 */
+
 		template <typename AL>
 			persist_fixed_string(
 				std::tuple<AK_FORMAL const std::size_t &, lock_state &&, AL>&& p_
@@ -374,8 +384,9 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		/* Needed because the persist_fixed_string arguments are sometimes conveyed via
 		 * forward_as_tuple, and the string is an element of a tuple, and std::tuple
-		 * (unlike pair) does not support picecewise_construct.
+		 * (unlike pair) does not support piecewise_construct.
 		 */
+
 		template <typename AL>
 			persist_fixed_string(
 				std::tuple<AK_FORMAL const fixed_data_location_t &, const std::size_t &, lock_state &&, AL>&& p_
@@ -392,6 +403,23 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 			{
 			}
 
+		template <typename AL>
+			persist_fixed_string(
+				std::tuple<AK_FORMAL const fixed_data_location_t &, const std::size_t &, const std::size_t &, lock_state &&, AL>&& p_
+			)
+				: persist_fixed_string(
+					std::get<0>(p_)
+					, std::get<1>(p_)
+					, std::get<2>(p_)
+					, std::get<3>(p_)
+					, std::get<4>(p_)
+#if AK_USED
+					, std::get<5>(p_)
+#endif
+				)
+			{
+			}
+#endif
 		template <typename AL>
 			persist_fixed_string(
 				AK_ACTUAL

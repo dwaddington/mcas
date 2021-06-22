@@ -658,7 +658,7 @@ auto hstore::lock(
   , lock_type_t type
   , void *& out_value
   , std::size_t & out_value_len
-  , std::size_t  /*alignment*/
+  , std::size_t alignment
   , key_t& out_key
   , const char ** out_key_ptr
 ) -> status_t
@@ -667,7 +667,12 @@ try
   TM_ROOT()
   const auto session = static_cast<session_type *>(locate_session(pool));
   if(!session) return E_FAIL;
-  auto r = session->lock(AK_INSTANCE TM_REF key, type, out_value, out_value_len);
+	/* 0 probably means that alignment is a don't care, which is the same as alignment 1 */
+	if ( alignment == 0 ) { alignment = 1; }
+#if 0 /* As with to mapstore, allocator (not hstore) deals with non-2^n alignments */
+	if ( ( alignment & (alignment - 1) ) != 0  ) { return E_BAD_ALIGNMENT; }
+#endif
+  auto r = session->lock(AK_INSTANCE TM_REF key, type, out_value, out_value_len, alignment);
 
   out_key = r.key;
   if ( out_key_ptr )
@@ -694,6 +699,11 @@ try
   case lock_result::e_state::creation_failed:
     /* should not happen. */
     return E_KEY_EXISTS;
+#if 0 /* not a separate error */
+  case lock_result::e_state::misaligned:
+    /* should not happen. */
+    return E_MISALIGNED;
+#endif
   }
   return E_KEY_NOT_FOUND;
 }
