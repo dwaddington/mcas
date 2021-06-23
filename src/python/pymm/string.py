@@ -13,7 +13,7 @@
 
 import pymmcore
 import flatbuffers
-import weakref
+
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
@@ -52,7 +52,6 @@ class string(Shadow):
 
         root = Header.Header()
         hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-        print("detected 'string' type - magic:{}, hdrsize:{} type:{}".format(hex(int(hdr.Magic())), hdr_size, hdr.Type()))
         
         if(hdr.Magic() != Constants.Constants().Magic):
             return (False, None)
@@ -73,6 +72,7 @@ class string(Shadow):
 
 
 class shelved_string(ShelvedCommon):
+    '''Shelved string with multiple encoding support'''
     def __init__(self, memory_resource, name, string_value, encoding):
 
         if not isinstance(name, str):
@@ -110,7 +110,7 @@ class shelved_string(ShelvedCommon):
             memref = memory_resource.create_named_memory(name, value_len, 1, False)
             # copy into memory resource
             memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = bytes(string_value)
+            memref.buffer[hdr_len:] = bytes(string_value, encoding)
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
@@ -119,11 +119,11 @@ class shelved_string(ShelvedCommon):
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
         self._value_named_memory = memref
-        self._encoding = encoding
+        self.encoding = encoding
 
     def __repr__(self):
         # TODO - some how this is keeping a reference? gc.collect() clears it.
-        return str(self.view,self._encoding)
+        return str(self.view,self.encoding)
     
     def __len__(self):
         return len(self.view)
@@ -139,5 +139,9 @@ class shelved_string(ShelvedCommon):
             return s.__getitem__(key)
         else:
             raise TypeError
-
     
+    def __getattr__(self, name):
+        if name not in ("encoding"):
+            raise AttributeError("'{}' object has no attribute '{}'".format(type(self),name))
+        else:
+            return self.__dict__[name]

@@ -61,12 +61,11 @@ class torch_tensor(Shadow):
         '''
         Determine if an persistent named memory object corresponds to this type
         '''
-        print('tensor existing instance...')
-        metadata = memory_resource.get_named_memory(name + '-meta')
+        metadata = memory_resource.get_named_memory(name)
         if metadata is None:
             return (False, None)
         
-        if pymmcore.ndarray_read_header(memoryview(metadata),type=1) == None:
+        if pymmcore.ndarray_read_header(memoryview(metadata), type=1) == None:
             return (False, None)
         else:
             return (True, shelved_torch_tensor(memory_resource, name, shape = None))
@@ -89,9 +88,7 @@ class torch_tensor(Shadow):
 # concrete subclass for torch tensor
 #
 class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
-    '''
-    torch tensor that is stored in a memory resource
-    '''
+    '''PyTorch tensor that is stored in a memory resource'''
     __array_priority__ = -100.0 # what does this do?
 
     def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
@@ -123,8 +120,10 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             for k in shape:
                 size *= k
                 
-        value_named_memory = memory_resource.open_named_memory(name)
-        metadata_key = name + '-meta'
+        value_key = name + '-value'
+        metadata_key = name
+        
+        value_named_memory = memory_resource.open_named_memory(value_key)
 
         if value_named_memory == None: # does not exist yet
 

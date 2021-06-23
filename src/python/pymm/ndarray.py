@@ -57,7 +57,7 @@ class ndarray(Shadow):
         '''
         Determine if an persistent named memory object corresponds to this type
         '''
-        metadata = memory_resource.get_named_memory(name + '-meta')
+        metadata = memory_resource.get_named_memory(name)
         if metadata is None:
             return (False, None)
         
@@ -91,7 +91,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     '''ndarray that is stored in a memory resource'''
     __array_priority__ = -100.0 # what does this do?
 
-    def __new__(subtype, memory_resource, name, shape, dtype, strides=None, order='C', type=0, zero=False):
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', type=0, zero=False):
 
         # determine size of memory needed
         #
@@ -104,15 +104,18 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
             for k in shape:
                 size *= k
-                
-        value_named_memory = memory_resource.open_named_memory(name)
-        metadata_key = name + '-meta'
+
+        # the meta data is always accessible by the key name
+        value_key = name + '-value'
+        metadata_key = name
+
+        value_named_memory = memory_resource.open_named_memory(value_key)
 
         if value_named_memory == None: # does not exist yet
             #
             # create a newly allocated named memory from MemoryResource
             #
-            value_named_memory = memory_resource.create_named_memory(name,
+            value_named_memory = memory_resource.create_named_memory(value_key,
                                                                      int(size*_dbytes),
                                                                      8, # alignment
                                                                      zero) # zero memory
@@ -136,6 +139,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._memory_resource = memory_resource
         self._value_named_memory = value_named_memory
         self._metadata_key = metadata_key
+        self._value_key = value_key
         self.name = name
         return self
 

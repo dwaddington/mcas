@@ -102,7 +102,7 @@ class MemoryResource(pymmcore.MemoryResource):
     @methodcheck(types=[])        
     def list_items(self):
         all_items = super()._MemoryResource_get_named_memory_list()
-        return [val for val in all_items if not val.endswith('-meta')]
+        return [val for val in all_items if not val.endswith('-value')]
     
     @methodcheck(types=[str,int,int,bool])
     def create_named_memory(self, name, size, alignment=8, zero=False):

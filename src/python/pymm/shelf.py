@@ -20,8 +20,14 @@ import numpy
 import torch
 import weakref
 
+import PyMM.Meta.Header as Header
+import PyMM.Meta.Constants as Constants
+import PyMM.Meta.DataType as DataType
+
 from .memoryresource import MemoryResource
 from .check import methodcheck
+from flatbuffers import util
+
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -52,13 +58,6 @@ class Shadow:
     pass
 
 
-def _shelf__of_supported_shadow_type(value):
-    '''
-    Helper function to return True if value is of a shadow type
-    '''
-    return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) or isinstance(value, pymm.torch_tensor)
-
-
 class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
@@ -73,24 +72,55 @@ class shelf():
         items = self.mr.list_items()
         for varname in items:
             if not varname in self.__dict__:
-                # check if metadata corresponds to a given type; extend for each supported type
-                (existing, value) = pymm.torch_tensor.existing_instance(self.mr, varname)
-                if existing == True:
-                    self.__dict__[varname] = value
-                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+
+                # read metadata header (always connect to name=key)
+                buffer = self.mr.get_named_memory(varname)
+                if buffer is None:
+                    print("WARNING: no named memory for '{}'".format(varname))
+                    continue
+                    
+                hdr_size = util.GetSizePrefix(buffer, 0)
+                if hdr_size != 28:
+                    print("WARNING: invalid header for '{}'; prior version?".format(varname))
                     continue
 
-                (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
-                if existing == True:
-                    self.__dict__[varname] = value
-                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                root = Header.Header()
+                hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
+                
+                if(hdr.Magic() != Constants.Constants().Magic):
+                    print("WARNING: bad magic number")
                     continue
+                
+                stype = hdr.Type()
 
-                (existing, value) = pymm.string.existing_instance(self.mr, varname)
-                if existing == True:
-                    self.__dict__[varname] = value
-                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
-                    continue
+                # call appropriate existing_instance for detected type
+                
+                # type: pymm.string
+                if (stype == DataType.DataType().AsciiString or
+                    stype == DataType.DataType().Utf8String or
+                    stype == DataType.DataType().Utf16String or
+                    stype == DataType.DataType().Latin1String):
+                    (existing, value) = pymm.string.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+                    
+                # type: pymm.ndarray
+                elif (stype == DataType.DataType().NumPyArray):
+                    (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                # type: pymm.torch_tensor
+                elif (stype == DataType.DataType().TorchTensor):
+                    (existing, value) = pymm.torch_tensor.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
 
                 # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
                 # if existing == True:
@@ -136,8 +166,10 @@ class shelf():
                 raise RuntimeError('cannot change shelf attribute')
 
         # check for supported shadow types
-        if __of_supported_shadow_type(value):
+        if self._is_supported_shadow_type(value):
             # create instance from shadow type
+            if name in self.__dict__:
+                raise RuntimeError('cannot implicitly replace shelved variable; use shelf.erase')
             self.__dict__[name] = value.make_instance(self.mr, name)
             print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
@@ -209,6 +241,15 @@ class shelf():
     @methodcheck(types=[])
     def get_percent_used(self):
         return self.mr.get_percent_used()
+
+    def _is_supported_shadow_type(self, value):
+        '''
+        Helper function to return True if value is of a shadow type
+        '''
+        return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) or isinstance(value, pymm.torch_tensor)
+
+
+
 
 # NUMPY
 #
