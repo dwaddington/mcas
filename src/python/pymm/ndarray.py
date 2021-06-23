@@ -30,7 +30,7 @@ class ndarray(Shadow):
     '''
     ndarray that is stored in a memory resource
     '''
-    def __init__(self, shape, dtype=float, strides=None, order='C'):
+    def __init__(self, shape, dtype=float, strides=None, order='C', zero=False):
 
         # todo check params
         # todo check and invalidate param 'buffer'
@@ -39,6 +39,7 @@ class ndarray(Shadow):
         self.__p_dtype = dtype
         self.__p_strides = strides
         self.__p_order = order
+        self.__p_zero = zero
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
@@ -49,7 +50,8 @@ class ndarray(Shadow):
                                shape = self.__p_shape,
                                dtype = self.__p_dtype,
                                strides = self.__p_strides,
-                               order = self.__p_order)
+                               order = self.__p_order,
+                               zero = self.__p_zero)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -86,12 +88,10 @@ class ndarray(Shadow):
 # concrete subclass for ndarray
 #
 class shelved_ndarray(np.ndarray, ShelvedCommon):
-    '''
-    ndarray that is stored in a memory resource
-    '''
+    '''ndarray that is stored in a memory resource'''
     __array_priority__ = -100.0 # what does this do?
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', type=0):
+    def __new__(subtype, memory_resource, name, shape, dtype, strides=None, order='C', type=0, zero=False):
 
         # determine size of memory needed
         #
@@ -115,7 +115,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             value_named_memory = memory_resource.create_named_memory(name,
                                                                      int(size*_dbytes),
                                                                      8, # alignment
-                                                                     False) # zero
+                                                                     zero) # zero memory
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
             self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
