@@ -25,14 +25,6 @@ The key attributes of the solution are:
 * [More documentation](./info/index.md)
 
 
-## Run dependencies for your OS 
-
-``` bash
-cd deps
-./install-<Your-OS-Version>.sh
-cd ../
-``` 
-
 ## How to Build
 
 Check out source (for example public version):
@@ -46,6 +38,15 @@ git clone https://github.com/IBM/mcas.git
 cd mcas
 git submodule update --init --recursive
 ```
+
+
+## Run dependencies for your OS 
+
+``` bash
+cd deps
+./install-<Your-OS-Version>.sh
+cd ../
+``` 
 
 ### Configure
 
@@ -88,8 +89,7 @@ make bootstrap
 
 ### Normal build
 ```bash
-make -j
-make install 
+make -j install 
 ```
 
 

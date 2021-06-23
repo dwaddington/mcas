@@ -181,8 +181,9 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			TM_FORMAL
 			const std::string & key
 			, lock_type type
-			, void *const value
-			, const std::size_t value_len
+			, void *value
+			, std::size_t value_len
+			, std::size_t alignment
 		) -> lock_result;
 
 		auto unlock_indefinite(

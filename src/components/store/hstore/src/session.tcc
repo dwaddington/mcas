@@ -101,16 +101,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 	}
 
 template <typename Handle, typename Allocator, typename Table, typename LockType>
-	bool session<Handle, Allocator, Table, LockType>::try_lock(typename std::tuple_element<0, mapped_type>::type &d, lock_type type)
-	{
-		return
-			type == component::IKVStore::STORE_LOCK_READ
-			? d.try_lock_shared()
-			: d.try_lock_exclusive()
-			;
-	}
-
-template <typename Handle, typename Allocator, typename Table, typename LockType>
 	bool session<Handle, Allocator, Table, LockType>::undo_redo_pin_data(
 		AK_ACTUAL
 		allocator_type heap_
@@ -397,7 +387,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		TM_ACTUAL
 		const std::string & key
 		, std::size_t new_mapped_len
-		, std::size_t alignment
+		, std::size_t alignment_
 	)
 	{
 		auto & map = locate_map(key);
@@ -406,7 +396,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto &v = map.at(TM_REF key);
 		auto &d = std::get<0>(v);
 		/* Replace the data if the size changes or if the data should be realigned */
-		if ( d.size() != new_mapped_len || reinterpret_cast<std::size_t>(d.data()) % alignment != 0 )
+		if ( d.size() != new_mapped_len || reinterpret_cast<std::size_t>(d.data()) % alignment_ != 0 )
 		{
 			this->_atomic_state.enter_replace(
 				AK_REF
@@ -418,7 +408,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				, d.data()
 				, std::min(d.size(), new_mapped_len)
 				, d.size() < new_mapped_len ? new_mapped_len - d.size() : std::size_t(0)
-				, alignment
+				, alignment_
 			);
 		}
 	}
@@ -431,6 +421,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		, lock_type type
 		, void *const value
 		, const std::size_t value_len
+		, const std::size_t alignment_
 	) -> lock_result
 	{
 		auto & map = locate_map(key);
@@ -461,7 +452,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 #if 0
 							std::piecewise_construct,
 #endif
-							std::forward_as_tuple(AK_REF fixed_data_location, value_len, lock_state::free, this->allocator())
+							std::forward_as_tuple(AK_REF fixed_data_location, value_len, alignment_, lock_state::free, this->allocator())
 #if ENABLE_TIMESTAMPS
 							, impl::tsc_now()
 #endif
@@ -471,7 +462,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				if ( ! r.second )
 				{
 					/* Should not happen. If we could not find it, should be able to create it */
-					return { lock_result::e_state::creation_failed, component::IKVStore::KEY_NONE, value, value_len, nullptr };
+					return lock_result(lock_result::e_state::creation_failed, value, value_len);
 				}
 
 				auto &v = *r.first;
@@ -482,19 +473,18 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 				PLOG(PREFIX "data exposed (newly created): %p", LOCATION, d.data_fixed());
 				PLOG(PREFIX "key exposed (newly created): %p", LOCATION, k.data_fixed());
 #endif
-				return {
+				return lock_result(
 					lock_result::e_state::created
-					, try_lock(d, type)
-						? new lock_impl(key)
-						: component::IKVStore::KEY_NONE
-					, d.data_fixed()
-					, d.size()
+					, d
+					, type
+					, key
 					, k.data_fixed()
-				};
+					, alignment_
+				);
 			}
 			else
 			{
-				return { lock_result::e_state::not_created, component::IKVStore::KEY_NONE, value, value_len, nullptr };
+				return lock_result(lock_result::e_state::not_created, value, value_len);
 			}
 		}
 		else
@@ -526,15 +516,14 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			PLOG(PREFIX "key exposed (extant): %p", LOCATION, k.data_fixed());
 #endif
 			/* Note: now returning E_LOCKED on lock failure as per a private request */
-			lock_result r {
+			lock_result r(
 				lock_result::e_state::extant
-				, try_lock(d, type)
-					? new lock_impl(key)
-					: component::IKVStore::KEY_NONE
-				, d.data_fixed()
-				, d.size()
+				, d
+				, type
+				, key
 				, k.data_fixed()
-			};
+				, alignment_
+			);
 
 #if ENABLE_TIMESTAMPS
 			if ( type == component::IKVStore::STORE_LOCK_WRITE && r.key != component::IKVStore::KEY_NONE )
@@ -799,12 +788,12 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 	void *session<Handle, Allocator, Table, LockType>::allocate_memory(
 		AK_ACTUAL
 		std::size_t size
-		, std::size_t alignment
+		, std::size_t alignment_
 	)
 	{
 		persistent_t<char *> p = nullptr;
 		/* ERROR: leaks memory on a crash */
-		allocator().allocate_tracked(AK_REF p, size, clean_align(alignment, sizeof(void *)));
+		allocator().allocate_tracked(AK_REF p, size, clean_align(alignment_, sizeof(void *)));
 		return p;
 	}
 

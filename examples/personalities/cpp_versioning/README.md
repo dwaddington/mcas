@@ -21,6 +21,6 @@ USE_ODP=1 USE_XTERM=1 USE_GDB=1 ./dist/bin/mcas --conf ./dist/conf/example-versi
 Client:
 
 ```bash
-./dist/bin/personality-example-fb-test --server <server-ip-addr> 
+./dist/bin/personality-example-versioning-test --server <server-ip-addr> 
 ```
 
