@@ -82,7 +82,7 @@ class shelved_string(ShelvedCommon):
 
         if memref == None:
             # create new value
-            builder = flatbuffers.Builder(128)
+            builder = flatbuffers.Builder(32)
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
@@ -123,8 +123,10 @@ class shelved_string(ShelvedCommon):
 
     def __repr__(self):
         # TODO - some how this is keeping a reference? gc.collect() clears it.
+        #
+        # creates a new string
         return str(self.view,self.encoding)
-    
+
     def __len__(self):
         return len(self.view)
 

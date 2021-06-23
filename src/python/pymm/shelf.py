@@ -122,6 +122,14 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
 
+                # type: pymm.torch_tensor
+                elif (stype == DataType.DataType().NumberFloat or stype == DataType.DataType().NumberInteger):
+                    (existing, value) = pymm.number.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+                    
                 # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
                 # if existing == True:
                 #     self.__dict__[varname] = value
@@ -246,8 +254,14 @@ class shelf():
         '''
         Helper function to return True if value is of a shadow type
         '''
-        return isinstance(value, pymm.ndarray) or isinstance(value, pymm.string) or isinstance(value, pymm.torch_tensor)
+        return (isinstance(value, pymm.ndarray) or
+                isinstance(value, pymm.string) or
+                isinstance(value, pymm.torch_tensor) or
+                isinstance(value, pymm.number)
+        )
 
+    def supported_types(self):
+        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.number"]
 
 
 
