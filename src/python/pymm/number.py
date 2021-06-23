@@ -26,7 +26,7 @@ from .shelf import ShelvedCommon
 
 class number(Shadow):
     '''
-    floatnumber object that is stored in the memory resource.  
+    Number object (float or int) that is stored in the memory resource.  
     '''
     def __init__(self, number_value):
         self.number_value = number_value
@@ -64,7 +64,9 @@ class number(Shadow):
 
 
 class shelved_number(ShelvedCommon):
-    '''Shelved string with multiple encoding support'''
+    '''
+    Shelved string with multiple encoding support
+    '''
     def __init__(self, memory_resource, name, number_value):
 
         memref = memory_resource.open_named_memory(name)
@@ -100,8 +102,10 @@ class shelved_number(ShelvedCommon):
 
             memref = memory_resource.create_named_memory(name, value_len, 1, False)
             # copy into memory resource
+            memref.tx_begin()
             memref.buffer[0:hdr_len] = hdr_ba
             memref.buffer[hdr_len:] = value_bytes
+            memref.tx_commit()
         else:
 
             hdr_size = util.GetSizePrefix(memref.buffer, 0)

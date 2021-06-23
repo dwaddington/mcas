@@ -25,8 +25,7 @@ from .shelf import ShelvedCommon
 
 class string(Shadow):
     '''
-    string object that is stored in the memory resource.  because
-    the object is string, read/write access is expected to be slow
+    String object that is stored in the memory resource.
     '''
     def __init__(self, string_value, encoding='utf-8'):
         self.string_value = string_value
@@ -109,8 +108,10 @@ class shelved_string(ShelvedCommon):
 
             memref = memory_resource.create_named_memory(name, value_len, 1, False)
             # copy into memory resource
+            memref.tx_begin()
             memref.buffer[0:hdr_len] = hdr_ba
             memref.buffer[hdr_len:] = bytes(string_value, encoding)
+            memref.tx_end()
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
