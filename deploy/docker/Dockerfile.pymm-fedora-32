@@ -30,6 +30,7 @@ RUN cmake -DBUILD_KERNEL_SUPPORT=OFF \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_INSTALL_PREFIX:PATH=/home/mcasuser/mcas/ ..
 RUN make bootstrap
-#RUN make install
+RUN make
+RUN make install
 WORKDIR /home/mcasuser
 CMD ["/bin/bash"]
