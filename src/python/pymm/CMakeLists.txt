@@ -5,8 +5,8 @@ project(pymm CXX)
 option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
 option(BUILD_PYMM_VALGRIND "build support for valgrind triggers" ON)
 
-set(BUILD_PYMM_NOPACKAGE ON)
-set(BUILD_PYMM_VALGRIND ON)
+set(BUILD_PYMM_NOPACKAGE OFF)
+set(BUILD_PYMM_VALGRIND OFF)
 
 if (BUILD_PYTHON_SUPPORT)
 
