@@ -11,7 +11,7 @@
    limitations under the License.
 */
 
-#define PYMMCORE_API_VERSION "v0.0.1"
+#define PYMMCORE_API_VERSION "v0.1.1"
 #define PAGE_SIZE 4096
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -133,6 +133,7 @@ PyInit_pymmcore(void)
 {  
   PyObject *m;
 
+  printf("[--(PyMM)--] Version %s\n", PYMMCORE_API_VERSION);
 
   if(::getenv("PYMM_DEBUG"))
     globals::debug_level = std::stoul(::getenv("PYMM_DEBUG"));

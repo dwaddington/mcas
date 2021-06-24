@@ -276,8 +276,6 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
     return NULL;
   } 
 
-  PNOTICE("allocated %p", ptr);
-
   /* optionally zero memory */
   if(zero)
     ::memset(ptr, 0x0, size);
@@ -446,6 +444,11 @@ static PyObject * MemoryResource_erase_named_memory(PyObject * self,
     PyErr_SetString(PyExc_RuntimeError,"erase failed unexpectedly");
     return NULL;
   }
+
+  /* optional erase of split-value */
+  std::string vname = name;
+  vname += "-value";
+  mr->_store->erase(mr->_pool, vname.c_str());
 
   return PyLong_FromLong(0);
 }

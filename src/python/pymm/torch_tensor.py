@@ -164,6 +164,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         return torch.tensor.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
+        print("__getattr__ :", name)
         if name == 'addr':
             return self._value_named_memory.addr()
         else:
@@ -174,11 +175,9 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     #     return super().__array_ufunc__(ufunc, method, *inputs, **kwargs)
         
 
-    def asndarray(self):
-        return self.view(np.ndarray)
-
-    def astensor(self):
-        return super()
+    def as_tensor(self):
+        '''Cast class to torch.Tensor subclass'''
+        return self.as_subclass(torch.Tensor)
     
     def update_metadata(self, array):
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str, type=1)
@@ -190,9 +189,13 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     def _value_only_transaction(self, F, *args):
         if self is None:
             return
-        self._value_named_memory.tx_begin()
-        result = F(*args)
-        self._value_named_memory.tx_commit()
+        if '_value_named_memory' in self.__dict__:
+            self._value_named_memory.tx_begin()
+            result = F(*args)
+            self._value_named_memory.tx_commit()            
+        else:
+            result = F(*args)
+        return result
 
     def _tx_begin(self):
         self._value_named_memory.tx_begin()
@@ -225,9 +228,6 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
     def __imod__(self, value): # %=
         return self._value_only_transaction(super().__imod__, value)
-
-    def __ipow__(self, value): # **=
-        return self._value_only_transaction(super().__ipow__, value)
 
     def __ilshift__(self, value): # <<=
         return self._value_only_transaction(super().__ilshift__, value)
@@ -289,48 +289,21 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
-        # NOTE: Logging calls Tensor.__repr__, so we can't log __repr__ without infinite recursion
-        if func is not torch.Tensor.__repr__:
-            return super().__torch_function__(func, types, args, kwargs)
-#            print(f"func: {func.__name__}, args: {args!r}, kwargs: {kwargs!r}")
-            
+        # NOTE: this is some PyTorch magic to intercept everything
+        #print('TORCH FUNCTION {} {}'.format(cls, func))
+        
         if kwargs is None:
             kwargs = {}
-        
+            
         r = super().__torch_function__(func, types, args, kwargs)
-        return r
 
-    # out-of-place we need to convert back to torch tensor because
-    # the variable (result) is escaping the shelf
-    def __add__(self, value):
-        return super().__add__(value).as_subclass(torch.Tensor)
+        # nicely, in-place functions have a underscore suffix
+        if func.__name__[-1:] == '_':
+            return r
 
-    def __mul__(self, value):
-        return super().__mul__(value).as_subclass(torch.Tensor)
+        if isinstance(r, shelved_torch_tensor):
+            return r.as_subclass(torch.Tensor) # cast to plain tensor
+        else:
+            return r # result may not be a tensor
 
-    def __sub__(self, value):
-        return super().__sub__(value).as_subclass(torch.Tensor)
 
-    def __div__(self, value):
-        return super().__div__(value).as_subclass(torch.Tensor)
-
-    def __mod__(self, value):
-        return super().__mod__(value).as_subclass(torch.Tensor)
-
-    def __pow__(self, value):
-        return super().__pow__(value).as_subclass(torch.Tensor)
-
-    def __lshift__(self, value):
-        return super().__lshift__(value).as_subclass(torch.Tensor)
-
-    def __rshift__(self, value):
-        return super().__rshift__(value).as_subclass(torch.Tensor)
-
-    def __and__(self, value):
-        return super().__and__(value).as_subclass(torch.Tensor)
-
-    def __or__(self, value):
-        return super().__or__(value).as_subclass(torch.Tensor)
-    
-    def __xor__(self, value):
-        return super().__xor__(value).as_subclass(torch.Tensor)

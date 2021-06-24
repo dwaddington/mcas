@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 project(pymm CXX)
 
 option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
-option(BUILD_PYMM_VALGRIND "build support for valgrind triggers" ON)
+option(BUILD_PYMM_VALGRIND "build support for valgrind triggers" OFF)
 
 set(BUILD_PYMM_NOPACKAGE OFF)
 set(BUILD_PYMM_VALGRIND OFF)

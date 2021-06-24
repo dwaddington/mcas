@@ -178,6 +178,7 @@ class shelf():
             # create instance from shadow type
             if name in self.__dict__:
                 raise RuntimeError('cannot implicitly replace shelved variable; use shelf.erase')
+
             self.__dict__[name] = value.make_instance(self.mr, name)
             print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
@@ -245,6 +246,7 @@ class shelf():
         
         # then remove the named memory from the store
         self.mr.erase_named_memory(name)
+
 
     @methodcheck(types=[])
     def get_percent_used(self):

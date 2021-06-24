@@ -129,6 +129,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
+            print("I THINK THE VALUE IS THERE! ", value_key)
             # entity already exists, load metadata            
             metadata = memory_resource.get_named_memory(metadata_key)
             hdr = pymmcore.ndarray_read_header(memoryview(metadata),type=type)
@@ -180,6 +181,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._value_named_memory.tx_begin()
         result = F(*args)
         self._value_named_memory.tx_commit()
+        return result
 
     # all methods that perform writes are implicitly used to define transaction
     # boundaries (at least most fine-grained)
