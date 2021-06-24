@@ -7,24 +7,33 @@ import torch
 
 s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 
-
-
 dtype = torch.float
-device = torch.device("cpu")
+
 # device = torch.device("cuda:0") # Uncomment this to run on GPU
 
 # Create random input and output data
-x = torch.linspace(-math.pi, math.pi, 2000, device=device, dtype=dtype)
-print (type(x))
-s.x = x
+s.x = torch.linspace(-math.pi, math.pi, 2000, dtype=dtype)
+
+# create reference to shelf object; use as_tensor to get the subclass representation
+# so that it looks like a Tensor type. this will prevent transactions happening where
+# they are not needed
+#x = s.x.as_tensor() 
+x = s.x
 print (type(s.x))
-y = torch.sin(s.x)
+y = torch.sin(x)
 
 # Randomly initialize weights
-a = torch.randn((), device=device, dtype=dtype)
-b = torch.randn((), device=device, dtype=dtype)
-c = torch.randn((), device=device, dtype=dtype)
-d = torch.randn((), device=device, dtype=dtype)
+a = torch.randn((), dtype=dtype)
+b = torch.randn((), dtype=dtype)
+c = torch.randn((), dtype=dtype)
+d = torch.randn((), dtype=dtype)
+
+# sanity checks
+if type(s.x * a) != torch.Tensor:
+    raise RuntimeError('unexpected type result: {}'.format(type(s.x * a)))
+if type(a * s.x) != torch.Tensor:
+    raise RuntimeError('unexpected type result: {}'.format(type(a * s.x)))
+
 
 learning_rate = 1e-6
 for t in range(2000):
