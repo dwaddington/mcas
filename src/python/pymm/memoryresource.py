@@ -39,10 +39,20 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-        # disable -
-        self.__tx_begin_swcopy()
+        print('tx_begin')
+        pymmcore.valgrind_trigger(1)
+        # disable SW copy
+        #self.__tx_begin_swcopy()
         pass
-        
+
+    def tx_commit(self):
+        print('tx_commit')
+        pymmcore.valgrind_trigger(2)
+        # disable SW copy 
+        #self.__tx_commit_swcopy()
+        pass
+    
+
     def __tx_begin_swcopy(self):
         '''
         Start consistent transaction (very basic copy-off undo-log)
@@ -56,11 +66,6 @@ class MemoryReference():
         if self._debug_level > 0:
             print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
 
-    def tx_commit(self):
-        # disable -
-        self.__tx_commit_swcopy()
-        pass
-    
     def __tx_commit_swcopy(self):
         '''
         Commit consistent transaction
@@ -97,7 +102,7 @@ class MemoryResource(pymmcore.MemoryResource):
     @methodcheck(types=[])        
     def list_items(self):
         all_items = super()._MemoryResource_get_named_memory_list()
-        return [val for val in all_items if not val.endswith('-meta')]
+        return [val for val in all_items if not val.endswith('-value')]
     
     @methodcheck(types=[str,int,int,bool])
     def create_named_memory(self, name, size, alignment=8, zero=False):

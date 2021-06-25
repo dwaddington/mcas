@@ -16,6 +16,10 @@ import numpy as np
 
 from .pymmtest import *
 from .ndarray import ndarray
+#from .pickled import pickled
+from .torch_tensor import torch_tensor
+from .string import string
+from .number import number
 from .shelf import shelf
 from .shelf import ShelvedCommon
 from .memoryresource import MemoryResource

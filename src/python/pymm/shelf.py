@@ -17,10 +17,17 @@ import gc
 import sys
 import copy
 import numpy
+import torch
 import weakref
+
+import PyMM.Meta.Header as Header
+import PyMM.Meta.Constants as Constants
+import PyMM.Meta.DataType as DataType
 
 from .memoryresource import MemoryResource
 from .check import methodcheck
+from flatbuffers import util
+
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -38,6 +45,8 @@ class ShelvedCommon:
     def __getattr__(self, name):
         if name == 'memory':
             return self._value_named_memory.addr()
+        if name == 'namedmemory':
+            return self._value_named_memory        
 #        else:
 #            raise AttributeError()
             
@@ -48,15 +57,6 @@ class Shadow:
     '''
     pass
 
-
-def _shelf__of_supported_shadow_type(value):
-    '''
-    Helper function to return True if value is of a shadow type
-    '''
-    return isinstance(value, pymm.ndarray)
-
-def _shelf__of_supported_concrete_type(value):
-    return isinstance(value, numpy.ndarray)
 
 class shelf():
     '''
@@ -72,13 +72,72 @@ class shelf():
         items = self.mr.list_items()
         for varname in items:
             if not varname in self.__dict__:
-                # extend for each supported type
-                existing = pymm.ndarray.existing_instance(self.mr, varname)
-                if type(existing) == type(None) and existing == None:
-                    print("Value '{}' is unknown type!".format(varname))
-                else:
-                    self.__dict__[varname] = existing
-                    print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+
+                # read metadata header (always connect to name=key)
+                buffer = self.mr.get_named_memory(varname)
+                if buffer is None:
+                    print("WARNING: no named memory for '{}'".format(varname))
+                    continue
+                    
+                hdr_size = util.GetSizePrefix(buffer, 0)
+                if hdr_size != 28:
+                    print("WARNING: invalid header for '{}'; prior version?".format(varname))
+                    continue
+
+                root = Header.Header()
+                hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
+                
+                if(hdr.Magic() != Constants.Constants().Magic):
+                    print("WARNING: bad magic number")
+                    continue
+                
+                stype = hdr.Type()
+
+                # call appropriate existing_instance for detected type
+                
+                # type: pymm.string
+                if (stype == DataType.DataType().AsciiString or
+                    stype == DataType.DataType().Utf8String or
+                    stype == DataType.DataType().Utf16String or
+                    stype == DataType.DataType().Latin1String):
+                    (existing, value) = pymm.string.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+                    
+                # type: pymm.ndarray
+                elif (stype == DataType.DataType().NumPyArray):
+                    (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                # type: pymm.torch_tensor
+                elif (stype == DataType.DataType().TorchTensor):
+                    (existing, value) = pymm.torch_tensor.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                # type: pymm.torch_tensor
+                elif (stype == DataType.DataType().NumberFloat or stype == DataType.DataType().NumberInteger):
+                    (existing, value) = pymm.number.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+                    
+                # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
+                # if existing == True:
+                #     self.__dict__[varname] = value
+                #     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                #     continue
+
+                print("Value '{}' is unknown type!".format(varname))
+
 
     def __del__(self):
         gc.collect()
@@ -115,11 +174,17 @@ class shelf():
                 raise RuntimeError('cannot change shelf attribute')
 
         # check for supported shadow types
-        if __of_supported_shadow_type(value):
+        if self._is_supported_shadow_type(value):
             # create instance from shadow type
-            self.__dict__[name] = value.make_instance(self.mr, name)            
+            if name in self.__dict__:
+                raise RuntimeError('cannot implicitly replace shelved variable; use shelf.erase')
+
+            self.__dict__[name] = value.make_instance(self.mr, name)
+            print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
+        elif isinstance(value, torch.Tensor): # perform a copy instantiation (ndarray)
+            self.__dict__[name] = pymm.torch_tensor.build_from_copy(self.mr, name, value)            
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')
         elif type(value) == type(None):
@@ -154,6 +219,9 @@ class shelf():
         for s in self.__dict__:
             if issubclass(type(self.__dict__[s]), pymm.ShelvedCommon):
                 items.append(s) # or to add object itself...self.__dict__[s]
+            elif issubclass(type(self.__dict__[s]), torch.Tensor):
+                items.append(s)
+                
         return items
             
         
@@ -167,20 +235,37 @@ class shelf():
             raise RuntimeError('attempting to erase something that is not on the shelf')
 
         # sanity check
-        gc.collect() # force gc
-        count = sys.getrefcount(self.__dict__[name])
-        if count != 2:
-            raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
-
-        self.__dict__.pop(name)
-        gc.collect() # force gc
+        if gc.is_tracked(self.__dict__[name]):
+            gc.collect() # force gc        
+            count = sys.getrefcount(self.__dict__[name])
+            if count != 2: 
+                raise RuntimeError('erase failed due to outstanding references ({})'.format(count))
+            
+            self.__dict__.pop(name)
+            gc.collect() # force gc
         
         # then remove the named memory from the store
         self.mr.erase_named_memory(name)
 
+
     @methodcheck(types=[])
     def get_percent_used(self):
         return self.mr.get_percent_used()
+
+    def _is_supported_shadow_type(self, value):
+        '''
+        Helper function to return True if value is of a shadow type
+        '''
+        return (isinstance(value, pymm.ndarray) or
+                isinstance(value, pymm.string) or
+                isinstance(value, pymm.torch_tensor) or
+                isinstance(value, pymm.number)
+        )
+
+    def supported_types(self):
+        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.number"]
+
+
 
 # NUMPY
 #

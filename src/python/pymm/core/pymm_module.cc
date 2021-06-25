@@ -10,8 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
-#define PYMMCORE_API_VERSION "v0.0.1"
+#define PYMMCORE_API_VERSION "v0.1.1"
 #define PAGE_SIZE 4096
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -30,8 +29,9 @@
 #include <execinfo.h>
 #endif
 
-#include <list>
 #include <common/logging.h>
+#include <common/cycles.h>
+
 #include "ndarray_helpers.h"
 #include "pymm_config.h"
 
@@ -47,6 +47,11 @@ PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
 PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
              "memoryview_addr(m) -> Return address of memory (for debugging)");
+
+#ifdef BUILD_PYMM_VALGRIND
+PyDoc_STRVAR(pymmcore_valgrind_trigger_doc,
+             "valgrind_trigger(i) -> Used to trigger/mark event in Valgrind");
+#endif
 
 PyDoc_STRVAR(pymcas_ndarray_header_size_doc,
              "ndarray_header_size(array) -> Return size of memory needed for header");
@@ -77,6 +82,13 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
                                            PyObject * kwargs);
 
 
+#ifdef BUILD_PYMM_VALGRIND
+static PyObject * pymmcore_valgrind_trigger(PyObject * self,
+                                            PyObject * args,
+                                            PyObject * kwargs);
+#endif
+
+
 static PyMethodDef pymmcore_methods[] =
   {
    {"version",
@@ -88,7 +100,11 @@ static PyMethodDef pymmcore_methods[] =
    {"ndarray_header_size",
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"memoryview_addr",
-    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },   
+    (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
+#ifdef BUILD_PYMM_VALGRIND   
+   {"valgrind_trigger",
+    (PyCFunction) pymmcore_valgrind_trigger, METH_VARARGS | METH_KEYWORDS, pymmcore_valgrind_trigger_doc },
+#endif
    {"ndarray_header",
     (PyCFunction) pymcas_ndarray_header, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_doc },
    {"ndarray_read_header",
@@ -116,6 +132,7 @@ PyInit_pymmcore(void)
 {  
   PyObject *m;
 
+  printf("[--(PyMM)--] Version %s\n", PYMMCORE_API_VERSION);
 
   if(::getenv("PYMM_DEBUG"))
     globals::debug_level = std::stoul(::getenv("PYMM_DEBUG"));
@@ -275,3 +292,72 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
   
   return PyLong_FromUnsignedLong(reinterpret_cast<unsigned long>(buffer->buf));
 }
+
+/* we always build these, so that if the Python code call
+   pymm.pymmcore.valgrind_trigger it will just do nothing
+*/
+
+extern "C" void valgrind_trigger(int event)
+{
+}
+
+/** 
+ * Used to cause a valgrind wrapper function from Python.  It is
+ * basically used to "mark" events in the output, e.g., the 
+ * start and finish of a transaction
+ * 
+ * @param self 
+ * @param args 
+ * @param kwargs 
+ * 
+ * @return None
+ */
+static PyObject * pymmcore_valgrind_trigger(PyObject * self,
+                                            PyObject * args,
+                                            PyObject * kwargs)
+{
+  static const char *kwlist[] = {"event",
+                                 NULL};
+
+  int event = 0;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "i",
+                                    const_cast<char**>(kwlist),
+                                    &event)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  valgrind_trigger(event);
+  Py_RETURN_NONE;
+}
+
+#ifdef BUILD_PYMM_VALGRIND
+
+#include <stdio.h>
+#include <valgrind/valgrind.h>
+
+extern "C" void I_WRAP_SONAME_FNNAME_ZU(NONE, valgrind_trigger)( int e )
+{
+  // No need to call function - it does nothing
+  //
+  // OrigFn fn;
+  // VALGRIND_GET_ORIG_FN(fn);
+  // CALL_FN_v_W(fn, e);
+  if(e == 1) {
+    VALGRIND_PRINTF("TX BEGIN: %lu %d\n", rdtsc(), e);
+    VALGRIND_MONITOR_COMMAND("trace:on");
+  }
+  else if(e == 2) {
+    VALGRIND_MONITOR_COMMAND("trace:off");
+    VALGRIND_PRINTF("TX END: %lu %d\n", rdtsc(), e);
+  }
+  else {
+    VALGRIND_PRINTF("TRIGGER EVENT: %lu %d\n", rdtsc(), e);
+  }
+}
+
+
+#endif

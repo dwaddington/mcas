@@ -10,17 +10,17 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
+import pymm
+import numpy as np
 
 def demo(force_new=True):
     '''
     Demonstration of pymm features
     '''
-    import pymm
-    import numpy as np
   
     # create new shelf (override any existing myShelf)
     #
-    s = pymm.shelf('myShelf',1024,pmem_path='/mnt/pmem0',force_new=force_new)
+    s = pymm.shelf('myShelf','/mnt/pmem0',1024, force_new=force_new)
 
     # create variable x on shelf (using shadow type)
     s.x = pymm.ndarray((1000,1000),dtype=np.float)
@@ -58,6 +58,10 @@ def demo(force_new=True):
     s.blended = s.i + (0.5 * s.j)
     io.imshow(s.blended)
     io.show()
+
+    # place a utf-16 string
+    s.msg = pymm.string(b'\xff\xfe=\xd8\t\xde', encoding='utf-16')
+    s.msg
 
     # remove objects from shelf
     for item in s.items:

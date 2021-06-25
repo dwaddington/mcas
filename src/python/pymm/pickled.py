@@ -13,7 +13,12 @@
 
 import pymmcore
 import pickle
+import flatbuffers
+import PyMM.Meta.Header as Header
+import PyMM.Meta.Constants as Constants
+import PyMM.Meta.DataType as DataType
 
+from flatbuffers import util
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
@@ -30,11 +35,37 @@ class pickled(Shadow):
         '''
         Create a concrete instance from the shadow
         '''
-        return shelved_pickled(memory_resource, name, self.obj)
+        return shelved_pickled(memory_resource, name, pickle.dumps(self.obj))
+
+    def existing_instance(memory_resource: MemoryResource, name: str):
+        '''
+        Determine if an persistent named memory object corresponds to this type
+        '''
+        buffer = memory_resource.get_named_memory(name)
+        if buffer is None:
+            return (False, None)
+
+        hdr_size = util.GetSizePrefix(buffer, 0)
+
+        if(hdr_size != 32):
+            return (False, None)
+        
+        root = Header.Header()
+        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
+        print("detected 'pickled' type - magic:{}, hdrsize:{}".format(hex(int(hdr.Magic())),hdr_size))
+        
+        if(hdr.Magic() != Constants.Constants().Magic):
+            return (False, None)
+
+        print("OK! name={}".format(name))
+        print("buffer_bytes=", buffer)
+        pickle_bytes = buffer[hdr_size + 4:]
+        print("pickle_bytes=", pickle_bytes)
+        return (True, shelved_pickled(memory_resource, name, pickle_bytes))
 
 
 class shelved_pickled(ShelvedCommon):
-    def __new__(subtype, memory_resource, name, obj):
+    def __init__(self, memory_resource, name, pickle_bytes):
 
         if not isinstance(name, str):
             raise RuntimeException("invalid name type")
@@ -42,17 +73,34 @@ class shelved_pickled(ShelvedCommon):
         root = memory_resource.open_named_memory(name)
 
         if root == None:
-            # create new entry
-            pickstr = pickle.dumps(obj)
-            root_memref = memory_resource.create_named_memory(name, len(pickstr),value_len, 8, False)
-            print("len-->", value_len)
-            # prefix used for values corresponding to pickled items
-            member_prefix = "__pickled_" + str(root_memref.addr()[0]) + "__" + name + "_"
-            print(member_prefix)
-        else:
-            print("pickled already exists!!")
-    
+            # create new value
+            builder = flatbuffers.Builder(128)
+            # create header
+            Header.HeaderStart(builder)
+            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+            Header.HeaderAddVersion(builder, Constants.Constants().Version)
+            Header.HeaderAddType(builder, DataType.DataType().Pickled)
+            Header.HeaderAddResvd(builder, len(pickle_bytes))
+            hdr = Header.HeaderEnd(builder)
+            builder.FinishSizePrefixed(hdr)
+            hdr_ba = builder.Output()
 
+            # allocate memory
+            value_len = len(hdr_ba) + len(pickle_bytes)
+            hdr_len = len(hdr_ba)
+            memref = memory_resource.create_named_memory(name, value_len, 8, False)
+            # copy into memory resource
+            print("type of {}".format(type(memref.buffer)))
+            memref.buffer[0:hdr_len] = hdr_ba
+            memref.buffer[hdr_len:] = pickle_bytes
+            print("new pickled hdr={} content={}".format(hdr_ba, pickle_bytes))
+            print("full buffer={}".format(memref.buffer[0:].tobytes()))
+
+        self.pickle_bytes = pickle_bytes # create member reference to pickled bytes
+        self.cached_object = pickle.loads(pickle_bytes)
+
+
+    
 #class dict(mapping, **kwarg)
 #class dict(iterable, **kwarg)
     

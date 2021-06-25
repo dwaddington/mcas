@@ -1,10 +1,18 @@
-namespace Meta;
+namespace PyMM.Meta;
 
 enum DataType : uint16 {
-  Unknown = 0,
-  Opaque = 1,
-  NumPyArray = 2,
-  Pickled = 3,
+  Unknown       = 0,
+  Opaque        = 1,
+  NumPyArray    = 2,
+  TorchTensor   = 4,  
+  AsciiString   = 8,
+  Utf8String    = 9,
+  Utf16String   = 10,
+  Latin1String  = 11,
+  OtherString   = 12,
+  NumberFloat   = 21,
+  NumberInteger = 22,
+  ThisIsPyMM    = 100,
 }
 
 enum Constants : uint32 {
@@ -12,9 +20,11 @@ enum Constants : uint32 {
   Magic = 4009738240,
 }
 
-struct Header {
+table Header {
   magic   : uint32;
   type    : DataType;
   version : uint16;
   resvd   : uint16;
 }
+
+root_type Header;

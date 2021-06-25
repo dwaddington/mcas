@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 
 project(pymm CXX)
 
-option(BUILD_PYMM_NOPACKAGE "do not build a python package" OFF)
+option(BUILD_PYMM_NOPACKAGE "do not build a python package - turn ON for development mode" OFF)
+option(BUILD_PYMM_VALGRIND "build support for valgrind triggers" OFF)
+
+if (BUILD_PYMM_VALGRIND)
+  set(EXTRA_FLAGS "BUILD_PYMM_VALGRIND=1")
+endif()
 
 if (BUILD_PYTHON_SUPPORT)
 
@@ -31,7 +36,7 @@ endif()
   message("-- Building Python support.")
   set(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in")
   set(SETUP_PY "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
-  set(DEPS "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py")
+  set(DEPS "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py ${CMAKE_CURRENT_SOURCE_DIR}/pickled.py")
   set(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/timestamp")
   
   string(REGEX REPLACE  "^.*python" "" PYTHON_VERSION ${PYTHON})
@@ -43,19 +48,24 @@ endif()
   configure_file(${SETUP_PY_IN} ${SETUP_PY})
   configure_file(core/pymm_config.h.in core/pymm_config.h)
 
-  file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
+  file(GLOB ALL_PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c* )
+
   file(GLOB PACKAGE_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py)
   # copy python files to build
 
   file(MAKE_DIRECTORY ${PKG_SOURCE_DIR})
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/pymm/PyMM/Meta)
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${PACKAGE_SOURCE_FILES} DESTINATION ${PKG_SOURCE_DIR})
 
-  set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated/meta_generated.h)
+  set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/meta_generated.h)
   add_custom_command(
     OUTPUT ${GENERATED}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND ${FLATC} --cpp --python -o ${CMAKE_CURRENT_BINARY_DIR}/generated/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND ${FLATC} --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
     COMMAND touch ${GENERATED}
     )
 
@@ -63,14 +73,24 @@ endif()
     DEPENDS ${GENERATED}
     )
 
+  if(BUILD_PYMM_VALGRIND)
+    message("-- Building Pymm with Valgrind support")
+  else()
+    message("-- Building Pymm without Valgrind support")
+  endif()
 
   if(BUILD_PYMM_NOPACKAGE)
     message("-- Building Pymm WITHOUT package (development only)")
-    add_custom_target(${PROJECT_NAME} ALL
+    add_custom_target(${PROJECT_NAME}-np ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
-      COMMAND ${PYTHON} ${SETUP_PY} build
+      COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} build
+      COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES}  
-      )    
+      )
+    add_custom_target(${PROJECT_NAME} ALL
+      DEPENDS build.stamp
+      )
+    
   else()
     message("-- Building Pymm with site package")
 
@@ -80,7 +100,7 @@ endif()
     
     add_custom_command(
       OUTPUT build.stamp
-      COMMAND ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
+      COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
       COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} 
       )
