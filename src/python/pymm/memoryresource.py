@@ -40,16 +40,16 @@ class MemoryReference():
 
     def tx_begin(self):
         print('tx_begin')
-        pymmcore.valgrind_trigger(1)
+        #pymmcore.valgrind_trigger(1)
         # disable SW copy
-        #self.__tx_begin_swcopy()
+        self.__tx_begin_swcopy()
         pass
 
     def tx_commit(self):
         print('tx_commit')
-        pymmcore.valgrind_trigger(2)
+        #pymmcore.valgrind_trigger(2)
         # disable SW copy 
-        #self.__tx_commit_swcopy()
+        self.__tx_commit_swcopy()
         pass
     
 
