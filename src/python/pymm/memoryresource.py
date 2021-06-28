@@ -40,6 +40,7 @@ class MemoryReference():
 
     def tx_begin(self):
         print('tx_begin')
+
         #pymmcore.valgrind_trigger(1)
         # disable SW copy
         self.__tx_begin_swcopy()
