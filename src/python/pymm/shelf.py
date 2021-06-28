@@ -173,12 +173,14 @@ class shelf():
             elif name == 'name' or name == 'mr':
                 raise RuntimeError('cannot change shelf attribute')
 
+        # currently we allow reassignment of shelf variables
+        # TODO: we might want to make a back up of it then later delete
+        if name in self.__dict__:
+            gc.collect()
+            self.erase(name)
+            
         # check for supported shadow types
         if self._is_supported_shadow_type(value):
-            # create instance from shadow type
-            if name in self.__dict__:
-                raise RuntimeError('cannot implicitly replace shelved variable; use shelf.erase')
-
             self.__dict__[name] = value.make_instance(self.mr, name)
             print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
