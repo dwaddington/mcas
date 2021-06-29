@@ -98,12 +98,20 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         descr = dtypedescr(dtype)
         _dbytes = descr.itemsize
 
-        if not shape is None:
-            if not isinstance(shape, tuple):
-                shape = (shape,)
-            size = np.intp(1)  # avoid default choice of np.int_, which might overflow
+        if shape == None:
+            raise RuntimeError('shape is None')
+
+        size = np.intp(1)  # avoid default choice of np.int_, which might overflow
+        print("shape:", shape)
+        print("subtype:", subtype)
+        if isinstance(shape, tuple) or isinstance(shape, list):
+            if isinstance(shape, tuple) and isinstance(shape[0], list):
+                shape = shape[0]
+
             for k in shape:
                 size *= k
+        else:
+            raise RuntimeError('unhandled condition in shelved_ndarray shape handling')
 
         # the meta data is always accessible by the key name
         value_key = name + '-value'
@@ -115,9 +123,16 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             #
             # create a newly allocated named memory from MemoryResource
             #
+            print("shape=",shape)
+            print(size)
+            msize = int(size*_dbytes)
+            if msize < 8:
+                alignment = 1
+            else:
+                alignment = 8
             value_named_memory = memory_resource.create_named_memory(value_key,
-                                                                     int(size*_dbytes),
-                                                                     8, # alignment
+                                                                     msize,
+                                                                     alignment,
                                                                      zero) # zero memory
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None

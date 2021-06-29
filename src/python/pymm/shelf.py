@@ -185,8 +185,10 @@ class shelf():
             print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
+            print("made ndarray instance from copy '{}' on shelf".format(name))
         elif isinstance(value, torch.Tensor): # perform a copy instantiation (ndarray)
-            self.__dict__[name] = pymm.torch_tensor.build_from_copy(self.mr, name, value)            
+            self.__dict__[name] = pymm.torch_tensor.build_from_copy(self.mr, name, value)
+            print("made torch_tensor instance from copy '{}' on shelf".format(name))
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')
         elif type(value) == type(None):

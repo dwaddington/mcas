@@ -39,7 +39,7 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-        print('tx_begin')
+        #print('tx_begin')
 
         #pymmcore.valgrind_trigger(1)
         # disable SW copy
@@ -47,7 +47,7 @@ class MemoryReference():
         pass
 
     def tx_commit(self):
-        print('tx_commit')
+        #print('tx_commit')
         #pymmcore.valgrind_trigger(2)
         # disable SW copy 
         self.__tx_commit_swcopy()

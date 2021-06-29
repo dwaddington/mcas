@@ -113,10 +113,13 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         descr = dtypedescr(np_dtype)
         _dbytes = descr.itemsize
 
-        if not shape is None:
-            if not isinstance(shape, tuple):
-                shape = (shape,)
+        if shape != None:
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
+
+            # if it is not a shape converted from tuple, then we may have to convert
+            if not isinstance(shape, torch.Size):
+                shape = get_shape(shape) # convert shape
+
             for k in shape:
                 size *= k
                 
@@ -164,7 +167,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         return torch.tensor.__array_wrap__(self, out_arr, context)
 
     def __getattr__(self, name):
-        print("__getattr__ :", name)
+#        print("__getattr__ :", name)
         if name == 'addr':
             return self._value_named_memory.addr()
         else:
@@ -307,3 +310,15 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             return r # result may not be a tensor
 
 
+
+from collections.abc import Sequence
+
+def get_shape(lst):
+    def ishape(lst):
+        shapes = [ishape(x) if isinstance(x, list) else [] for x in lst]
+        shape = shapes[0]
+        if shapes.count(shape) != len(shapes):
+            raise ValueError('Ragged list')
+        shape.append(len(lst))
+        return shape
+    return tuple(reversed(ishape(lst)))
