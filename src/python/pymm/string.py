@@ -197,14 +197,13 @@ class shelved_string(ShelvedCommon):
         del self._value_named_memory # this will force release
         gc.collect()
 
-        # release locks
-
+        # swap names
         memory.atomic_swap_names(self._name, self._name + "-tmp")
 
-        # erase old one
+        # erase old data
         memory.erase_named_memory(self._name + "-tmp")
 
-        # open new one
+        # open new data
         memref = memory.open_named_memory(self._name)
         self._value_named_memory = memref
         self.view = memoryview(memref.buffer[hdr_len:])
