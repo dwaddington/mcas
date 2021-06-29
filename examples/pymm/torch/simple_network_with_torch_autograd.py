@@ -31,13 +31,13 @@ d = torch.randn((), device=device, dtype=dtype, requires_grad=True)
 
 learning_rate = 1e-6
 for t in range(2000):
-    # Forward pass: compute predicted y
-    y_pred = a + b * s.x + c * s.x ** 2 + d * s.x ** 3
+    # Forward pass: compute predicted 
+    s.y_pred = a + b * s.x + c * s.x ** 2 + d * s.x ** 3
 
     # Compute and print loss using operations on Tensors.
     # Now loss is a Tensor of shape (1,)
     # loss.item() gets the scalar value held in the loss.
-    loss = (y_pred - s.y).pow(2).sum()
+    loss = (s.y_pred - s.y).pow(2).sum()
     if t % 100 == 99:
         print(t, loss.item())
 
