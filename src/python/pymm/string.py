@@ -69,6 +69,9 @@ class string(Shadow):
         # not a string
         return (False, None)
 
+    def build_from_copy(memory_resource: MemoryResource, name: str, value):
+        return shelved_string(memory_resource, name, string_value=value, encoding='utf-8')
+
 
 class shelved_string(ShelvedCommon):
     '''Shelved string with multiple encoding support'''
@@ -111,7 +114,7 @@ class shelved_string(ShelvedCommon):
             memref.tx_begin()
             memref.buffer[0:hdr_len] = hdr_ba
             memref.buffer[hdr_len:] = bytes(string_value, encoding)
-            memref.tx_end()
+            memref.tx_commit()
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
@@ -148,3 +151,53 @@ class shelved_string(ShelvedCommon):
             raise AttributeError("'{}' object has no attribute '{}'".format(type(self),name))
         else:
             return self.__dict__[name]
+
+    def __add__(self, value):
+        print("__add__", value)
+        if not isinstance(value, str):
+            raise TypeError('must be str, not int')
+
+    def __eq__(self, value): # == operator
+        return (str(self.view,self.encoding).__eq__(value))
+
+    def __ge__(self, value): # == operator
+        return (str(self.view,self.encoding).__ge__(value))
+
+    def __gt__(self, value): # == operator
+        return (str(self.view,self.encoding).__gt__(value))
+
+    def __le__(self, value): # == operator
+        return (str(self.view,self.encoding).__le__(value))
+
+    def __lt__(self, value): # == operator
+        return (str(self.view,self.encoding).__lt__(value))
+
+    def __ne__(self, value): # == operator
+        return (str(self.view,self.encoding).__ne__(value))
+
+    def __contains__(self, value): # in / not in operator
+        return (value in str(self.view,self.encoding))
+
+    def capitalize(self):
+        return str(self.view,self.encoding).capitalize()
+
+    def center(self, width, fillchar=' '):
+        return str(self.view,self.encoding).center(width, fillchar)
+    
+    def casefold(self):
+        return str(self.view,self.encoding).casefold()
+
+    def count(self, start=0, end=0):
+        if end > 0:
+            return str(self.view,self.encoding).count(start, end)
+        else:
+            return str(self.view,self.encoding).count(start)
+        
+    def encode(self, encoding='utf-8', errors='strict'):
+        return str(self.view,self.encoding).encode(encoding, errors)
+
+    # TODO MOSHIK TO FINISH ..
+
+# string object methods
+#
+#  ['__add__', '__class__', '__contains__', '__delattr__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getitem__', '__getnewargs__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__iter__', '__le__', '__len__', '__lt__', '__mod__', '__mul__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__rmod__', '__rmul__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', 'capitalize', 'casefold', 'center', 'count', 'encode', 'endswith', 'expandtabs', 'find', 'format', 'format_map', 'index', 'isalnum', 'isalpha', 'isdecimal', 'isdigit', 'isidentifier', 'islower', 'isnumeric', 'isprintable', 'isspace', 'istitle', 'isupper', 'join', 'ljust', 'lower', 'lstrip', 'maketrans', 'partition', 'replace', 'rfind', 'rindex', 'rjust', 'rpartition', 'rsplit', 'rstrip', 'split', 'splitlines', 'startswith', 'strip', 'swapcase', 'title', 'translate', 'upper', 'zfill']

@@ -293,7 +293,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
         # NOTE: this is some PyTorch magic to intercept everything
-        #print('TORCH FUNCTION {} {}'.format(cls, func))
+#        print('TORCH FUNCTION {} {}'.format(cls, func))
         
         if kwargs is None:
             kwargs = {}

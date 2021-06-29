@@ -54,8 +54,8 @@ def test_ndarray(s):
 def test_torch_tensor(s):
     
     log("Testing: torch_tensor")
-    s.x = pymm.torch_tensor((100,100))
-    n = torch.Tensor(np.ndarray((100,100)))
+    s.x = pymm.torch_tensor((10,))
+    n = torch.Tensor([1,2,3,4,5,6,7,8,9,10])
 
     # shelf type S
     if str(type(s.x)) != "<class 'pymm.torch_tensor.shelved_torch_tensor'>":
@@ -66,7 +66,6 @@ def test_torch_tensor(s):
     if str(type(s.x)) != "<class 'pymm.torch_tensor.shelved_torch_tensor'>":
         fail('type check failed')
 
-    
     # shelf type S * NS (non-shelf type)
     if str(type(s.x * n)) != "<class 'torch.Tensor'>":
         fail('type check failed')
@@ -90,6 +89,6 @@ def test_torch_tensor(s):
 
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 
-s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
+s = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',size_mb=1024,force_new=True)
 test_ndarray(s)
 test_torch_tensor(s)

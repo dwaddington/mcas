@@ -105,10 +105,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                 if isinstance(shape, tuple) and isinstance(shape[0], list):
                     shape = shape[0]
 
-                    for k in shape:
-                        size *= k
-                else:
-                    raise RuntimeError('unhandled condition in shelved_ndarray shape handling')
+                for k in shape:
+                    size *= k
+            else:
+                raise RuntimeError('unhandled condition in shelved_ndarray shape handling (shape={})'.format(shape))
 
         # the meta data is always accessible by the key name
         value_key = name + '-value'
