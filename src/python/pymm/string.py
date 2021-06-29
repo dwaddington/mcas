@@ -13,6 +13,7 @@
 
 import pymmcore
 import flatbuffers
+import gc
 
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
@@ -124,6 +125,7 @@ class shelved_string(ShelvedCommon):
         self._memory_resource = memory_resource
         self._value_named_memory = memref
         self.encoding = encoding
+        self._name = name
 
     def __repr__(self):
         # TODO - some how this is keeping a reference? gc.collect() clears it.
@@ -152,10 +154,61 @@ class shelved_string(ShelvedCommon):
         else:
             return self.__dict__[name]
 
-    def __add__(self, value):
-        print("__add__", value)
-        if not isinstance(value, str):
-            raise TypeError('must be str, not int')
+    def __add__(self, value): # in-place append e.g, through +=
+
+        # build a new value with different name, then swap & delete
+        new_str = str(self.view,self.encoding).__add__(value)
+        memory = self._memory_resource
+        # create new value
+        builder = flatbuffers.Builder(32)
+        # create header
+        Header.HeaderStart(builder)
+        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+        Header.HeaderAddVersion(builder, Constants.Constants().Version)
+
+        if self.encoding == 'ascii':
+            Header.HeaderAddType(builder, DataType.DataType().AsciiString)
+        elif self.encoding == 'utf-8':
+            Header.HeaderAddType(builder, DataType.DataType().Utf8String)
+        elif self.encoding == 'utf-16':
+            Header.HeaderAddType(builder, DataType.DataType().Utf16String)
+        elif self.encoding == 'latin-1':
+            Header.HeaderAddType(builder, DataType.DataType().Latin1String)
+        else:
+            raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
+            
+        hdr = Header.HeaderEnd(builder)
+        builder.FinishSizePrefixed(hdr)
+        hdr_ba = builder.Output()
+
+        # allocate memory
+        hdr_len = len(hdr_ba)
+        value_len = len(new_str) + hdr_len
+
+        memref = memory.create_named_memory(self._name + "-tmp", value_len, 1, False)
+        
+        # copy into memory resource
+        #memref.tx_begin() # don't need transaction here?
+        memref.buffer[0:hdr_len] = hdr_ba
+        memref.buffer[hdr_len:] = bytes(new_str, self.encoding)
+        #memref.tx_commit()
+
+        del memref # this will force release
+        del self._value_named_memory # this will force release
+        gc.collect()
+
+        # release locks
+
+        memory.atomic_swap_names(self._name, self._name + "-tmp")
+
+        # erase old one
+        memory.erase_named_memory(self._name + "-tmp")
+
+        # open new one
+        memref = memory.open_named_memory(self._name)
+        self._value_named_memory = memref
+        self.view = memoryview(memref.buffer[hdr_len:])
+        return self
 
     def __eq__(self, value): # == operator
         return (str(self.view,self.encoding).__eq__(value))

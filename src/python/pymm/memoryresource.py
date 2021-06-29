@@ -171,3 +171,8 @@ class MemoryResource(pymmcore.MemoryResource):
         return super()._MemoryResource_get_percent_used()
 
 
+    def atomic_swap_names(self, a: str, b: str):
+        '''
+        Swap the names of two named memories; must be released
+        '''
+        return super()._MemoryResource_atomic_swap_names(a,b)

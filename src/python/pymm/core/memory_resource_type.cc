@@ -647,7 +647,41 @@ static PyObject * MemoryResource_get_percent_used(MemoryResource *self, PyObject
   return PyLong_FromUnsignedLong(value[0]);
 }
 
+/** 
+ * Atomically swap names of two memories
+ * 
+ * @param self 
+ * @param args 
+ * @param kwds 
+ * 
+ * @return 
+ */
+static PyObject * MemoryResource_atomic_swap_names(MemoryResource *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"left",
+                                 "right",
+                                 NULL,
+  };
 
+  const char * left_name = nullptr;
+  const char * right_name = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "ss",
+                                    const_cast<char**>(kwlist),
+                                    &left_name, &right_name)) {
+    PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+    return NULL;
+  }
+
+  auto mr = reinterpret_cast<MemoryResource *>(self);
+  auto pool = mr->_pool;
+  status_t s = mr->_store->swap_keys(pool, left_name, right_name);
+  if(s != S_OK)
+    PWRN("swap_keys failed (%d)", s);
+  return PyLong_FromLong(s);
+}
 
 static PyMemberDef MemoryResource_members[] =
   {
@@ -674,12 +708,12 @@ static PyMethodDef MemoryResource_methods[] =
     "MemoryResource_put_named_memory(data)"},
    {"_MemoryResource_get_named_memory", (PyCFunction) MemoryResource_get_named_memory, METH_VARARGS | METH_KEYWORDS,
     "MemoryResource_get_named_memory(data)"},
+   {"_MemoryResource_atomic_swap_names", (PyCFunction) MemoryResource_atomic_swap_names, METH_VARARGS | METH_KEYWORDS,
+    "MemoryResource_atomic_swap_name(a,b)"},
    {"_MemoryResource_get_named_memory_list", (PyCFunction) MemoryResource_get_named_memory_list, METH_NOARGS,
     "MemoryResource_get_named_memory_list()"},
    {"_MemoryResource_get_percent_used", (PyCFunction) MemoryResource_get_percent_used, METH_NOARGS,
     "MemoryResource_get_percent_used()"},   
-
-   
    {NULL}
   };
 
