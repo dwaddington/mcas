@@ -256,7 +256,7 @@ class shelved_integer_number(ShelvedCommon):
         return self._get_value() // value
 
     def __rfloordiv__(self, value):
-        return self._get_value() // value    
+        return value // self._get_value()
     
     def __divmod__(self, x):
         return divmod(self._get_value(),x)
