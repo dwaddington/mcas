@@ -10,7 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define PYMMCORE_API_VERSION "v0.1.3"
+#define PYMMCORE_API_VERSION "v0.1.4"
 #define PAGE_SIZE 4096
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION

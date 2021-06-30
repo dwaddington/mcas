@@ -27,7 +27,7 @@ from .shelf import ShelvedCommon
 
 class float_number(Shadow):
     '''
-    Number object (float or int) that is stored in the memory resource.  
+    Floating point number that is stored in the memory resource. Uses value cache
     '''
     def __init__(self, number_value):
         self.number_value = number_value
@@ -69,7 +69,7 @@ class float_number(Shadow):
 
 class shelved_float_number(ShelvedCommon):
     '''
-    Shelved string with multiple encoding support
+    Shelved floating point number
     '''
     def __init__(self, memory_resource, name, number_value):
 
@@ -114,7 +114,8 @@ class shelved_float_number(ShelvedCommon):
             self._type = hdr.Type()
 
         # set up the view of the data
-        self._view = memoryview(memref.buffer[32:])
+        # materialization alternative - self._view = memoryview(memref.buffer[32:])
+        self._cached_value = number_value
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -161,15 +162,17 @@ class shelved_float_number(ShelvedCommon):
         
         memref = memory.open_named_memory(self._name)
         self._value_named_memory = memref
-        self._view = memoryview(memref.buffer[32:])
+        self._cached_value = value
+        # materialization alternative - self._view = memoryview(memref.buffer[32:])
         return self
 
         
     def _get_value(self):
         '''
-        Materialize the value from persistent bytes
+        Materialize the value either from persistent memory or cached value
         '''
-        return float.fromhex((bytearray(self._view)).decode())
+        return self._cached_value
+        # materialization alternative - return float.fromhex((bytearray(self._view)).decode())
 
 
     def __repr__(self):
@@ -183,9 +186,6 @@ class shelved_float_number(ShelvedCommon):
 
     def __bool__(self):
         return bool(self._get_value())
-
-#    def __setattr__(self, key, value):
-#        print("setattr: ", key, " ", value)
 
     # in-place arithmetic
     def __iadd__(self, value): # +=
@@ -224,35 +224,58 @@ class shelved_float_number(ShelvedCommon):
         
 
     # arithmetic operations
+    # not using magic method seems to help with implicit casting
     def __add__(self, value):
-        return float(self._get_value()).__add__(value)
+        return self._get_value() + value
 
-    def __and__(self, value):
-        return float(self._get_value()).__and__(value)
+    def __radd__(self, value):
+        return value + self._get_value()
 
-    def __divmod__(self, x):
-        return float(self._get_value()).__divmod__(float(x))
+    def __sub__(self, value):
+        return self._get_value() - value
 
-    def __eq__(self, x):
-        return float(self._get_value()).__eq__(float(x))
-
-    def __le__(self, x):
-        return float(self._get_value()).__le__(float(x))
-
-    def __lt__(self, x):
-        return float(self._get_value()).__lt__(float(x))
-
-    def __ge__(self, x):
-        return float(self._get_value()).__ge__(float(x))
-
-    def __gt__(self, x):
-        return float(self._get_value()).__gt__(float(x))
-
-    def __ne__(self, x):
-        return float(self._get_value()).__ne__(float(x))    
+    def __rsub__(self, value):
+        return value - self._get_value()
 
     def __mul__(self, value):
-        return float(self._get_value()).__mul__(value)
+        return self._get_value() * value
+
+    def __rmul__(self, value):
+        return value * self._get_value()
+
+    def __truediv__(self, value):
+        return self._get_value() / value
+
+    def __rtruediv__(self, value):
+        return self._get_value() / value
+
+    def __floordiv__(self, value):
+        return self._get_value() // value
+
+    def __rfloordiv__(self, value):
+        return self._get_value() // value    
+    
+    def __divmod__(self, x):
+        return divmod(self._get_value(),x)
+
+    def __eq__(self, x):
+        return self._get_value() == x
+
+    def __le__(self, x):
+        return self._get_value() <= x
+
+    def __lt__(self, x):
+        return self._get_value() < x
+
+    def __ge__(self, x):
+        return self._get_value() >= x
+
+    def __gt__(self, x):
+        return self._get_value() > x
+
+    def __ne__(self, x):
+        return self._get_value() != x
+
 
 
     # TODO: MOSHIK TO FINISH

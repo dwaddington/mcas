@@ -20,6 +20,7 @@ from .ndarray import ndarray
 from .torch_tensor import torch_tensor
 from .string import string
 from .float_number import float_number
+from .integer_number import integer_number
 from .shelf import shelf
 from .shelf import ShelvedCommon
 from .memoryresource import MemoryResource
