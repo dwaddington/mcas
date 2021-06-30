@@ -122,9 +122,9 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
 
-                # type: pymm.torch_tensor
-                elif (stype == DataType.DataType().NumberFloat or stype == DataType.DataType().NumberInteger):
-                    (existing, value) = pymm.number.existing_instance(self.mr, varname)
+                # type: pymm.float_number
+                elif (stype == DataType.DataType().NumberFloat):
+                    (existing, value) = pymm.float_number.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
@@ -191,6 +191,8 @@ class shelf():
             print("made torch_tensor instance from copy '{}' on shelf".format(name))
         elif isinstance(value, str):
             self.__dict__[name] = pymm.string.build_from_copy(self.mr, name, value)
+        elif isinstance(value, float):
+            self.__dict__[name] = pymm.float_number.build_from_copy(self.mr, name, value)            
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')            
         elif type(value) == type(None):
@@ -265,11 +267,11 @@ class shelf():
         return (isinstance(value, pymm.ndarray) or
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
-                isinstance(value, pymm.number)
+                isinstance(value, pymm.float_number)
         )
 
     def supported_types(self):
-        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.number"]
+        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.float_number"]
 
 
 

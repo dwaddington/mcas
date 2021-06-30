@@ -24,7 +24,7 @@ from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
 
-class number(Shadow):
+class float_number(Shadow):
     '''
     Number object (float or int) that is stored in the memory resource.  
     '''
@@ -55,8 +55,7 @@ class number(Shadow):
         if(hdr.Magic() != Constants.Constants().Magic):
             return (False, None)
 
-        if (hdr.Type() == DataType.DataType().NumberFloat or
-            hdr.Type() == DataType.DataType().NumberInteger):
+        if (hdr.Type() == DataType.DataType().NumberFloat):
             return (True, shelved_number(memory_resource, name, buffer[hdr_size + 4:]))
 
         # not a string
@@ -78,14 +77,8 @@ class shelved_number(ShelvedCommon):
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
             Header.HeaderAddVersion(builder, Constants.Constants().Version)
+            Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
 
-            if isinstance(number_value, float):
-                Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
-                self._type = DataType.DataType().NumberFloat
-            else:
-                Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
-                self._type = DataType.DataType().NumberInteger
-                                
             hdr = Header.HeaderEnd(builder)
             builder.FinishSizePrefixed(hdr)
             hdr_ba = builder.Output()
@@ -93,11 +86,7 @@ class shelved_number(ShelvedCommon):
             # allocate memory
             hdr_len = len(hdr_ba)
 
-            if isinstance(number_value, float):
-                value_bytes = str.encode(number_value.hex())
-            else:
-                value_bytes = number_value.to_bytes((number_value.bit_length() + 7) // 8, 'big')
-                
+            value_bytes = str.encode(number_value.hex())                
             value_len = hdr_len + len(value_bytes) 
 
             memref = memory_resource.create_named_memory(name, value_len, 1, False)
