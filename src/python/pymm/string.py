@@ -147,6 +147,12 @@ class shelved_string(ShelvedCommon):
             return s.__getitem__(key)
         else:
             raise TypeError
+
+    def persist(self):
+        '''
+        Flush cache and persistent all value memory
+        '''
+        self._value_named_memory.persist()        
     
     def __getattr__(self, name):
         if name not in ("encoding"):
