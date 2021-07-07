@@ -309,6 +309,13 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         else:
             return r # result may not be a tensor
 
+    def persist(self):
+        '''
+        Flush cache and persistent all value memory
+        '''
+        self._value_named_memory.persist()
+
+
 
 
 from collections.abc import Sequence

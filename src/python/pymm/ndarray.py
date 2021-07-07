@@ -139,7 +139,6 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
-            print("I THINK THE VALUE IS THERE! ", value_key)
             # entity already exists, load metadata            
             metadata = memory_resource.get_named_memory(metadata_key)
             hdr = pymmcore.ndarray_read_header(memoryview(metadata),type=type)
@@ -308,3 +307,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._value_named_memory = getattr(obj, '_value_named_memory', None)
         self._metadata_key = getattr(obj, '_metadata_key', None)
         self.name = getattr(obj, 'name', None)
+
+    def persist(self):
+        '''
+        Flush cache and persistent all value memory
+        '''
+        self._value_named_memory.persist()
+        
