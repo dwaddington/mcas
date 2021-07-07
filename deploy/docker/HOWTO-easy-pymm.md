@@ -47,7 +47,7 @@ Use s and s.x to access shelf...
 To force a "re-pull" from docker io, you can delete your images:
 
 ```bash
-docker rmi $(docker images -a -q)
+docker rmi $(docker images -a -q) -f
 ```
 
 Or selectively delete as follows:
