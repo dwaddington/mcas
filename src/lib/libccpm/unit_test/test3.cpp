@@ -137,8 +137,6 @@ TEST_F(Libccpm_test, list_container)
     ccl->container->push_back(8);
     ccl->commit();
     ASSERT_TRUE(ccl->container->size() == 3);
-
-    ccl->~cc_list(); /* CLEM, why would we do this? */
   }
 
   /* let's try reconsistution */
@@ -157,9 +155,49 @@ TEST_F(Libccpm_test, list_container)
     
     PLOG("list size: %lu", ccl->container->size());
     ASSERT_TRUE(ccl->container->size() == 4);
-  }
-  
+  }  
 }
+
+// Test adding new regions to the heap
+//
+TEST_F(Libccpm_test, list_container_2)
+{
+  std::size_t size = KB(128);
+  auto pr = aligned_alloc(4096,size);
+  ASSERT_NE(nullptr, pr);
+
+  /* persister defines a function used to persist/flush data */
+  pmem_persister persister;
+
+  /* create region vector */
+  ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(pr, size)));
+
+ 	using logged_int = ccpm::value_tracked<uint64_t, ccpm::tracker_log>;
+	using cc_list = ccpm::container_cc<eastl::list<logged_int, ccpm::allocator_tl>>;
+
+  ccpm::cca heap(&persister, rv);
+  
+  void *root = heap.allocate_root(sizeof(cc_list)); //heap.allocate(list_size);
+  ASSERT_TRUE(root);
+
+  auto ccl = new (root) cc_list(&persister, heap);
+  PLOG("ccl: %p", reinterpret_cast<void*>(ccl));
+    
+  ccl->container->push_back(6);
+  ccl->container->push_back(7);
+  ccl->container->push_back(8);
+  ccl->commit();
+  ASSERT_TRUE(ccl->container->size() == 3);
+
+  /* iterate */
+  for ( auto it = ccl->container->begin(); it != ccl->container->end(); ++it )
+    {
+      auto i = *it;
+      std::cerr << "value: " << i << "\n";
+    }
+
+}
+
 
 int main(int argc, char **argv)
 {
