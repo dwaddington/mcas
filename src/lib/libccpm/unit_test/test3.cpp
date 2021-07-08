@@ -190,12 +190,15 @@ TEST_F(Libccpm_test, list_container_2)
   ASSERT_TRUE(ccl->container->size() == 3);
 
   /* iterate */
+  unsigned count = 0;
   for ( auto it = ccl->container->begin(); it != ccl->container->end(); ++it )
     {
       auto i = *it;
-      std::cerr << "value: " << i << "\n";
+      std::cout << "value: " << i << "\n";
+      count++;
     }
 
+  ASSERT_TRUE(count == 3);
 }
 
 
