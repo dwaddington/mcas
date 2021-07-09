@@ -16,6 +16,8 @@ import flatbuffers
 import struct
 import gc
 
+
+
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
@@ -25,6 +27,8 @@ from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
 
+from .float_number import float_number
+
 class linked_list(Shadow):
     '''
     Floating point number that is stored in the memory resource. Uses value cache
@@ -32,11 +36,11 @@ class linked_list(Shadow):
     def __init__(self):
         pass
 
-    def make_instance(self, memory_resource: MemoryResource, name: str):
+    def make_instance(self, shelf, name: str):
         '''
         Create a concrete instance from the shadow
         '''
-        return shelved_linked_list(memory_resource, name)
+        return shelved_linked_list(shelf, name)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -72,8 +76,10 @@ class shelved_linked_list(ShelvedCommon):
     '''
     Shelved floating point number
     '''
-    def __init__(self, memory_resource, name):
+    def __init__(self, shelf, name):
 
+        self._shelf = shelf # retain reference to shelf
+        memory_resource = shelf.mr
         memref = memory_resource.open_named_memory(name)
 
         if memref == None:
@@ -120,4 +126,16 @@ class shelved_linked_list(ShelvedCommon):
 
         # save name
         self._name = name
+
+    def append(self, element):
+        '''
+        Add element to end of list
+        '''
+        if issubclass(type(element), ShelvedCommon): # implies it already on the shelf
+            return self._internal.append(element=None, name=element._name)
+
+        # new shelved instance
+        self._shelf.__setattr__('foobar', element)
+        return self._internal.append(element)
+        
 

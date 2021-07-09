@@ -83,6 +83,9 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
                                            PyObject * args,
                                            PyObject * kwargs);
 
+extern PyObject * pymmcore_create_metadata(PyObject * self,
+                                           PyObject * args,
+                                           PyObject * kwargs);
 
 #ifdef BUILD_PYMM_VALGRIND
 static PyObject * pymmcore_valgrind_trigger(PyObject * self,
@@ -103,6 +106,9 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"memoryview_addr",
     (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
+   //   {"create_metadata",
+   // (PyCFunction) pymmcore_create_metadata, METH_VARARGS | METH_KEYWORDS, "pymmcore_create_metadata(buffer,type)" },
+   
 #ifdef BUILD_PYMM_VALGRIND   
    {"valgrind_trigger",
     (PyCFunction) pymmcore_valgrind_trigger, METH_VARARGS | METH_KEYWORDS, pymmcore_valgrind_trigger_doc },

@@ -46,7 +46,8 @@ class ShelvedCommon:
         if name == 'memory':
             return self._value_named_memory.addr()
         if name == 'namedmemory':
-            return self._value_named_memory        
+            return self._value_named_memory
+
 #        else:
 #            raise AttributeError()
             
@@ -201,6 +202,10 @@ class shelf():
         if self._is_supported_shadow_type(value):
             self.__dict__[name] = value.make_instance(self.mr, name)
             print("made instance '{}' on shelf".format(name))
+        elif isinstance(value, pymm.linked_list):
+            # pass shelf itself as param
+            self.__dict__[name] = value.make_instance(self, name)
+            print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
             print("made ndarray instance from copy '{}' on shelf".format(name))
@@ -288,8 +293,7 @@ class shelf():
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
                 isinstance(value, pymm.float_number) or
-                isinstance(value, pymm.integer_number) or
-                isinstance(value, pymm.linked_list)
+                isinstance(value, pymm.integer_number)
         )
 
     def supported_types(self):

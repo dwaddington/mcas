@@ -60,7 +60,52 @@ ListType_dealloc(List *self)
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static PyObject * ListType_method_append(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"element",
+                                 "name",
+                                 NULL};
 
+  const char * element_name = nullptr;
+  PyObject * element_object = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "O|s",
+                                    const_cast<char**>(kwlist),
+                                    &element_object,
+                                    &element_name)) {
+     PyErr_SetString(PyExc_RuntimeError, "ListType_method_append unable to parse args");
+     return NULL;
+  }
+
+  if(element_name) { /* add a reference to an already shelved item */
+    PNOTICE("Append! shelved (%s)", element_name);
+  }
+  else {
+
+    if(PyLong_Check(element_object)) {
+      
+    }
+    else if(PyUnicode_Check(element_object)) {
+    }
+    else {
+      PyErr_SetString(PyExc_RuntimeError, "ListType_method_append don't know how to append this type");
+      return NULL;
+    }
+
+    PNOTICE("Append! new");
+  }
+
+  Py_RETURN_NONE;
+}
+
+
+static PyMethodDef ListType_methods[] = 
+  {
+   {"append", (PyCFunction) ListType_method_append, METH_VARARGS | METH_KEYWORDS, "append(a) -> append 'a' to list"},
+   {NULL}  /* Sentinel */
+  };
 
 static int
 ListType_init(List *self, PyObject *args, PyObject *kwds)
@@ -132,7 +177,7 @@ PyTypeObject ListType = {
   0,                       /* tp_weaklistoffset */
   0,                       /* tp_iter */
   0,                       /* tp_iternext */
-  0, //ListType_methods,         /* tp_methods */
+  ListType_methods,        /* tp_methods */
   0, //ListType_members,         /* tp_members */
   0,                       /* tp_getset */
   0,                       /* tp_base */
