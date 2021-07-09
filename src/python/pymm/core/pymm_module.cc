@@ -10,7 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define PYMMCORE_API_VERSION "v0.1.5"
+#define PYMMCORE_API_VERSION "v0.1.6"
 #define STATUS_TEXT "(CC=off)"
 #define PAGE_SIZE 4096
 
@@ -39,6 +39,7 @@
 // forward declaration of custom types
 //
 extern PyTypeObject MemoryResourceType;
+extern PyTypeObject ListType;
 
 PyDoc_STRVAR(pymmcore_version_doc,
              "version() -> Get module version");
@@ -147,7 +148,15 @@ PyInit_pymmcore(void)
   import_array();
 
   MemoryResourceType.tp_base = 0; // no inheritance
+  /* ready types */
   if(PyType_Ready(&MemoryResourceType) < 0) {
+    assert(0);
+    return NULL;
+  }
+
+  ListType.tp_base = 0; // no inheritance
+  /* ready types */
+  if(PyType_Ready(&ListType) < 0) {
     assert(0);
     return NULL;
   }
@@ -167,7 +176,14 @@ PyInit_pymmcore(void)
 
   Py_INCREF(&MemoryResourceType);
   rc = PyModule_AddObject(m, "MemoryResource", (PyObject *) &MemoryResourceType);
+  assert(rc == 0);
   if(rc) return NULL;
+
+  Py_INCREF(&ListType);
+  rc = PyModule_AddObject(m, "List", (PyObject *) &ListType);
+  assert(rc == 0);
+  if(rc) return NULL;
+
 
   return m;
 }

@@ -138,6 +138,15 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
                     
+                # type: pymm.integer_number
+                elif (stype == DataType.DataType().LinkedList):
+                    (existing, value) = pymm.linked_list.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                    
                     
                 # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
                 # if existing == True:
@@ -203,7 +212,7 @@ class shelf():
         elif isinstance(value, float):
             self.__dict__[name] = pymm.float_number.build_from_copy(self.mr, name, value)
         elif isinstance(value, int):
-            self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)                        
+            self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')            
         elif type(value) == type(None):
@@ -279,7 +288,8 @@ class shelf():
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
                 isinstance(value, pymm.float_number) or
-                isinstance(value, pymm.integer_number)
+                isinstance(value, pymm.integer_number) or
+                isinstance(value, pymm.linked_list)
         )
 
     def supported_types(self):
