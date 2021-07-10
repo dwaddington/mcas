@@ -143,7 +143,9 @@ class shelved_linked_list(ShelvedCommon):
             return self._internal.append(element=None, name=element._name)
         elif (isinstance(element, float) or isinstance(element, int)): # inline value
             return self._internal.append(element)
-        elif (isinstance(element, np.ndarray)): # use shelf to store value
+        elif (isinstance(element, np.ndarray) or
+              isinstance(element, str)):
+            # use shelf to store value
             self._tag += 1
             tag = self._tag
             name = '_' + self._name + '_' + str(tag)
@@ -152,6 +154,8 @@ class shelved_linked_list(ShelvedCommon):
 
         raise RuntimeError('unhandled type')
 
+    def __len__(self):
+        return self._internal.size()
 
     def __getitem__(self, item):
         if isinstance(item, int):

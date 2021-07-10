@@ -209,11 +209,18 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
   Py_RETURN_NONE;
 }
 
+PyObject * ListType_method_size(List *self, PyObject *args)
+{
+  return PyLong_FromUnsignedLong(self->list->container->size());
+}
+
+
 
 static PyMethodDef ListType_methods[] = 
   {
    {"append", (PyCFunction) ListType_method_append, METH_VARARGS | METH_KEYWORDS, "append(a) -> append 'a' to list"},
    {"getitem", (PyCFunction) ListType_method_getitem, METH_VARARGS | METH_KEYWORDS, "getitem(item) -> access slice"},
+   {"size", (PyCFunction) ListType_method_size, METH_NOARGS, "size() -> get size of list"},
    {NULL}  /* Sentinel */
   };
 
