@@ -20,6 +20,9 @@ import numpy
 import torch
 import weakref
 
+import numpy as np
+import torch
+
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
@@ -139,9 +142,9 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
                     
-                # type: pymm.integer_number
+                # type: pymm.linked_list (needs shelf)
                 elif (stype == DataType.DataType().LinkedList):
-                    (existing, value) = pymm.linked_list.existing_instance(self.mr, varname)
+                    (existing, value) = pymm.linked_list.existing_instance(self, varname)
                     if existing == True:
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
@@ -240,8 +243,8 @@ class shelf():
         if not name in self.__dict__:
             raise RuntimeError('invalid member {}'.format(name))
         else:
-            print("returning weak ref...")
-            return weakref.ref(self.__dict__[name])
+            return self.__dict__[name]
+#            return weakref.ref(self.__dict__[name])
             
     @methodcheck(types=[])
     def get_item_names(self):

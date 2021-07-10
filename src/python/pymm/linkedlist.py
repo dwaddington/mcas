@@ -15,8 +15,7 @@ import pymmcore
 import flatbuffers
 import struct
 import gc
-
-
+import numpy as np
 
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
@@ -29,12 +28,17 @@ from .shelf import ShelvedCommon
 
 from .float_number import float_number
 
+
+def colored(r, g, b, text):
+    return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
+
+
 class linked_list(Shadow):
     '''
     Floating point number that is stored in the memory resource. Uses value cache
     '''
     def __init__(self):
-        pass
+        print(colored(255,0,0, 'WARNING: linked_list is experimental and unstable!'))
 
     def make_instance(self, shelf, name: str):
         '''
@@ -42,10 +46,11 @@ class linked_list(Shadow):
         '''
         return shelved_linked_list(shelf, name)
 
-    def existing_instance(memory_resource: MemoryResource, name: str):
+    def existing_instance(shelf, name: str):
         '''
         Determine if an persistent named memory object corresponds to this type
-        '''                        
+        '''
+        memory_resource = shelf.mr
         buffer = memory_resource.get_named_memory(name)
         if buffer is None:
             return (False, None)
@@ -61,16 +66,16 @@ class linked_list(Shadow):
             return (False, None)
 
         if (hdr.Type() == DataType.DataType().LinkedList):
-            return (True, shelved_linked_list(memory_resource, name))
+            return (True, shelved_linked_list(shelf, name))
 
         # not a string
         return (False, None)
 
     def build_from_copy(memory_resource: MemoryResource, name: str, value):
         raise RuntimeError("not implemented!")
-        return shelved_linked_list(memory_resource, name, value=value)
+#        return shelved_linked_list(memory_resource, name, value=value)
 
-MEMORY_INCREMENT_SIZE=4096
+MEMORY_INCREMENT_SIZE=128*1024
 
 class shelved_linked_list(ShelvedCommon):
     '''
@@ -79,6 +84,8 @@ class shelved_linked_list(ShelvedCommon):
     def __init__(self, shelf, name):
 
         self._shelf = shelf # retain reference to shelf
+        self._tag = 0
+        
         memory_resource = shelf.mr
         memref = memory_resource.open_named_memory(name)
 
@@ -127,15 +134,37 @@ class shelved_linked_list(ShelvedCommon):
         # save name
         self._name = name
 
+        
     def append(self, element):
         '''
         Add element to end of list
         '''
         if issubclass(type(element), ShelvedCommon): # implies it already on the shelf
             return self._internal.append(element=None, name=element._name)
+        elif (isinstance(element, float) or isinstance(element, int)): # inline value
+            return self._internal.append(element)
+        elif (isinstance(element, np.ndarray)): # use shelf to store value
+            self._tag += 1
+            tag = self._tag
+            name = '_' + self._name + '_' + str(tag)
+            self._shelf.__setattr__(name, element)
+            return self._internal.append(element=None, tag=tag)
 
-        # new shelved instance
-        self._shelf.__setattr__('foobar', element)
-        return self._internal.append(element)
+        raise RuntimeError('unhandled type')
+
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            value, item_in_index = self._internal.getitem(item)
+            if item_in_index:
+                name = '_' + self._name + '_' + str(value)
+                try:
+                    return self._shelf.__getattr__(name)
+                except RuntimeError:
+                    raise RuntimeError('list member is missing from main index; did it get deleted?')
+            return value
+        else:
+            raise RuntimeError('slice criteria not supported')
+              
         
 

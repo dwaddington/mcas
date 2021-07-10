@@ -202,6 +202,42 @@ TEST_F(Libccpm_test, list_container_2)
 }
 
 
+typedef struct {
+  void * ptr;
+}
+Element;
+
+TEST_F(Libccpm_test, list_container_3)
+{
+  std::size_t size = KB(128);
+  auto pr = aligned_alloc(4096,size);
+  ASSERT_NE(nullptr, pr);
+
+  /* persister defines a function used to persist/flush data */
+  pmem_persister persister;
+
+  /* create region vector */
+  ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(pr, size)));
+
+ 	using logged_element = ccpm::value_tracked<Element, ccpm::tracker_log>;
+	using cc_list = ccpm::container_cc<eastl::list<logged_element, ccpm::allocator_tl>>;
+
+  ccpm::cca heap(&persister, rv);
+  
+  void *root = heap.allocate_root(sizeof(cc_list)); //heap.allocate(list_size);
+  ASSERT_TRUE(root);
+
+  auto ccl = new (root) cc_list(&persister, heap);
+  PLOG("ccl: %p", reinterpret_cast<void*>(ccl));
+    
+  ccl->container->push_back(Element{nullptr});
+  ccl->container->push_back(Element{nullptr});
+  ccl->container->push_back(Element{nullptr});
+
+  ASSERT_TRUE(ccl->container->size() == 3);
+}
+
+
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
