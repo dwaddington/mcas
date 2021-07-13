@@ -278,11 +278,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         return super().__xor__(value).asndarray()
 
 
-    # TODO... more
-
     # set item, e.g. x[2] = 2
-    def __setitem__(self, position, x):
-        return self._value_only_transaction(super().__setitem__, position, x)
+    # if we want transactionality on this we override it - but beware, it will cost!
+#    def __setitem__(self, position, x):
+#        return self._value_only_transaction(super().__setitem__, position, x)
 
     def flip(self, m, axis=None):
         return self._value_only_transaction(super().flip, m, axis)
