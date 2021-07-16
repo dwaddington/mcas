@@ -59,6 +59,13 @@ def test_ndarray(s):
     s.r3 = s.r.reshape((1,-1,))
     print(id(s.r3))
 
+    
+    s.r2.fill(2)
+    s.r3.fill(3)
+    print(s.r)
+    print(s.r2)
+    print(s.r3)
+    
     s.erase('r')
     s.erase('r2')
     s.erase('r3')
