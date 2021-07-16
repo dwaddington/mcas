@@ -271,10 +271,10 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
     # operations that return new views on same data.  we want to change
     # the behavior to give a normal volatile version
-    
-    def reshape(self, shape, order='C'):
-        x = self.clone() # copy
-        return x.reshape(shape)
+    #
+    #def reshape(self, shape, order='C'):
+    #    x = self.clone() # copy
+    #    return x.reshape(shape)
         
 
     def __array_finalize__(self, obj):

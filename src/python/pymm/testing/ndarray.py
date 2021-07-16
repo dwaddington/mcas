@@ -45,20 +45,40 @@ def test_ndarray(s):
 
     s.r = np.ndarray((3,4,))
     s.r.fill(1)
+    print(id(s.r))
+    
+    if (s.r.shape[0] != 3 or s.r.shape[1] != 4):
+        raise RuntimeError('shape check failed')
+
     s.r2 = s.r.reshape((2,6,))
+    print(id(s.r2))
+
+    if (s.r2.shape[0] != 2 or s.r2.shape[1] != 6):
+        raise RuntimeError('shape check failed')
+
     s.r3 = s.r.reshape((1,-1,))
+    print(id(s.r3))
 
     s.erase('r')
     s.erase('r2')
     s.erase('r3')
-        
-    
+            
     log("Testing: ndarray OK!")
+
+    
+def test_tf_example(shelf):
+    import tensorflow as tf
+    (X_train, _), (X_test, _) = tf.keras.datasets.mnist.load_data()
+
+    shelf.X = np.vstack([X_train, X_test])
+    shelf.X = shelf.X.reshape(shelf.X.shape[0], -1).astype(np.float32)
+    log("Testing: tf_example OK!")
 
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 
 s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 
 test_ndarray(s)
+test_tf_example(s)
 
 print(colored(255,255,255,"OK!"))
