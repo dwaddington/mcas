@@ -98,11 +98,12 @@ class MemoryResource(pymmcore.MemoryResource):
         recoveries = [val for val in all_items if val.endswith('-tx')]
         
         if len(recoveries) > 0:
-            raise RuntimeError('detected outstanding undo log condition: recovery not implemented')
+            raise RuntimeError('detected outstanding undo log condition: recovery not yet implemented')
 
     @methodcheck(types=[])        
     def list_items(self):
         all_items = super()._MemoryResource_get_named_memory_list()
+        # exclude values
         return [val for val in all_items if not val.endswith('-value')]
     
     @methodcheck(types=[str,int,int,bool])

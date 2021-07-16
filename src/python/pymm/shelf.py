@@ -46,7 +46,8 @@ class ShelvedCommon:
         if name == 'memory':
             return self._value_named_memory.addr()
         if name == 'namedmemory':
-            return self._value_named_memory        
+            return self._value_named_memory
+
 #        else:
 #            raise AttributeError()
             
@@ -138,6 +139,15 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
                     
+                # type: pymm.integer_number
+                elif (stype == DataType.DataType().LinkedList):
+                    (existing, value) = pymm.linked_list.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                    
                     
                 # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
                 # if existing == True:
@@ -192,6 +202,10 @@ class shelf():
         if self._is_supported_shadow_type(value):
             self.__dict__[name] = value.make_instance(self.mr, name)
             print("made instance '{}' on shelf".format(name))
+        elif isinstance(value, pymm.linked_list):
+            # pass shelf itself as param
+            self.__dict__[name] = value.make_instance(self, name)
+            print("made instance '{}' on shelf".format(name))
         elif isinstance(value, numpy.ndarray): # perform a copy instantiation (ndarray)
             self.__dict__[name] = pymm.ndarray.build_from_copy(self.mr, name, value)
             print("made ndarray instance from copy '{}' on shelf".format(name))
@@ -203,7 +217,7 @@ class shelf():
         elif isinstance(value, float):
             self.__dict__[name] = pymm.float_number.build_from_copy(self.mr, name, value)
         elif isinstance(value, int):
-            self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)                        
+            self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')            
         elif type(value) == type(None):
