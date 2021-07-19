@@ -289,9 +289,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
     # operations that return new views on same data.  we want to change
     # the behavior to give a normal volatile version
-    def reshape(self, shape, order='C'):
-        x = np.array(self) # copy constructor
-        return x.reshape(shape)
+#    def reshape(self, shape, order='C'):
+#        x = np.array(self) # copy constructor
+#        return x.reshape(shape)
         
 
     def __array_finalize__(self, obj):
