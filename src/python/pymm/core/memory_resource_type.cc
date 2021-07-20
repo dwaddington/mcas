@@ -130,8 +130,13 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
   if(backend == "hstore-mc") {
     PLOG("Using hstore-mc backend");
     std::map<std::string, std::string> params;
-    params["path"] = path;
-    params["addr"] = std::to_string(load_addr);
+
+    std::stringstream ss;
+    ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
+    params["dax_config"] = ss.str();
+    
+    // params["path"] = path;
+    //params["addr"] = std::to_string(load_addr);
     params["mm_plugin_path"] = CCPM_MM_PLUGIN_PATH;
     store = fact->create(debug_level,params);
   }
