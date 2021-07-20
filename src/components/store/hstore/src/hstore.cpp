@@ -125,7 +125,7 @@ hstore::hstore(
   , _pools{}
 {
 #if HEAP_MM
-  PLOG("Plugin path(%s)", mm_plugin_path_.data());
+  PLOG("hstore plugin path(%s)", mm_plugin_path_.data());
 #endif
 }
 

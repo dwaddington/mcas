@@ -80,7 +80,7 @@ def test_torch_tensor(s):
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 
 s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
-test_ndarray(s)
-test_torch_tensor(s)
+#test_ndarray(s)
+#test_torch_tensor(s)
 
 print(colored(255,255,255,"OK!"))

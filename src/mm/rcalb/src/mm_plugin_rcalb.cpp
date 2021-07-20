@@ -6,10 +6,12 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+//#define DEBUG /* enable log output */
+
 #include "../../mm_plugin_itf.h"
 #include "rc_alloc_lb.h"
 #include "logging.h"
-//#define DEBUG /* enable log output */
+
 
 namespace global
 {
