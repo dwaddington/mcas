@@ -112,6 +112,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
   else if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
   }
+  else if (backend == "hstore-mc") {
+    comp = load_component("libcomponent-hstore-mc.so", hstore_factory);
+  }  
   else if (backend == "mapstore") {
     comp = load_component("libcomponent-mapstore.so", mapstore_factory);
   }
@@ -124,11 +127,19 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
   auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
   assert(fact);
 
+  if(backend == "hstore-mc") {
+    PLOG("Using hstore-mc backend");
+    std::map<std::string, std::string> params;
+    params["path"] = path;
+    params["addr"] = std::to_string(load_addr);
+    params["mm_plugin_path"] = "/home/danielwaddington/mcas/build-debug/dist/lib/libmm-plugin-ccpm.so";
+    store = fact->create(debug_level,params);
+  }
   if(backend == "hstore" || backend == "hstore-cc") {
 
     std::stringstream ss;
     ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
-    //  PLOG("dax config: %s", ss.str().c_str());
+    PLOG("dax config: %s", ss.str().c_str());
     
     store = fact->create(debug_level,
                          {
@@ -142,7 +153,7 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
                          });
   }
-      
+  assert(store);   
   return store;
 }
 
@@ -184,14 +195,18 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   const std::string path = p_path ? p_path : DEFAULT_PMEM_PATH;  
 
   //  self->_store = g_store_map.get("hstore-cc", path, load_addr, debug_level);
-  self->_store = g_store_map.get("hstore", path, load_addr, globals::debug_level);
+  self->_store = g_store_map.get("hstore-mc", path, load_addr, globals::debug_level);
   
   assert(self->_store);
 
   if(force_new) {
     if(globals::debug_level > 0)
       PLOG("forcing new.");
-    self->_pool = self->_store->delete_pool(pool_name);
+
+    try {
+      self->_pool = self->_store->delete_pool(pool_name);
+    }
+    catch(...){}
   }
 
   if((self->_pool = self->_store->create_pool(pool_name, MiB(size_mb))) == 0) {
