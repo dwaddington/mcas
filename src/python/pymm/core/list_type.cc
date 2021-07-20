@@ -176,7 +176,7 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
   //  self->list->rollback(); /* recovery check */
   
   if(element_tag > 0) { /* add a reference to an already shelved item */
-    self->list->container->push_back(Element{SHELF_REFERENCE,.tag=element_tag});
+    self->list->container->push_back(Element{SHELF_REFERENCE,element_tag});
     PLOG("Appended SHELF_REFERENCE (%lu)",element_tag);
   }
   else {
@@ -189,12 +189,12 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
         PyErr_SetString(PyExc_RuntimeError, "ListType_method_append long overflowed system's long long type");
         return NULL;
       }
-      self->list->container->push_back(Element{INLINE_LONGLONGINT,.inline_longlongint=value});
+      self->list->container->push_back(Element{INLINE_LONGLONGINT,value});
       PLOG("Appended INLINE long long int");
     }
     else if(PyFloat_Check(element_object)) {
       double value = PyFloat_AsDouble(element_object);
-      self->list->container->push_back(Element{INLINE_FLOAT,.inline_float64=value});
+      self->list->container->push_back(Element{INLINE_FLOAT,value});
       PLOG("Appended INLINE float64");      
     }
     // else if(PyUnicode_Check(element_object)) {
