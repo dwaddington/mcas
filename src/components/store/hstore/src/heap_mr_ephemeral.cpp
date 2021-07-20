@@ -42,8 +42,8 @@ status_t heap_mr_shim::free(
 {
 	return
 		bytes
-		? _mm.deallocate(ptr, bytes)
-		: _mm.deallocate_without_size(ptr)
+		? _mm.deallocate(&ptr, bytes)
+		: _mm.deallocate_without_size(&ptr)
 		;
 }
 

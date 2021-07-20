@@ -13,6 +13,7 @@ add_subdirectory(unit_test)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/mm)
 #include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")

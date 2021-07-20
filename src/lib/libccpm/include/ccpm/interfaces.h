@@ -57,6 +57,7 @@ namespace ccpm
  *   (3) return the area located by the original value of ptr to free status
  *   (4) persist an invalidation of the note written in step 1.
  */
+
 typedef std::function<bool(const void * ptr)> ownership_callback_t;
 
 inline bool accept_all(const void *) { return true; }
@@ -98,15 +99,18 @@ public:
    *
    * @param regions Pointer/length regions of contiguous memory
    * @param resolver Access to an object which can resolve the ambiguity
-   *        over area ownership which occurs during iphase of allocate()
-   *        and free() calls.
+   *        over area ownership which occurs during a phase of allocate()
+   *        and free() calls. If the callee of the ownership_callback_t
+   *        function might own the area located by the arument, the callee
+   *        must return true. If the callee does not own the area, it should
+   *        return false.
    * @param force_init If true, force re-setting to empty
    *
    *
    * @return : True if memory was reset to empty
    **/
   virtual bool reconstitute(const region_span regions,
-                            ownership_callback_t resolver = nullptr,
+                            ownership_callback_t resolver = [] (const void *) -> bool { return true; },
                             const bool force_init = false) = 0;
 
   /* Allocate memory

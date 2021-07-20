@@ -127,7 +127,10 @@ static void __init_components(void)
   LOAD_SYMBOL(mm_plugin_destroy);
 
   __mm_funcs.mm_plugin_init();  
-  __mm_funcs.mm_plugin_create(nullptr, /* config */
+  __mm_funcs.mm_plugin_create(nullptr, /* persister */
+                              nullptr, /* regions */
+                              nullptr, /* callee_owned */
+                              nullptr, /* config */
                               nullptr, /* root pointer */
                               &__mm_heap);
 
@@ -234,7 +237,7 @@ EXPORT_C void mm_free(void* p) noexcept
     auto start = rdtsc();
 #endif
     
-    __mm_funcs.mm_plugin_deallocate_without_size(__mm_heap, p);
+    __mm_funcs.mm_plugin_deallocate_without_size(__mm_heap, &p);
 
 #ifdef LOG_TO_FILE
     globals::log->log("free", rdtsc()-start, p, 0, 0);
@@ -253,19 +256,18 @@ EXPORT_C void* mm_realloc(void* p, size_t newsize) noexcept
   if(!real::realloc) __get_os_functions();
 
   if(globals::intercept_active) {
-    void * new_ptr = nullptr;
 
 #ifdef LOG_TO_FILE
     auto start = rdtsc();
 #endif
 
-    __mm_funcs.mm_plugin_reallocate(__mm_heap, p, newsize, &new_ptr);
+    __mm_funcs.mm_plugin_reallocate(__mm_heap, &p, newsize);
 
 #ifdef LOG_TO_FILE
-    globals::log->log("realloc",rdtsc()-start, p, newsize, 0);
+    globals::log->log("realloc",rdtsc()-start, &p, newsize, 0);
 #endif
     
-    return new_ptr;
+    return p;
   }
   else {
     //return real::realloc(p, newsize);

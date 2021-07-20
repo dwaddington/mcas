@@ -50,7 +50,7 @@ TEST_F(Libmm_test, MM_plugin_wrapper)
   
   void * p = nullptr;
   ASSERT_TRUE(mm.allocate(1022, &p) == S_OK);
-  ASSERT_TRUE(mm.deallocate(p, 1022) == S_OK);  
+  ASSERT_TRUE(mm.deallocate(&p, 1022) == S_OK);  
   ASSERT_TRUE(munmap(slab_memory, slab_size) == 0);
 }
 

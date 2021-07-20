@@ -669,7 +669,7 @@ try
   if(!session) return E_FAIL;
 	/* 0 probably means that alignment is a don't care, which is the same as alignment 1 */
 	if ( alignment == 0 ) { alignment = 1; }
-#if 0 /* As with to mapstore, allocator (not hstore) deals with non-2^n alignments */
+#if 0 /* As with mapstore, allocator (not hstore) deals with non-2^n alignments */
 	if ( ( alignment & (alignment - 1) ) != 0  ) { return E_BAD_ALIGNMENT; }
 #endif
   auto r = session->lock(AK_INSTANCE TM_REF key, type, out_value, out_value_len, alignment);
