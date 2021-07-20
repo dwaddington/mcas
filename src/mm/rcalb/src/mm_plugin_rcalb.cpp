@@ -25,10 +25,10 @@ PUBLIC status_t mm_plugin_init()
   return S_OK;
 }
 
-PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(void *persister, const void *regions, void *callee_owned, const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
-
+  assert(out_heap);
   auto new_heap = new Heap(global::debug_level);
   *out_heap = reinterpret_cast<mm_plugin_heap_t>(new_heap);
 
@@ -95,20 +95,22 @@ PUBLIC status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t 
   return E_NOT_IMPL;
 }
 
-PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t n)
+PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void ** ptr, size_t n)
 {
   if(ptr == nullptr || n == 0) return S_OK;
   PPLOG("%s (%p, %lu)",__func__, ptr, n);
   auto h = reinterpret_cast<Heap*>(heap);
-  h->free(ptr, 0); // should use size   h->free(ptr, 0);
+  h->free(*ptr, 0); // should use size   h->free(ptr, 0);
+  *ptr = nullptr;
   return S_OK;
 }
 
-PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
+PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void ** ptr)
 {
   PPLOG("%s (%p)",__func__, ptr);
   auto h = reinterpret_cast<Heap*>(heap);
-  h->free(ptr, 0);
+  h->free(*ptr, 0);
+  *ptr = nullptr;
   return S_OK;
 }
 
@@ -123,17 +125,19 @@ PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out
   return S_OK;
 }
 
-PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t n, void ** out_ptr)
+PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void ** in_out_ptr, size_t n)
 {
-  if(ptr == nullptr)
-    return mm_plugin_allocate(heap, n, out_ptr);
-
-  if(n == 0 && ptr != nullptr)
-    return mm_plugin_deallocate_without_size(heap, ptr);
-
-  PPLOG("%s (%p, %lu)",__func__, ptr, n);
-  *out_ptr = nullptr;
-  return E_NOT_IMPL; /* we don't support reallocation */
+  if(*in_out_ptr == nullptr)
+    return mm_plugin_allocate(heap, n, in_out_ptr);
+  else if(n == 0)
+  {
+    return mm_plugin_deallocate_without_size(heap, in_out_ptr);
+  }
+  else {
+    PPLOG("%s (%p, %lu)",__func__, *in_out_ptr, n);
+    *in_out_ptr = nullptr;
+    return E_NOT_IMPL; /* we don't support reallocation */
+  }
 }
 
 PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t * out_size)
@@ -147,6 +151,11 @@ PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, s
   auto h = reinterpret_cast<Heap*>(heap);
   h->inject_allocation(ptr, size, 0);
   return S_OK;
+}
+
+PUBLIC  status_t mm_plugin_reconstitute(mm_plugin_heap_t heap, void *regions, void *callee_owns, int force_init)
+{
+  return E_NOT_IMPL;
 }
 
 PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)

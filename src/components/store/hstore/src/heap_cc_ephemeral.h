@@ -108,6 +108,8 @@ public:
 	friend struct heap_cc;
 
 	using common::log_source::debug_level;
+
+	/* initial construction */
 	explicit heap_cc_ephemeral(
 		unsigned debug_level
 		, impl::allocation_state_emplace *ase
@@ -119,6 +121,8 @@ public:
 		, const std::vector<byte_span> &rv_full
 		, const byte_span &pool0_heap_
 	);
+
+	/* crash-consistent recovery */
 	explicit heap_cc_ephemeral(
 		unsigned debug_level
 		, impl::allocation_state_emplace *ase
@@ -131,10 +135,11 @@ public:
 		, const byte_span &pool0_heap
 		, ccpm::ownership_callback_t f
 	);
-	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
 	heap_cc_ephemeral(const heap_cc_ephemeral &) = delete;
 	heap_cc_ephemeral& operator=(const heap_cc_ephemeral &) = delete;
+
 	void add_managed_region(const byte_span &r_full, const byte_span &r_heap, unsigned numa_node);
+	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
 };
 
 #endif

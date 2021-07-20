@@ -40,6 +40,8 @@ namespace
 	persister p_cc{};
 }
 
+/* initial cosntruction */
+
 heap_cc_ephemeral::heap_cc_ephemeral(
 	unsigned debug_level_
 	, impl::allocation_state_emplace *ase_
@@ -95,6 +97,7 @@ heap_cc_ephemeral::heap_cc_ephemeral(
   CPLOG(2, "%s : pool0_heap: %p.%zx", __func__, ::base(pool0_heap_), ::size(pool0_heap_));
 }
 
+/* initial cosntruction */
 heap_cc_ephemeral::heap_cc_ephemeral(
 	unsigned debug_level_
 	, impl::allocation_state_emplace *ase_
@@ -109,6 +112,7 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 	: heap_cc_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(&p_cc, ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)), id_, backing_file_, rv_full_, pool0_heap_)
 {}
 
+/* crash-consistent recovery */
 heap_cc_ephemeral::heap_cc_ephemeral(
 	unsigned debug_level_
 	, impl::allocation_state_emplace *ase_
@@ -121,7 +125,19 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 	, const byte_span &pool0_heap_
 	, ccpm::ownership_callback_t f
 )
-	: heap_cc_ephemeral(debug_level_, ase_, aspd_, aspk_, asx_, std::make_unique<ccpm::cca>(&p_cc, ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1), f), id_, backing_file_, rv_full_, pool0_heap_)
+	: heap_cc_ephemeral(
+		debug_level_
+		, ase_, aspd_, aspk_, asx_
+		, std::make_unique<ccpm::cca>(
+			&p_cc
+			, ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)
+			, f
+		)
+		, id_
+		, backing_file_
+		, rv_full_
+		, pool0_heap_
+	)
 {}
 
 void heap_cc_ephemeral::add_managed_region(

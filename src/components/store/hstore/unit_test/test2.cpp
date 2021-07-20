@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -18,15 +18,23 @@
 #include <gtest/gtest.h>
 #pragma GCC diagnostic pop
 
+#include <common/env.h>
 #include <common/utils.h>
 #include <api/components.h>
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
 
+#include <cstddef>
+#include <cstring>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+#if ! defined MAKE_SYNDROME_REPORT
+#define MAKE_SYNDROME_REPORT 0
+#endif
 
 using namespace component;
 
@@ -35,11 +43,9 @@ namespace {
 // The fixture for testing class Foo.
 class KVStore_test : public ::testing::Test {
 
-#if 0
   static constexpr std::size_t estimated_object_count_large = 64000000;
   /* More testing of table splits, at a performance cost */
   static constexpr std::size_t estimated_object_count_small = 1;
-#endif
   static constexpr std::size_t many_count_target_large = 2000000;
   /* Shorter test: use when PMEM_IS_PMEM_FORCE=0 */
   static constexpr std::size_t many_count_target_small = 400;
@@ -86,10 +92,8 @@ class KVStore_test : public ::testing::Test {
   }
 };
 
-#if 0
 constexpr std::size_t KVStore_test::estimated_object_count_small;
 constexpr std::size_t KVStore_test::estimated_object_count_large;
-#endif
 constexpr std::size_t KVStore_test::many_count_target_small;
 constexpr std::size_t KVStore_test::many_count_target_large;
 constexpr char KVStore_test::long_value[24];
@@ -99,6 +103,10 @@ bool KVStore_test::pmem_effective = ! getenv("PMEM_IS_PMEM_FORCE") || getenv("PM
 component::IKVStore * KVStore_test::_kvstore;
 
 const std::size_t KVStore_test::estimated_object_count =
+/*
+ * Any estimated count should work, subject to some size limit. A small count,
+ * such as 0, causes more allocations and therefore a more rigorous test.
+ */
 #if 0
   pmem_simulated ? estimated_object_count_small : estimated_object_count_large
 #else
@@ -106,10 +114,17 @@ const std::size_t KVStore_test::estimated_object_count =
 #endif
   ;
 
+const std::size_t KVStore_test::many_count_target =
+#if MAKE_SYNDROME_REPORT
+  20
+#else
+  pmem_simulated ? many_count_target_small : many_count_target_large
+#endif
+  ;
+
 constexpr unsigned KVStore_test::many_key_length;
 constexpr unsigned KVStore_test::many_value_length;
 
-const std::size_t KVStore_test::many_count_target = pmem_simulated ? many_count_target_small : many_count_target_large;
 std::size_t KVStore_test::many_count_actual;
 std::vector<KVStore_test::kv_t> KVStore_test::kvv;
 
@@ -122,6 +137,7 @@ TEST_F(KVStore_test, Instantiate)
   /* create object instance through factory */
   /* This test only: use hstore-pe. the version compiled with simulated injection */
   auto link_library = "libcomponent-" + store_map::impl->name + "-pe.so";
+  std::cerr << "link library: " << link_library << " mm plugin " << common::env_value<const char *>("MM_PLUGIN_PATH", "no_plugin_path") << "\n";
   component::IBase * comp = component::load_component(link_library,
                                                       store_map::impl->factory_id);
 
@@ -132,8 +148,10 @@ TEST_F(KVStore_test, Instantiate)
     fact->create(
       0
       , {
-          { +component::IKVStore_factory::k_dax_config, store_map::location }
+          { +component::IKVStore_factory::k_name, "numa0"}
+          , { +component::IKVStore_factory::k_dax_config, store_map::location }
           , { +component::IKVStore_factory::k_debug, debug_level() }
+          , { +component::IKVStore_factory::k_mm_plugin_path, common::env_value<const char *>("MM_PLUGIN_PATH", "no_plugin_path") }
         }
     );
 }
@@ -216,38 +234,84 @@ TEST_F(KVStore_test, PopulateMany)
   }
 }
 
+/*
+ * We would like to generate "crashes" with some reasonable frequency,
+ * but not at every store. (Every store would be too slow, at least
+ * when using mmap to simulate persistent store). We use a Fibonacci
+ * series to produce crashes at decreasingly frequent intervals.
+ *
+ * _p0 and _p1 produce a Fibonacci series in perishable_count
+ */
+struct fib
+{
+	std::uint64_t _p0;
+	std::uint64_t _p1;
+	/* defined in perishable, but that definition not visibe to test cases */
+	static constexpr auto use_syndrome = std::numeric_limits<std::uint64_t>::max();
+	fib()
+		: _p0(0)
+		, _p1(1)
+	{}
+	std::uint64_t value() const
+	{
+#if MAKE_SYNDROME_REPORT
+		return use_syndrome;
+#else
+		return _p0 + _p1;
+#endif
+	}
+
+	std::uint64_t step()
+	{
+		auto v = value();
+#if 0
+/*
+ * Crash after every other perishable operation. Guarantees progress, but is slow.
+ */
+#else
+/*
+ * Crash in decreasing frequency, by Fibonacci sequence.
+ */
+		_p0 = _p1;
+		_p1 = v;
+#endif
+		return v;
+	}
+};
+
+std::ostream &operator<<(std::ostream &o_, fib f_)
+{
+	if ( f_.value() == fib::use_syndrome )
+	{
+		o_ << "(syndrome)";
+	}
+	else
+	{
+		o_ << f_.value();
+	}
+	return o_;
+}
+
 TEST_F(KVStore_test, PutMany)
 {
   /* We will try the inserts many times, as the perishable timer will abort all but the last attempt */
   bool finished = false;
 
   _kvstore->debug(0, 0 /* enable */, 0);
-  /*
-   * We would like to generate "crashes" with some reasonable frequency,
-   * but not at every store. (Every store would be too slow, at least
-   * when using mmap to simulate persistent store). We use a Fibonacci
-   * series to produce crashes at decreasingly frequent intervals.
-   *
-   * p0 and p1 produce a Fibonacci series in perishable_count
-   */
-  unsigned p0 = 0;
-  unsigned p1 = 1;
-  for (
-    unsigned perishable_count = p0 + p1
+  for ( fib perishable_count{}
     ; ! finished
-    ; perishable_count = p0 + p1, p0 = p1, p1 = perishable_count
+    ; perishable_count.step()
     )
   {
-    unsigned extant_count = 0;
-    unsigned fail_count = 0;
-    unsigned succeed_count = 0;
-    _kvstore->debug(0, 1 /* reset */, perishable_count);
+    _kvstore->debug(0, 1 /* reset */, perishable_count.value());
     _kvstore->debug(0, 0 /* enable */, true);
+
+    unsigned extant_count = 0;
+    unsigned succeed_count = 0;
+    unsigned fail_count = 0;
     try
     {
       pool_open p(_kvstore, pool_name());
-
-      std::mt19937_64 r0{};
 
       for ( auto &kv : kvv )
       {
@@ -299,7 +363,7 @@ TEST_F(KVStore_test, GetMany)
     auto count = _kvstore->count(p.pool());
     {
       /* count should be close to PutMany many_count_actual; duplicate keys are the difference */
-      EXPECT_LE(many_count_actual * 99 / 100, count);
+      EXPECT_LE(double(many_count_actual) * 99. / 100., count);
     }
     {
       std::size_t mismatch_count = 0;
@@ -334,31 +398,20 @@ TEST_F(KVStore_test, UpdateMany)
   bool finished = false;
 
   _kvstore->debug(0, 0 /* enable */, 0);
-  /*
-   * We would like to generate "crashes" with some reasonable frequency,
-   * but not at every store. (Every store would be too slow, at least
-   * when using mmap to simulate persistent store). We use a Fibonacci
-   * series to produce crashes at decreasingly frequent intervals.
-   *
-   * p0 and p1 produce a Fibonacci series in perishable_count
-   */
-  unsigned p0 = 0;
-  unsigned p1 = 1;
-  for (
-    unsigned perishable_count = p0 + p1
+  for ( fib perishable_count{}
     ; ! finished
-    ; perishable_count = p0 + p1, p0 = p1, p1 = perishable_count
+    ; perishable_count.step()
     )
   {
-    unsigned fail_count = 0;
-    unsigned succeed_count = 0;
-    _kvstore->debug(0, 1 /* reset */, perishable_count);
+    _kvstore->debug(0, 1 /* reset */, perishable_count.value());
     _kvstore->debug(0, 0 /* enable */, true);
+
+    unsigned extant_count = 0;
+    unsigned succeed_count = 0;
+    unsigned fail_count = 0;
     try
     {
       pool_open p(_kvstore, pool_name());
-
-      std::mt19937_64 r0{};
 
       for ( auto &kv : kvv )
       {
@@ -366,6 +419,16 @@ TEST_F(KVStore_test, UpdateMany)
         const auto &key = std::get<0>(kv);
         const auto &value = std::get<1>(kv);
         const auto update_value = value + ((key[0] & 1) ? "X" : "") + ((key[0] & 2) ? long_value : "");
+
+        void * extant_value = nullptr;
+        size_t extant_value_len = 0;
+        auto gr = _kvstore->get(p.pool(), key, extant_value, extant_value_len);
+        ASSERT_EQ(S_OK, gr);
+        if ( extant_value_len == update_value.size() && 0 == std::memcmp(extant_value, update_value.c_str(), extant_value_len) )
+        {
+          ++extant_count;
+        }
+        else
         {
           auto r = _kvstore->put(p.pool(), key, update_value.c_str(), update_value.length());
           EXPECT_EQ(S_OK, r);
@@ -378,9 +441,10 @@ TEST_F(KVStore_test, UpdateMany)
             ++fail_count;
           }
         }
+        _kvstore->free_memory(extant_value);
       }
-      EXPECT_EQ(many_count_target, succeed_count + fail_count);
-      many_count_actual = succeed_count;
+      /* Due to forced crashes we may never see a success or failure, but all new values should exist */
+      EXPECT_EQ(many_count_actual, extant_count + succeed_count);
       finished = true;
       /* Done with forcing crashes */
       _kvstore->debug(0, 0 /* enable */, false);
@@ -443,16 +507,16 @@ TEST_F(KVStore_test, EraseMany)
 {
   ASSERT_TRUE(_kvstore);
   bool finished = false;
+  auto erase_count = 0;
 
-  unsigned p0 = 0;
-  unsigned p1 = 1;
-  for (
-    auto perishable_count = p0 + p1
+  _kvstore->debug(0, 0 /* enable */, 0);
+  for ( fib perishable_count{}
     ; ! finished
-    ; perishable_count = p0 + p1, p0 = p1, p1 = perishable_count
+    ; perishable_count.step()
     )
   {
-    auto erase_count = 0;
+    _kvstore->debug(0, 1 /* reset */, perishable_count.value() );
+    _kvstore->debug(0, 0 /* enable */, true);
     try
     {
       pool_open p(_kvstore, pool_name());

@@ -406,7 +406,7 @@ status_t Pool_instance::put(const std::string &key,
       i->second._ptr = p._ptr;
 
       /* release old memory*/
-      try {  _mm_plugin.deallocate(p_to_free, len_to_free);      }
+      try {  _mm_plugin.deallocate(&p_to_free, len_to_free);      }
       catch(...) {  throw Logic_exception("unable to release old value memory");   }
     }
 
@@ -719,7 +719,7 @@ status_t Pool_instance::erase(const std::string &key)
   write_touch();
   _map->erase(i);
 
-  _mm_plugin.deallocate(i->second._ptr, i->second._length);
+  _mm_plugin.deallocate(&i->second._ptr, i->second._length);
   aal.deallocate(i->second._value_lock, 1); //, DEFAULT_ALIGNMENT);
 
   return S_OK;
@@ -847,7 +847,7 @@ status_t Pool_instance::resize_value(const std::string &key,
   memcpy(buffer, i->second._ptr, size_to_copy);
 
   /* free previous memory */
-  _mm_plugin.deallocate(i->second._ptr, i->second._length);
+  _mm_plugin.deallocate(&i->second._ptr, i->second._length);
 
   i->second._ptr = buffer;
   i->second._length = new_size;
@@ -891,9 +891,9 @@ status_t Pool_instance::free_pool_memory(const void *addr, const size_t size) {
     return E_INVAL;
 
   if(size)
-    _mm_plugin.deallocate(const_cast<void *>(addr), size);
+    _mm_plugin.deallocate(const_cast<void **>(&addr), size);
   else
-    _mm_plugin.deallocate_without_size(const_cast<void *>(addr));
+    _mm_plugin.deallocate_without_size(const_cast<void **>(&addr));
 
   /* the region memory is not freed, only memory in region */
   return S_OK;

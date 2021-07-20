@@ -33,7 +33,7 @@ PUBLIC status_t mm_plugin_init()
  * 
  * @return 
  */
-PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(void *persister, const void *regions, void *callee_owned, const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   struct heap_t * inst = malloc(sizeof(struct heap_t));
   memset(inst, 0, sizeof(struct heap_t));
@@ -175,9 +175,10 @@ PUBLIC status_t mm_plugin_aligned_allocate_offset(mm_plugin_heap_t heap, size_t 
  *
  * @return S_OK or E_INVAL;
  */
-PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t size)
+PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void ** ptr, size_t size)
 {
-  free(ptr);
+  free(*ptr);
+  *ptr = 0;
 
   ((struct heap_t*)heap)->_free_count++;
   return S_OK;
@@ -192,9 +193,10 @@ PUBLIC status_t mm_plugin_deallocate(mm_plugin_heap_t heap, void * ptr, size_t s
  * 
  * @return S_OK
  */
-PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void * ptr)
+PUBLIC status_t mm_plugin_deallocate_without_size(mm_plugin_heap_t heap, void ** ptr)
 {
-  free(ptr);
+  free(*ptr);
+  *ptr = 0;
   ((struct heap_t*)heap)->_free_count++;
   return S_OK;
 }
@@ -223,15 +225,14 @@ PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out
  * Resize an existing allocation
  * 
  * @param heap Heap context
- * @param ptr Pointer to existing allocated region
+ * @param in_out_ptr Address of [in] pointer to existing allocated region, [out] New reallocated region or null on unable to reallocate
  * @param size New size in bytes
- * @param ptr [out] New reallocated region or null on unable to reallocate
  * 
  * @return S_OK
  */
-PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void * ptr, size_t size, void ** out_ptr)
+PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void ** in_out_ptr, size_t size)
 {
-  *out_ptr = realloc(ptr, size);
+  *in_out_ptr = realloc(*in_out_ptr, size);
   return S_OK;
 }
 

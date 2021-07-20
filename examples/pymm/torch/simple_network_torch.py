@@ -20,6 +20,7 @@ s.x = torch.linspace(-math.pi, math.pi, 2000, dtype=dtype)
 #x = s.x.as_tensor() 
 x = s.x
 print (type(s.x))
+
 s.y = torch.sin(s.x)
 
 # Randomly initialize weights

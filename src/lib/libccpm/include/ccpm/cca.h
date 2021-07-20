@@ -38,8 +38,6 @@ namespace ccpm
 		top_vec_t::difference_type _last_top_free;
 		persist_type _persist;
 
-		explicit cca(persist_type persist);
-
 		void init(
 			region_span regions
 			, ownership_callback_t resolver
@@ -49,6 +47,8 @@ namespace ccpm
 		explicit cca(persist_type persist, region_span regions, ownership_callback_t resolver);
 
 		explicit cca(persist_type persist, region_span regions);
+
+		explicit cca(persist_type persist);
 
 		~cca();
 

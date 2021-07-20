@@ -27,8 +27,34 @@
 constexpr unsigned heap_mc_ephemeral::log_min_alignment;
 constexpr unsigned heap_mc_ephemeral::hist_report_upper_bound;
 
-heap_mc_shim::heap_mc_shim(common::string_view path)
-	: _mm(std::string(path), "", nullptr)
+namespace
+{
+	struct persister final
+		: public ccpm::persister
+	{
+		void persist(common::byte_span s) override
+		{
+			::pmem_persist(::base(s), ::size(s));
+		}
+	};
+	persister p_cc{};
+}
+
+heap_mc_shim::heap_mc_shim(
+	common::string_view path
+	, ccpm::persister *pe
+	, gsl::span<common::byte_span> range
+	, std::function<bool(const void *)> callee_owns
+)
+	: _mm(std::string(path), pe, &range, &callee_owns, "", nullptr)
+{
+}
+
+heap_mc_shim::heap_mc_shim(
+	common::string_view path
+	, ccpm::persister *pe
+)
+	: _mm(std::string(path), pe, nullptr, nullptr, "", nullptr)
 {
 }
 
@@ -38,7 +64,7 @@ bool heap_mc_shim::reconstitute(
 	, bool // force_init
 )
 {
-	return true; /* No reconstitute support, so every use must be "initialize". */
+	return true; /* Only reconsstitute support is in the constructor. */
 }
 
 status_t heap_mc_shim::allocate(
@@ -61,8 +87,8 @@ status_t heap_mc_shim::free(
 {
 	return
 		bytes
-		? _mm.deallocate(ptr, bytes)
-		: _mm.deallocate_without_size(ptr)
+		? _mm.deallocate(&ptr, bytes)
+		: _mm.deallocate_without_size(&ptr)
 		;
 }
 
@@ -165,6 +191,7 @@ heap_mc_ephemeral::heap_mc_ephemeral(
   CPLOG(2, "%s : pool0_heap: %p.%zx", __func__, ::base(pool0_heap_), ::size(pool0_heap_));
 }
 
+/* initial */
 heap_mc_ephemeral::heap_mc_ephemeral(
 	unsigned debug_level_
 	, common::string_view plugin_path_
@@ -180,7 +207,10 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 	: heap_mc_ephemeral(
 		debug_level_
 		, ase_, aspd_, aspk_, asx_
-		, std::make_unique<heap_mc_shim>(plugin_path_)
+		, std::make_unique<heap_mc_shim>(
+			plugin_path_
+			, &p_cc
+		)
 		, id_
 		, backing_file_
 		, rv_full_
@@ -189,6 +219,7 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 {
 }
 
+/* crach-consistent reconstitute */
 heap_mc_ephemeral::heap_mc_ephemeral(
 	unsigned debug_level_
 	, common::string_view plugin_path_
@@ -200,17 +231,22 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 	, string_view backing_file_
 	, const std::vector<byte_span> rv_full_
 	, const byte_span pool0_heap_
-	, ccpm::ownership_callback_t
+	, ccpm::ownership_callback_t ownership_callback_
 )
 	: heap_mc_ephemeral(
 		debug_level_
 		, ase_, aspd_, aspk_, asx_
-		, std::make_unique<heap_mc_shim>(plugin_path_)
+		, std::make_unique<heap_mc_shim>(
+			plugin_path_
+			, &p_cc
+			, ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)
+			, ownership_callback_
+		)
 		, id_
 		, backing_file_
 		, rv_full_
 		, pool0_heap_
-		)
+	)
 {
 }
 

@@ -26,9 +26,11 @@
 #include <common/byte_span.h>
 #include <common/string_view.h>
 #include <nupm/region_descriptor.h>
+#include <gsl/span>
 
 #include <algorithm> /* min, swap */
 #include <cstddef> /* size_t */
+#include <functional> /* function */
 #include <memory> /* unique_ptr */
 #include <vector>
 
@@ -45,7 +47,8 @@ struct heap_mc_shim
 private:
 	MM_plugin_wrapper _mm;
 public:
-	heap_mc_shim(common::string_view path);
+	heap_mc_shim(common::string_view path, ccpm::persister *pe, gsl::span<common::byte_span> range, std::function<bool(const void *)> callee_owns);
+	heap_mc_shim(common::string_view path, ccpm::persister *pe);
 
 	bool reconstitute(
 		ccpm::region_span regions
