@@ -226,7 +226,7 @@ public:
       if(access(path.c_str(), F_OK) != 0) {
         path = DEFAULT_MM_PLUGIN_LOCATION + path;
         if(access(path.c_str(), F_OK) != 0) {
-          PERR("inaccessible plugin path (%s)", mm_plugin_path_it->second.c_str());
+          PERR("inaccessible plugin path (%s) and (%s)", mm_plugin_path_it->second.c_str(), path.c_str());
           throw General_exception("unable to open mm_plugin");
         }
         checked_mm_plugin_path = path;
