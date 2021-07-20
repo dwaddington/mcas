@@ -14,6 +14,8 @@
 #ifndef __PYMM_PYTHON_CONFIG_H__
 #define __PYMM_PYTHON_CONFIG_H__
 
+#define CCPM_MM_PLUGIN_PATH "@CMAKE_INSTALL_PREFIX@/lib/libmm-plugin-ccpm.so"
+
 namespace globals {
   static unsigned long debug_level;
 };

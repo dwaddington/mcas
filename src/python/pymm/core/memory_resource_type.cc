@@ -132,7 +132,7 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
     std::map<std::string, std::string> params;
     params["path"] = path;
     params["addr"] = std::to_string(load_addr);
-    params["mm_plugin_path"] = "/home/danielwaddington/mcas/build-debug/dist/lib/libmm-plugin-ccpm.so";
+    params["mm_plugin_path"] = CCPM_MM_PLUGIN_PATH;
     store = fact->create(debug_level,params);
   }
   if(backend == "hstore" || backend == "hstore-cc") {
