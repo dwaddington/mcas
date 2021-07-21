@@ -231,6 +231,9 @@ public:
         }
         checked_mm_plugin_path = path;
       }
+      else {
+        checked_mm_plugin_path = path;
+      }
     }
     
     component::IKVStore *obj =
