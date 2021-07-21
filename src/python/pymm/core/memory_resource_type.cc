@@ -138,9 +138,25 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
     return nullptr;
   }
 
+  /* try adding default path if needed */
+  std::string checked_mm_plugin_path = mm_plugin_path;
+  if(checked_mm_plugin_path != "") /* empty means use default */
+  {   
+    std::string path = mm_plugin_path;
+    if(access(path.c_str(), F_OK) != 0) { /* is not accessible */
+        path = LIB_INSTALL_PATH + path;
+        if(access(path.c_str(), F_OK) != 0) {
+          PERR("inaccessible plugin path (%s) and (%s)", mm_plugin_path.c_str(), path.c_str());
+          throw General_exception("unable to open mm_plugin");
+        }
+        checked_mm_plugin_path = path;
+    }
+  }
+
+
   IKVStore* store = nullptr;
   auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
-  assert(fact);
+  assert(fact);  
 
   if(backend == "hstore-mc" || backend == "hstore-mr") {
     
@@ -152,7 +168,7 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
                           {+component::IKVStore_factory::k_dax_config, ss.str()},
-                          {+component::IKVStore_factory::k_mm_plugin_path, mm_plugin_path}
+                          {+component::IKVStore_factory::k_mm_plugin_path, checked_mm_plugin_path}
                          });
   }
   else if(backend == "hstore" || backend == "hstore-cc") {
@@ -180,7 +196,7 @@ IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
       store = fact->create(debug_level,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-                          {+component::IKVStore_factory::k_mm_plugin_path, mm_plugin_path}
+                          {+component::IKVStore_factory::k_mm_plugin_path, checked_mm_plugin_path}
                          });      
     }
   }
