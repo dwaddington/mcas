@@ -22,7 +22,7 @@ using offset_t = std::size_t;
 #endif
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-pedantic"
+#pragma GCC diagnostic ignored "-Wpedantic"
 
 #include <boost/icl/interval_map.hpp>
 #include <boost/icl/right_open_interval.hpp>
