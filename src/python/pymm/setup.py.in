@@ -21,7 +21,7 @@ for key, value in cfg_vars.items():
         if(value == 1):
             include_dir = '/usr/include/${PYTHON_FILENAME}'
 
-extra_compile_flags = ['-fPIC','-std=c++17','-g','-O2','-DPYMM', '-DCONFIG_DEBUG']
+extra_compile_flags = ['-fPIC','-std=c++14','-g','-O2','-DPYMM', '-DCONFIG_DEBUG']
 flag_build_pymm_valgrind = os.environ.get('BUILD_PYMM_VALGRIND', None)
 if flag_build_pymm_valgrind != None:
     extra_compile_flags.append("-DBUILD_PYMM_VALGRIND")
