@@ -5,7 +5,10 @@ project(pymm CXX)
 option(BUILD_PYMM_NOPACKAGE "do not build a python package - turn ON for development mode" OFF)
 option(BUILD_PYMM_VALGRIND "build support for valgrind triggers" OFF)
 
-#set(BUILD_PYMM_NOPACKAGE ON)
+# set PYMM_DEV=1 in your environment to turn this on
+if ($ENV{PYMM_DEV})
+  set(BUILD_PYMM_NOPACKAGE ON)
+endif()
 
 if (BUILD_PYMM_VALGRIND)
   set(EXTRA_FLAGS "BUILD_PYMM_VALGRIND=1")
