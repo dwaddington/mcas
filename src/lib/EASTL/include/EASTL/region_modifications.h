@@ -22,7 +22,7 @@ using offset_t = std::size_t;
 #endif
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpermissive"
+#pragma GCC diagnostic ignored "-fpermissive"
 
 #include <boost/icl/interval_map.hpp>
 #include <boost/icl/right_open_interval.hpp>
