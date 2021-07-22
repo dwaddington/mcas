@@ -127,10 +127,7 @@ static void __init_components(void)
   LOAD_SYMBOL(mm_plugin_destroy);
 
   __mm_funcs.mm_plugin_init();  
-  __mm_funcs.mm_plugin_create(nullptr, /* persister */
-                              nullptr, /* regions */
-                              nullptr, /* callee_owned */
-                              nullptr, /* config */
+  __mm_funcs.mm_plugin_create(nullptr, /* config */
                               nullptr, /* root pointer */
                               &__mm_heap);
 

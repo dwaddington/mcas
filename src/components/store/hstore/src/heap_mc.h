@@ -17,50 +17,59 @@
 
 #include "hstore_config.h"
 
-#include "as_emplace.h"
-#include "cptr.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
 #include "persistent.h"
 #include "persister_nupm.h"
+#include "pin_control.h"
 #include "trace_flags.h"
-#include "valgrind_memcheck.h"
 
 #include <boost/icl/interval_set.hpp>
-#include <ccpm/interfaces.h>
 #include <common/byte_span.h>
 #include <common/exceptions.h> /* General_exception */
-#include <common/logging.h> /* log_source */
 #include <common/string_view.h>
 #include <nupm/region_descriptor.h>
 
 #include <algorithm>
 #include <array>
 #include <cstddef> /* size_t, ptrdiff_t */
-#include <memory>
+#include <memory> /* unique_ptr */
 #include <vector>
 
 struct dax_manager;
 
 namespace impl
 {
-	struct allocation_state_pin;
+	struct allocation_state_combined;
+	struct allocation_state_emplace;
 	struct allocation_state_extend;
+	struct allocation_state_pin;
 }
 
-struct heap_mc_ephemeral;
+struct cptr;
+
+struct heap_mm_ephemeral;
 
 struct heap_mc
 {
+private:
 	using byte_span = common::byte_span;
 	using string_view = common::string_view;
-private:
 	byte_span _pool0_full; /* entire extent of pool 0 */
 	byte_span _pool0_heap; /* portion of pool 0 which can be used for the heap */
 	unsigned _numa_node;
 	std::size_t _more_region_uuids_size;
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
-	std::unique_ptr<heap_mc_ephemeral> _eph;
+	std::unique_ptr<heap_mm_ephemeral> _eph;
+	pin_control<heap_mc> _pin_data;
+	pin_control<heap_mc> _pin_key;
+
+	void pin_data_arm(cptr &cptr) const;
+	void pin_key_arm(cptr &cptr) const;
+	char *pin_data_get_cptr() const;
+	char *pin_key_get_cptr() const;
+	void pin_data_disarm() const;
+	void pin_key_disarm() const;
 
 public:
 	explicit heap_mc(
@@ -73,8 +82,8 @@ public:
 		, byte_span pool0_full
 		, byte_span pool0_heap
 		, unsigned numa_node
-		, string_view id_
-		, string_view backing_file_
+		, string_view id
+		, string_view backing_file
 	);
 
 	explicit heap_mc(
@@ -83,8 +92,8 @@ public:
 		, const std::unique_ptr<dax_manager> &dax_manager
 		, string_view id
 		, string_view backing_file
-		, const byte_span *iov_addl_first_
-		, const byte_span *iov_addl_last_
+		, const byte_span *iov_addl_first
+		, const byte_span *iov_addl_last
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -97,37 +106,40 @@ public:
 	~heap_mc();
 
 	static constexpr std::uint64_t magic_value() { return 0x7c84297de2de94a3; }
-	static void *iov_limit(const byte_span &r);
 
 	auto grow(
-		const std::unique_ptr<dax_manager> & dax_manager_
-		, std::uint64_t uuid_
-		, std::size_t increment_
+		const std::unique_ptr<dax_manager> & dax_manager
+		, std::uint64_t uuid
+		, std::size_t increment
 	) -> std::size_t;
 
 	void quiesce();
 
-	void alloc(persistent_t<void *> *p, std::size_t sz, std::size_t alignment);
-	void free(persistent_t<void *> *p, std::size_t sz);
+	void alloc(persistent_t<void *> &p, std::size_t sz, std::size_t alignment);
+	void *alloc_tracked(std::size_t sz, std::size_t alignment);
+	void inject_allocation(const void * p, std::size_t sz);
+	void free(persistent_t<void *> &p, std::size_t sz);
+	void free_tracked(const void *p, std::size_t sz);
 
 	void emplace_arm() const;
 	void emplace_disarm() const;
 
-	impl::allocation_state_pin &aspd() const;
-	impl::allocation_state_pin &aspk() const;
-	void pin_data_arm(cptr &cptr) const;
-	void pin_key_arm(cptr &cptr) const;
-
-	char *pin_data_get_cptr() const;
-	char *pin_key_get_cptr() const;
-	void pin_data_disarm() const;
-	void pin_key_disarm() const;
+	impl::allocation_state_pin *aspd() const;
+	impl::allocation_state_pin *aspk() const;
 	void extend_arm() const;
 	void extend_disarm() const;
 
+	const pin_control<heap_mc> &pin_control_data() const { return _pin_data; }
+	const pin_control<heap_mc> &pin_control_key() const { return _pin_key; }
+
 	unsigned percent_used() const;
 
+	bool is_reconstituted(const void *) const { return false; };
+
 	nupm::region_descriptor regions() const;
+
+	bool is_crash_consistent() const;
+	bool can_reconstitute() const;
 };
 
 #endif

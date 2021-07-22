@@ -59,41 +59,67 @@ template <typename T, typename Heap, typename Persister = persister>
 
 		allocator_cc &operator=(const allocator_cc &a_) = delete;
 
-		void arm_extend()
+		void extend_arm()
 		{
 			this->pool()->extend_arm();
 		}
-		void disarm_extend()
+
+		void extend_disarm()
 		{
 			this->pool()->extend_disarm();
 		}
 
 		void allocate(
 			AK_ACTUAL
-			pointer_type & p_
-			, size_type s_
-			, size_type alignment_
+			pointer_type & p
+			, size_type sz
+			, size_type alignment = alignof(T)
 		)
 		{
-			this->pool()->alloc(reinterpret_cast<persistent_t<void *> *>(&p_), s_ * sizeof(T), alignment_);
-			/* Error: this check is too late;
+			this->pool()->alloc(reinterpret_cast<persistent_t<void *> &>(p), sz * sizeof(T), alignment);
+			/* Error: for ccpm pool, this check is too late;
 			 * most of the intersting information is gone.
 			 */
-			if ( p_ == 0 )
+			if ( p == nullptr )
 			{
-				throw bad_alloc_cc(AK_REF alignment_, s_, sizeof(T));
+				throw bad_alloc_cc(AK_REF alignment, sz, sizeof(T));
 			}
 		}
 
-		/* allocate and remember the allocation. heap_access<heap_type> does this for every allocation */
+		/*
+		 * For crash-consistent allocation, the allocate or remembers the allocation.
+		 * For others, special code in the pool remembers the allocation.
+		 */
 		void allocate_tracked(
 			AK_ACTUAL
-			pointer_type & p_
-			, size_type s_
-			, size_type alignment_
+			pointer_type & p
+			, size_type sz
+			, size_type alignment = alignof(T)
 		)
 		{
-			allocate(AK_REF p_, s_, alignment_);
+			p = static_cast<value_type *>(this->pool()->alloc_tracked(sz * sizeof(T), alignment));
+			if ( p == nullptr )
+			{
+				throw bad_alloc_cc(AK_REF alignment, sz, sizeof(T));
+			}
+		}
+
+		/* Should not be called for the crash-consistent allocoator */
+		void reconstitute(
+			size_type s
+			, const void *location
+			, const char * = nullptr
+		)
+		{
+			this->pool()->inject_allocation(location, s * sizeof(T));
+		}
+
+		/* The crash-consistent allocator reconstitutes nothing */
+		bool is_reconstituted(
+			const void *location
+		)
+		{
+			return this->pool()->is_reconstituted(location);
 		}
 	};
 

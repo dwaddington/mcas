@@ -72,8 +72,10 @@ private:
 		, string_view id
 		, string_view backing_file
 		, const std::vector<byte_span> &rv_full
-		, const byte_span &pool0_heap
+		, byte_span pool0_heap
 	);
+public:
+	friend struct heap_cc;
 	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
 	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n)
 	{
@@ -83,7 +85,7 @@ private:
 	}
 
 	template <bool B>
-		void write_hist(const byte_span & pool_) const
+		void write_hist(byte_span pool_) const
 		{
 			static bool suppress = false;
 			if ( ! suppress )
@@ -105,8 +107,6 @@ private:
 			}
 		}
 public:
-	friend struct heap_cc;
-
 	using common::log_source::debug_level;
 
 	/* initial construction */
@@ -119,7 +119,7 @@ public:
 		, string_view id
 		, string_view backing_file
 		, const std::vector<byte_span> &rv_full
-		, const byte_span &pool0_heap_
+		, byte_span pool0_heap_
 	);
 
 	/* crash-consistent recovery */
@@ -132,14 +132,19 @@ public:
 		, string_view id
 		, string_view backing_file
 		, const std::vector<byte_span> &rv_full
-		, const byte_span &pool0_heap
+		, byte_span pool0_heap
 		, ccpm::ownership_callback_t f
 	);
 	heap_cc_ephemeral(const heap_cc_ephemeral &) = delete;
 	heap_cc_ephemeral& operator=(const heap_cc_ephemeral &) = delete;
 
-	void add_managed_region(const byte_span &r_full, const byte_span &r_heap, unsigned numa_node);
-	std::size_t free(persistent_t<void *> *p_, std::size_t sz_);
+	std::size_t capacity() const { return _capacity; }
+	std::size_t allocated() const { return _allocated; }
+	void add_managed_region(byte_span r_full, byte_span r_heap, unsigned numa_node);
+	void allocate(persistent_t<void *> &p, std::size_t sz, std::size_t alignment);
+	std::size_t free(persistent_t<void *> &p_, std::size_t sz_);
+	void free_tracked(const void *p, std::size_t sz, unsigned numa_node);
+	bool is_crash_consistent() const { return true; }
 };
 
 #endif

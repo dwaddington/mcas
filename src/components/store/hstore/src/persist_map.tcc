@@ -14,6 +14,7 @@
 #include "hstore_config.h"
 #include "alloc_key.h" /* AK_ACTUAL */
 #include "construction_mode.h"
+#include "monitor_extend.h"
 #include "perishable.h"
 #include "segment_layout.h"
 #if 1
@@ -21,29 +22,6 @@
 #endif
 
 #include <type_traits> /* is_base_of */
-
-template <typename Allocator>
-	struct monitor_extend
-	{
-	private:
-		Allocator _a;
-	public:
-		monitor_extend(const Allocator &a_)
-			: _a(a_)
-		{
-#if HSTORE_TRACE_EXTEND
-			PLOG(PREFIX "ctor %d", LOCATION, USE_CC_HEAP);
-#endif
-			_a.arm_extend();
-		}
-		~monitor_extend()
-		{
-#if HSTORE_TRACE_EXTEND
-			PLOG(PREFIX "dtor", LOCATION);
-#endif
-			_a.disarm_extend();
-		}
-	};
 
 /*
  * ===== persist_map =====
@@ -84,14 +62,13 @@ template <typename Allocator>
 template <typename Allocator>
 	void impl::persist_map<Allocator>::do_initial_allocation(
 		AK_ACTUAL
-		persist_map_controller<Allocator> *pc_)
+		gsl::not_null<persist_map_controller<Allocator> *> pc_)
 	{
 		auto &av = static_cast<Allocator &>(*pc_);
 		if ( _segment_count.actual().is_stable() )
 		{
 			if ( _segment_count.actual().value() == 0 )
 			{
-#if HEAP_CONSISTENT
 				/*
 				 * (1) save enough information to know when the allocated pointer is hardened. In this case, the address and new value of the length of the segment table
 				 *
@@ -103,7 +80,7 @@ template <typename Allocator>
 				 * pc_, which is the persistent controller. This is one too many ways.
 				 */
 				monitor_extend<Allocator> m{bucket_allocator_t(av)};
-#endif
+
 				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
 				/* Run the allocation */
 				bucket_allocator_t(av).allocate(
@@ -130,11 +107,12 @@ template <typename Allocator>
 			for ( auto ix = _segment_count.actual().value(); ix != _segment_count.specified(); ++ix )
 			{
 				auto segment_size = base_segment_size<<(ix-1U);
-#if HEAP_CONSISTENT
-// 				tas_type tas(bucket_allocator_t(av), &_asc.extend);
+
 				monitor_extend<Allocator> m{bucket_allocator_t(av)};
-				pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
-#endif
+				if ( pc_->pool()->is_crash_consistent() )
+				{
+					pc_->record_segment_count_addr_and_target_value(&_segment_count, _segment_count.actual().value() + 1);
+				}
 
 				bucket_allocator_t(av).allocate(
 					AK_REF
@@ -155,46 +133,56 @@ template <typename Allocator>
 template <typename Allocator>
 	void impl::persist_map<Allocator>::reconstitute(Allocator av_)
 	{
-#if HEAP_RECONSTITUTE
-		auto av = bucket_allocator_t(av_);
-		if ( ! _segment_count.actual().is_stable() || _segment_count.actual().value() != 0 )
-		{
-			segment_layout::six_t ix = 0U;
-			av.reconstitute(base_segment_size, _sc[ix].bp);
-			++ix;
-
-			/* restore segments beyond the first */
-			for ( ; ix != _segment_count.actual().value_not_stable(); ++ix )
-			{
-				auto segment_size = base_segment_size<<(ix-1U);
-				av.reconstitute(segment_size, _sc[ix].bp);
-			}
-			if ( ! _segment_count.actual().is_stable() )
-			{
-				/* restore the last, "junior" segment */
-				auto segment_size = base_segment_size<<(ix-1U);
-				av.reconstitute(segment_size, _sc[ix].bp);
-			}
-
-		}
-#endif
-#if HEAP_CONSISTENT
-		/* */
-		/* manifest constant 4 is number of possible emplace/erase deallocations (though 2 is the maximum expected) */
-		for ( auto i = 0; i != 4; ++i )
-		{
-			if ( auto p = ase().er_disused_ptr(i) )
-			{
-				PLOG(PREFIX "possibly incomplete deallocation at %p", LOCATION, p);
-				av_.deallocate(&p);
-			}
-		}
-		/* emplace can be disarmed now. */
-		av_.emplace_disarm();
-		/* extend has only allocations (no deallocations), so it could ahve been
-		 * disarmed when the allocator was reinstantiated. But it was not,
-		 * so disarm it here.
+		/*
+		 * Note: persist_map<Allocator>::reconstitute(Allocator) is not called
+		 * if is_crash_consistent, so this code is not yet exercised.
 		 */
-		av_.extend_disarm();
+		if ( av_.pool()->is_crash_consistent() )
+		{
+			/* */
+			/* manifest constant 4 is number of possible emplace/erase deallocations (though 2 is the maximum expected) */
+			for ( auto i = 0; i != 4; ++i )
+			{
+#if ! TEST_HSTORE_PERISHABLE // compile error when testing perishable
+				if ( auto p = static_cast<typename Allocator::pointer_type>(ase()->er_disused_ptr(i)) )
+				{
+					PLOG(PREFIX "possibly incomplete deallocation at %p", LOCATION, static_cast<void *>(p));
+#if 0
+					/* error: no version of deallocate works without a size */
+					av_.deallocate(p);
 #endif
+				}
+#endif
+			}
+			/* emplace can be disarmed now. */
+			av_.emplace_disarm();
+			/* extend has only allocations (no deallocations), so it could have been
+			 * disarmed when the allocator was reinstantiated. But it was not,
+			 * so disarm it here.
+			 */
+			av_.extend_disarm();
+		}
+		else if ( av_.pool()->can_reconstitute() )
+		{
+			auto av = bucket_allocator_t(av_);
+			if ( ! _segment_count.actual().is_stable() || _segment_count.actual().value() != 0 )
+			{
+				segment_layout::six_t ix = 0U;
+				av.reconstitute(base_segment_size, _sc[ix].bp);
+				++ix;
+	
+				/* restore segments beyond the first */
+				for ( ; ix != _segment_count.actual().value_not_stable(); ++ix )
+				{
+					auto segment_size = base_segment_size<<(ix-1U);
+					av.reconstitute(segment_size, _sc[ix].bp);
+				}
+				if ( ! _segment_count.actual().is_stable() )
+				{
+					/* restore the last, "junior" segment */
+					auto segment_size = base_segment_size<<(ix-1U);
+					av.reconstitute(segment_size, _sc[ix].bp);
+				}
+			}
+		}
 	}

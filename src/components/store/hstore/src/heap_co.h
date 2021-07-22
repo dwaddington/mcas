@@ -134,6 +134,7 @@ struct heap_co
 	explicit heap_co(PMEMoid oid_)
 		: sbrk_offset_heap(oid_)
 	{}
+	bool is_crash_consistent() const { return false; }
 };
 
 #endif

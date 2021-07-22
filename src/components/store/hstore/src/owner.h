@@ -23,6 +23,7 @@
 #include "hop_hash_debug.h"
 #endif
 
+#include <gsl/pointers>
 #include <cassert>
 #include <cstddef> /* size_t */
 #include <cstdint> /* uint64_t */
@@ -99,7 +100,7 @@ namespace impl
 			return index_type(__builtin_ctzll(c & ownership_bit_mask()));
 		}
 
-		/* ERROR: it is being a bit lazy to make PersistController as a template parameter.
+		/* ERROR: it is being a bit lazy to make PersistController a template parameter.
 		 * Chances are that what we need of the persist_map_controller_t could be provided
 		 * in a more limited manner.
 		 */
@@ -108,32 +109,28 @@ namespace impl
 				const std::size_t pos_
 				, const index_type p_
 				, bucket_unique_ref<Bucket, Referent, SharedMutex>
-				, PersistController *
-#if HEAP_CONSISTENT
-				pc_
-#endif
+				, gsl::not_null<PersistController *> pc_
 			)
 			{
-#if HEAP_CONSISTENT
-				/* includes setting of doubt type to emplace */
-				pc_->em_record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
-#endif
+				if ( pc_->pool()->is_crash_consistent() )
+				{
+					/* includes setting of doubt type to emplace */
+					pc_->em_record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
+				}
 				insert(pos_, p_);
 			}
 		template<typename Bucket, typename Referent, typename SharedMutex, typename PersistController>
 			void erase(
 				index_type p_
 				, bucket_unique_ref<Bucket, Referent, SharedMutex>
-				, PersistController *
-#if HEAP_CONSISTENT
-				pc_
-#endif
+				, gsl::not_null<PersistController *> pc_
 			)
 			{
-#if HEAP_CONSISTENT
-				/* includes setting of doubt type to emplace */
-				pc_->er_record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
-#endif
+				if ( pc_->pool()->is_crash_consistent() )
+				{
+					/* includes setting of doubt type to emplace */
+					pc_->er_record_owner_addr_and_bitmask(&_value, mask_from_pos(p_));
+				}
 				_value &= ~mask_from_pos(p_);
 			}
 		template<typename Bucket, typename Referent, typename SharedMutex>

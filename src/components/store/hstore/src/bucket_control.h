@@ -35,14 +35,15 @@ namespace impl
 			explicit bucket_control(
 				six_t index_
 				, bucket_aligned_t *buckets_
+				, bool can_reconstitute_
 			)
-				: bucket_control_unlocked<Bucket>(index_, buckets_)
+				: bucket_control_unlocked<Bucket>(index_, buckets_, can_reconstitute_)
 				, _bucket_mutexes(nullptr)
 			{
 			}
 
 			explicit bucket_control()
-				: bucket_control(0U, nullptr)
+				: bucket_control(0U, nullptr, false)
 			{
 			}
 

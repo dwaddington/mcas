@@ -15,26 +15,20 @@ PUBLIC status_t mm_plugin_init()
   return S_OK;
 }
 
-PUBLIC status_t mm_plugin_create(
-	void *persister /* actual type: ccpm::persister * */
-	, const void *regions /* actual type: gsl::span<common::byte_span> * */
-	, void *callee_owns /* actual type: decltype(std::function<bool(const void *)> * */
-	, const char * params
-	, void * root_ptr
-	, mm_plugin_heap_t * out_heap
-)
+PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
 	PLOG("%s (%s)", __func__, params);
 	if (out_heap == nullptr) { return E_INVAL; }
-	if ( persister == nullptr ) { return E_INVAL; }
+	ccpm::cca::ctor_args *args = static_cast<ccpm::cca::ctor_args *>(root_ptr);
+	if ( args->persister == nullptr ) { return E_INVAL; }
 	auto heap =
-		regions && callee_owns
-		? new Heap(
-			static_cast<ccpm::persister *>(persister)
-			, *static_cast<const gsl::span<common::byte_span> *>(regions)
-			, *static_cast<std::function<bool(const void *)> *>(callee_owns)
+		args->regions.size() == 0 && args->force_init
+		? new Heap(static_cast<ccpm::persister *>(args->persister))
+		: new Heap(
+			args->persister
+			, args->regions
+			, args->callee_owns
 		)
-		: new Heap(static_cast<ccpm::persister *>(persister))
 		;
 	*out_heap = heap;
 	return S_OK;
@@ -141,9 +135,14 @@ PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, s
   return E_NOT_IMPL;
 }
 
-PUBLIC status_t mm_plugin_reconstitute(mm_plugin_heap_t heap, void *regions, void *callee_owns, int force_init)
+PUBLIC int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap)
 {
-  return E_NOT_IMPL;
+  return true;
+}
+
+PUBLIC int mm_plugin_can_inject_allocation(mm_plugin_heap_t heap)
+{
+  return false;
 }
 
 PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)

@@ -89,22 +89,23 @@ namespace impl
 
 			void deconstitute()
 			{
-#if HEAP_RECONSTITUTE
-				for ( auto it = _buckets; it != _buckets_end; ++it )
+				if ( _can_reconstitute )
 				{
-					typename bucket_type::owner_type &w = *it;
-					/* deconsititute key and value */
-					if ( w.is_adjacent_content_in_use() )
+					for ( auto it = _buckets; it != _buckets_end; ++it )
 					{
-						typename bucket_type::content_type &c = *it;
-						c.value().first.deconstitute();
-						/* ERROR: depends on the types of first and second,
-						 * so should be handled by the session level, not here
-						 */
-						std::get<0>(c.value().second).deconstitute();
+						typename bucket_type::owner_type &w = *it;
+						/* deconsititute key and value */
+						if ( w.is_adjacent_content_in_use() )
+						{
+							typename bucket_type::content_type &c = *it;
+							c.value().first.deconstitute();
+							/* ERROR: depends on the types of first and second,
+							 * so should be handled by the session level, not here
+							 */
+							std::get<0>(c.value().second).deconstitute();
+						}
 					}
 				}
-#endif
 			}
 
 		public:
@@ -121,6 +122,7 @@ namespace impl
 			bucket_aligned_t *_buckets; /* public only so that transform can access the element */
 		private:
 			bucket_aligned_t *_buckets_end;
+			bool _can_reconstitute;
 
 
 			unsigned log_segment_size() const
@@ -136,6 +138,7 @@ namespace impl
 			bucket_control_unlocked(
 				six_t index_
 				, bucket_aligned_t *buckets_
+				, bool can_reconstitute_
 			)
 				: _index(index_)
 				, _bi_mask(segment_size_from_log()-1U)
@@ -147,6 +150,7 @@ namespace impl
 					? _buckets + segment_size()
 					: nullptr
 				)
+				, _can_reconstitute(can_reconstitute_)
 			{
 			}
 			bucket_control_unlocked(const bucket_control_unlocked &) = delete;

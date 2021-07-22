@@ -61,6 +61,10 @@ template <typename T, typename Heap, typename Persister = persister>
 
 		deallocator_cc &operator=(const deallocator_cc &e_) = delete;
 
+		/*
+		 * Note: emplace_{arm,disarm} must be no-ops in pools which do not support
+		 * crash-consistency.
+		 */
 		void emplace_arm()
 		{
 			_pool->emplace_arm();
@@ -86,16 +90,34 @@ template <typename T, typename Heap, typename Persister = persister>
 			/* What we might like to say, if persistent_t had the intelligence:
 			 * _pool->free(static_pointer_cast<void *>(&p), sizeof(T) * sz_);
 			 */
-			_pool->free(reinterpret_cast<persistent_t<void *> *>(&p_), sizeof(T) * sz_);
+			_pool->free(reinterpret_cast<persistent_t<void *> &>(p_), sizeof(T) * sz_);
 		}
 
-		/* Deallocate a "tracked" allocation */
-		void deallocate_tracked(
+		void deallocate(
 			pointer_type & p_
+		)
+		{
+			/* What we might like to say, if persistent_t had the intelligence:
+			 * _pool->free(static_pointer_cast<void *>(&p));
+			 */
+			_pool->free(reinterpret_cast<persistent_t<void *> *>(&p_));
+		}
+
+		/* Deallocate a "tracked" allocation.
+		 * The crash-consistent allocator remembers allocations, so hstore does not
+		 * need to "track" them.
+		 *
+		 * The "reconstituting" allocator does not track memory allocations.
+		 * The memory used by kvstore::alloc_memory anmd kvstore::free_memory
+		 * must therefore be tracked by someone else. That job falls to hstore,
+		 * even though it has nothing to do with the hash store.
+		 */
+		void deallocate_tracked(
+			const void *p_
 			, size_type sz_
 		)
 		{
-			deallocate(p_, sz_);
+			_pool->free_tracked(p_, sizeof(T) * sz_);
 		}
 
 		void persist(const void *ptr, size_type len, const char * = nullptr) const

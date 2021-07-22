@@ -98,11 +98,11 @@ namespace impl
 			persist_map(persist_map &&) noexcept(!perishable_testing) = default;
 			void do_initial_allocation(
 				AK_ACTUAL
-				persist_map_controller<Allocator> *pc
+				gsl::not_null<persist_map_controller<Allocator> *> pc
 			);
 			void reconstitute(Allocator av);
-			allocation_state_emplace &ase() { return *_ase; }
-			allocation_state_extend &asx() { return *_asx; }
+			allocation_state_emplace *ase() { return _ase; }
+			allocation_state_extend *asx() { return _asx; }
 			friend struct persist_map_controller<Allocator>;
 		};
 }

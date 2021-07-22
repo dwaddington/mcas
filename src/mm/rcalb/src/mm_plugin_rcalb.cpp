@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <new> /* bad_alloc */
 #include <unistd.h>
 
 #pragma GCC diagnostic push
@@ -25,7 +26,7 @@ PUBLIC status_t mm_plugin_init()
   return S_OK;
 }
 
-PUBLIC status_t mm_plugin_create(void *persister, const void *regions, void *callee_owned, const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
   assert(out_heap);
@@ -75,7 +76,14 @@ PUBLIC status_t mm_plugin_register_callback_request_memory(mm_plugin_heap_t heap
 PUBLIC status_t mm_plugin_allocate(mm_plugin_heap_t heap, size_t n, void ** out_ptr)
 {
   auto h = reinterpret_cast<Heap*>(heap);
-  *out_ptr = h->alloc(n, 0);
+  try /* function is noexcept, so cannot propagate exceptions */ 
+  {
+    *out_ptr = h->alloc(n, 0);
+  }
+  catch ( const std::bad_alloc & )
+  {
+    return E_NO_MEM;
+  }
   PPLOG("%s (%lu) -> %p",__func__, n, *out_ptr);
   return S_OK;
 }
@@ -84,7 +92,14 @@ PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size
 {
   PPLOG("%s (%lu,%lu)",__func__, n, alignment);
   auto h = reinterpret_cast<Heap*>(heap);
-  *out_ptr = h->alloc(n, 0, alignment);
+  try /* function is noexcept, so cannot propagate exceptions */
+  {
+    *out_ptr = h->alloc(n, 0, alignment);
+  }
+  catch ( const std::bad_alloc & )
+  {
+    return E_NO_MEM;
+  }
   assert(*out_ptr);
   return S_OK;
 }
@@ -153,9 +168,14 @@ PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, s
   return S_OK;
 }
 
-PUBLIC  status_t mm_plugin_reconstitute(mm_plugin_heap_t heap, void *regions, void *callee_owns, int force_init)
+PUBLIC int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap)
 {
-  return E_NOT_IMPL;
+  return false;
+}
+
+PUBLIC int mm_plugin_can_inject_allocation(mm_plugin_heap_t heap)
+{
+  return true;
 }
 
 PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)

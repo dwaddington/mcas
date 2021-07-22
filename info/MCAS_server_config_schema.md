@@ -64,12 +64,39 @@ The JSON schema for a configuration is:
 	                        ],
 	                        "type": "string"
 	                    },
+	                    "security_mode": {
+	                        "description": "Security mode",
+	                        "examples": [
+	                            "none",
+	                            "tls-hmac"
+	                        ],
+	                        "type": "string"
+	                    },
+	                    "security_port": {
+	                        "description": "Port for security channel",
+	                        "examples": [
+	                            "0",
+	                            "11922"
+	                        ],
+	                        "type": "integer",
+	                        "minimum": "0"
+	                    },
 	                    "default_backend": {
 	                        "description": "Key/value store implementation to use.",
 	                        "examples": [
 	                            "hstore",
 	                            "hstore-cc",
+	                            "hstore-mm",
 	                            "mapstore"
+	                        ],
+	                        "type": "string",
+	                        "type": "string"
+	                    },
+	                    "mm_plugin_path": {
+	                        "description": "Path (absolute, as of now) to use for Key/value store memory allocator plugin. Required for hstore-mm, optional for others.",
+	                        "examples": [
+	                            "/opt/mcas/lib/libmm-plugin-rcalb.so",
+	                            "/opt/mcas/lib/libmm-plugin-ccpm.so"
 	                        ],
 	                        "type": "string",
 	                        "type": "string"
@@ -82,6 +109,16 @@ The JSON schema for a configuration is:
 	                        "description": "An array of ADO shared libraries to load.",
 	                        "examples": [
 	                            "libcomponent-adoplugin-testing.so"
+	                        ],
+	                        "type": "array",
+	                        "items": "string"
+	                    },
+	                    "ado_signals": {
+	                        "description": "Set of ADO signals.",
+	                        "examples": [
+	                            "post-put",
+	                            "post-get",
+	                            "post-erase"
 	                        ],
 	                        "type": "array",
 	                        "items": "string"
@@ -124,14 +161,14 @@ The JSON schema for a configuration is:
 	            }
 	        },
 	        "ado_path": {
-	            "description": "Full patch to the server ADO plugin manager executable.",
+	            "description": "Full path to the ADO plugin executable.",
 	            "examples": [
 	                "/opt/mcas/bin/ado"
 	            ],
 	            "type": "string"
 	        },
 	        "net_providers": {
-	            "description": "ilibfabric net provider ('verbs' or 'sockets')",
+	            "description": "libfabric net provider ('verbs' or 'sockets')",
 	            "examples": [
 	                "verbs",
 	                "sockets"
@@ -139,7 +176,7 @@ The JSON schema for a configuration is:
 	            "type": "string"
 	        },
 	        "resources": {
-	            "description": "ADO(?) resources",
+	            "description": "ADO resources",
 	            "type": "object",
 	            "additionalProperties": false,
 	            "properties": {
@@ -167,21 +204,28 @@ The JSON schema for a configuration is:
 	            "description": "Security parameters",
 	            "type": "object",
 	            "properties": {
-	                "cert": {
-	                    "description": "Certificate file path",
+	                "cert_path": {
+	                    "description": "Default certificate file path",
 	                    "examples": [
-	                        "/opt/mcas/certs/mcas-cert.pem"
+	                        "~/mcas/certs/mcas-cert.pem"
+	                    ],
+	                    "type": "string"
+	                },
+	                "key_path": {
+	                    "description": "Default key file path",
+	                    "examples": [
+	                        "~/mcas/certs/mcas-privkey.pem"
 	                    ],
 	                    "type": "string"
 	                }
 	            },
 	            "required": [
-	                "cert"
+	                "cert_path"
 	            ],
 	            "additionalProperties": false
 	        },
 	        "cluster": {
-	            "description": "Some sort of cluster identificaton",
+	            "description": "Clustering parameters",
 	            "type": "object",
 	            "properties": {
 	                "group": {
@@ -229,10 +273,15 @@ The server provides shard connections on the specified ports.
 
 Alothough not checked in the schema, addr/port combinations must be unique.
 
-Three back ends are available:
+Four normal back ends are available:
  - mapstore: a non-persistent KV store, for speed and for testing
  - hstore: a persistent KV store
- - hstore-cc: a variation fo hstore with less steady-state speed but faster crash build.
+ - hstore-cc: a variation of hstore with less steady-state speed but faster crash rebuild.
+ - hstore-mm: a variation of hstore which dynamically loads its memory allocatoor from mm-plugin-path
+These testing backends are also built and installed:
+ - hstore-nt: like hstore, but does not write timestamps on put operations does not functions (such as some scans) which need timestamps
+ - hstore-cc-pe: like hstore-cc, but supports tests which periodically cause hstore to "crash" in order to test crash consistency
+ - hstore-mm-pe: like hstore-mm, but supports tests which periodically cause hstore to "crash" in order to test crash consistency
 
 Lists of cores are comma-separated list of cores and/or ranges of cores, on which to pin ADO threads. Cores are integer strings; a range of cores is either an inclusive range of cores separated by a hyphen, e.g. 4-6, or an initial core and count of cores separated by a colon, e.g 4:3.
 

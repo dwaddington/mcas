@@ -15,94 +15,46 @@
 #ifndef MCAS_MONITOR_PIN_H
 #define MCAS_MONITOR_PIN_H
 
-#include "hstore_config.h" /* HEAP_CONSISTENT */
 #include "logging.h"
 #include "perishable_expiry.h"
+#include "pin_control.h"
 #include "test_flags.h"
 
 template <typename Pool>
-	struct monitor_pin_data
+	struct monitor_pin
 	{
 	private:
 		Pool _p;
-#if ! HEAP_CONSISTENT
+		pin_control<typename Pool::shared_type> _c;
 		char *_old_cptr;
-		monitor_pin_data(const monitor_pin_data &) = delete;
-		monitor_pin_data &operator=(const monitor_pin_data &) = delete;
-#endif
+		bool heap_consistent() const { return _p->is_crash_consistent(); }
+		monitor_pin(const monitor_pin &) = delete;
+		monitor_pin &operator=(const monitor_pin &) = delete;
 	public:
 		template <typename Value>
-			monitor_pin_data(Value &v_, const Pool &p_)
+			monitor_pin(Value &v_, const Pool &p_, const pin_control<typename Pool::shared_type> &c_)
 				: _p(p_)
-#if ! HEAP_CONSISTENT
-				, _old_cptr(v_.get_cptr().P)
-#endif
+				, _c(c_)
+				, _old_cptr(heap_consistent() ? nullptr : v_.get_cptr().P)
 			{
-#if HEAP_CONSISTENT
-				_p->pin_data_arm(v_.get_cptr());
-#endif
+				((*_p).*(_c._arm))(v_.get_cptr());
 			}
 
 		char *get_cptr() const
 		{
-#if HEAP_CONSISTENT
-			return _p->pin_data_get_cptr();
-#else
-			return _old_cptr;
-#endif
+			return
+				_old_cptr
+				? _old_cptr
+				: ((*_p).*_c._get_cptr)() // pin_data_get_cptr()
+				;
 		}
 
-		~monitor_pin_data() noexcept(! TEST_HSTORE_PERISHABLE)
+		~monitor_pin() noexcept(! TEST_HSTORE_PERISHABLE)
 		{
 			if ( ! perishable_expiry::is_current() )
 			{
-#if HEAP_CONSISTENT
-				_p->pin_data_disarm();
-#endif
+				((*_p).*_c._disarm)();
 			}
 		}
 	};
-
-template <typename Pool>
-	struct monitor_pin_key
-	{
-		Pool _p;
-#if ! HEAP_CONSISTENT
-		char *_old_cptr;
-		monitor_pin_key(const monitor_pin_key &) = delete;
-		monitor_pin_key &operator=(const monitor_pin_key &) = delete;
-#endif
-	public:
-		template <typename Value>
-			monitor_pin_key(Value &v_, const Pool &p_)
-				: _p(p_)
-#if ! HEAP_CONSISTENT
-				, _old_cptr(v_.get_cptr().P)
-#endif
-			{
-#if HEAP_CONSISTENT
-				_p->pin_key_arm(v_.get_cptr());
-#endif
-			}
-
-		char *get_cptr() const
-		{
-#if HEAP_CONSISTENT
-			return _p->pin_key_get_cptr();
-#else
-			return _old_cptr;
-#endif
-		}
-
-		~monitor_pin_key() noexcept(! TEST_HSTORE_PERISHABLE)
-		{
-			if ( ! perishable_expiry::is_current() )
-			{
-#if HEAP_CONSISTENT
-				_p->pin_key_disarm();
-#endif
-			}
-		}
-	};
-
 #endif

@@ -57,12 +57,7 @@ extern "C"
    * 
    * @return S_OK, E_FAIL
    */
-  status_t mm_plugin_create(
-			void *persister /* actual type: ccpm::persister * */
-			, const void *regions /* actual type: const gsl::span<common::byte_span> * */
-			, void *callee_owns /* actual type: std::function<bool(const void *)> * */
-			,
-                             const char * params,
+  status_t mm_plugin_create(const char * params,
                             void * root_ptr,
                             mm_plugin_heap_t * out_heap);
 
@@ -236,28 +231,25 @@ extern "C"
   status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size);
 
   /** 
-   * Reconsitute regions from a crash-consistent allocator
-   * 
-   * @param heap Heap context
-   * @param regions Span of regions to reconstitute
-   * @param callee_owns Functoor which returns "true" if the callee owns the obejct at the specified address
-   * @param force_init
-   * 
-   * @return S_OK, E_NOT_IMPL
-   */
-  status_t mm_plugin_reconstitute(mm_plugin_heap_t heap
-		, void *regions /* actual type: gsl::span<common::byte_span> * */
-		, void *callee_owns /* actual type: decltype(std::function<bool(const void *)> * */
-		, int force_init);
-
-  /** 
    * Get debugging information
    * 
    * @param heap Heap context
    */
   void mm_plugin_debug(mm_plugin_heap_t heap);
 
+  /**
+   * Check for crash consistency libccpm behavior)
+   *
+   * @return non-zero iff the root_ptr parameter of mm_plugin_create is interpreted as a struct ccpm_params *.
+   */
+  int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap);
 
+  /**
+   * Check for inject_allocation capability
+   *
+   * @return non-zero iff mm_plugin_inject_allocation is implemented
+   */
+  int mm_plugin_can_inject_allocation(mm_plugin_heap_t heap);
 
   /** 
    * Function pointer table for all methods
@@ -266,12 +258,7 @@ extern "C"
   typedef struct tag_mm_plugin_function_table_t
   {
     status_t (*mm_plugin_init)();
-    status_t (*mm_plugin_create)(
-			void *persister /* actual type: ccpm::persister * */
-			, const void *regions /* actual type: gsl::span<common::byte_span> * */
-			, void *callee_owns /* actual type: std::function<bool(const void *)> * */
-			,
-                                 const char * params, void * root_ptr
+    status_t (*mm_plugin_create)(const char * params, void * root_ptr
 			, mm_plugin_heap_t * out_heap);
     status_t (*mm_plugin_destroy)(mm_plugin_heap_t heap);
     status_t (*mm_plugin_add_managed_region)(mm_plugin_heap_t heap,
@@ -294,8 +281,8 @@ extern "C"
     status_t (*mm_plugin_usable_size)(mm_plugin_heap_t heap, void * ptr, size_t * out_size);
     void     (*mm_plugin_debug)(mm_plugin_heap_t heap);
     status_t (*mm_plugin_inject_allocation)(mm_plugin_heap_t heap, void * ptr, size_t size);
-    /* a couple of non-C arguments. If the interface must be C, ichange them to pointers and pass as void * */
-    status_t (*mm_plugin_reconstitute)(mm_plugin_heap_t heap, void *regions, void *callee_owns, int force_init);
+    int (*mm_plugin_is_crash_consistent)(mm_plugin_heap_t heap);
+    int (*mm_plugin_can_inject_allocation)(mm_plugin_heap_t heap);
   } mm_plugin_function_table_t;
 
 #if defined(__cplusplus)
@@ -321,15 +308,11 @@ class MM_plugin_wrapper
 public:
     
   MM_plugin_wrapper(const std::string& plugin_path,
-			void *persister /* actual type: ccpm::persister * */
-			, void *regions /* actual type: gsl::span<common::byte_span> * */
-			, void *callee_owns /* actual type: std::function<bool(const void *)> * */
-			,
                     const std::string& config = "",
-                    void * root_ptr = nullptr) {
+                    void * root_ptr = nullptr)
+  {
     assert(plugin_path.empty() == false);
     _module = dlopen(plugin_path.c_str(), RTLD_NOW | RTLD_NODELETE); // RTLD_DEEPBIND | 
-
     if(_module == nullptr) {
       char err[1024];
       sprintf(err, "%s\n", dlerror());
@@ -352,20 +335,30 @@ public:
     LOAD_SYMBOL(mm_plugin_debug);
     LOAD_SYMBOL(mm_plugin_destroy);
     LOAD_SYMBOL(mm_plugin_inject_allocation);
-    LOAD_SYMBOL(mm_plugin_reconstitute);
+    LOAD_SYMBOL(mm_plugin_is_crash_consistent);
+    LOAD_SYMBOL(mm_plugin_can_inject_allocation);
 
     //      dlclose(_module);
       
     /* create heap instance */      
-    _ft.mm_plugin_create(persister, regions, callee_owns, config.c_str(), root_ptr, &_heap);
+    _ft.mm_plugin_create(config.c_str(), root_ptr, &_heap);
   }
-    
-  MM_plugin_wrapper(const std::string& plugin_path,
-                    const std::string& config = "",
-                    void * root_ptr = nullptr) : MM_plugin_wrapper(plugin_path, nullptr, nullptr, nullptr, config, root_ptr) {}
+
+  MM_plugin_wrapper(const MM_plugin_wrapper &) = delete;
+
+  MM_plugin_wrapper(MM_plugin_wrapper && other) noexcept
+    : _module(std::move(other._module))
+    , _ft(std::move(other._ft))
+    , _heap(std::move(other._heap))
+  {
+    other._heap = nullptr;
+  }
 
   virtual ~MM_plugin_wrapper() noexcept {
-    _ft.mm_plugin_destroy(_heap);
+    if ( _heap )
+    {
+      _ft.mm_plugin_destroy(_heap);
+    }
   }
 
   /* forwarding in liners */
@@ -424,15 +417,24 @@ public:
   inline status_t inject_allocation(void * ptr, size_t size) noexcept {
     return _ft.mm_plugin_inject_allocation(_heap, ptr, size);
   }
-    
-  inline status_t reconstitute(gsl::span<common::byte_span> regions, std::function<bool(const void *)> callee_owns, bool force_init) noexcept {
-    return _ft.mm_plugin_reconstitute(_heap, &regions, &callee_owns, force_init);
+
+  inline int is_crash_consistent() noexcept {
+    return _ft.mm_plugin_is_crash_consistent(_heap);
+  }
+
+  inline int can_inject_allocation() noexcept {
+    return _ft.mm_plugin_can_inject_allocation(_heap);
   }
 
 private:
   void *                     _module;
   mm_plugin_function_table_t _ft;
-  mm_plugin_heap_t           _heap;
+#if 0
+  /* intention, but we avoid appealing to moveable_ptr */
+  common::moveable_ptr<void> _heap;
+#else
+  void *                     _heap;
+#endif
 };
 
 #include <limits>

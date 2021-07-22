@@ -64,6 +64,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		using string_view = common::string_view;
 
 		allocator_type _heap;
+		bool _is_crash_consistent;
 		bool _pin_seq; /* used only for force undo_redo call */
 		table_type _map;
 		impl::persist_atomic_controller<table_type> _atomic_state;
@@ -75,30 +76,6 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto locate_map(string_view key) -> table_type &;
 		auto locate_map(string_view key) const -> const table_type &;
 
-	public:
-		/* PMEMoid, persist_data_t */
-		template <typename OID, typename Persist>
-			explicit session(
-				OID
-#if ! HEAP_RECONSTITUTE && ! HEAP_CONSISTENT
-					heap_oid_
-#endif
-				, handle_type &&pop_
-				, Persist *persist_data_
-				, unsigned debug_level_ = 0
-			);
-
-		std::uint64_t writes() const;
-
-		explicit session(
-			AK_FORMAL
-			handle_type &&pop_
-			, construction_mode mode_
-			, unsigned debug_level_ = 0
-		);
-
-		~session();
-
 		bool undo_redo_pin_data(
 			AK_FORMAL
 			allocator_type heap_
@@ -108,6 +85,27 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 			AK_FORMAL
 			allocator_type heap_
 		);
+
+	public:
+		/* PMEMoid, persist_data_t */
+		template <typename OID, typename Persist>
+			explicit session(
+				unsigned debug_level
+				, OID heap_oid_
+				, handle_type &&pop
+				, Persist *persist_data
+			);
+
+		std::uint64_t writes() const;
+
+		explicit session(
+			AK_FORMAL
+			unsigned debug_level
+			, handle_type &&pop
+			, construction_mode mode
+		);
+
+		~session();
 
 		session(const session &) = delete;
 		session& operator=(const session &) = delete;

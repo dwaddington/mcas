@@ -47,7 +47,7 @@ namespace impl
 		allocation_state_extend(allocation_state_extend &&) noexcept;
 
 		bool is_armed() const { return _armed; }
-		bool is_in_use(const void *ptr);
+		bool is_in_use(const void *ptr, bool can_reconstitute);
 
 		/* ERROR: There are now two mechanisms which invalidate the allocation_state data:
 		 * clear (here) and the allocation_state_combined enum. This is probably one too

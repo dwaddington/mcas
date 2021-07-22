@@ -36,7 +36,7 @@ ccpm::cca::cca(persist_type persist_)
 	, _persist(persist_)
 {}
 
-ccpm::cca::cca(persist_type persist_, const region_span regions_, ownership_callback_t resolver_)
+ccpm::cca::cca(persist_type persist_, const region_span regions_, ownership_callback_type resolver_)
 	: cca(persist_)
 {
 	init(regions_, resolver_, false);
@@ -45,7 +45,7 @@ ccpm::cca::cca(persist_type persist_, const region_span regions_, ownership_call
 ccpm::cca::cca(persist_type persist_, const region_span regions_)
 	: cca(persist_)
 {
-	init(regions_, nullptr, true);
+	init(regions_, [] (const void *) -> bool { return true; }, true);
 }
 
 ccpm::cca::~cca()
@@ -54,7 +54,7 @@ ccpm::cca::~cca()
 
 bool ccpm::cca::reconstitute(
 	const region_span regions_
-	, ownership_callback_t resolver_
+	, ownership_callback_type resolver_
 	, const bool force_init_
 )
 {
@@ -65,7 +65,7 @@ bool ccpm::cca::reconstitute(
 
 void ccpm::cca::init(
 	const region_span regions_
-	, ownership_callback_t resolver_
+	, ownership_callback_type resolver_
 	, const bool force_init_
 )
 {
