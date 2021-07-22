@@ -19,7 +19,7 @@ struct injectee
 protected:
 	~injectee() {}
 public:
-	virtual void inject_allocation(void *p, std::size_t sz, unsigned numa_node) = 0;
+	virtual void inject_allocation(void *p, std::size_t sz) = 0;
 };
 
 #endif

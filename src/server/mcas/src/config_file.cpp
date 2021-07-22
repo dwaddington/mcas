@@ -343,7 +343,16 @@ auto make_schema_shard()
           ( config::default_backend
             , json::object
             ( json::member(schema::description, "Key/value store implementation to use.")
-              , json::member(schema::examples, json::array("hstore", "hstore-cc", "hstore-mc", "hstore-mr", "mapstore"))
+              , json::member(schema::examples, json::array("hstore", "hstore-cc", "hstore-mc", "hstore-mr", "hstore-mm", "mapstore"))
+              , json::member(schema::type, schema::string)
+              , json::member(schema::type, schema::string)
+              )
+            )
+          , json::member
+          ( config::mm_plugin_path
+            , json::object
+            ( json::member(schema::description, "Path (absolute, as of now) to use for Key/value store memory allocator plugin. Required for hstore-mm, optional for others.")
+              , json::member(schema::examples, json::array("/opt/mcas/lib/libmm-plugin-rcalb.so", "/opt/mcas/lib/libmm-plugin-ccpm.so"))
               , json::member(schema::type, schema::string)
               , json::member(schema::type, schema::string)
               )

@@ -19,6 +19,7 @@
 
 #include "alloc_key.h" /* AK_ACTUAL */
 #include "bad_alloc_cc.h"
+#include "heap_access.h"
 #include "persister_cc.h"
 #include "persistent.h"
 
@@ -43,14 +44,7 @@ template <typename T, typename Heap, typename Persister = persister>
 		using typename deallocator_type::heap_type;
 		using typename deallocator_type::value_type;
 		using typename deallocator_type::size_type;
-
-		explicit allocator_rc(void *area_, std::size_t size_, Persister p_ = Persister())
-			: deallocator_type(area_, size_, p_)
-		{}
-
-		explicit allocator_rc(void *area_, Persister p_ = Persister())
-			: deallocator_type(area_, p_)
-		{}
+		using typename deallocator_type::pointer_type;
 
 		allocator_rc(const heap_access<heap_type> &pool_, Persister p_ = Persister()) noexcept
 			: deallocator_type(pool_, (p_))
@@ -65,64 +59,52 @@ template <typename T, typename Heap, typename Persister = persister>
 
 		allocator_rc &operator=(const allocator_rc &a_) = delete;
 
-		auto allocate(
-			AK_ACTUAL
-			size_type s
-			, size_type alignment = alignof(T)
-		) -> value_type *
+		void extend_arm()
 		{
-			auto ptr = this->pool()->alloc(s * sizeof(T), alignment);
-			if ( ptr == 0 )
-			{
-				throw bad_alloc_cc(AK_REF 0, s, sizeof(T));
-			}
-			return static_cast<value_type *>(ptr);
+			this->pool()->extend_arm();
 		}
 
-		auto allocate_tracked(
-			AK_ACTUAL
-			size_type s
-			, size_type alignment = alignof(T)
-		) -> value_type *
+		void extend_disarm()
 		{
-			auto ptr = this->pool()->alloc_tracked(s * sizeof(T), alignment);
-			if ( ptr == 0 )
-			{
-				throw bad_alloc_cc(AK_REF 0, s, sizeof(T));
-			}
-			return static_cast<value_type *>(ptr);
-		}
-
-		void allocatep(
-			AK_ACTUAL
-			persistent<value_type *> &ptr
-			, size_type sz
-			, size_type alignment = alignof(T)
-		)
-		{
-			allocate(AK_REF ptr, sz, alignment);
-		}
-
-		void allocate_tracked(
-			AK_ACTUAL
-			value_type * &ptr
-			, size_type sz
-			, size_type alignment = alignof(T)
-		)
-		{
-			ptr = allocate_tracked(AK_REF sz, alignment);
+			this->pool()->extend_disarm();
 		}
 
 		void allocate(
 			AK_ACTUAL
-			value_type * &ptr
+			pointer_type & p
 			, size_type sz
 			, size_type alignment = alignof(T)
 		)
 		{
-			ptr = allocate(AK_REF sz, alignment);
+			this->pool()->alloc(reinterpret_cast<persistent_t<void *> &>(p), sz * sizeof(T), alignment);
+			/* Error: for ccpm pool, this check is too late;
+			 * most of the intersting information is gone.
+			 */
+			if ( p == nullptr )
+			{
+				throw bad_alloc_cc(AK_REF alignment, sz, sizeof(T));
+			}
 		}
 
+		/*
+		 * For crash-consistent allocation, the allocate or remembers the allocation.
+		 * For others, special code in the pool remembers the allocation.
+		 */
+		void allocate_tracked(
+			AK_ACTUAL
+			pointer_type & p
+			, size_type sz
+			, size_type alignment = alignof(T)
+		)
+		{
+			p = static_cast<value_type *>(this->pool()->alloc_tracked(sz * sizeof(T), alignment));
+			if ( p == nullptr )
+			{
+				throw bad_alloc_cc(AK_REF alignment, sz, sizeof(T));
+			}
+		}
+
+		/* Should not be called for the crash-consistent allocoator */
 		void reconstitute(
 			size_type s
 			, const void *location
@@ -132,6 +114,7 @@ template <typename T, typename Heap, typename Persister = persister>
 			this->pool()->inject_allocation(location, s * sizeof(T));
 		}
 
+		/* The crash-consistent allocator reconstitutes nothing */
 		bool is_reconstituted(
 			const void *location
 		)

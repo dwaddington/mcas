@@ -16,6 +16,7 @@
 
 #include "hstore_config.h" /* Persister */
 
+#include "allocator_cc.h"
 #include "cptr.h"
 #include "hstore_alloc_type.h"
 #include "hstore_kv_types.h"

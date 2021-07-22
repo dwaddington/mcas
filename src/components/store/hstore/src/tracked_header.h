@@ -37,7 +37,7 @@ struct tracked_header
 	std::size_t _align;
 
 	explicit tracked_header(unsigned debug_level, tracked_header *prev, tracked_header *next, std::size_t size, std::size_t align);
-	void recover(unsigned debug_level, injectee *, unsigned numa_node);
+	void recover(unsigned debug_level, injectee *);
 };
 
 #endif

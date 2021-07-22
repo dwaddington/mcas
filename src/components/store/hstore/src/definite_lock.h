@@ -17,6 +17,7 @@
 #include "hstore_config.h"
 
 #include "alloc_key.h" /* AK_ACTUAL */
+#include "heap_access.h"
 #include "hstore_alloc_type.h" /* hstore_alloc_type */
 #include "hstore_nupm_types.h" /* Persister */
 #include "key_not_found.h"
@@ -27,6 +28,8 @@
 
 #include <stdexcept>
 #include <tuple>
+
+class Exception;
 
 template <typename Table, typename Allocator>
 	struct definite_lock
@@ -64,11 +67,7 @@ template <typename Table, typename Allocator>
 					 */
 
 					/* convert value to lockable */
-#if 0
-					using monitor = monitor_pin<session::allocator_type>;
-					using monitor = monitor_pin<hstore_alloc_type<Persister>::heap_alloc_access_type>;
-#endif
-					monitor_pin_data<hstore_alloc_type<Persister>::heap_alloc_access_type> mp(d, al_.pool());
+					monitor_pin<hstore_alloc_type<Persister>::heap_alloc_access_type> mp(d, al_.pool(), al_.pool()->pin_control_data());
 					/* convert d to immovable data */
 					d.pin(AK_REF mp.get_cptr(), al_);
 				}

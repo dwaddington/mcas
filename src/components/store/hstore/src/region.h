@@ -20,6 +20,12 @@
 #include "alloc_key.h" /* AK_ACTUAL */
 #include "persist_data.h"
 
+#include "heap_mr.h"
+#include "heap_rc.h"
+#include "heap_mc.h"
+#include "heap_cc.h"
+#include "heap_mm.h"
+
 #include <nupm/region_descriptor.h>
 #include <common/byte_span.h>
 #include <common/pointer_cast.h>
@@ -86,12 +92,10 @@ template <
 #if HEAP_MM
 			, plugin_path
 #endif
-#if HEAP_CONSISTENT
-        , &_persist_data.ase()
-        , (&_persist_data.aspd())
-        , (&_persist_data.aspk())
-        , &_persist_data.asx()
-#endif
+        , _persist_data.ase()
+        , _persist_data.aspd()
+        , _persist_data.aspk()
+        , _persist_data.asx()
         , byte_span(common::make_byte_span(this, size_))
         , byte_span(common::make_byte_span(this+1, adjust_size(size_)))
         , numa_node_
@@ -136,26 +140,25 @@ template <
         , backing_file_
         , iov_addl_first_
         , iov_addl_last_
-#if HEAP_CONSISTENT
-        , &this->_persist_data.ase()
-        , &this->_persist_data.aspd()
-        , &this->_persist_data.aspk()
-        , &this->_persist_data.asx()
-#endif
+        , this->_persist_data.ase()
+        , this->_persist_data.aspd()
+        , this->_persist_data.aspk()
+        , this->_persist_data.asx()
       )
       , _persist_data(std::move(this->_persist_data))
     {
       magic = magic_value;
       persister_nupm::persist(this, sizeof *this);
-#if HEAP_CONSISTENT
-      /* any old values in the allocation states have been queried, as needed, by
-       * the crash-consistent allocator. Reset all allocation states.
-       */
-      this->_persist_data.ase().reset();
-      this->_persist_data.aspd().reset();
-      this->_persist_data.aspk().reset();
-      this->_persist_data.asx().reset();
-#endif
+			if ( _heap.is_crash_consistent() )
+			{
+				/* any old values in the allocation states have been queried, as needed, by
+				 * the crash-consistent allocator. Reset all allocation states.
+				 */
+				this->_persist_data.ase()->reset();
+				this->_persist_data.aspd()->reset();
+				this->_persist_data.aspk()->reset();
+				this->_persist_data.asx()->reset();
+			}
     }
 #pragma GCC diagnostic pop
 

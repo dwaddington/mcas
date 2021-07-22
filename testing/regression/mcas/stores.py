@@ -17,6 +17,11 @@ class hstore_mc(dm):
     def __init__(self):
         dm.__init__(self, {"default_backend": "hstore-mc"})
 
+class hstore_mm(dm):
+    """ hstore-mm backend (within a shard) """
+    def __init__(self):
+        dm.__init__(self, {"default_backend": "hstore-mm"})
+
 class hstore_mr(dm):
     """ hstore-mr backend (within a shard) """
     def __init__(self):

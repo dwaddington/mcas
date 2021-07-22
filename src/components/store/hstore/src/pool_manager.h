@@ -41,8 +41,8 @@ template <typename Pool>
     using string_view = common::string_view;
     pool_manager(
 			unsigned debug_level_
-	) : common::log_source(debug_level_)
-    {}
+		) : common::log_source(debug_level_)
+		{}
 
     virtual ~pool_manager() {}
 

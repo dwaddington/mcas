@@ -21,6 +21,7 @@
 #include "hstore_config.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
+#include "persistent.h"
 
 #include <boost/icl/interval_set.hpp>
 #include <common/byte_span.h>
@@ -58,17 +59,17 @@ private:
 	/* Rca_LB seems not to allocate at or above about 2GiB. Limit reporting to 16 GiB. */
 	static constexpr unsigned hist_report_upper_bound = 34U;
 
-	void add_managed_region(const byte_span &r);
+	void add_managed_region(byte_span r);
 public:
 	explicit heap_rc_ephemeral(unsigned debug_level, string_view id, string_view backing_file);
 	virtual ~heap_rc_ephemeral() {}
 
-	void add_managed_region(const byte_span &r_full, const byte_span &r_heap, unsigned numa_node);
+	void add_managed_region(byte_span r_full, byte_span r_heap, unsigned numa_node);
 	nupm::region_descriptor get_managed_regions() const { return _managed_regions; }
 	nupm::region_descriptor set_managed_regions(nupm::region_descriptor n) { using std::swap; swap(n, _managed_regions); return n; }
 
 	template <bool B>
-		void write_hist(const byte_span & pool_) const
+		void write_hist(byte_span pool_) const
 		{
 			static bool suppress = false;
 			if ( ! suppress )
@@ -95,11 +96,14 @@ public:
 
 	std::size_t allocated() const {  return _allocated; }
 	std::size_t capacity() const { return _capacity; };
-	void inject_allocation(void *p, std::size_t sz, unsigned numa_node) override;
-	void *allocate(std::size_t sz, unsigned numa_node, std::size_t alignment);
+	void inject_allocation(void *p, std::size_t sz) override;
+	void allocate(persistent_t<void *> &p, std::size_t sz, unsigned numa_node, std::size_t alignment);
 	void *allocate_tracked(std::size_t sz, unsigned numa_node, std::size_t alignment);
-	void free(void *p, std::size_t sz, unsigned numa_node);
+	void free_tracked(const void *p, std::size_t sz, unsigned numa_node);
+	std::size_t free(persistent_t<void *> &p, std::size_t sz_);
+	std::size_t free(persistent_t<void *> &p, std::size_t sz_, unsigned numa_node);
 	bool is_reconstituted(const void *p) const;
+	bool is_crash_consistent() const { return false; }
 	using common::log_source::debug_level;
 };
 

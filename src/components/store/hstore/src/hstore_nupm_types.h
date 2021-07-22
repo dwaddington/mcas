@@ -17,12 +17,6 @@
 
 #include "hstore_config.h"
 
-#if HEAP_RECONSTITUTE
-#elif HEAP_CONSISTENT
-#else
-#error USE_CC_HEAP type incompatible with nupm
-#endif
-
 #include "persister_nupm.h"
 
 #include <cstring> /* strerror */

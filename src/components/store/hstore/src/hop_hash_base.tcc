@@ -718,7 +718,7 @@ template <
 						owner_lk.index()
 						, content_index
 						, owner_lk
-						, static_cast<persist_map_controller_t *>(this)
+						, gsl::not_null<persist_map_controller_t *>(this)
 					);
 					this->persist_map_controller_t::persist_owner(owner_lk.ref(), "owner emplace");
 					hop_hash_log<HSTORE_TRACE_MANY>::write(LOG_LOCATION, " bucket ", owner_lk.index()
@@ -994,13 +994,13 @@ template <
 				ix_junior_owner
 				, owner_pos
 				, junior_owner_lk
-				, static_cast<persist_map_controller_t *>(this)
+				, gsl::not_null<persist_map_controller_t *>(this)
 			);
 			hop_hash_log<false>::write(LOG_LOCATION, "resize moves content at +", owner_pos, " from senior ", senior_owner_lk.index(), " to junior ", junior_owner_lk.index());
 			senior_owner_lk.ref().erase(
 				owner_pos
 				, senior_owner_lk
-				, static_cast<persist_map_controller_t *>(this)
+				, gsl::not_null<persist_map_controller_t *>(this)
 			);
 			this->persist_map_controller_t::persist_owner(junior_owner_lk.ref(), "pass 2 junior owner");
 			this->persist_map_controller_t::persist_owner(senior_owner_lk.ref(), "pass 2 senior owner");
@@ -1427,7 +1427,7 @@ template <
 			owner_lk.ref().erase(
 				static_cast<unsigned>(erase_src_lk.index()-owner_lk.index())
 				, owner_lk
-				, static_cast<persist_map_controller_t *>(this)
+				, gsl::not_null<persist_map_controller_t *>(this)
 			);
 			this->persist_map_controller_t::persist_owner(owner_lk.ref(), "owner erase");
 			erase_src_lk.ref().content_erase();
