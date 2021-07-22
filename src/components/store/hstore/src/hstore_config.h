@@ -39,13 +39,19 @@
 #define HEAP_RECONSTITUTE 0
 #define HEAP_CONSISTENT 1
 #elif USE_CC_HEAP == 5
+#error Obsolete
 #define HEAP_MM 1
 #define HEAP_RECONSTITUTE 0
 #define HEAP_CONSISTENT 1
 #elif USE_CC_HEAP == 6
+#error Obsolete
 #define HEAP_MM 1
 #define HEAP_RECONSTITUTE 1
 #define HEAP_CONSISTENT 0
+#elif USE_CC_HEAP == 7
+#define HEAP_MM 1
+#undef HEAP_RECONSTITUTE
+#undef HEAP_CONSISTENT
 #else
 #define HEAP_MM 0
 #define HEAP_RECONSTITUTE 0

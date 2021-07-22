@@ -33,7 +33,7 @@ PUBLIC status_t mm_plugin_init()
  * 
  * @return 
  */
-PUBLIC status_t mm_plugin_create(void *persister, const void *regions, void *callee_owned, const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
+PUBLIC status_t mm_plugin_create(const char * params, void * root_ptr, mm_plugin_heap_t * out_heap)
 {
   struct heap_t * inst = malloc(sizeof(struct heap_t));
   memset(inst, 0, sizeof(struct heap_t));
@@ -253,10 +253,29 @@ PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t 
   return S_OK;
 }
   
-
 /** 
- * Get debugging information
+ * Report whether passthru is a "crash consistent" allocator.
  * 
+ * @return false
+ */
+PUBLIC int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap)
+{
+  return 0;
+}
+
+/**
+ * Report whether passthru supports "inject allocation."
+ *
+ * @return false
+ */
+PUBLIC int mm_plugin_can_inject_allocation(mm_plugin_heap_t heap)
+{
+  return 0;
+}
+
+/**
+ * Get debugging information
+ *
  * @param heap Heap context
  */
 PUBLIC void mm_plugin_debug(mm_plugin_heap_t heap)

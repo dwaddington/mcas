@@ -27,6 +27,20 @@
 #include <stdexcept> /* range_error */
 #include <string> /* to_string */
 
+namespace
+{
+	using byte_span = common::byte_span;
+	auto open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_) -> byte_span
+	{
+		auto & iovs = dax_manager_->open_region(std::to_string(uuid_), 0).address_map();
+		if ( iovs.size() != 1 )
+		{
+			throw std::range_error("failed to re-open region " + std::to_string(uuid_));
+		}
+		return iovs.front();
+	}
+}
+
 /* When used with ADO, this space apparently needs a 2MiB alignment.
  * 4 KiB alignment sometimes produces a disagreement between server and ADO mappings,
  * which manifests as incorrect key and data values as seen on the ADO side.
@@ -34,6 +48,10 @@
 heap_mr::heap_mr(
 	unsigned debug_level_
 	, const string_view plugin_path_
+	, impl::allocation_state_emplace *
+	, impl::allocation_state_pin *
+	, impl::allocation_state_pin *
+	, impl::allocation_state_extend *
 	, byte_span pool0_full_
 	, byte_span pool0_heap_
 	, unsigned numa_node_
@@ -46,7 +64,9 @@ heap_mr::heap_mr(
 	, _more_region_uuids_size(0)
 	, _more_region_uuids()
 	, _tracked_anchor(debug_level_, &_tracked_anchor, &_tracked_anchor, sizeof(_tracked_anchor), sizeof(_tracked_anchor))
-	, _eph(std::make_unique<heap_mr_ephemeral>(debug_level_, plugin_path_, id_, backing_file_))
+	, _eph(new heap_mr_ephemeral(debug_level_, plugin_path_, id_, backing_file_))
+	, _pin_data(&heap_mr::pin_data_arm, &heap_mr::pin_data_disarm, &heap_mr::pin_data_get_cptr)
+	, _pin_key(&heap_mr::pin_key_arm, &heap_mr::pin_key_disarm, &heap_mr::pin_key_get_cptr)
 {
 	void *last = ::end(pool0_heap_);
 	if ( 0 < debug_level_ )
@@ -57,7 +77,7 @@ heap_mr::heap_mr(
 		PLOG("%s: pool0 heap %p: 0x%zx", __func__, ::base(_pool0_heap), ::size(_pool0_heap));
 	}
 	/* cursor now locates the best-aligned region */
-	_eph->add_managed_region(_pool0_full, _pool0_heap, _numa_node);
+	_eph->add_managed_region(_pool0_full, _pool0_heap);
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
 		, " pool ", ::base(_pool0_full), " .. ", ::end(_pool0_full)
@@ -79,6 +99,10 @@ heap_mr::heap_mr(
     , const string_view backing_file_
 	, const byte_span *iov_addl_first_
 	, const byte_span *iov_addl_last_
+	, impl::allocation_state_emplace *
+	, impl::allocation_state_pin *
+	, impl::allocation_state_pin *
+	, impl::allocation_state_extend *
 )
 	: _pool0_full(this->_pool0_full)
 	, _pool0_heap(this->_pool0_heap)
@@ -87,8 +111,10 @@ heap_mr::heap_mr(
 	, _more_region_uuids(this->_more_region_uuids)
 	, _tracked_anchor(this->_tracked_anchor)
 	, _eph(std::make_unique<heap_mr_ephemeral>(debug_level_, plugin_path_, id_, backing_file_))
+	, _pin_data(&heap_mr::pin_data_arm, &heap_mr::pin_data_disarm, &heap_mr::pin_data_get_cptr)
+	, _pin_key(&heap_mr::pin_key_arm, &heap_mr::pin_key_disarm, &heap_mr::pin_key_get_cptr)
 {
-	_eph->add_managed_region(_pool0_full, _pool0_heap, _numa_node);
+	_eph->add_managed_region(_pool0_full, _pool0_heap);
 	hop_hash_log<trace_heap_summary>::write(
 		LOG_LOCATION
 		, " pool ", ::base(_pool0_full), " .. ", ::end(_pool0_full)
@@ -101,33 +127,26 @@ heap_mr::heap_mr(
 
 	for ( auto r = iov_addl_first_; r != iov_addl_last_; ++r )
 	{
-		_eph->add_managed_region(*r, *r, _numa_node);
+		_eph->add_managed_region(*r, *r);
 	}
 
 	for ( std::size_t i = 0; i != _more_region_uuids_size; ++i )
 	{
-		auto r = open_region(dax_manager_, _more_region_uuids[i], _numa_node);
-		_eph->add_managed_region(r, r, _numa_node);
+		auto r = open_region(dax_manager_, _more_region_uuids[i]);
+		_eph->add_managed_region(r, r);
 		VALGRIND_MAKE_MEM_DEFINED(::base(r), ::size(r));
 		VALGRIND_CREATE_MEMPOOL(::base(r), 0, true);
 	}
-	_tracked_anchor.recover(debug_level_, _eph.get(), _numa_node);
+	if ( auto eph = dynamic_cast<heap_mr_ephemeral *>(_eph.get()) )
+	{
+		_tracked_anchor.recover(debug_level_, eph);
+	}
 }
 #pragma GCC diagnostic pop
 
 heap_mr::~heap_mr()
 {
 	quiesce();
-}
-
-auto heap_mr::open_region(const std::unique_ptr<dax_manager> &dax_manager_, std::uint64_t uuid_, unsigned numa_node_) -> byte_span
-{
-	auto & iovs = dax_manager_->open_region(std::to_string(uuid_), numa_node_).address_map();
-	if ( iovs.size() != 1 )
-	{
-		throw std::range_error("failed to re-open region " + std::to_string(uuid_));
-	}
-	return iovs.front();
 }
 
 auto heap_mr::regions() const -> nupm::region_descriptor
@@ -145,7 +164,7 @@ namespace
 				v.begin()
 				, v.end()
 				, std::size_t(0)
-				, [] (std::size_t s, const byte_span &iov) -> std::size_t
+				, [] (std::size_t s, byte_span iov) -> std::size_t
 					{
 						return s + ::size(iov);
 					}
@@ -184,7 +203,7 @@ auto heap_mr::grow(
 				for ( auto i = old_list_size; i != new_list_size; ++i )
 				{
 					const auto &r = new_region_list[i];
-					_eph->add_managed_region(r, r, _numa_node);
+					_eph->add_managed_region(r, r);
 					hop_hash_log<trace_heap_summary>::write(
 						LOG_LOCATION
 						, " pool ", ::base(r), " .. ", ::end(r)
@@ -222,7 +241,7 @@ auto heap_mr::grow(
 						}
 						for ( const auto &r : rv )
 						{
-							_eph->add_managed_region(r, r, _numa_node);
+							_eph->add_managed_region(r, r);
 							hop_hash_log<trace_heap_summary>::write(
 								LOG_LOCATION
 								, " pool ", ::base(r), " .. ", ::end(r)
@@ -254,7 +273,11 @@ auto heap_mr::grow(
 
 void heap_mr::quiesce()
 {
-	hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap), " allocated ", _eph->allocated());
+	auto eph = dynamic_cast<heap_mr_ephemeral *>(_eph.get());
+	if ( eph )
+	{
+		hop_hash_log<trace_heap_summary>::write(LOG_LOCATION, " size ", ::size(_pool0_heap), " allocated ", eph->allocated());
+	}
 	_eph->write_hist<trace_heap_summary>(_pool0_heap);
 	VALGRIND_DESTROY_MEMPOOL(::base(_pool0_heap));
 	VALGRIND_MAKE_MEM_UNDEFINED(::base(_pool0_heap), ::size(_pool0_heap));
@@ -280,7 +303,7 @@ namespace
 	}
 }
 
-void *heap_mr::alloc(const std::size_t sz_, const std::size_t align_)
+void heap_mr::alloc(persistent_t<void *> &p_, std::size_t sz_, std::size_t align_)
 {
 	auto align = clean_align(align_, sizeof(void *));
 
@@ -302,14 +325,14 @@ void *heap_mr::alloc(const std::size_t sz_, const std::size_t align_)
 	sz = (sz + align - 1U)/align * align;
 
 	try {
-		auto p = _eph->allocate(sz, _numa_node, align);
+		/* Good use of eph */
+		_eph->allocate(p_, sz, align);
 		/* Note: allocation exception from Rca_LB is General_exception, which does not derive
 		 * from std::bad_alloc.
 		 */
 
-		VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p, sz);
-		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_full), " addr ", p, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
-		return p;
+		VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p_, sz);
+		hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_full), " addr ", p_, " align ", align_, " -> ", align, " size ", sz_, " -> ", sz);
 	}
 	catch ( const std::bad_alloc & )
 	{
@@ -339,7 +362,8 @@ void *heap_mr::alloc_tracked(const std::size_t sz_, const std::size_t align_)
 	auto sz = round_up(sz_ + align, align);
 
 	try {
-		auto p = _eph->allocate(sz, _numa_node, align);
+		void *p = nullptr;
+		_eph->allocate(p, sz, align);
 		/* Note: allocation exception from Rca_LB is General_exception, which does not derive
 		 * from std::bad_alloc.
 		 */
@@ -392,28 +416,26 @@ void heap_mr::inject_allocation(const void * p, std::size_t sz_)
 	sz_ = std::max(sz_, alignment);
 	auto sz = (sz_ + alignment - 1U)/alignment * alignment;
 	/* NOTE: inject_allocation should take a const void* */
-	_eph->inject_allocation(const_cast<void *>(p), sz, _numa_node);
+	auto &eph = dynamic_cast<heap_mr_ephemeral &>(*_eph);
+	eph.inject_allocation(const_cast<void *>(p), sz);
 	VALGRIND_MEMPOOL_ALLOC(::base(_pool0_heap), p, sz);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p, " size ", sz);
 }
 
-void heap_mr::free(void *p_, std::size_t sz_, std::size_t alignment_)
+void heap_mr::free(void *&p_, std::size_t sz_)
 {
-	auto align = clean_align(alignment_, sizeof(void *));
-	sz_ = std::max(sz_, align);
-	auto sz = (sz_ + align - 1U)/align * align;
+	auto sz = std::max(sz_, sizeof(void *));
 	VALGRIND_MEMPOOL_FREE(::base(_pool0_heap), p_);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p_, " size ", sz);
-	return _eph->free(p_, sz, _numa_node);
+	_eph->free(p_, sz);
 }
 
 void heap_mr::free_tracked(
-	void *p_
+	const void *p_
 	, std::size_t sz_
-	, std::size_t // align_
 )
 {
-	tracked_header *h = static_cast<tracked_header *>(p_)-1;
+	tracked_header *h = static_cast<tracked_header *>(const_cast<void *>(p_))-1;
 	auto align = h->_align;
 	/* size: a multiple of alignment */
 	auto sz = round_up(sz_ + align, align);
@@ -433,19 +455,64 @@ void heap_mr::free_tracked(
 	h->_prev->_next = h->_next; /* _next, must flush */
 	persister_nupm::persist(&h->_prev->_next, sizeof h->_prev->_next);
 
-	auto p = static_cast<char *>(p_) - h->_align;
+	auto p = static_cast<const char *>(p_) - h->_align;
 	assert(sz == h->_size);
 	VALGRIND_MEMPOOL_FREE(::base(_pool0_heap), p);
 	hop_hash_log<trace_heap>::write(LOG_LOCATION, "pool ", ::base(_pool0_heap), " addr ", p, " size ", sz);
-	return _eph->free(p, sz, _numa_node);
+	return _eph->free_tracked(p, sz);
 }
 
 unsigned heap_mr::percent_used() const
 {
-    return _eph->capacity() == 0 ? 0xFFFFU : unsigned(_eph->allocated() * 100U / _eph->capacity());
+	auto eph = dynamic_cast<heap_mr_ephemeral *>(_eph.get());
+    return ( eph  && _eph->capacity() != 0 ) ? unsigned(eph->allocated() * 100U / eph->capacity()) :  0xFFFFU;
 }
 
 bool heap_mr::is_reconstituted(const void * p_) const
 {
-	return _eph->is_reconstituted(p_);
+	auto eph = dynamic_cast<heap_mr_ephemeral *>(_eph.get());
+	return eph && eph->is_reconstituted(p_);
 }
+
+impl::allocation_state_pin *heap_mr::aspd() const
+{
+	throw std::logic_error(__func__ + std::string(" call without crash-consistent heap"));
+}
+
+impl::allocation_state_pin *heap_mr::aspk() const
+{
+	throw std::logic_error(__func__ + std::string(" call without crash-consistent heap"));
+}
+
+char *heap_mr::pin_data_get_cptr() const
+{
+	return nullptr;
+}
+
+char *heap_mr::pin_key_get_cptr() const
+{
+	return nullptr;
+}
+
+void heap_mr::pin_data_arm(
+	cptr & // cptr_
+) const
+{
+}
+
+void heap_mr::pin_key_arm(
+	cptr & // cptr_
+) const
+{
+}
+
+void heap_mr::pin_data_disarm() const
+{
+}
+
+void heap_mr::pin_key_disarm() const
+{
+}
+
+bool heap_mr::is_crash_consistent() const { return _eph->is_crash_consistent(); }
+bool heap_mr::can_reconstitute() const { return _eph->can_reconstitute(); }

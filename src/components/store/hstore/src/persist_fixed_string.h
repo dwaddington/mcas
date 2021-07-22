@@ -640,8 +640,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 
 		void deconstitute() const
 		{
-#if HEAP_RECONSTITUTE
-			if ( ! is_inline() )
+			if ( ! is_inline() && _outline.al().pool()->can_reconstitute() )
 			{
 				/* used only by the table_base destructor, at which time
 				 * the reference count should be 1. There is not much point
@@ -653,7 +652,6 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					_outline.al().~allocator_char_type();
 				}
 			}
-#endif
 		}
 
 		template <typename AL>
@@ -666,33 +664,36 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 					 * it would not need restoration. Arrange that.
 					 */
 					new (&const_cast<persist_fixed_string *>(this)->_outline.al()) allocator_char_type(al_);
-#if HEAP_RECONSTITUTE
-					using reallocator_char_type =
-						typename std::allocator_traits<AL>::template rebind_alloc<char>;
-					auto alr = reallocator_char_type(al_);
-					if ( alr.is_reconstituted(_outline.P) )
+					if ( al_.pool()->can_reconstitute() )
 					{
-						/* The data has already been reconstituted. Increase the reference
-						 * count. */
-						_outline.ptr()->inc_ref(__LINE__, "reconstitute");
+						using reallocator_char_type =
+							typename std::allocator_traits<AL>::template rebind_alloc<char>;
+						auto alr = reallocator_char_type(al_);
+						if ( alr.is_reconstituted(_outline.P) )
+						{
+							/* The data has already been reconstituted. Increase the reference
+							 * count. */
+							_outline.ptr()->inc_ref(__LINE__, "reconstitute");
+						}
+						else
+						{
+							/* The data is not yet reconstituted. Reconstitute it.
+							 * Although the original may have had a refcount
+							 * greater than one, we have not yet seen the
+							 * second reference, so the refcount must be set to one.
+							 */
+							alr.reconstitute(
+								_outline.ptr()->alloc_element_count() * sizeof(T), _outline.P
+							);
+							new (_outline.P)
+								element_type( size(), _outline.ptr()->alignment(), lock_state::free );
+						}
+						reset_lock();
 					}
 					else
 					{
-						/* The data is not yet reconstituted. Reconstitute it.
-						 * Although the original may have had a refcount
-						 * greater than one, we have not yet seen the
-						 * second reference, so the refcount must be set to one.
-						 */
-						alr.reconstitute(
-							_outline.ptr()->alloc_element_count() * sizeof(T), _outline.P
-						);
-						new (_outline.P)
-							element_type( size(), _outline.ptr()->alignment(), lock_state::free );
+						reset_lock_with_pending_retries();
 					}
-					reset_lock();
-#else
-					reset_lock_with_pending_retries();
-#endif
 				}
 			}
 

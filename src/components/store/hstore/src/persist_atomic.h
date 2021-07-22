@@ -96,7 +96,7 @@ namespace impl
 			persist_atomic(const persist_atomic &) = delete;
 			persist_atomic(persist_atomic &&) noexcept(!perishable_testing) = default;
 			persist_atomic& operator=(const persist_atomic &) = delete;
-			allocation_state_emplace &ase() { return *_ase; }
+			allocation_state_emplace *ase() { return _ase; }
 			friend struct impl::persist_atomic_controller<Table>;
 		};
 }

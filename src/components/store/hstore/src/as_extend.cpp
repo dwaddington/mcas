@@ -35,16 +35,24 @@ impl::allocation_state_extend::allocation_state_extend(allocation_state_extend &
 	, _segment_count_updated_value(std::move(m_._segment_count_updated_value))
 {}
 
-bool impl::allocation_state_extend::is_in_use(const void *const ptr_)
+bool impl::allocation_state_extend::is_in_use(
+	const void *const ptr_
+	, bool can_reconstitute_
+)
 {
 	auto in_use =
 		ptr_ != nullptr
-#if HEAP_RECONSTITUTE
 		&&
-		ptr_ == _ptr
-		&&
-		_psegment_count != nullptr && ( _psegment_count->actual().is_stable() && _psegment_count->actual().value()  == _segment_count_updated_value )
-#endif
+		(
+			can_reconstitute_
+			?
+			(
+				ptr_ == _ptr
+				&&
+				_psegment_count != nullptr && ( _psegment_count->actual().is_stable() && _psegment_count->actual().value()  == _segment_count_updated_value )
+			)
+			: true
+		)
 		;
 	PLOG(PREFIX "ptr %p, extend %s", LOCATION, ptr_, in_use ? "in_use" : "free");
 	return in_use;

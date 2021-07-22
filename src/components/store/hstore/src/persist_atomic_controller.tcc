@@ -16,6 +16,7 @@
 #include "hstore_kv_types.h"
 #include "monitor_emplace.h"
 #include <common/perf/tm.h>
+#include <gsl/pointers>
 #include <algorithm> /* copy, move */
 #include <array>
 #include <stdexcept> /* out_of_range */
@@ -38,9 +39,8 @@ template <typename Table>
 			, _tick_expired(false)
 #endif
 		{
-			if ( mode_ == construction_mode::reconstitute )
+			if ( mode_ == construction_mode::reconstitute && al_.pool()->can_reconstitute() )
 			{
-#if HEAP_RECONSTITUTE
 				/* reconstitute allocated memory */
 				_persist->mod_key.reconstitute(allocator_type(*this));
 				_persist->mod_mapped.reconstitute(allocator_type(*this));
@@ -51,7 +51,6 @@ template <typename Table>
 				else
 				{
 				}
-#endif
 			}
 			try
 			{
@@ -92,12 +91,12 @@ template <typename Table>
 		monitor_emplace<allocator_type> m(*this);
 
 		/* Identify the element owner for the allocations to be freed */
-#if HEAP_CONSISTENT
+		if ( _persist->ase() )
 		{
-			auto pe = static_cast<allocator_type *>(this);
-			_persist->ase().em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);
+			auto pe = gsl::not_null<allocator_type *>(this);
+			_persist->ase()->em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);
 		}
-#endif
+
 		/* Atomic set of initiative to clear elements owned by persist->mod_owner */
 		_persist->mod_owner = 0;
 		this->persist(&_persist->mod_owner, sizeof _persist->mod_owner);
@@ -270,12 +269,13 @@ template <typename Table>
 		_persist->mod_owner = 0;
 		{
 			monitor_emplace<allocator_type> m(*this);
-#if HEAP_CONSISTENT
+
+			if ( al_.pool()->is_crash_consistent() )
 			{
-				auto pe = static_cast<allocator_type *>(this);
-				_persist->ase().em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);
+				auto pe = gsl::not_null<allocator_type *>(this);
+				_persist->ase()->em_record_owner_addr_and_bitmask(&_persist->mod_owner, 1, *pe);
 			}
-#endif
+
 			_persist->mod_key.assign(AK_REF key.begin(), key.end(), lock_state::free, al_);
 			_persist->mod_mapped.assign(AK_REF data_, data_ + data_len_, zeros_extend_, alignment_, lock_, al_);
 			_persist->map = map_;

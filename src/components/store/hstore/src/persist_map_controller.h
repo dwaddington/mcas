@@ -134,7 +134,7 @@ namespace impl
 			{
 				auto pe = static_cast<allocator_type *>(this);
 				_persist->ase()
-					.em_record_owner_addr_and_bitmask(
+					->em_record_owner_addr_and_bitmask(
 						pmask_
 						, mask_
 						, *pe
@@ -147,7 +147,7 @@ namespace impl
 			{
 				auto pe = static_cast<allocator_type *>(this);
 				_persist->ase()
-					.er_record_owner_addr_and_bitmask(
+					->er_record_owner_addr_and_bitmask(
 						pmask_
 						, mask_
 						, *pe
@@ -160,7 +160,7 @@ namespace impl
 			{
 				auto pe = static_cast<allocator_type *>(this);
 				_persist->asx()
-					.record_segment_count_addr_and_target_value(
+					->record_segment_count_addr_and_target_value(
 						psegment_count_
 						, segment_count_expected_
 						, *pe
@@ -169,7 +169,7 @@ namespace impl
 			void clear_allocation_doubt()
 			{
 				_persist->ase().clear_allocation_doubt(static_cast<allocator_type *>(this));
-				_persist->asx().clear_allocation_doubt(static_cast<allocator_type *>(this));
+				_persist->asx()->clear_allocation_doubt(static_cast<allocator_type *>(this));
 			}
 
 			auto segment_count_actual() const

@@ -5,14 +5,15 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
 DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
-STORETYPE=hstore-mr
+STORETYPE=hstore-mm
+MM_PLUGIN_PATH="$(pwd)/dist/lib/libmm-plugin-rcalb.so"
 TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
-CONFIG_STR="$("./dist/testing/hstore-0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP")"
+CONFIG_STR="$("./dist/testing/hstore-0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" --mm-plugin-path "${MM_PLUGIN_PATH}")"
 # launch MCAS server
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
