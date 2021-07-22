@@ -17,6 +17,7 @@
 #include <common/cycles.h>
 #include <common/utils.h>
 #include <common/memory.h>
+#include <common/str_utils.h>
 #include <fcntl.h>
 #include <nupm/region_descriptor.h>
 #include <stdio.h>
@@ -131,7 +132,7 @@ private:
   
   unsigned debug_level() const { return _debug_level; }
 
-  void * allocate_region_memory(size_t alignment, size_t size);
+  void * allocate_region_memory(size_t size, const std::string& pool_name);
   void free_region_memory(void *addr, const size_t size);
   
   static const Pool_instance *checked_pool(const Pool_instance * pool)
@@ -168,8 +169,8 @@ public:
                 unsigned flags_)
     : _debug_level(debug_level),
       _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
-      _regions{{allocate_region_memory(MiB(2) /* alignment */, _nsize), _nsize}},
       _name{name_},
+      _regions{{allocate_region_memory(round_up_page(_nsize), name_), round_up_page(_nsize)}},
       _mm_plugin(mm_plugin_path), /* plugin path for heap allocator */
       _map_lock{},
       _flags{flags_},
@@ -214,8 +215,8 @@ private:
   unsigned                   _debug_level;
   unsigned                   _ref_count = 0; 
   size_t                     _nsize; /*< order important */
-  std::vector<::iovec>       _regions; /*< regions supporting pool */
   std::string                _name; /*< pool name */
+  std::vector<::iovec>       _regions; /*< regions supporting pool */
   MM_plugin_wrapper          _mm_plugin;
   map_t *                    _map; /*< hash table based map */
   common::RWLock             _map_lock; /*< read write lock */
@@ -877,10 +878,12 @@ status_t Pool_instance::grow_pool(const size_t increment_size,
   if (increment_size <= 0)
     return E_INVAL;
 
-  reconfigured_size = _nsize + increment_size;
-  void *new_region = allocate_region_memory(DEFAULT_ALIGNMENT, increment_size);
-  _mm_plugin.add_managed_region(new_region, increment_size);
-  _regions.push_back({new_region, increment_size});
+  size_t rounded_increment_size = round_up_page(increment_size);
+  reconfigured_size = _nsize + rounded_increment_size;
+
+  void *new_region = allocate_region_memory(rounded_increment_size, _name);
+  _mm_plugin.add_managed_region(new_region, rounded_increment_size);
+  _regions.push_back({new_region, rounded_increment_size});
   _nsize = reconfigured_size;
   return S_OK;
 }
@@ -980,29 +983,61 @@ status_t Pool_instance::close_pool_iterator(IKVStore::pool_iterator_t iter)
   return S_OK;
 }
 
-void * Pool_instance::allocate_region_memory(size_t alignment, size_t size)
+void * Pool_instance::allocate_region_memory(size_t size, const std::string& pool_name)
 {
   assert(size > 0);
 
-  void *p = mmap(reinterpret_cast<void*>(0x800000000), /* help debugging */
-                 size,
-                 PROT_READ | PROT_WRITE,
-                 MAP_ANONYMOUS | MAP_SHARED | effective_map_locked,
-                 0, /* file */
-                 0 /* offset */);
+  void * p = nullptr;
+  char * backing_store_dir = ::getenv("MAPSTORE_BACKING_STORE_DIR");
 
-  if ( p == MAP_FAILED ) {
-    auto e = errno;
-    std::ostringstream msg;
-    msg << __FILE__ << " allocate_region_memory mmap failed on DRAM for region allocation"
-        << " alignment="
-        << std::hex << alignment
-        << " size=" << std::dec << size << " :" << strerror(e);
-    throw General_exception("%s", msg.str().c_str());
+  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  assert(size % PAGE_SIZE == 0);
+  
+  if(backing_store_dir) {
+    struct stat st;
+    if(stat(backing_store_dir,&st) == 0) {
+      if(st.st_mode & (S_IFDIR != 0)) {
+        std::string filename = backing_store_dir;
+        filename += "/mapstore_backing_" + pool_name + ".dat";
+        int fdout;
+        if ((fdout = open (filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, mode)) >= 0) {
+          /* create space in file */
+          if(ftruncate(fdout, size) == 0) {
+            p = mmap(reinterpret_cast<void*>(0xff00000000), /* help debugging */
+                     size,
+                     PROT_READ | PROT_WRITE,
+                     MAP_SHARED | effective_map_locked,
+                     fdout, /* file */
+                     0 /* offset */);
+            if(p)
+              PINF("[Mapstore] using mmap'ed backing file (%s) (%lu MiB)", filename.c_str(), REDUCE_MB(size));
+
+            close(fdout);
+          }
+        }
+      }
+    }
   }
 
-  if(madvise(p, size, MADV_DONTFORK) != 0)
-    throw General_exception("madvise 'don't fork' failed unexpectedly (%p %lu)", p, size);
+  if(p == nullptr) {
+    p = mmap(reinterpret_cast<void*>(0x800000000), /* help debugging */
+             size,
+             PROT_READ | PROT_WRITE,
+             MAP_ANONYMOUS | MAP_SHARED | effective_map_locked,
+             0, /* file */
+             0 /* offset */);
+
+    if ( p == MAP_FAILED ) {
+      auto e = errno;
+      std::ostringstream msg;
+      msg << __FILE__ << " allocate_region_memory mmap failed on DRAM for region allocation"
+          << " size=" << std::dec << size << " :" << strerror(e);
+      throw General_exception("%s", msg.str().c_str());
+    }
+  }
+  
+  //  if(madvise(p, size, MADV_DONTFORK) != 0)
+  //    throw General_exception("madvise 'don't fork' failed unexpectedly (%p %lu)", p, size);
 
   CPLOG(1, PREFIX "allocated_region_memory (%p,%lu)", p, size);
   return p;
