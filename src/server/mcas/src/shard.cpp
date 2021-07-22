@@ -108,15 +108,17 @@ namespace global
 unsigned debug_level = 0;
 }
 
-static std::string default_mm_plugin(const Config_file& /*config_file*/,
-                                     const std::string& backend)
+static std::string default_mm_plugin(const Config_file& /* config_file */,
+                                     const std::string& backend,
+                                     const boost::optional<std::string>& config_value)
 {
+  if ( config_value ) { return *config_value; }
   if(backend == "mapstore") return DEFAULT_MAPSTORE_MM_PLUGIN_PATH;
   else if(backend == "hstore") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
   else if(backend == "hstore-mr") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
   else if(backend == "hstore-cc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
   else if(backend == "hstore-mc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
-  else throw Logic_exception("invalid store: %s", backend.c_str());
+  else throw Logic_exception("store woih unspecified plugin path: %s", backend.c_str());
 }
 
 Shard::Shard(const Config_file &config_file,
@@ -173,7 +175,7 @@ Shard::Shard(const Config_file &config_file,
               debug_level_),
     _cluster_signal_queue(),
     _backend(config_file.get_shard_required(config::default_backend, shard_index)),
-    _mm_plugin_path(default_mm_plugin(config_file, _backend)),
+    _mm_plugin_path(default_mm_plugin(config_file, _backend, config_file.get_shard_optional(config::mm_plugin_path, shard_index))),
     _dax_config(dax_config),
     _thread(std::async(std::launch::async,
                        &Shard::thread_entry,

@@ -16,7 +16,7 @@ status_t mm_plugin_init()
   return E_NOT_IMPL;
 }
 
-status_t mm_plugin_create(void *persister, const void *regions, void *callee_owned, const char * params, mm_plugin_heap_t * out_heap)
+status_t mm_plugin_create(const char * params, mm_plugin_heap_t * out_heap)
 {
   PPLOG("mm_plugin_create (%s)", params);
   return E_NOT_IMPL;
@@ -104,7 +104,17 @@ status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t s
 {
   return E_NOT_IMPL;
 }
-  
+
+int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap)
+{
+  return false;
+}
+
+int mm_plugin_can_inject_allocation(mm_plugin_heap_t heap)
+{
+  return false;
+}
+
 void mm_plugin_debug(mm_plugin_heap_t heap)
 {
 }

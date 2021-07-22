@@ -11,37 +11,37 @@
    limitations under the License.
 */
 
-
-#ifndef MCAS_MONITOR_EMPLACE_H
-#define MCAS_MONITOR_EMPLACE_H
+#ifndef MCAS_HSTORE_MONITOR_EXTEND_H_
+#define MCAS_HSTORE_MONITOR_EXTEND_H_
 
 #include "hstore_config.h"
-#include "perishable_expiry.h"
-#include "test_flags.h"
-#include "logging.h"
+#include <common/logging.h>
 
 template <typename Allocator>
-	struct monitor_emplace
+	struct monitor_extend
 	{
 	private:
 		Allocator _a;
 	public:
-		monitor_emplace(const Allocator &a_)
+		monitor_extend(const Allocator &a_)
 			: _a(a_)
 		{
+#if HSTORE_TRACE_EXTEND
+			PLOG(PREFIX "ctor %d", LOCATION, USE_CC_HEAP);
+#endif
 			if ( _a.pool()->is_crash_consistent() )
 			{
-				_a.emplace_arm();
+				_a.extend_arm();
 			}
 		}
-		~monitor_emplace() noexcept(! TEST_HSTORE_PERISHABLE)
+		~monitor_extend()
 		{
-			if ( ! perishable_expiry::is_current() )
+#if HSTORE_TRACE_EXTEND
+			PLOG(PREFIX "dtor", LOCATION);
+#endif
+			if ( _a.pool()->is_crash_consistent() )
 			{
-				if ( _a.pool()->is_crash_consistent() )
-				{
-					_a.emplace_disarm();
-				}
+				_a.extend_disarm();
 			}
 		}
 	};

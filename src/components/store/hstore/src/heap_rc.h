@@ -16,9 +16,14 @@
 #define MCAS_HSTORE_HEAP_RC_H
 
 #include "hstore_config.h"
+
+#include "as_extend.h"
+#include "as_pin.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
+#include "persistent.h"
 #include "persister_nupm.h"
+#include "pin_control.h"
 #include "rc_alloc_wrapper_lb.h"
 #include "trace_flags.h"
 #include "tracked_header.h"
@@ -58,10 +63,23 @@ private:
 	std::array<std::uint64_t, 1024U> _more_region_uuids;
 	tracked_header _tracked_anchor;
 	std::unique_ptr<heap_rc_ephemeral> _eph;
+	pin_control<heap_rc> _pin_data;
+	pin_control<heap_rc> _pin_key;
+
+	void pin_data_arm(cptr &cptr) const;
+	void pin_key_arm(cptr &cptr) const;
+	char *pin_data_get_cptr() const;
+	char *pin_key_get_cptr() const;
+	void pin_data_disarm() const;
+	void pin_key_disarm() const;
 
 public:
 	explicit heap_rc(
 		unsigned debug_level
+		, impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
 		, byte_span pool0_full
 		, byte_span pool0_heap
 		, unsigned numa_node
@@ -75,6 +93,10 @@ public:
 		, string_view backing_file
 		, const byte_span *iov_addl_first_
 		, const byte_span *iov_addl_last_
+		, impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
 	);
 	/* allocation_state_combined offered, but not used */
 	explicit heap_rc(
@@ -85,8 +107,12 @@ public:
 		, impl::allocation_state_combined const *
 		, const byte_span *iov_addl_first_
 		, const byte_span *iov_addl_last_
+		, impl::allocation_state_emplace *ase
+		, impl::allocation_state_pin *aspd
+		, impl::allocation_state_pin *aspk
+		, impl::allocation_state_extend *asx
 	)
-		: heap_rc(debug_level, dax_manager, id, backing_file, iov_addl_first_, iov_addl_last_)
+		: heap_rc(debug_level, dax_manager, id, backing_file, iov_addl_first_, iov_addl_last_, ase, aspd, aspk, asx)
 	{
 	}
 
@@ -97,8 +123,6 @@ public:
 
     static constexpr std::uint64_t magic_value() { return 0xc74892d72eed493a; }
 
-	static byte_span open_region(const std::unique_ptr<dax_manager> &dax_manager, std::uint64_t uuid, unsigned numa_node);
-
 	auto grow(
 		const std::unique_ptr<dax_manager> & dax_manager
 		, std::uint64_t uuid
@@ -106,26 +130,31 @@ public:
 	) -> std::size_t;
 
 	void quiesce();
-
-	void *alloc(std::size_t sz, std::size_t alignment);
+	void alloc(persistent_t<void *> &p, std::size_t sz, std::size_t alignment);
 	void *alloc_tracked(std::size_t sz, std::size_t alignment);
 
 	void inject_allocation(const void * p, std::size_t sz);
+	std::size_t free(persistent_t<void *> &p, std::size_t sz);
+	void free_tracked(const void *p, std::size_t sz);
 
-	void free(void *p, std::size_t sz, std::size_t alignment);
-	void free_tracked(void *p, std::size_t sz, std::size_t alignment);
+	void extend_arm() const {};
+	void extend_disarm() const {};
+	void emplace_arm() const {};
+	void emplace_disarm() const {};
+
+	impl::allocation_state_pin *aspd() const;
+	impl::allocation_state_pin *aspk() const;
+
+	const pin_control<heap_rc> &pin_control_data() const { return _pin_data; }
+	const pin_control<heap_rc> &pin_control_key() const { return _pin_key; }
 
 	unsigned percent_used() const;
 
 	bool is_reconstituted(const void * p) const;
 
-	/* debug */
-	unsigned numa_node() const
-	{
-		return _numa_node;
-	}
-
     nupm::region_descriptor regions() const;
+	bool is_crash_consistent() const { return false; }
+	bool can_reconstitute() const { return true; }
 };
 
 #endif

@@ -58,7 +58,8 @@ namespace ccpm
  *   (4) persist an invalidation of the note written in step 1.
  */
 
-typedef std::function<bool(const void * ptr)> ownership_callback_t;
+using ownership_callback_type = std::function<bool(const void * ptr)>;
+using ownership_callback_t = ownership_callback_type;
 
 inline bool accept_all(const void *) { return true; }
 /*

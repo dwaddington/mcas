@@ -204,8 +204,6 @@ namespace impl
 			return _er.has_disused_ptrs();
 		}
 
-		void *er_disused_ptr(unsigned i) { return _er.disused_ptr(i); }
-
 	public:
 		allocation_state_emplace();
 		allocation_state_emplace(allocation_state_emplace &&) noexcept(!perishable_testing);
@@ -270,6 +268,8 @@ namespace impl
 		{
 			_er.record_owner_addr_and_bitmask(pmask_, mask_, p_);
 		}
+
+		void *er_disused_ptr(unsigned i) { return _er.disused_ptr(i); }
 	};
 }
 

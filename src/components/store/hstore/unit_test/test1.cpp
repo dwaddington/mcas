@@ -23,6 +23,7 @@
 /* note: we do not include component source, only the API definition */
 #include <api/kvstore_itf.h>
 #include <common/byte_span.h>
+#include <common/env.h>
 #include <common/str_utils.h> /* random_string */
 #include <common/utils.h> /* MiB, GiB */
 #include <nupm/region_descriptor.h>
@@ -211,6 +212,7 @@ TEST_F(KVStore_test, Instantiate)
           { +component::IKVStore_factory::k_name, "numa0"}
           , { +component::IKVStore_factory::k_dax_config, store_map::location }
           , { +component::IKVStore_factory::k_debug, debug_level() }
+          , { +component::IKVStore_factory::k_mm_plugin_path, common::env_value<const char *>("MM_PLUGIN_PATH", "no_plugin_path") }
         }
     );
 }

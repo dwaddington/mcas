@@ -38,7 +38,7 @@ tracked_header::tracked_header(unsigned debug_level_, tracked_header *prev_, tra
 	}
 }
 
-void tracked_header::recover(unsigned debug_level_, injectee *eph_, unsigned numa_node_)
+void tracked_header::recover(unsigned debug_level_, injectee *eph_)
 {
 	/* _next ptrs must be a consistent circular list.
 	 * Fix up _prev ptrs so that they are consistent with next.
@@ -62,7 +62,7 @@ void tracked_header::recover(unsigned debug_level_, injectee *eph_, unsigned num
 	for ( auto e = h->_next; e != h; e = e->_next )
 	{
 		e->_next->_prev = e;
-		eph_->inject_allocation(common::pointer_cast<char>(e+1) - e->_align, e->_size, numa_node_);
+		eph_->inject_allocation(common::pointer_cast<char>(e+1) - e->_align, e->_size);
 		if ( 3 < debug_level_ )
 		{
 			PLOG(

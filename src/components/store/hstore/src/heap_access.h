@@ -18,12 +18,13 @@
 template <typename T>
 	struct heap_access
 	{
-		using shared_t = T;
+		using shared_type = T;
 	private:
-		shared_t *_heap;
+		using shared_t = shared_type;
+		shared_type *_heap;
 
 	public:
-		explicit heap_access(shared_t *area)
+		explicit heap_access(shared_type *area)
 			: _heap(area)
 		{
 		}
@@ -36,9 +37,14 @@ template <typename T>
 
 		heap_access & operator=(const heap_access &) = default;
 
-		shared_t *operator->() const
+		shared_type *operator->() const
 		{
 			return _heap;
+		}
+
+		shared_type &operator*() const
+		{
+			return *_heap;
 		}
 	};
 
