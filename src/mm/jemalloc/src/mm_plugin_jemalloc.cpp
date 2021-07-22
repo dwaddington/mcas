@@ -22,16 +22,15 @@
 #include <common/utils.h>
 #include <jemalloc/jemalloc.h>
 
-#include "avl_malloc.h"
-#include "logging.h"
-
-#include "../../mm_plugin_itf.h"
-
 //#define DEBUG_EXTENTS
 //#define DEBUG_ALLOCS
 //#define DEBUG
 #define USE_AVL
 
+#include "avl_malloc.h"
+#include "logging.h"
+
+#include "../../mm_plugin_itf.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-value"
@@ -444,10 +443,6 @@ PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out
 
 PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void ** in_out_ptr, size_t n)
 {
-#ifdef DEBUG_ALLOCS
-  PPLOG("%s (%p, %lu) x_flags=%x",__func__, *ptr, n, CAST_HEAP(heap)->x_flags());
-#endif
-  
   if(*in_out_ptr == nullptr) {
     /* if pointer is null, then we just do a new allocation */
     *in_out_ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags());
@@ -458,6 +453,11 @@ PUBLIC status_t mm_plugin_reallocate(mm_plugin_heap_t heap, void ** in_out_ptr, 
   else {
     *in_out_ptr = jel_rallocx(*in_out_ptr, n, CAST_HEAP(heap)->x_flags());
   }
+
+#ifdef DEBUG_ALLOCS
+  PPLOG("%s (%p, %lu) x_flags=%x",__func__, *in_out_ptr, n, CAST_HEAP(heap)->x_flags());
+#endif
+  
 
   return S_OK;
 }

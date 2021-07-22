@@ -83,7 +83,7 @@ def test_tf_example(shelf):
 
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 
-s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
+s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',backend="mapstore",force_new=True)
 
 test_ndarray(s)
 test_tf_example(s)
