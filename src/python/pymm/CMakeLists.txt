@@ -48,7 +48,11 @@ endif()
   
   message("-- Python version ${PYTHON_VERSION}")
   set(LIBDIR "lib.linux-x86_64-${PYTHON_VERSION}")
-  set(PYTHON_SITE_NUMPY_INCLUDES "${PYTHON_SITE_PACKAGES}/numpy/core/include")
+
+  execute_process ( COMMAND ${PYTHON} -c "import numpy; print(numpy.__path__[0])" OUTPUT_VARIABLE NUMPY_SITE_PACKAGE OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message("-- Numpy     site : ${NUMPY_SITE_PACKAGE}")
+  
+  set(PYTHON_SITE_NUMPY_INCLUDES "${NUMPY_SITE_PACKAGE}/core/include")
 
   configure_file(${SETUP_PY_IN} ${SETUP_PY})
   configure_file(core/pymm_config.h.in core/pymm_config.h)

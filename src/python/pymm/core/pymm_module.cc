@@ -10,6 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
 #define PYMMCORE_API_VERSION "v0.1.9"
 #define STATUS_TEXT "(CC=off)"
 #define PAGE_SIZE 4096

@@ -62,9 +62,9 @@ public:
   }
   
 private:
-  IKVStore * load_backend(const std::string& backend,
-                          const std::string& path,
-                          const std::string& mm_plugin_path,
+  IKVStore * load_backend(const std::string backend,
+                          const std::string path,
+                          const std::string mm_plugin_path,
                           const addr_t load_addr,
                           const unsigned debug_level);
 
@@ -110,9 +110,9 @@ MemoryResource_dealloc(MemoryResource *self)
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-IKVStore * Backend_instance_manager::load_backend(const std::string& backend,
-                                                  const std::string& path,
-                                                  const std::string& mm_plugin_path,
+IKVStore * Backend_instance_manager::load_backend(const std::string backend,
+                                                  const std::string path,
+                                                  const std::string mm_plugin_path,
                                                   const uint64_t load_addr,
                                                   const unsigned debug_level)
 {

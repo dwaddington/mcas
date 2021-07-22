@@ -26,6 +26,13 @@ extern "C" void* Intercept_Realloc(void * ctx, void * p, size_t n)
   return realloc(p, n);
 }
 
+extern "C" void Intercept_Free(void * ctx, void * p)
+{
+  if(n > 1024)
+    PLOG("free (%p)", p);
+  free(p);
+}
+
 
 PyObject * pymmcore_enable_transient_memory(PyObject * self,
                                             PyObject * args,
@@ -37,7 +44,7 @@ PyObject * pymmcore_enable_transient_memory(PyObject * self,
   allocator.malloc = &Intercept_Malloc;
   allocator.realloc = &Intercept_Realloc;
   allocator.calloc = &Intercept_Calloc;
-  // allocator.free = PyObject_Free;
+  allocator.free = &Intercept_Free;
   
   PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &allocator);
 
