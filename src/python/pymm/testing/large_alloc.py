@@ -2,6 +2,7 @@ import pymm
 import numpy as np
 import math
 import torch
+import gc
 
 from inspect import currentframe, getframeinfo
 line = lambda : currentframe().f_back.f_lineno
@@ -20,17 +21,22 @@ def log(*args):
     print(colored(0,255,255,*args))
     
 
-def test_large_alloc(s):
-    s.w = np.ndarray((1000000000),dtype=np.uint8)
-#    s.w = np.ndarray((400000000000),dtype=np.uint8)
-
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 pymm.pymmcore.enable_transient_memory()
 
 s = pymm.shelf('myShelf',size_mb=500*1024,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=True)
 
-test_large_alloc(s)
+w = np.ndarray((1000000000),dtype=np.uint8)
+s.w = w
+#w = np.ndarray((1000),dtype=np.uint8)
+print(hex(id(w)))
 
+del w
+
+gc.collect()
+gc.get_objects()
+
+print('get_objects() ok')
 print(s.w._value_named_memory.addr())
 
 print(colored(255,255,255,"OK!"))

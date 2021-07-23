@@ -63,10 +63,11 @@ public:
 
   bool belongs(void * addr)  {
     return (reinterpret_cast<uint64_t>(addr) >= _base) &&
-      (reinterpret_cast<uint64_t>(addr)  <= _addr);
+      (reinterpret_cast<uint64_t>(addr) < _addr);
   }
 
   void * malloc(size_t n) {
+
     const mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
     size_t rounded_n = round_up_page(n);
     std::stringstream ss;
@@ -88,6 +89,7 @@ public:
 
         close(fdout);
         _filemap[p] = filename;
+        PLOG("[PyMM]: allocated %p", p);
         return p;
       }
     }
@@ -97,18 +99,28 @@ public:
 
   void * calloc(size_t nelem, size_t elsize) {
     size_t size = nelem * elsize;
-    void * p = malloc(size);
+    void * p = this->malloc(size);
+    PLOG("[PyMM]: callocated %p", p);
     memset(p, 0, size);
     return p;
   }
   
   void * realloc(void * p, size_t n) {
-    return nullptr;
+
+    if(belongs(p)) {
+      PLOG("[PyMM]: reallocate attempt (%p,%lu)", p, n);
+      return nullptr;
+    }
+
+    return ::realloc(p,n);
   }
   
   void free(void * p) {
 
-    if(p==nullptr || belongs(p)==false) return;
+    if(p==nullptr || belongs(p)==false) {
+      ::free(p);
+      return;
+    }
 
     if(_filemap.find(p) == _filemap.end())
       throw General_exception("trying to free bad address");
@@ -124,7 +136,7 @@ public:
   }
 };
 
-Mmap_memory_provider g_provider;
+static Mmap_memory_provider g_provider;
 
 extern "C" void* Intercept_Malloc(void * ctx, size_t n)
 {
