@@ -21,13 +21,16 @@ def log(*args):
     
 
 def test_large_alloc(s):
-    s.w = np.ndarray((1000000),dtype=np.uint8)
+    s.w = np.ndarray((1000000000),dtype=np.uint8)
+#    s.w = np.ndarray((400000000000),dtype=np.uint8)
 
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 pymm.pymmcore.enable_transient_memory()
 
-s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',backend="mapstore",force_new=True)
+s = pymm.shelf('myShelf',size_mb=500*1024,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=True)
 
 test_large_alloc(s)
+
+print(s.w._value_named_memory.addr())
 
 print(colored(255,255,255,"OK!"))
