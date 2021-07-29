@@ -1001,12 +1001,13 @@ void * Pool_instance::allocate_region_memory(size_t size, const std::string& poo
         filename += "/mapstore_backing_" + pool_name + ".dat";
         int fdout;
         if ((fdout = open (filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, mode)) >= 0) {
+
           /* create space in file */
           if(ftruncate(fdout, size) == 0) {
             p = mmap(reinterpret_cast<void*>(0xff00000000), /* help debugging */
                      size,
                      PROT_READ | PROT_WRITE,
-                     MAP_SHARED | effective_map_locked,
+                     MAP_SHARED, /* paging means no MAP_LOCKED */
                      fdout, /* file */
                      0 /* offset */);
             if(p)
