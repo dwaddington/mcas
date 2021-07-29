@@ -49,7 +49,7 @@ PUBLIC status_t mm_plugin_add_managed_region(mm_plugin_heap_t heap,
 {
   PPNOTICE("%s base=%p size=%lu",__func__, region_base, region_size);
   auto h = reinterpret_cast<Heap*>(heap);
-  memset(region_base, 0, region_size);
+
   h->add_managed_region(region_base, region_size, 0 /* numa node */);
   return S_OK;
 }

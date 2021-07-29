@@ -73,19 +73,19 @@ def test_ndarray(s):
     log("Testing: ndarray OK!")
 
     
-def test_tf_example(shelf):
-    import tensorflow as tf
-    (X_train, _), (X_test, _) = tf.keras.datasets.mnist.load_data()
+# def test_tf_example(shelf):
+#     import tensorflow as tf
+#     (X_train, _), (X_test, _) = tf.keras.datasets.mnist.load_data()
 
-    shelf.X = np.vstack([X_train, X_test])
-    shelf.X = shelf.X.reshape(shelf.X.shape[0], -1).astype(np.float32)
-    log("Testing: tf_example OK!")
+#     shelf.X = np.vstack([X_train, X_test])
+#     shelf.X = shelf.X.reshape(shelf.X.shape[0], -1).astype(np.float32)
+#     log("Testing: tf_example OK!")
 
 # based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
 
 s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',backend="mapstore",force_new=True)
 
 test_ndarray(s)
-test_tf_example(s)
+#test_tf_example(s)
 
 print(colored(255,255,255,"OK!"))

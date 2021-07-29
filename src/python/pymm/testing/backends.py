@@ -31,7 +31,7 @@ def test_default():
 
 def test_dram_mapstore():
     log("Running shelf with mapstore and default MM plugin ...")
-    s = pymm.shelf('myShelf2',size_mb=8,backend='mapstore')
+    s = pymm.shelf('myShelf2',size_mb=8,backend='mapstore') # note, no force_new or pmem_path
     s.x = pymm.ndarray((10,10,))
     print(s.items)
     log("OK!")
