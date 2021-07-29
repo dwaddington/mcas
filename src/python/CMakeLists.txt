@@ -8,7 +8,6 @@ if (BUILD_PYTHON_SUPPORT)
   endif()
   
   add_subdirectory(pymm)
-  add_subdirectory(pymm-intercepts)
 
 endif(BUILD_PYTHON_SUPPORT)
 
