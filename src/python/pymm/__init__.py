@@ -33,9 +33,16 @@ def colored(r, g, b, text):
 def print_warning(*args):
     print(colored(255,0,0,*args))
 
-def enable_transient_memory(backing_directory='/tmp'):
+def enable_transient_memory(backing_directory='/tmp', pmem_file=None, pmem_file_size_gb=0):
     # check that the modified version of numpy is loaded
     if np.__version__ != '1.19.6.dev0+78b5f9b':
         print_warning('[WARNING]: unable to detect modified NumPy installation; transient memory is not enable')
         return
-    pymm.pymmcore.enable_transient_memory(backing_directory=backing_directory)
+    if (pmem_file == None or pmem_file_size_gb == 0):
+        pymm.pymmcore.enable_transient_memory(backing_directory=backing_directory)
+    else:
+        pymm.pymmcore.enable_transient_memory(backing_directory=backing_directory,pmem_file=pmem_file,pmem_file_size_gb=pmem_file_size_gb)
+    
+def disable_transient_memory():
+    pymm.pymmcore.disable_transient_memory()
+

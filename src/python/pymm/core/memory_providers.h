@@ -1,6 +1,10 @@
 #ifndef __MEMORY_PROVIDERS__
 #define __MEMORY_PROVIDERS__
 
+#include <libpmem.h>
+#include "mm_plugin_itf.h"
+#include "pymm_config.h"
+
 class Mmap_memory_provider;
 
 /** 
@@ -10,6 +14,7 @@ class Mmap_memory_provider;
 class Transient_memory_provider
 {
 public:
+  virtual ~Transient_memory_provider() {}
   virtual void * malloc(size_t n) = 0;
   virtual void * calloc(size_t nelem, size_t elsize) = 0;
   virtual void * realloc(void * p, size_t n) = 0;
@@ -26,47 +31,126 @@ inline bool ends_with(std::string const & value, std::string const & ending)
  * Provider for tiering between persistent memory and mmap
  * 
  */
-class Tiered_memory_provider : public Transient_memory_provider
+class Pmem_memory_provider : public Transient_memory_provider
 {
+private:
+  void *              _mapped_memory;
+  size_t              _mapped_memory_size;
+  MM_plugin_wrapper * _heap;
+  addr_t _base;
+  addr_t _limit;
+
 public:
+
+  Pmem_memory_provider(const std::string& pmem_file,
+                       const unsigned long pmem_file_size_gb) {
+    PLOG("using tiered memory provider (pmem_file=%s)(pmem_file_size_gb=%lu)",
+         pmem_file.c_str(), pmem_file_size_gb);
+    assert(!backing_directory.empty());
+    assert(!pmem_file.empty());
+
+    remove(pmem_file.c_str());
+
+    /* set up pmem file and mapping */
+    size_t mapped_lenp = 0;
+    int is_pmem = 0;
+    _mapped_memory_size = GiB(pmem_file_size_gb);
+    _mapped_memory = pmem_map_file(pmem_file.c_str(),
+                                   _mapped_memory_size,
+                                   PMEM_FILE_CREATE,
+                                   O_RDWR,
+                                   &mapped_lenp,
+                                   &is_pmem);
+    assert(_mapped_memory);
+    assert(is_pmem);
+    assert(mapped_lenp == _mapped_memory_size);
+    _base = reinterpret_cast<addr_t>(_mapped_memory);
+    _limit = _base + _mapped_memory_size;
+
+    /* set up pluggable heap allocator */
+    _heap = new MM_plugin_wrapper(RCA_MM_PLUGIN_PATH);
+    assert(_heap);
+    if(_heap->init() != S_OK)
+      throw Constructor_exception("heap init failed");
+
+    if(_heap->add_managed_region(_mapped_memory, _mapped_memory_size) != S_OK)
+      throw Constructor_exception("heap add region failed");
+    
+    PLOG("tiered memory provider checks OK (mapped len=%luGiB)", REDUCE_GiB(_mapped_memory_size));      
+  }
+
+  virtual ~Pmem_memory_provider() {
+    delete _heap;
+    pmem_unmap(_mapped_memory, _mapped_memory_size);
+  }
+  
   void * malloc(size_t n) {
-    return nullptr;
+    void * p = nullptr;
+    if(_heap->allocate(n, &p) != S_OK)
+      throw General_exception("_heap->allocate failed");
+
+    assert(p);
+    PLOG("[PyMM]: using pmem allocation for transient memory");
+    return p;
   }
   
   void * calloc(size_t nelem, size_t elsize) {
-    return nullptr;
+    void * p = nullptr;
+    if(_heap->callocate(nelem * elsize, &p) != S_OK)
+      throw General_exception("_heap->callocate failed");
+    PLOG("transient pmem callocation (%p)", p);
+    return p;
   }
   
   void * realloc(void * p, size_t n) {
-    return nullptr;
+    if(belongs(p)) {
+      PLOG("[PyMM]: reallocate attempt (%p,%lu)", p, n);
+      return nullptr;
+    }
+
+    return ::realloc(p,n);
   }
-  
+
+  inline bool belongs(void * addr)  {
+    return (reinterpret_cast<uint64_t>(addr) >= _base) &&
+      (reinterpret_cast<uint64_t>(addr) < _limit);
+  }
+
   void free(void * p) {
+    if(p==nullptr || belongs(p)==false) {
+      ::free(p);
+      return;
+    }
+
+    PLOG("transient pmem free (%p)", p);
+    void * q = p;
+    if(_heap->deallocate_without_size(&q) != S_OK)
+      throw General_exception("free failed in Pmem_memory_provider");
   }
 };
 
-/** 
- * Provider for persistent memory
- * 
- */
-class Pmem_memory_provider : public Transient_memory_provider
-{
-public:
-  void * malloc(size_t n) {
-    return nullptr;
-  }
+// /** 
+//  * Provider for persistent memory
+//  * 
+//  */
+// class Pmem_memory_provider : public Transient_memory_provider
+// {
+// public:
+//   void * malloc(size_t n) {
+//     return nullptr;
+//   }
   
-  void * calloc(size_t nelem, size_t elsize) {
-    return nullptr;
-  }
+//   void * calloc(size_t nelem, size_t elsize) {
+//     return nullptr;
+//   }
   
-  void * realloc(void * p, size_t n) {
-    return nullptr;
-  }
+//   void * realloc(void * p, size_t n) {
+//     return nullptr;
+//   }
   
-  void free(void * p) {
-  }
-};
+//   void free(void * p) {
+//   }
+// };
 
 /** 
  * Use mmap'ed file for each allocation
@@ -117,6 +201,7 @@ public:
 
   void * malloc(size_t n) {
 
+    PLOG("[PyMM]: using transient mmap'ed file allocator for size (%lu)", n);
     const mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
     size_t rounded_n = round_up_page(n);
     std::stringstream ss;

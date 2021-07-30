@@ -33,7 +33,6 @@ extern "C" void* Intercept_Malloc(void * ctx, size_t n)
   if(n < LARGE_ALLOCATION_THRESHOLD)
     return malloc(n);
 
-  PLOG("[PyMM]: using transient memory allocator for size (%lu)", n);
   void * p = g_provider->malloc(n); /* n > 0 --> p != null */
   if(p == nullptr) {
     perror("");
@@ -86,23 +85,35 @@ PyObject * pymmcore_enable_transient_memory(PyObject * self,
                                             PyObject * kwds)
 {
   static const char *kwlist[] = {"backing_directory",
+                                 "pmem_file",
+                                 "pmem_file_size_gb",
                                  NULL};
 
   char * p_backing_directory = nullptr;
+  char * p_pmem_file = nullptr;
+  unsigned long p_pmem_file_size_gb = 0;
   
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s",
+                                    "s|sk",
                                     const_cast<char**>(kwlist),
-                                    &p_backing_directory)) {
+                                    &p_backing_directory,
+                                    &p_pmem_file,
+                                    &p_pmem_file_size_gb)) {
     PyErr_SetString(PyExc_RuntimeError,"bad arguments");
     return NULL;
   }
 
-  if(p_backing_directory)
+  assert(p_backing_directory);
+
+  if(p_pmem_file == nullptr) {
+    /* single mmap'ed file tier */
     g_provider = new Mmap_memory_provider(p_backing_directory);
-  else
-    g_provider = new Mmap_memory_provider();
+  }
+  else {
+    g_provider = new Pmem_memory_provider(p_pmem_file, p_pmem_file_size_gb);
+  }
+      
   
   /* modify allocator */
   PyMemAllocatorEx allocator;
