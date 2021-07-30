@@ -14,6 +14,6 @@ pip3 install flatbuffers --user -I
 
 wget https://github.com/dwaddington/python-wheels/archive/refs/tags/v1.0.tar.gz
 tar -zxvf v1.0.tar.gz
-pip3 install ./python-wheels-1.0/numpy-1.19.6.dev0+78b5f9b-cp36-cp36m-linux_x86_64.whl --user
+pip3 install ./python-wheels-1.0/numpy-1.19.6.dev0+78b5f9b-cp36-cp36m-linux_x86_64.whl --user -I
 rm v1.0.tar.gz
 rm -Rf ./python-wheels-1.0
