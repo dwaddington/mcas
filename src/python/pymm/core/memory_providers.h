@@ -129,29 +129,6 @@ public:
   }
 };
 
-// /** 
-//  * Provider for persistent memory
-//  * 
-//  */
-// class Pmem_memory_provider : public Transient_memory_provider
-// {
-// public:
-//   void * malloc(size_t n) {
-//     return nullptr;
-//   }
-  
-//   void * calloc(size_t nelem, size_t elsize) {
-//     return nullptr;
-//   }
-  
-//   void * realloc(void * p, size_t n) {
-//     return nullptr;
-//   }
-  
-//   void free(void * p) {
-//   }
-// };
-
 /** 
  * Use mmap'ed file for each allocation
  * 
@@ -267,6 +244,61 @@ public:
     PLOG("[PyMM]: freeing (%p,%lu)", p, stat_buf.st_size);
     remove(fname);
     _filemap.erase(p);
+  }
+};
+
+
+/** 
+ * Provider for persistent memory
+ * 
+ */
+class Tiered_memory_provider : public Transient_memory_provider
+{
+private:
+  Pmem_memory_provider _prov_pmem;
+  Mmap_memory_provider _prov_mmap;
+  
+public:
+  Tiered_memory_provider(const std::string& file_directory,
+                         const std::string& pmem_file,
+                         const unsigned long pmem_file_size_gb)
+    : _prov_pmem(pmem_file, pmem_file_size_gb),
+      _prov_mmap(file_directory) {
+  }
+  
+  void * malloc(size_t n) {
+    void * p = nullptr;
+    try {
+      p = _prov_pmem.malloc(n);
+    }
+    catch(...) {
+      p = _prov_mmap.malloc(n);
+    }
+    return p;
+  }
+  
+  void * calloc(size_t nelem, size_t elsize) {
+    return nullptr;
+  }
+  
+  void * realloc(void * p, size_t n) {
+    return nullptr;
+  }
+  
+  void free(void * p) {
+    if(p==nullptr) {
+      ::free(p);
+      return;
+    }
+    if(_prov_mmap.belongs(p)) {
+      _prov_mmap.free(p);      
+    }
+    else if(_prov_pmem.belongs(p)) {
+      _prov_pmem.free(p);
+    }
+    else {
+      ::free(p);
+    }
   }
 };
 
