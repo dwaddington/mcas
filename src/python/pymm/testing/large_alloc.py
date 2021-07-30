@@ -22,18 +22,22 @@ def log(*args):
     
 
 print('[TEST]: enabling transient memory ...')
-pymm.enable_transient_memory(pmem_file='/mnt/pmem0/swap',pmem_file_size_gb=128, backing_directory='/tmp')
+pymm.enable_transient_memory(pmem_file='/mnt/pmem0/swap',pmem_file_size_gb=2, backing_directory='/tmp')
 
 s = pymm.shelf('myShelf',size_mb=2048,backend="hstore-cc",force_new=True)
 
-# create a large right-hand side expression which will be evaluated in transient memory
+# create a large right-hand side expression which will be evaluated in pmem transient memory
 w = np.ndarray((1000000000*1),dtype=np.uint8) # 1GB
+
+# create something even larger that will fail in pmem and drop into mmap filed
+w2 = np.ndarray((1000000000*10),dtype=np.uint8) # 10GB
 
 # copy to shelf
 s.w = w
 
 # force clean up of w
 del w
+del w2
 gc.collect()
 gc.get_objects()
 

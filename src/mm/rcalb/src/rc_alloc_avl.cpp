@@ -83,7 +83,7 @@ class Rca_AVL_internal : private common::log_source {
       return mr->paddr();
     }
     catch(...) {
-      PWRN("%s:%d region allocation out-of-space (requested %lu MiB, alignment=%lu)", __FILE__, __LINE__, REDUCE_MiB(size), alignment);
+      //PWRN("%s:%d region allocation out-of-space (requested %lu MiB, alignment=%lu)", __FILE__, __LINE__, REDUCE_MiB(size), alignment);
       throw std::bad_alloc();
     }
     return nullptr;

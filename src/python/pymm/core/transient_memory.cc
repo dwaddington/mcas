@@ -111,7 +111,8 @@ PyObject * pymmcore_enable_transient_memory(PyObject * self,
     g_provider = new Mmap_memory_provider(p_backing_directory);
   }
   else {
-    g_provider = new Pmem_memory_provider(p_pmem_file, p_pmem_file_size_gb);
+    //    g_provider = new Pmem_memory_provider(p_pmem_file, p_pmem_file_size_gb);
+    g_provider = new Tiered_memory_provider(p_backing_directory, p_pmem_file, p_pmem_file_size_gb);
   }
       
   

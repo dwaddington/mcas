@@ -87,7 +87,7 @@ public:
   void * malloc(size_t n) {
     void * p = nullptr;
     if(_heap->allocate(n, &p) != S_OK)
-      throw General_exception("_heap->allocate failed");
+      throw Out_of_memory("_heap->allocate failed");
 
     assert(p);
     PLOG("[PyMM]: using pmem allocation for transient memory");
@@ -122,7 +122,7 @@ public:
       return;
     }
 
-    PLOG("transient pmem free (%p)", p);
+    PLOG("[PyMM]: transient pmem free (%p)", p);
     void * q = p;
     if(_heap->deallocate_without_size(&q) != S_OK)
       throw General_exception("free failed in Pmem_memory_provider");
@@ -204,7 +204,7 @@ public:
         return p;
       }
     }
-    throw General_exception("transient_memory: malloc failed");
+    throw Out_of_memory("transient_memory: malloc failed");
     return nullptr;
   }
 
@@ -278,11 +278,25 @@ public:
   }
   
   void * calloc(size_t nelem, size_t elsize) {
-    return nullptr;
+    void * p = nullptr;
+    size_t n = nelem * elsize;
+    try {
+      p = _prov_pmem.malloc(n);
+    }
+    catch(...) {
+      p = _prov_mmap.malloc(n);
+    }
+    return p;
   }
   
   void * realloc(void * p, size_t n) {
-    return nullptr;
+    void * q = nullptr;
+    q = _prov_pmem.realloc(p, n);
+    if(q) return q;
+    q = _prov_mmap.realloc(p, n);
+    if(q) return q;
+    
+    return ::realloc(p, n);
   }
   
   void free(void * p) {
