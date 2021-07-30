@@ -21,22 +21,20 @@ def log(*args):
     print(colored(0,255,255,*args))
     
 
-# based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
-pymm.pymmcore.enable_transient_memory()
+pymm.enable_transient_memory(backing_directory='/tmp')
 
-s = pymm.shelf('myShelf',size_mb=500*1024,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=True)
+s = pymm.shelf('myShelf',size_mb=1024,backend="hstore-cc",force_new=True)
 
-w = np.ndarray((1000000000),dtype=np.uint8)
-s.w = w
-#w = np.ndarray((1000),dtype=np.uint8)
+# create a large right-hand side expression
+w = np.ndarray((500000000),dtype=np.uint8)
 print(hex(id(w)))
 
-del w
+# copy to shelf
+s.w = w
 
+# force clean up of w
+del w
 gc.collect()
 gc.get_objects()
 
-print('get_objects() ok')
 print(s.w._value_named_memory.addr())
-
-print(colored(255,255,255,"OK!"))

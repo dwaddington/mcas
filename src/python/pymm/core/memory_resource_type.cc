@@ -39,7 +39,6 @@ public:
                  const unsigned debug_level,
                  const std::string mm_plugin_path)
   {
-    PLOG("Backend_instance_mgr: (%s) (%s) (%s)", backend.c_str(), path.c_str(), mm_plugin_path.c_str());
     auto iter = _map.find(backend);
     std::string key = path + mm_plugin_path;
     

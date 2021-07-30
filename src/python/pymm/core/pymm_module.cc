@@ -10,9 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
 #define PYMMCORE_API_VERSION "v0.1.9"
-
 #define STATUS_TEXT "(CC=off)"
 #define PAGE_SIZE 4096
 
@@ -47,6 +45,8 @@ PyDoc_STRVAR(pymmcore_version_doc,
              "version() -> Get module version");
 PyDoc_STRVAR(pymmcore_enable_transient_memory_doc,
              "enable_transient_memory() -> Allow other memory resources (e.g. PMEM) for large transient allocations");
+PyDoc_STRVAR(pymmcore_disable_transient_memory_doc,
+             "disable_transient_memory() -> Revert to default system allocators for large transient allocations");
 PyDoc_STRVAR(pymmcore_allocate_direct_memory_doc,
              "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
 PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
@@ -95,6 +95,11 @@ extern PyObject * pymmcore_enable_transient_memory(PyObject * self,
                                                    PyObject * args,
                                                    PyObject * kwargs);
 
+extern PyObject * pymmcore_disable_transient_memory(PyObject * self,
+                                                    PyObject * args,
+                                                    PyObject * kwargs);
+
+
 #ifdef BUILD_PYMM_VALGRIND
 static PyObject * pymmcore_valgrind_trigger(PyObject * self,
                                             PyObject * args,
@@ -108,6 +113,8 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymmcore_version, METH_NOARGS, pymmcore_version_doc },
    {"enable_transient_memory",
     (PyCFunction) pymmcore_enable_transient_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_enable_transient_memory_doc },
+   {"disable_transient_memory",
+    (PyCFunction) pymmcore_disable_transient_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_disable_transient_memory_doc },   
    {"allocate direct memory",
     (PyCFunction) pymmcore_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_allocate_direct_memory_doc },
    {"free direct memory",
