@@ -1,0 +1,37 @@
+// FlatBuffers IDL file
+
+namespace rangeindex_ADO_protocol;
+
+table PutRequest
+{
+  word : string;
+}
+
+table BuildIndex
+{
+}
+
+table GetSymbol
+{
+  word : string;
+}
+
+table GetString
+{
+  symbol : uint64;
+}
+
+union Command
+{
+  PutRequest,
+  BuildIndex,
+  GetSymbol,
+  GetString,
+}
+
+table Message
+{
+  command : Command;
+}
+
+root_type Message;
