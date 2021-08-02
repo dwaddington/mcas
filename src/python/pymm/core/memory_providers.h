@@ -1,6 +1,7 @@
 #ifndef __MEMORY_PROVIDERS__
 #define __MEMORY_PROVIDERS__
 
+#include <common/exceptions.h>
 #include <libpmem.h>
 #include "mm_plugin_itf.h"
 #include "pymm_config.h"
