@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -m unittest
 #
-# basic numpy ndarray
+# basic base type test
 #
 import unittest
 import pymm
@@ -19,7 +19,7 @@ def log(*args):
 
 force_new=True
 
-class TestNdarray(unittest.TestCase):
+class TestBaseTypes(unittest.TestCase):
     def setUp(self):
         global force_new
         self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=force_new)
