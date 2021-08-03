@@ -12,18 +12,12 @@
 import unittest
 import pymm
 import numpy as np
-import math
-import torch
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
 
-def print_error(*args):
-    print(colored(255,0,0,*args))
-
 def log(*args):
     print(colored(0,255,255,*args))
-    
 
 class TestDevDaxSupport(unittest.TestCase):
 

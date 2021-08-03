@@ -21,7 +21,7 @@ class TestTransientMemory(unittest.TestCase):
         pymm.pymmcore.enable_transient_memory(backing_directory='/tmp', pmem_file='/mnt/pmem0/swap', pmem_file_size_gb=1)
 
     def test_tm(self):
-        self.s.x = np.ndarray((1000000,), dtype=np.uint8)
+        self.s.x = np.ndarray((1000000,), dtype=np.uint8) # large RHS eval
         print(self.s.x)
         print(colored(255,255,255,"OK!"))
     
