@@ -20,6 +20,7 @@
 #include <Python.h>
 #include <structmember.h>
 #include <objimpl.h>
+#include <libpmem.h>
 #include <pythread.h>
 #include <numpy/arrayobject.h>
 
@@ -243,14 +244,14 @@ static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
   char * ptr = static_cast<char*>(aligned_alloc(PAGE_SIZE, nsize));
 
   if(zero_flag)
-    memset(ptr, 0x0, nsize);
+    ::pmem_memset_persist(ptr, 0x0, nsize);
   
   if(ptr == NULL) {
     PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
     return NULL;
   }
 
-  memset(ptr, 0xe, nsize); // temporary
+  //  memset(ptr, 0xe, nsize); // temporary
   PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
   return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
 }

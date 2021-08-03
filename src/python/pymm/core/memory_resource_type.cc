@@ -340,7 +340,7 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
 
   /* optionally zero memory */
   if(zero)
-    ::memset(ptr, 0x0, size);
+    ::pmem_memset_persist(ptr, 0x0, size);
   
   /* build a tuple (memory view, memory handle) */
   auto mview = PyMemoryView_FromMemory(static_cast<char*>(ptr), size, PyBUF_WRITE);
