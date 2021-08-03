@@ -17,7 +17,7 @@ def print_error(*args):
 def log(*args):
     print(colored(0,255,255,*args))
     
-
+force_new=True
 class TestAssignment(unittest.TestCase):
     def setUp(self):
         global force_new

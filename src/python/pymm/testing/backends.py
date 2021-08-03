@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -m unittest
 #
-# basic shelf assignment tests
+# testing for different backends
 #
 import unittest
 import pymm

@@ -44,7 +44,7 @@ extern PyTypeObject ListType;
 PyDoc_STRVAR(pymmcore_version_doc,
              "version() -> Get module version");
 PyDoc_STRVAR(pymmcore_enable_transient_memory_doc,
-             "enable_transient_memory() -> Allow other memory resources (e.g. PMEM) for large transient allocations");
+             "enable_transient_memory(backing_directory, pmem_file, pmem_file_size_gb) -> Allow other memory resources (e.g. PMEM) for large transient allocations");
 PyDoc_STRVAR(pymmcore_disable_transient_memory_doc,
              "disable_transient_memory() -> Revert to default system allocators for large transient allocations");
 PyDoc_STRVAR(pymmcore_allocate_direct_memory_doc,
