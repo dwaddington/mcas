@@ -1,10 +1,11 @@
+#!/usr/bin/python3 -m unittest
+#
+# basic numpy ndarray
+#
+import unittest
 import pymm
 import numpy as np
 import math
-
-def fail(msg):
-    print(colored(255,0,0,msg))
-    raise RuntimeError(msg)
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -16,102 +17,95 @@ def log(*args):
     print(colored(0,255,255,*args))
     
 
-def test_string(s):
+force_new=True
 
-    log("Testing: string")
-    s.x = pymm.string("Hello world!")
-    if str(s.x) != "Hello world!":
-        print_error("FAIL: string value check")
+class TestNdarray(unittest.TestCase):
+    def setUp(self):
+        global force_new
+        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=force_new)
+        force_new=False
 
-    s.y = "Good Day sir!"
-    if s.y != "Good Day sir!":
-        print_error("FAIL: string value check 2")
+    def tearDown(self):
+        del self.s
         
-    print(s)
+    def test_string(self):
 
-    if "Day" not in s.y:
-        print_error("FAIL: __contains__ result failed")
+        log("Testing: string")
+        self.s.x = pymm.string("Hello world!")
+        self.assertTrue(str(self.s.x) == "Hello world!")
 
-    if "foobar" in s.y:
-        print_error("FAIL: __contains__ result failed")
+        self.s.y = "Good Day sir!"
+        self.assertTrue(self.s.y == "Good Day sir!")
 
-    if s.y.capitalize() != "Good day sir!":
-        print(">", s.y.capitalize())
-        print_error("FAIL: string capitalize failed")
+        self.assertTrue("Day" in self.s.y)
+        self.assertFalse("foobar" in self.s.y)
 
-    if s.x.count("world") != 1:
-        print_error("FAIL: count failed")
+        self.assertTrue(self.s.y.capitalize() == "Good day sir!")
 
-    s.x += " Brilliant!"
-    print("Modified string >{}<".format(s.x))
+        self.assertTrue(self.s.x.count("world") == 1)
+
+        self.s.x += " Brilliant!"
+        print("Modified string >{}<".format(self.s.x))
         
-    log("Testing: string OK!")
+        log("Testing: string OK!")
 
-
-def test_float_number(s):    
-    log("Testing: float number")
-
-    s.n = pymm.float_number(700.001)
-
-    # in-place ops
-    s.n *= 2
-    s.n /= 2
-
-    print(s.n)
-    print(s.n * 2)
-    print(s.n * 1.1)
+        
+    def test_float_number(self):    
+        log("Testing: float number")
+        
+        self.s.n = pymm.float_number(700.001)
+        
+        # in-place ops
+        self.s.n *= 2
+        self.s.n /= 2
     
-    print(2 * s.n)
-    print(1.1 * s.n)
-
-    print(s.n / 2.11)
-    print(2.11 / s.n)
-
-    print(s.n // 2.11)
-    print(2.11 // s.n)
-
-    print(s.n - 2.11)
-    print(2.11 - s.n)
+        print(self.s.n)
+        print(self.s.n * 2)
+        print(self.s.n * 1.1)
     
-    if s.n * 2.0 != 1400.002:
-        raise RuntimeError('arithmetic error')
+        print(2 * self.s.n)
+        print(1.1 * self.s.n)
 
-    # from implicit cast
-    s.m = 700.001
-    if s.m != s.n:
-        raise RuntimeError('equality error')
+        print(self.s.n / 2.11)
+        print(2.11 / self.s.n)
+        
+        print(self.s.n // 2.11)
+        print(2.11 // self.s.n)
+
+        print(self.s.n - 2.11)
+        print(2.11 - self.s.n)
     
-    log("Testing: number OK!")
+        self.assertTrue(self.s.n * 2.0 == 1400.002)
 
-
-def test_integer_number(s):    
-    log("Testing: integer number")
-
-    s.n = pymm.integer_number(700)
-    print(s.n)
+        # from implicit cast
+        self.s.m = 700.001
+        self.assertTrue(self.s.m == self.s.n)
     
-    # in-place ops
-    s.n *= 2
-    print(s.n)
+        log("Testing: number OK!")
 
-    x = s.n * 2.1111
-    print(x)
-    if x != 2955.54:
-        raise RuntimeError("integer arithmetic value check result")
-
-    s.n += 2
-    print(s.n)
-    s.n /= 2
-    print(s.n)
+        
+    def test_integer_number(self):    
+        log("Testing: integer number")
+        
+        self.s.n = pymm.integer_number(700)
+        print(self.s.n)
     
-    log("Testing: integer number OK!")
+        # in-place ops
+        self.s.n *= 2
+        print(self.s.n)
 
-#--- main ---
+        x = self.s.n * 2.1111
+        print(x)
+        self.assertTrue(x == 2955.54)
+
+        self.s.n += 2
+        print(self.s.n)
+        self.s.n /= 2
+        print(self.s.n)
     
-s = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',size_mb=1024,force_new=True)
+        log("Testing: integer number OK!")
 
-test_string(s)
-test_float_number(s)
-test_integer_number(s)
 
+if __name__ == '__main__':
+    unittest.main()
 
