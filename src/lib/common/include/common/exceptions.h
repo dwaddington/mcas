@@ -80,7 +80,7 @@ class Exception {
 #endif
   }
  public:
-  const char *cause() const { asm("int3"); return _cause; }
+  const char *cause() const { return _cause; }
 
   void set_cause(const char *cause) {
     __builtin_strncpy(_cause, cause, sizeof _cause);

@@ -20,8 +20,10 @@ def log(*args):
 
 class TestAssignment(unittest.TestCase):
     def setUp(self):
-        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
-
+        global force_new
+        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=force_new)
+        force_new=False
+    
     def tearDown(self):
         del self.s
         

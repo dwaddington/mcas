@@ -469,6 +469,12 @@ PUBLIC status_t mm_plugin_usable_size(mm_plugin_heap_t heap, void * ptr, size_t 
   return S_OK;
 }
 
+PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size)
+{
+  return E_NOT_IMPL;
+}
+
+
 PUBLIC int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap)
 {
   return 0;

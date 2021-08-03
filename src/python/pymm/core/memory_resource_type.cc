@@ -117,18 +117,12 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
 {
   PLOG("load_backend: (%s) (%s) (%s)", backend.c_str(), path.c_str(), mm_plugin_path.c_str());
   IBase* comp = nullptr;
-  if(backend == "hstore") {
-    comp = load_component("libcomponent-hstore.so", hstore_factory);
-  }
-  else if (backend == "hstore-cc") {
+  if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
   }
-  else if (backend == "hstore-mc") {
-    comp = load_component("libcomponent-hstore-mc.so", hstore_factory);
+  else if (backend == "hstore-mm") {
+    comp = load_component("libcomponent-hstore-mm.so", hstore_factory);
   }
-  else if (backend == "hstore-mr") {
-    comp = load_component("libcomponent-hstore-mr.so", hstore_factory);
-  }    
   else if (backend == "mapstore") {
     comp = load_component("libcomponent-mapstore.so", mapstore_factory);
   }
