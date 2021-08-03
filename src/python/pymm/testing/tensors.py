@@ -5,7 +5,6 @@
 import unittest
 import pymm
 import numpy as np
-import math
 import torch
 
 def colored(r, g, b, text):
@@ -23,7 +22,6 @@ class TestTensors(unittest.TestCase):
     
     def tearDown(self):
         del self.s
-
 
     def test_torch_tensor(self):
         log("Testing: torch_tensor")
