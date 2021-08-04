@@ -123,6 +123,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
   else if (backend == "hstore-mm") {
     comp = load_component("libcomponent-hstore-mm.so", hstore_factory);
   }
+  else if (backend == "hstore-mr") {
+    comp = load_component("libcomponent-hstore-mr.so", hstore_factory);
+  }  
   else if (backend == "mapstore") {
     comp = load_component("libcomponent-mapstore.so", mapstore_factory);
   }
@@ -151,7 +154,7 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
   auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
   assert(fact);  
 
-  if(backend == "hstore-mc" || backend == "hstore-mr") {
+  if(backend == "hstore-mm" || backend == "hstore-mc" || backend == "hstore-mr") {
     
     std::stringstream ss;
     ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
