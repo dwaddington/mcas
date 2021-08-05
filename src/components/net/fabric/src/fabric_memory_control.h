@@ -107,8 +107,7 @@ public:
   void *get_memory_descriptor(const memory_region_t memory_region) const noexcept override;
   /* END component::IFabric_memory_control */
 
-  std::vector<void *> populated_desc(const std::vector<::iovec> & buffers);
-  std::vector<void *> populated_desc(const ::iovec *first, const ::iovec *last);
+  std::vector<void *> populated_desc(gsl::span<const ::iovec> buffers);
 };
 
 #endif

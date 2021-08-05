@@ -49,8 +49,6 @@ struct {
   std::string                  pool;
   std::string                  device;
   unsigned                     debug_level;
-  unsigned                     base_core;
-  size_t                       value_size;
 } Options{};
 
 namespace
@@ -154,12 +152,83 @@ TEST_F(mcas_client_test, GetDirectWithContent)
     ASSERT_TRUE(buffer[i] == 0xA);
   }
   PMAJOR("Data check OK!");
-  
+
   _mcas->unregister_direct_memory(handle);
 
   ::free(buffer);
 
-  ASSERT_TRUE(_mcas->close_pool(pool) == S_OK);  
+  ASSERT_TRUE(_mcas->close_pool(pool) == S_OK);
+}
+
+TEST_F(mcas_client_test, PutDirectGather)
+{
+  PMAJOR("Running PutDirectGather...");
+  using namespace component;
+  IKVStore::pool_t pool;
+
+  const std::string poolname = Options.pool + "/PutDirectGather";
+  ASSERT_TRUE((pool = _mcas->create_pool(poolname, MB(1))) != IKVStore::POOL_ERROR);
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  /* two buffers: a (registered), b (not registered) */
+  size_t size_b = KB(128);
+  auto buffer_b = static_cast<char*>(aligned_alloc(64, size_b));
+
+  size_t size_a = KB(128);
+  auto buffer_a = static_cast<char*>(aligned_alloc(64, size_a));
+  auto handle_a = _mcas->register_direct_memory(buffer_a, size_a);
+  ASSERT_NE(IMCAS::MEMORY_HANDLE_NONE, handle_a);
+  /* write order will be b, a, b */
+
+  /* populate with 0xA */
+  memset(buffer_a, 0xA, size_a);
+  memset(buffer_b, 0xB, size_b);
+  common::const_byte_span span_a = common::make_const_byte_span(buffer_a, size_a);
+  common::const_byte_span span_b = common::make_const_byte_span(buffer_b, size_b);
+  common::const_byte_span s[] = { span_b, span_a, span_b };
+  IMCAS::memory_handle_t h[] = { IMCAS::MEMORY_HANDLE_NONE, handle_a };
+
+  /* put into storage */
+  std::string key = "KEY";
+  auto rc = _mcas->put_direct( pool, key, s, h);
+  ASSERT_EQ(S_OK, rc);
+
+  PMAJOR("Put direct OK (%lu)", size_b + size_a + size_b);
+
+  /* reset buffer */
+  auto size_get = size_b + size_a + size_b;
+  auto buffer_get = static_cast<char*>(aligned_alloc(64, size_get));
+  memset(buffer_get, 0xF, size_get);
+
+  size_t expected_size = size_get;
+  rc = _mcas->get_direct(pool,
+                                key,
+                                buffer_get,
+                                size_get);
+  ASSERT_EQ(S_OK, rc);
+
+  ASSERT_EQ(expected_size, size_get);
+
+  PMAJOR("Get direct OK (%lu)", size_get);
+
+  /* check content */
+  auto cr = buffer_get;
+  cr = std::find_if_not(cr, buffer_get + size_get, [] (char c) { return c == 0xB; });
+  ASSERT_EQ(buffer_get + size_b, cr);
+  cr = std::find_if_not(cr, buffer_get + size_get, [] (char c) { return c == 0xA; });
+  ASSERT_EQ(buffer_get + size_b + size_a, cr);
+  cr = std::find_if_not(cr, buffer_get + size_get, [] (char c) { return c == 0xB; });
+  ASSERT_EQ(buffer_get + size_get, cr);
+
+  PMAJOR("Data check OK!");
+
+  _mcas->unregister_direct_memory(handle_a);
+
+  ::free(buffer_b);
+  ::free(buffer_a);
+  ::free(buffer_get);
+
+  ASSERT_TRUE(_mcas->close_pool(pool) == S_OK);
 }
 
 
@@ -184,7 +253,6 @@ int main(int argc, char **argv)
       ("server-addr", po::value<std::string>()->default_value("10.0.0.101:11911:verbs"), "Server address IP:PORT[:PROVIDER]")
       ("device", po::value<std::string>()->default_value("mlx5_0"), "Network device (e.g., mlx5_0)")
       ("pool", po::value<std::string>()->default_value("myPool"), "Pool name")
-      ("value_size", po::value<std::size_t>()->default_value(0), "Value size")
       ("base", po::value<unsigned>()->default_value(0), "Base core.");
 
     po::variables_map vm;
@@ -199,13 +267,11 @@ int main(int argc, char **argv)
     Options.debug_level = vm["debug"].as<unsigned>();
     Options.pool        = vm["pool"].as<std::string>();
     Options.device      = vm["device"].as<std::string>();
-    Options.base_core   = vm["base"].as<unsigned>();
-    Options.value_size  = vm["value_size"].as<std::size_t>();
 
     PLOG("Instantiating..");
     instantiate();
     PLOG("Instantiation OK.");
-    
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
   }

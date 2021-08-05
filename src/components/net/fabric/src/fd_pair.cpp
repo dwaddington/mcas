@@ -35,18 +35,6 @@ Fd_pair::Fd_pair()
   _write = common::Fd_open(pair[1]);
 }
 
-#if 0
-Fd_pair::Fd_pair(int read_flags)
-  : Fd_pair{}
-{
-  if ( -1 == ::fcntl(fd_read(), F_SETFL, read_flags) )
-  {
-    auto e = errno;
-    system_fail(e, "setting flags " + std::to_string(read_flags) + " on Fd_pair");
-  }
-}
-#endif
-
 std::size_t Fd_pair::read(void *b, std::size_t sz) const
 {
   auto ct = ::read(fd_read(), b, sz);

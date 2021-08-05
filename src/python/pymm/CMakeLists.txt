@@ -41,6 +41,7 @@ endif()
   message("-- Building Python support.")
   set(SETUP_PY_IN "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in")
   set(SETUP_PY "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
+  set(SETUP_PY_DEPS common pmem ccpm)
   set(DEPS "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py ${CMAKE_CURRENT_SOURCE_DIR}/pickled.py")
   set(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/timestamp")
   
@@ -94,7 +95,7 @@ endif()
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
       COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} build
       COMMAND cmake -E touch build.stamp
-      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES}  
+      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
       )
     add_custom_target(${PROJECT_NAME} ALL
       DEPENDS build.stamp
@@ -111,7 +112,7 @@ endif()
       OUTPUT build.stamp
       COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
       COMMAND cmake -E touch build.stamp
-      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} 
+      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
       )
 
     # install as a site-package

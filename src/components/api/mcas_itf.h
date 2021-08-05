@@ -21,7 +21,9 @@
 #include <common/byte_span.h>
 #include <common/pointer_cast.h>
 #include <common/string_view.h>
+#include <gsl/span>
 
+#include <array>
 #include <cstdint> /* uint16_t */
 #include <memory>
 
@@ -53,16 +55,10 @@ public:
   using Attribute       = KVStore::Attribute;
   using Addr            = KVStore::Addr;
   using byte            = common::byte;
-  using memory_handle_t = KVStore::memory_handle_t;
-  
+
   template <typename T>
     using basic_string_view = std::experimental::basic_string_view<T>;
 
-#if 0
-  static constexpr key_t           KEY_NONE           = KVStore::KEY_NONE;
-  static constexpr memory_handle_t MEMORY_HANDLE_NONE = KVStore::HANDLE_NONE;
-  static constexpr pool_t          POOL_ERROR         = KVStore::POOL_ERROR;
-#endif
   static constexpr async_handle_t  ASYNC_HANDLE_INIT  = nullptr;
 
   enum {
@@ -75,7 +71,7 @@ public:
         FLAGS_MAX_VALUE   = KVStore::FLAGS_MAX_VALUE,
   };
 
-  
+
   /* per-shard statistics */
   struct Shard_stats {
     uint64_t op_request_count;
@@ -175,7 +171,7 @@ public:
     return put(pool, key, value.data(), value.length(), flags);
   }
 
-  /**
+  /*
    * Asynchronous put operation.  Use check_async_completion to check for
    * completion. This operation is not normally used, simple put is fast.
    *
@@ -231,6 +227,36 @@ public:
                                     const size_t          value_len,
                                     async_handle_t&       out_handle,
                                     const memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
+                                    const unsigned int    flags  = IMCAS::FLAGS_NONE)
+  {
+    return
+      async_put_direct(
+        pool
+        , key
+        , std::array<common::const_byte_span,1>{common::make_const_byte_span(value, value_len)}
+        , out_handle, std::array<memory_handle_t,1>{handle}
+        , flags
+      );
+  }
+
+  /**
+   * Asynchronous put_direct operation.  Use check_async_completion to check for
+   * completion.
+   *
+   * @param pool Pool handle
+   * @param key Object key
+   * @param values list of value sources
+   * @param out_handle Async handle
+   * @param handle List of memory registration handle
+   * @param flags Optional flags
+   *
+   * @return S_OK or other error code
+   */
+  virtual status_t async_put_direct(const IMCAS::pool_t   pool,
+                                    const std::string&    key,
+                                    gsl::span<const common::const_byte_span> value,
+                                    async_handle_t&       out_handle,
+                                    gsl::span<const memory_handle_t> handles = gsl::span<const memory_handle_t>(),
                                     const unsigned int    flags  = IMCAS::FLAGS_NONE) = 0;
 
   using KVStore::get;

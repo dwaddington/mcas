@@ -87,15 +87,15 @@ class Fabric_transport : protected common::log_source {
    * Forwarders that allow us to avoid exposing _transport and _bm
    *
    */
-  auto inline make_memory_registered(void *base, size_t len)
+  auto inline make_memory_registered(common::const_byte_span region)
   {
-    return memory_registered_fabric(debug_level(), _transport, base, len, 0, 0);
+    return memory_registered_fabric(debug_level(), _transport, region, 0, 0);
   }
 
  private:
-  inline memory_region_t register_memory(void *base, size_t len)
+  inline memory_region_t register_memory(common::const_byte_span region)
   {
-    return _transport->register_memory(base, len, 0, 0);
+    return _transport->register_memory(region, 0, 0);
   }
 
  public:
@@ -170,15 +170,6 @@ class Fabric_transport : protected common::log_source {
     post_send(iob->iov, iob->iov + 1, iob->desc, iob);
   }
 
-#if 0
-  void post_send(buffer_t *iob, buffer_external *iob_extra)
-  {
-    iovec v[2]   = {iob->iov[0], iob_extra->iov[0]};
-    void *desc[] = {iob->desc[0], iob_extra->desc[0]};
-    post_send(&v[0], &v[2], desc, iob);
-  }
-#endif
-
   /**
    * Post receive then wait for completion before returning.
    * Use after post_send may lead to poor performance if the response
@@ -202,14 +193,13 @@ class Fabric_transport : protected common::log_source {
    *
    * @param iob First IO buffer
    */
-  void post_write(const ::iovec *first,
-                  const ::iovec *last,
+  void post_write(gsl::span<const ::iovec> iov,
                   void **        desc,
                   uint64_t       remote_addr,
                   std::uint64_t  remote_key,
                   void *         context)
   {
-    _transport->post_write(first, last, desc, remote_addr, remote_key, context);
+    _transport->post_write(iov, desc, remote_addr, remote_key, context);
   }
 
   /**
@@ -227,14 +217,14 @@ class Fabric_transport : protected common::log_source {
     _transport->post_read(first, last, desc, remote_addr, remote_key, context);
   }
 
-  component::IKVStore::memory_handle_t register_direct_memory(void *region, size_t region_len)
+  component::IKVStore::memory_handle_t register_direct_memory(common::const_byte_span region)
   {
     // if (!check_aligned(region, 64))
     //   throw API_exception("register_direct_memory: region should be
     //   aligned");
 
-    auto buffer = new buffer_external(debug_level(), _transport, region, region_len);
-    CPLOG(0, "register_direct_memory (%p, %lu, mr=%p)", region, region_len, common::p_fmt(buffer->region()));
+    auto buffer = new buffer_external(debug_level(), _transport, const_cast<void *>(::base(region)), ::size(region));
+    CPLOG(0, "register_direct_memory (%p, %lu, mr=%p)", ::base(region), ::size(region), common::p_fmt(buffer->region()));
     return buffer;
   }
 

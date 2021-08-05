@@ -37,11 +37,8 @@ private:
                              std::size_t   len_,
                              std::uint64_t key_,
                              std::uint64_t flags_)
-      : common::log_source(debug_level_),
-        _t(transport_),
-        _r(_t->register_memory(base_, len_, key_, flags_))
+      : memory_registered(debug_level_, transport_, common::make_const_byte_span(base_, len_), key_, flags_)
   {
-    CPLOG(3, "%s %p (%p:0x%zx)", __func__, common::p_fmt(_r), base_, len_);
   }
   explicit memory_registered(unsigned      debug_level_,
                              T *           transport_,

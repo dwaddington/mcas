@@ -55,6 +55,7 @@ namespace common
       }
 
       operator T() const { return v; }
+      T get() const { return v; }
     };
 }
 
