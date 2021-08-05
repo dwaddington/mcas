@@ -16,6 +16,7 @@
 import pymmcore
 import numpy as np
 import copy
+import os
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
@@ -23,7 +24,8 @@ from .shelf import Shadow
 from .shelf import ShelvedCommon
 
 dtypedescr = np.dtype
-    
+wbinvd_threshold = 1073741824
+
 # shadow type for ndarray
 #
 class ndarray(Shadow):
@@ -151,6 +153,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._metadata_key = metadata_key
         self._value_key = value_key
         self.name = name
+        self._use_wbinvd = os.path.isfile('/proc/wbinvd')
         return self
 
     def __delete__(self, instance):
@@ -311,5 +314,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         '''
         Flush cache and persistent all value memory
         '''
+        if self._use_wbinvd and ((super().size * super().itemsize) > wbinvd_threshold):
+            os.system("cat /proc/wbinvd")
+            return
+        
         self._value_named_memory.persist()
+
         
