@@ -845,7 +845,7 @@ template <typename T, std::size_t SmallLimit, typename Allocator>
 				persist_fixed_string temp{};
 				/* reconstruct the original inline value, which is "this" but with data bits from the original cptr */
 #pragma GCC diagnostic push
-#if 9 <= __GNUC__
+#if 8 <= __GNUC__
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
 				std::memcpy(&temp, this, sizeof temp);
