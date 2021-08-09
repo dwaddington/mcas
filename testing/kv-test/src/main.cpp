@@ -66,6 +66,7 @@ component::Itf_ref<component::IMCAS> init(const std::string &server_hostname, in
  * SECTION: Tests
  *
  */
+
 TEST_F(KV_test, BasicPoolOperations)
 {
   using namespace component;
@@ -664,6 +665,75 @@ TEST_F(KV_test, AsyncPutDirectRegistered)
 TEST_F(KV_test, AsyncPutDirectUnregistered)
 {
   async_put_direct(mcas, make_handle_fake);
+}
+
+TEST_F(KV_test, AsyncPutDirectGather)
+{
+  using namespace component;
+
+  const std::string poolname = "AsyncPutDirectGather";
+
+  auto pool = mcas->create_pool(poolname, GiB(1), /* size */
+                                0,               /* flags */
+                                100);            /* obj count */
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  IMCAS::async_handle_t  out_handle      = IMCAS::ASYNC_HANDLE_INIT;
+  size_t                 user_buffer_len = MiB(1);
+  auto                   user_buffer0    = static_cast<char *>(aligned_alloc(KiB(4), user_buffer_len));
+  std::fill_n(user_buffer0, user_buffer_len, '0');
+  auto                   user_buffer1    = static_cast<char *>(aligned_alloc(KiB(4), user_buffer_len));
+  std::fill_n(user_buffer1, user_buffer_len, '1');
+  auto                   user_buffer2    = static_cast<char *>(aligned_alloc(KiB(4), user_buffer_len));
+  std::fill_n(user_buffer2, user_buffer_len, '2');
+  auto mem0 = make_handle_fake(mcas, user_buffer0, user_buffer_len);
+  auto mem1 = make_handle_real(mcas, user_buffer1, user_buffer_len);
+  auto mem2 = make_handle_fake(mcas, user_buffer2, user_buffer_len);
+  ASSERT_OK(
+    mcas->async_put_direct(
+      pool
+      , "testKey"
+      , std::array<const common::const_byte_span,3>
+        {
+          common::make_const_byte_span(user_buffer0, user_buffer_len)
+          , common::make_const_byte_span(user_buffer1, user_buffer_len)
+          , common::make_const_byte_span(user_buffer2, user_buffer_len)
+        }
+      , out_handle
+      /* cover three memory handle cases: MEMORY_HANDLE_NONE, valid handle, missing handle */
+      , std::array<const component::IMCAS::memory_handle_t,2>{mem0->get(), mem1->get()}
+    )
+  );
+  ASSERT_TRUE(out_handle != nullptr);
+
+  int iterations = 0;
+  while (mcas->check_async_completion(out_handle) == E_BUSY) {
+    ASSERT_TRUE(iterations < 100000000);
+    iterations++;
+  }
+
+  auto user_buffer_read = static_cast<char *>(aligned_alloc(KiB(4), user_buffer_len*3));
+  auto  mem_read = make_handle_real(mcas, user_buffer_read, user_buffer_len*3);
+
+  auto read_size = user_buffer_len*3;
+  ASSERT_OK(mcas->get_direct(pool, "testKey", user_buffer_read, read_size, mem_read->get()));
+  ASSERT_EQ(user_buffer_len*3, read_size);
+
+  ASSERT_EQ(user_buffer_len, std::count(user_buffer_read+user_buffer_len*0, user_buffer_read+user_buffer_len*1, '0')); /* integrity check */
+  ASSERT_EQ(user_buffer_len, std::count(user_buffer_read+user_buffer_len*1, user_buffer_read+user_buffer_len*2, '1')); /* integrity check */
+  ASSERT_EQ(user_buffer_len, std::count(user_buffer_read+user_buffer_len*2, user_buffer_read+user_buffer_len*3, '2')); /* integrity check */
+  ::free(user_buffer0);
+  ::free(user_buffer1);
+  ::free(user_buffer2);
+  ::free(user_buffer_read);
+
+  std::vector<uint64_t> attr;
+  ASSERT_OK(mcas->get_attribute(pool, IMCAS::Attribute::COUNT, attr));
+  ASSERT_TRUE(attr[0] == 1);
+
+  ASSERT_OK(mcas->close_pool(pool));
+  ASSERT_OK(mcas->delete_pool(poolname));
 }
 
 void async_get_direct(component::Itf_ref<component::IMCAS> &mcas, make_handle_t mh_)

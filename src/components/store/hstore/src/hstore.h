@@ -29,15 +29,8 @@
 
 #include "hstore_alloc_type.h"
 
-#pragma GCC diagnostic push
-#if __GNUC__ > 7
-#pragma GCC diagnostic ignored "-Wclass-memaccess"
-#endif
-
 #include "hop_hash.h"
 #include "hstore_nupm.h"
-
-#pragma GCC diagnostic pop
 
 #include "region.h"
 

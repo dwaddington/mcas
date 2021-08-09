@@ -29,14 +29,6 @@ Fabric_server_grouped_factory::Fabric_server_grouped_factory(Fabric &fabric_, ev
 Fabric_server_grouped_factory::~Fabric_server_grouped_factory()
 {}
 
-#if 0
-std::shared_ptr<event_expecter> Fabric_server_grouped_factory::new_server(Fabric &fabric_, event_producer &eq_, ::fi_info &info_)
-{
-  auto conn = std::make_shared<Fabric_server_grouped>(fabric_, eq_, info_);
-  return std::static_pointer_cast<event_expecter>(conn);
-}
-#endif
-
 /* Note: shared_ptr may be overkill */
 auto Fabric_server_grouped_factory::open_connection(component::IFabric_endpoint_unconnected_server * aep) -> Fabric_server_grouped *
 {
@@ -45,12 +37,7 @@ auto Fabric_server_grouped_factory::open_connection(component::IFabric_endpoint_
 	open_connection_generic(conn);
 	return conn;
 }
-#if 0
-component::IFabric_server_grouped * Fabric_server_grouped_factory::get_new_connection()
-{
-  return static_cast<Fabric_server_grouped *>(Fabric_server_generic_factory::get_new_connection());
-}
-#endif
+
 std::vector<component::IFabric_server_grouped *> Fabric_server_grouped_factory::connections()
 {
   auto g = Fabric_server_generic_factory::connections();

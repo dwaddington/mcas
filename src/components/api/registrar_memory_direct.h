@@ -14,8 +14,8 @@
 #ifndef _REGISTRAR_MEMORY_DIRECT__
 #define _REGISTRAR_MEMORY_DIRECT__
 
+#include <common/byte_span.h>
 #include <common/types.h>
-
 
 #define DECLARE_OPAQUE_TYPE(NAME)               \
   struct Opaque_##NAME {                        \
@@ -39,18 +39,30 @@ public:
   /**
    * Register memory for zero copy DMA
    *
+   * @param bytes Appropriately aligned memory buffer to register
+   *
+   * @return Memory handle or NULL on not supported.
+   */
+  virtual memory_handle_t register_direct_memory(common::const_byte_span bytes) = 0;
+
+  /**
+   * Register memory for zero copy DMA
+   *
    * @param vaddr Appropriately aligned memory buffer
    * @param len Length of memory buffer in bytes
    *
    * @return Memory handle or NULL on not supported.
    */
-  virtual memory_handle_t register_direct_memory(void* vaddr, const size_t len) = 0;
+  memory_handle_t register_direct_memory(void* vaddr, const size_t len)
+  {
+    return register_direct_memory(common::make_const_byte_span(vaddr, len));
+  }
 
   /**
    * Direct memory regions should be unregistered before the memory is released
    * on the client side.
    *
-   * @param vaddr Address of region to unregister.
+   * @param handle (as returned by register_direct_memory) of region to deregister.
    *
    * @return S_OK on success
    */

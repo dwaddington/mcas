@@ -277,9 +277,9 @@ private:
    *
    */
  public:
-  inline auto register_memory(const void *base, size_t len, std::uint64_t key, std::uint64_t flags)
+  inline auto register_memory(common::const_byte_span region, std::uint64_t key, std::uint64_t flags)
   {
-    return transport()->register_memory(base, len, key, flags); /* flags not supported for verbs */
+    return transport()->register_memory(region, key, flags); /* flags not supported for verbs */
   }
 
   inline void deregister_memory(memory_region_t region) { return transport()->deregister_memory(region); }

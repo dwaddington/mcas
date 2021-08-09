@@ -16,12 +16,13 @@
 #define _FABRIC_H_
 
 #include <api/fabric_itf.h> /* component::IFabric */
-#include <common/moveable_value.h>
-#include <common/string_view.h>
 #include "event_producer.h"
 
 #include "rdma-fabric.h" /* fid_t */
 #include "rdma-fi_domain.h" /* fi_eq_attr */
+
+#include <common/moveable_value.h>
+#include <common/string_view.h>
 
 #include <map>
 #include <memory> /* shared_ptr */

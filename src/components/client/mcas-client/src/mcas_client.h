@@ -37,6 +37,7 @@
 
 #include <boost/optional.hpp>
 
+#include <array>
 #include <cstdint> /* uint16_t */
 #include <memory>  /* unique_ptr */
 #include <string>
@@ -57,12 +58,6 @@ class MCAS_client
     , private common::log_source
 {
   friend class MCAS_client_factory;
-
- private:
-  //  static constexpr bool option_DEBUG = true;
-#if 0
-  using IKVStore = component::IKVStore;
-#endif
 
  protected:
   /**
@@ -151,10 +146,27 @@ class MCAS_client
 
   virtual status_t put_direct(const pool_t                 pool,
                               const std::string &          key,
-                              const void *                 value,
-                              const size_t                 value_len,
-                              const IMCAS::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
-                              const unsigned int           flags  = IMCAS::FLAGS_NONE) override;
+                              gsl::span<const common::const_byte_span> values,
+                              gsl::span<const IMCAS::memory_handle_t> handles,
+                              const unsigned int           flags) override;
+
+  status_t put_direct(const pool_t       pool,
+                              const std::string& key,
+                              const void*        value,
+                              const size_t       value_len,
+                              IKVStore::memory_handle_t handle = HANDLE_NONE,
+                              flags_t            flags  = IKVStore::FLAGS_NONE)
+  {
+    return
+      put_direct(
+        pool
+        , key
+        , std::array<common::const_byte_span, 1>{common::make_const_byte_span(value,value_len)}
+        , std::array<IMCAS::memory_handle_t, 1>{handle}
+        , flags
+      );
+  }
+
 
   virtual status_t async_put(const IKVStore::pool_t pool,
                              const std::string &    key,
@@ -164,12 +176,11 @@ class MCAS_client
                              const unsigned int     flags = IMCAS::FLAGS_NONE) override;
 
   virtual status_t async_put_direct(const IKVStore::pool_t          pool,
-                                    const std::string &             key,
-                                    const void *                    value,
-                                    const size_t                    value_len,
+                                    const std::string&              key,
+                                    gsl::span<const common::const_byte_span> values,
                                     async_handle_t &                out_handle,
-                                    const IKVStore::memory_handle_t handle = IMCAS::MEMORY_HANDLE_NONE,
-                                    const unsigned int              flags  = IMCAS::FLAGS_NONE) override;
+                                    gsl::span<const IMCAS::memory_handle_t> handles,
+                                    const unsigned int              flags) override;
 
   virtual status_t check_async_completion(async_handle_t &handle) override;
 
@@ -232,7 +243,7 @@ class MCAS_client
 
   virtual void debug(const pool_t pool, const unsigned cmd, const uint64_t arg) override;
 
-  virtual IMCAS::memory_handle_t register_direct_memory(void *vaddr, const size_t len) override;
+  virtual IMCAS::memory_handle_t register_direct_memory(common::const_byte_span m) override;
 
   virtual status_t unregister_direct_memory(const IMCAS::memory_handle_t handle) override;
 
