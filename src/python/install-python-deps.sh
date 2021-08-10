@@ -7,6 +7,7 @@
 pip3 install matplotlib --user -I
 pip3 install scikit-image --user -I
 pip3 install torch --user -I
+pip3 install torchvision --user -I
 pip3 install flatbuffers --user -I
 pip3 install parallel_sort --user -I
 

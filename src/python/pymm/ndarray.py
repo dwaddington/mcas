@@ -94,7 +94,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     __array_priority__ = -100.0 # what does this do?
 
     def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', type=0, zero=False):
-
+        #
         # determine size of memory needed
         #
         descr = dtypedescr(dtype)
@@ -104,8 +104,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
 
             if isinstance(shape, tuple) or isinstance(shape, list):
-                if isinstance(shape, tuple) and isinstance(shape[0], list):
-                    shape = shape[0]
+#                if isinstance(shape, tuple):
+#                    if isinstance(shape[0], list):
+#                        shape = shape[0]
 
                 for k in shape:
                     size *= k
