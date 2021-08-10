@@ -16,8 +16,10 @@
 
 #include <api/components.h>
 #include <api/registrar_memory_direct.h>
+#include <common/byte_span.h>
 #include <common/errors.h> /* ERROR_BASE */
 #include <common/time.h>
+#include <gsl/span>
 #include <sys/uio.h> /* iovec */
 
 #include <cinttypes> /* PRIx64 */
@@ -377,14 +379,42 @@ protected:
    *
    * @return S_OK or E_POOL_NOT_FOUND, E_KEY_EXISTS
    */
-  virtual status_t put_direct(const pool_t       pool,
-                              const std::string& key,
-                              const void*        value,
-                              const size_t       value_len,
-                              memory_handle_t    handle = HANDLE_NONE,
-                              flags_t            flags  = FLAGS_NONE)
+  virtual status_t put_direct(const pool_t   pool,
+                              const std::string&    key,
+                              gsl::span<const common::const_byte_span> values,
+                              gsl::span<const memory_handle_t> handles = gsl::span<const memory_handle_t>(),
+                              const unsigned int    flags  = FLAGS_NONE)
   {
-    return error_value(E_NOT_SUPPORTED, pool, key, value, value_len, handle, flags);
+    return error_value(E_NOT_SUPPORTED, pool, key, values, handles, flags);
+  }
+
+
+ /**
+   * Zero-copy put operation (see exceptions above).
+   *
+   * @param pool Pool handle
+   * @param key Object key
+   * @param value Value
+   * @param value_len Value length in bytes
+   * @param handle Memory registration handle
+   * @param flags Optional flags
+   *
+   * @return S_OK or error code
+   */
+  virtual status_t put_direct(const pool_t   pool,
+                              const std::string&    key,
+                              const void*           value,
+                              const size_t          value_len,
+                              const memory_handle_t handle = MEMORY_HANDLE_NONE,
+                              const unsigned int    flags  = FLAGS_NONE)
+  {
+    return put_direct(
+      pool
+      , key
+      , std::array<const common::const_byte_span,1>{common::make_const_byte_span(value, value_len)}
+      , std::array<memory_handle_t,1>{handle}
+      , flags
+    );
   }
 
   /**
@@ -528,21 +558,22 @@ protected:
    * Register memory for zero copy DMA
    *
    * @param vaddr Appropriately aligned memory buffer
-   * @param len Length of memory buffer in bytes
    *
    * @return Memory handle or NULL on not supported.
    */
-  memory_handle_t register_direct_memory(void* vaddr,
-                                         size_t len) override
+
+  memory_handle_t register_direct_memory(common::const_byte_span bytes) override
   {
-    return error_value(nullptr, vaddr, len);
+    return error_value(nullptr, bytes);
   }
+
+  using Registrar_memory_direct::register_direct_memory;
 
   /**
    * Direct memory regions should be unregistered before the memory is released
    * on the client side.
    *
-   * @param vaddr Address of region to unregister.
+   * @param handle (as returned by register_direct_memory) of region to deregister.
    *
    * @return S_OK on success
    */

@@ -27,11 +27,7 @@ Fabric_transport::Fabric_transport(unsigned                   debug_level_,
       cycles_per_second(common::get_rdtsc_frequency_mhz() * 1000000.0),
       _transport(fabric_connection),
       _max_inject_size(_transport->max_inject_size()),
-#if 0
-      _bm(debug_level(), fabric_connection, NUM_BUFFERS),
-#else
       _bm(bm_),
-#endif
       _patience(patience_)
 {
 }

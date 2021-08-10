@@ -53,6 +53,7 @@
 #include <chrono> /* milliseconds */
 #include <iostream> /* cerr */
 #include <limits> /* <int>::max */
+#include <typeinfo> /* typeinfo::name */
 
 struct mr_and_address
 {
@@ -660,7 +661,7 @@ try
 }
 catch ( const std::exception &e )
 {
-  std::cerr << __func__ << " (Fabric_op_control) " << e.what() << "\n";
+  std::cerr << typeid(*this).name() << "::" << __func__ << " " << e.what() << "\n";
 }
 
 void fabric_endpoint::err(::fid_eq *eq_, ::fi_eq_err_entry &e_) noexcept
@@ -693,7 +694,7 @@ try
 }
 catch ( const std::exception &e )
 {
-  std::cerr << __func__ << " (Fabric_op_control) " << e.what() << "\n";
+  std::cerr << typeid(*this).name() << "::" << __func__ << " " << e.what() << "\n";
 }
 
 void fabric_endpoint::ensure_event(const fabric_connection *cnxn_) const

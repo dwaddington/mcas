@@ -196,6 +196,9 @@ public:
       }
       CPLOG(2, PREFIX "all regions freed");
       _regions.clear();
+
+      syncfs(_fdout);
+      close(_fdout);
     }
   }
 
@@ -222,7 +225,7 @@ private:
   common::RWLock             _map_lock; /*< read write lock */
   unsigned int               _flags;
   std::set<Iterator*>        _iterators;
-
+  int                        _fdout;
   /*
     We use this counter to see if new writes have come in
     during an iteration.  This is essentially an optmistic
@@ -999,21 +1002,19 @@ void * Pool_instance::allocate_region_memory(size_t size, const std::string& poo
       if(st.st_mode & (S_IFDIR != 0)) {
         std::string filename = backing_store_dir;
         filename += "/mapstore_backing_" + pool_name + ".dat";
-        int fdout;
-        if ((fdout = open (filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, mode)) >= 0) {
+
+        if ((_fdout = open (filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, mode)) >= 0) {
 
           /* create space in file */
-          if(ftruncate(fdout, size) == 0) {
+          if(ftruncate(_fdout, size) == 0) {
             p = mmap(reinterpret_cast<void*>(0xff00000000), /* help debugging */
                      size,
                      PROT_READ | PROT_WRITE,
                      MAP_SHARED, /* paging means no MAP_LOCKED */
-                     fdout, /* file */
+                     _fdout, /* file */
                      0 /* offset */);
             if(p)
               PINF("[Mapstore] using mmap'ed backing file (%s) (%lu MiB)", filename.c_str(), REDUCE_MB(size));
-
-            close(fdout);
           }
         }
       }

@@ -286,7 +286,7 @@ protected:
  */
 class AVL_range_allocator {
 private:
-  static constexpr unsigned option_DEBUG = 2;
+  static constexpr unsigned option_DEBUG = 0;
 
   core::slab::CRuntime<Memory_region> __default_allocator;
 
@@ -355,7 +355,7 @@ public:
         void* p = slab.alloc();
 
         if (!p)
-          throw General_exception("AVL_range_allocator: failed to allocate from slab");
+          throw Out_of_memory("AVL_range_allocator: failed to allocate from slab");
 
         if (option_DEBUG)
           PLOG("inserting root region (%lx-%lx)", start, start + size);
@@ -457,9 +457,8 @@ public:
         assert(alignment > 0);
 
         Memory_region* region = root->find_free_region(root, size);
-        if (region == nullptr) {
-          throw General_exception("AVL_range_allocator: failed to allocate %ld (no free region)", size);
-        }
+        if (region == nullptr)
+          throw Out_of_memory("AVL_range_allocator: failed to allocate %ld (no free region!)", size);
 
         assert(region->_free == true);
         if (option_DEBUG) {
@@ -490,7 +489,9 @@ public:
 
         /* allocate and adjust nodes */
         void* p = _slab.alloc();
-        if (!p) throw General_exception("AVL_range_allocator: failed to allocate %ld", size);
+        if (!p)
+          throw Out_of_memory("AVL_range_allocator: failed to allocate %ld", size);
+
         aligned_region =
           new (p) Memory_region(center_split_base, center_split_size);
 
@@ -503,7 +504,9 @@ public:
           assert(center_split_size > 0);
           
           void* q = _slab.alloc();
-          if (!q) throw General_exception("AVL_range_allocator: failed to allocate %ld", size);
+          if (!q)
+            throw Out_of_memory("AVL_range_allocator: failed to allocate %ld", size);
+          
           Memory_region* right_node = new (q) Memory_region(right_split_base, right_split_size);
 
           auto adjacent_right = region->_next;
@@ -648,8 +651,7 @@ public:
       auto right_size = middle->_size - size;
       void* p = _slab.alloc();
       if (!p)
-        throw General_exception(
-                                "AVL_range_allocator: line %d failed to allocate %ld bytes",
+        throw General_exception("AVL_range_allocator: line %d failed to allocate %ld bytes",
                                 __LINE__, size);
 
       Memory_region* right = new (p) Memory_region(middle->_addr + size, right_size);
@@ -692,7 +694,7 @@ public:
     assert(size > 0);
     void* p = _slab.alloc();
     if (!p)
-      throw General_exception("AVL_range_allocator: line %d failed to allocate %ld bytes", __LINE__, size);
+      throw Out_of_memory("AVL_range_allocator: line %d failed to allocate %ld bytes", __LINE__, size);
 
     auto new_region = new (p) Memory_region(addr, size);
     assert(new_region);
@@ -994,7 +996,7 @@ public:
 
     Memory_region* mr = _range_allocator.alloc(size);
 
-    if (mr == nullptr) throw General_exception("no memory.");
+    if (mr == nullptr) throw Out_of_memory("region allocator no memory.");
 
     return mr->addr();
   }

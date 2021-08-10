@@ -57,7 +57,8 @@ class float_number(Shadow):
             return (False, None)
 
         if (hdr.Type() == DataType.DataType().NumberFloat):
-            return (True, shelved_float_number(memory_resource, name, buffer[hdr_size + 4:]))
+            f = float.fromhex((buffer[hdr_size + 4:]).decode())
+            return (True, shelved_float_number(memory_resource, name, f))
 
         # not a string
         return (False, None)
@@ -115,7 +116,7 @@ class shelved_float_number(ShelvedCommon):
 
         # set up the view of the data
         # materialization alternative - self._view = memoryview(memref.buffer[32:])
-        self._cached_value = number_value
+        self._cached_value = float(number_value)
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource

@@ -30,10 +30,10 @@ struct fi_info;
 class Fabric_connection_server
   : public fabric_connection
 {
-  /* BEGIN Fabric_op_control */
+  /* BEGIN fabric_connection */
   void solicit_event() const override;
   void wait_event() const override;
-  /* END Fabric_op_control */
+  /* END fabric_connection */
 public:
   /*
    * @throw fabric_bad_alloc : std::bad_alloc - out of memory

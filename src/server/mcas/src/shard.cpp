@@ -118,7 +118,7 @@ static std::string default_mm_plugin(const Config_file& /* config_file */,
   else if(backend == "hstore-mr") return DEFAULT_HSTORE_MR_MM_PLUGIN_PATH;
   else if(backend == "hstore-cc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
   else if(backend == "hstore-mc") return DEFAULT_HSTORE_MC_MM_PLUGIN_PATH;
-  else throw Logic_exception("store woih unspecified plugin path: %s", backend.c_str());
+  else throw Logic_exception("store with unspecified plugin path: %s", backend.c_str());
 }
 
 Shard::Shard(const Config_file &config_file,

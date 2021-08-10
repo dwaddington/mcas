@@ -10,7 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define PYMMCORE_API_VERSION "v0.1.8.2"
+#define PYMMCORE_API_VERSION "v0.1.9"
 #define STATUS_TEXT "(CC=off)"
 #define PAGE_SIZE 4096
 
@@ -20,6 +20,7 @@
 #include <Python.h>
 #include <structmember.h>
 #include <objimpl.h>
+#include <libpmem.h>
 #include <pythread.h>
 #include <numpy/arrayobject.h>
 
@@ -43,6 +44,10 @@ extern PyTypeObject ListType;
 
 PyDoc_STRVAR(pymmcore_version_doc,
              "version() -> Get module version");
+PyDoc_STRVAR(pymmcore_enable_transient_memory_doc,
+             "enable_transient_memory(backing_directory, pmem_file, pmem_file_size_gb) -> Allow other memory resources (e.g. PMEM) for large transient allocations");
+PyDoc_STRVAR(pymmcore_disable_transient_memory_doc,
+             "disable_transient_memory() -> Revert to default system allocators for large transient allocations");
 PyDoc_STRVAR(pymmcore_allocate_direct_memory_doc,
              "allocate_direct_memory(s) -> Returns 4K page-aligned memory view (experimental)");
 PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
@@ -87,6 +92,15 @@ extern PyObject * pymmcore_create_metadata(PyObject * self,
                                            PyObject * args,
                                            PyObject * kwargs);
 
+extern PyObject * pymmcore_enable_transient_memory(PyObject * self,
+                                                   PyObject * args,
+                                                   PyObject * kwargs);
+
+extern PyObject * pymmcore_disable_transient_memory(PyObject * self,
+                                                    PyObject * args,
+                                                    PyObject * kwargs);
+
+
 #ifdef BUILD_PYMM_VALGRIND
 static PyObject * pymmcore_valgrind_trigger(PyObject * self,
                                             PyObject * args,
@@ -98,6 +112,10 @@ static PyMethodDef pymmcore_methods[] =
   {
    {"version",
     (PyCFunction) pymmcore_version, METH_NOARGS, pymmcore_version_doc },
+   {"enable_transient_memory",
+    (PyCFunction) pymmcore_enable_transient_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_enable_transient_memory_doc },
+   {"disable_transient_memory",
+    (PyCFunction) pymmcore_disable_transient_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_disable_transient_memory_doc },   
    {"allocate direct memory",
     (PyCFunction) pymmcore_allocate_direct_memory, METH_VARARGS | METH_KEYWORDS, pymmcore_allocate_direct_memory_doc },
    {"free direct memory",
@@ -106,9 +124,6 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"memoryview_addr",
     (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
-   //   {"create_metadata",
-   // (PyCFunction) pymmcore_create_metadata, METH_VARARGS | METH_KEYWORDS, "pymmcore_create_metadata(buffer,type)" },
-   
 #ifdef BUILD_PYMM_VALGRIND   
    {"valgrind_trigger",
     (PyCFunction) pymmcore_valgrind_trigger, METH_VARARGS | METH_KEYWORDS, pymmcore_valgrind_trigger_doc },
@@ -229,14 +244,14 @@ static PyObject * pymmcore_allocate_direct_memory(PyObject * self,
   char * ptr = static_cast<char*>(aligned_alloc(PAGE_SIZE, nsize));
 
   if(zero_flag)
-    memset(ptr, 0x0, nsize);
+    ::pmem_memset_persist(ptr, 0x0, nsize);
   
   if(ptr == NULL) {
     PyErr_SetString(PyExc_RuntimeError,"aligned_alloc failed");
     return NULL;
   }
 
-  memset(ptr, 0xe, nsize); // temporary
+  //  memset(ptr, 0xe, nsize); // temporary
   PNOTICE("%s allocated %lu at %p", __func__, nsize, ptr);
   return PyMemoryView_FromMemory(ptr, nsize, PyBUF_WRITE);
 }
@@ -358,6 +373,10 @@ static PyObject * pymmcore_valgrind_trigger(PyObject * self,
   Py_RETURN_NONE;
 }
 
+
+
+/* Valgrind stuff */
+
 #ifdef BUILD_PYMM_VALGRIND
 
 #include <stdio.h>
@@ -382,6 +401,5 @@ extern "C" void I_WRAP_SONAME_FNNAME_ZU(NONE, valgrind_trigger)( int e )
     VALGRIND_PRINTF("TRIGGER EVENT: %lu %d\n", rdtsc(), e);
   }
 }
-
 
 #endif

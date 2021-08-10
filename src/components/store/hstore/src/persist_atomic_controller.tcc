@@ -209,14 +209,14 @@ template <typename Table>
 	auto impl::persist_atomic_controller<Table>::do_swap() -> void
 	{
 #pragma GCC diagnostic push
-#if 9 <= __GNUC__
+#if 8 <= __GNUC__
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
 		std::memcpy(_persist->_swap.pd0, _persist->_swap.pd1, sizeof *_persist->_swap.pd0);
 #pragma GCC diagnostic pop
 		this->persist(_persist->_swap.pd0, sizeof *_persist->_swap.pd0, "do swap part 1");
 #pragma GCC diagnostic push
-#if 9 <= __GNUC__
+#if 8 <= __GNUC__
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
 		std::memcpy(_persist->_swap.pd1, &_persist->_swap.temp[0], sizeof *_persist->_swap.pd1);

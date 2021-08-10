@@ -17,9 +17,6 @@
 
 #include "heap_co.h"
 #include "hop_hash_log.h"
-#if 0
-#include "persister_pmem.h"
-#endif
 #include "pointer_pobj.h"
 #include "store_root.h"
 #include "trace_flags.h"
@@ -36,14 +33,7 @@
 
 template <typename T, typename Persister>
 	struct deallocator_co;
-#if 0
-template <>
-	struct deallocator_co<void, persister_pmem>
-		: public persister_pmem
-	{
-		using value_type = void;
-	};
-#endif
+
 template <typename Persister>
 	struct deallocator_co<void, Persister>
 		: public Persister

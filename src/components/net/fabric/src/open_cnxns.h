@@ -34,9 +34,7 @@ public:
 private:
 	/* the internal type */
 	using owned_type = std::unique_ptr<cnxn_type>;
-#if 0
-  using open_type = std::set<owned_type>;
-#endif
+
   std::mutex _m; /* protects _s */
   std::set<owned_type> _s;
 public:

@@ -31,7 +31,7 @@ pip3 install numpy --user -I
 pip3 install matplotlib --user -I
 pip3 install scikit-image --user -I
 ```
-Currently, PyMM requires a full build and install of MCAS.  See [Quick Start](./quick_start.md).  This should be performed first.
+Currently, PyMM requires a full build and install of MCAS.  See [MCAS_BUILD](../README.md).  This should be performed first.
 
 Once everything has been correctly installed, the pymm module can be loaded.
 
@@ -247,7 +247,7 @@ RuntimeError: non-pymm type (y, <class 'int'>) cannot be put on the shelf
 
 ## Appendix
 
-Example creating large array:
+* Example creating large array:
 
 ```python
 Python 3.6.8 (default, Aug 18 2020, 08:33:21) 
@@ -255,12 +255,26 @@ Python 3.6.8 (default, Aug 18 2020, 08:33:21)
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import pymm
 >>> import numpy as np
->>> s = pymm.shelf('myShelf',1024*512,pmem_path='/mnt/pmem0',force_new=True)
+>>> s = pymm.shelf('myShelf', size_mb=1024*512, pmem_path='/mnt/pmem0', force_new=True)
 >>> s.x = pymm.ndarray((1000,1000,1000,500),dtype=np.uint8)
 >>> s.used
-90
+92
+>>int(s.x.nbytes/1024/1024/1024)
+465 
 ```
 
+* Example loading large file (beyond DRAM size)
+
+```python
+>>> import pymm
+>>> import numpy as np
+>>> s = pymm.shelf('myShelf', size_mb=1024*512, pmem_path='/mnt/pmem0', force_new=True)
+>>> s.z = np.memmap("/mnt/nvme0/file_300GB.out", dtype="float32", mode="r")
+>>> s.used
+60
+>>int(s.z.nbytes/1024/1024/1024)
+300
+```
 
 Debugging:
 

@@ -234,12 +234,11 @@ status_t MCAS_client::put(const IKVStore::pool_t pool,
 
 status_t MCAS_client::put_direct(const pool_t           pool,
                                  const std::string &    key,
-                                 const void *           value,
-                                 const size_t           value_len,
-                                 IMCAS::memory_handle_t handle,
+                                 gsl::span<const common::const_byte_span> values,
+                                 gsl::span<const IMCAS::memory_handle_t> handles,
                                  uint32_t               flags)
 {
-  return _connection->put_direct(pool, key.data(), key.size(), value, value_len, registrar(), handle, flags);
+  return _connection->put_direct(pool, key.data(), key.size(), values, registrar(), handles, flags);
 }
 
 status_t MCAS_client::async_put(IKVStore::pool_t   pool,
@@ -254,13 +253,12 @@ status_t MCAS_client::async_put(IKVStore::pool_t   pool,
 
 status_t MCAS_client::async_put_direct(const IKVStore::pool_t          pool,
                                        const std::string &             key,
-                                       const void *                    value,
-                                       const size_t                    value_len,
+                                       gsl::span<const common::const_byte_span> values,
                                        async_handle_t &                out_handle,
-                                       const IKVStore::memory_handle_t handle,
+                                       gsl::span<const IMCAS::memory_handle_t> handles,
                                        const unsigned int              flags)
 {
-  return _connection->async_put_direct(pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle, flags);
+  return _connection->async_put_direct(pool, key.data(), key.size(), values, out_handle, registrar(), handles, flags);
 }
 
 status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
@@ -271,7 +269,7 @@ status_t MCAS_client::async_get_direct(IKVStore::pool_t          pool,
                                        IKVStore::memory_handle_t handle)
 {
   TM_ROOT();
-  return _connection->async_get_direct(TM_REF pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle);
+  return _connection->async_get_direct(TM_REF pool, key.data(), key.size(), value, value_len, out_handle, registrar(), handle, 0);
 }
 
 status_t MCAS_client::check_async_completion(async_handle_t &handle)
@@ -335,7 +333,7 @@ status_t MCAS_client::async_put_direct_offset(const IMCAS::pool_t          pool,
   return _connection->async_put_direct_offset(pool, offset, length, out_buffer, out_handle, registrar(), handle);
 }
 
-component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(void *vaddr, const size_t len)
+component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(common::const_byte_span mem)
 {
   /* register_direct_memory is exposed at the interface. A failure of madvise
    * might well be expected if the parameters passed in at the interface are
@@ -343,12 +341,12 @@ component::IKVStore::memory_handle_t MCAS_client::register_direct_memory(void *v
    * fixed by using On Demand Paging (ODP), which should remove the need for
    * madvise.
    */
-  if (madvise(vaddr, len, MADV_DONTFORK) != 0) {
-    if (debug_level() > 2) 
-      PWRN("MCAS_client::%s: madvise MADV_DONTFORK failed (%p %lu) %s", __func__, vaddr, len, strerror(errno));
+  if (madvise(const_cast<void *>(::base(mem)), ::size(mem), MADV_DONTFORK) != 0) {
+    if (debug_level() > 2)
+      PWRN("MCAS_client::%s: madvise MADV_DONTFORK failed (%p %lu) %s", __func__, ::base(mem), ::size(mem), strerror(errno));
   }
 
-  return _connection->register_direct_memory(vaddr, len);
+  return _connection->register_direct_memory(mem);
 }
 
 status_t MCAS_client::unregister_direct_memory(IKVStore::memory_handle_t handle)

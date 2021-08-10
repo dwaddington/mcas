@@ -195,7 +195,7 @@ public:
   /* END IFabric_client_grouped (IFabric_op_completer) */
 
   /*
-   * @throw fabric_runtime_error : std::runtime_error : ::fi_recvv fail
+   * @throw fabric_runtime_error : std::runtime_error : ::fi_sendv fail
    */
   void post_recv(gsl::span<const ::iovec> buffers, void **desc, void *context) override { return aep()->post_recv(buffers, desc, context); }
   void post_recv(gsl::span<const ::iovec> buffers, void *context) override { return aep()->post_recv(buffers, context); }

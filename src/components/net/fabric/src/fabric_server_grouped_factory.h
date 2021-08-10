@@ -55,25 +55,11 @@ public:
    * @throw std::logic_error : unexpected event
    * @throw std::system_error : read error on event pipe
    */
-#if 0
-  component::IFabric_server_grouped * get_new_connection() override;
-#endif
 
   void close_connection(component::IFabric_server_grouped * connection) override;
 
   std::vector<component::IFabric_server_grouped *> connections() override;
 
-  /**
-   * @throw std::bad_alloc : fabric_bad_alloc - libfabric out of memory
-   */
-#if 0
-  std::shared_ptr<event_expecter> new_server(Fabric &fabric, event_producer &eq, ::fi_info &entry) override;
-#else
-	/* Note: shared_ptr may be overkill */
-#if 0
-	auto open_connection(std::shared_ptr<component::IFabric_endpoint_unconnected> aep) -> Fabric_server_grouped * override;
-#endif
-#endif
   std::size_t max_message_size() const noexcept override { return Fabric_server_generic_factory::max_message_size(); }
   std::string get_provider_name() const override { return Fabric_server_generic_factory::get_provider_name(); }
   void cb(std::uint32_t event, ::fi_eq_cm_entry &entry) noexcept override { return Fabric_server_generic_factory::cb(event, entry); }

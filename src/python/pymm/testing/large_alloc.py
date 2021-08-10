@@ -2,6 +2,7 @@ import pymm
 import numpy as np
 import math
 import torch
+import gc
 
 from inspect import currentframe, getframeinfo
 line = lambda : currentframe().f_back.f_lineno
@@ -20,13 +21,27 @@ def log(*args):
     print(colored(0,255,255,*args))
     
 
-def test_large_alloc(s):
-    s.w = np.ndarray((1000000),dtype=np.uint8)
+print('[TEST]: enabling transient memory ...')
+pymm.enable_transient_memory(pmem_file='/mnt/pmem0/swap',pmem_file_size_gb=2, backing_directory='/tmp')
 
-# based on https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
+s = pymm.shelf('myShelf',size_mb=2048,backend="hstore-cc",force_new=True)
 
-s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',backend="mapstore",force_new=True)
+# create a large right-hand side expression which will be evaluated in pmem transient memory
+w = np.ndarray((1000000000*1),dtype=np.uint8) # 1GB
 
-test_large_alloc(s)
+# create something even larger that will fail in pmem and drop into mmap filed
+w2 = np.ndarray((1000000000*10),dtype=np.uint8) # 10GB
 
-print(colored(255,255,255,"OK!"))
+# copy to shelf
+s.w = w
+
+# force clean up of w
+del w
+del w2
+gc.collect()
+gc.get_objects()
+
+print(s.w._value_named_memory.addr())
+
+print('[TEST]: disabling transient memory ...')
+pymm.disable_transient_memory()
