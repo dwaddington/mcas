@@ -265,8 +265,8 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
     hdr.write(dtype.c_str(), dtype_len);
   }
   else { /* for backwards compatibility with pymcas */
-    int type = PyArray_TYPE(src_ndarray);
-    hdr.write(reinterpret_cast<const char*>(&type), sizeof(type));
+    int src_type = PyArray_TYPE(src_ndarray);
+    hdr.write(reinterpret_cast<const char*>(&src_type), sizeof(src_type));
   }
 
   out_hdr = hdr.str();

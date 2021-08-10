@@ -16,6 +16,7 @@
 import pymmcore
 import numpy as np
 import copy
+import os
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
@@ -23,7 +24,8 @@ from .shelf import Shadow
 from .shelf import ShelvedCommon
 
 dtypedescr = np.dtype
-    
+wbinvd_threshold = 1073741824
+
 # shadow type for ndarray
 #
 class ndarray(Shadow):
@@ -92,7 +94,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     __array_priority__ = -100.0 # what does this do?
 
     def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', type=0, zero=False):
-
+        #
         # determine size of memory needed
         #
         descr = dtypedescr(dtype)
@@ -102,8 +104,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
 
             if isinstance(shape, tuple) or isinstance(shape, list):
-                if isinstance(shape, tuple) and isinstance(shape[0], list):
-                    shape = shape[0]
+#                if isinstance(shape, tuple):
+#                    if isinstance(shape[0], list):
+#                        shape = shape[0]
 
                 for k in shape:
                     size *= k
@@ -151,6 +154,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._metadata_key = metadata_key
         self._value_key = value_key
         self.name = name
+        self._use_wbinvd = os.path.isfile('/proc/wbinvd')
         return self
 
     def __delete__(self, instance):
@@ -311,5 +315,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         '''
         Flush cache and persistent all value memory
         '''
+        if self._use_wbinvd and ((super().size * super().itemsize) > wbinvd_threshold):
+            os.system("cat /proc/wbinvd")
+            return
+        
         self._value_named_memory.persist()
+
         

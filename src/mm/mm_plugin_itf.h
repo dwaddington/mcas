@@ -152,7 +152,7 @@ extern "C"
    * Free a previously allocated region of memory with length known
    * 
    * @param heap Heap context
-   * @param ptr Address of [in] pointer to previously allocated region, [out} nullptr
+   * @param ptr Address of [in] pointer to previously allocated region, [out] nullptr
    * @param size Length of region in bytes
    *
    * @return S_OK or E_INVAL;
@@ -297,7 +297,7 @@ extern "C"
 #include <stdio.h>
 #include <stdexcept>
 
-#define LOAD_SYMBOL(X) _ft.X = reinterpret_cast<typeof(_ft.X)>(dlsym(_module, # X)); assert(_ft.X)
+#define LOAD_SYMBOL(X) _ft.X = reinterpret_cast<decltype(_ft.X)>(dlsym(_module, # X)); assert(_ft.X)
 
 /** 
  * C++ wrapper on C-based plugin API

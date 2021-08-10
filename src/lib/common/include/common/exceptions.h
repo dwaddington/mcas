@@ -84,7 +84,6 @@ class Exception {
 
   void set_cause(const char *cause) {
     __builtin_strncpy(_cause, cause, sizeof _cause);
-    PEXCEP("%s", cause);
   }
 
 private:
@@ -168,7 +167,7 @@ public:
 };
 
 /*
- * std::logic_execetion means a program error which should have been detectable before execution.
+ * std::logic_exeception means a program error which should have been detectable before execution.
  * Indicates a coding error, and arguably cannot be handled, as it indicates that the program
  * has lost its integrity cannot be handled, as it indicates that the program
  * has lost its integrity.
@@ -273,23 +272,6 @@ public:
   }
 };
 
-#if 0
-/*
- * Unused. Whoever first employs it should provide a meaning here.
- */
-class IO_exception : public Coded_exception {
-public:
-  IO_exception(int err) : Coded_exception(err, "IO error") {}
-
-  IO_exception() : IO_exception(E_FAIL) {}
-
-  template <typename ... Args>
-  __attribute__((__format__(__printf__, 2, 0)))
-  IO_exception(const char *fmt, Args&& ... args)
-    : Coded_exception(E_FAIL, fmt, std::forward<Args>(args)...) {}
-};
-#endif
-
 /*
  * Two uses:
  *   Out of buffers (a runtime exception)
@@ -308,22 +290,20 @@ public:
   }
 };
 
-#if 0
 /*
- * Unused. Whoever first employs it should provide a meaning here.
+ * Used to indicate memory exhaustion or inability to allocate requested memory
  */
-class Data_exception : public Coded_exception {
+class Out_of_memory : public Exception {
 public:
-  Data_exception(int err) : Coded_exception(err, "Data error") {}
-
-  Data_exception() : Data_exception(E_FAIL) {}
+  Out_of_memory() {}
 
   template <typename ... Args>
-  __attribute__((__format__(__printf__, 2, 0)))
-  Data_exception(const char *fmt, Args&& ... args)
-    : Coded_exception(E_FAIL, fmt, std::forward<Args>(args)...) {}
+  Out_of_memory(const char *fmt, Args&& ... args)
+    : Exception(fmt, std::forward<Args>(args)...)
+  {
+  }
 };
-#endif
+
 
 /*
  * (Presumed) failure of a client or server to adhere to a protocoli: 6 uses, all in MCAS server

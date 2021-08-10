@@ -57,7 +57,8 @@ class integer_number(Shadow):
             return (False, None)
 
         if (hdr.Type() == DataType.DataType().NumberInteger):
-            return (True, shelved_integer_number(memory_resource, name, buffer[hdr_size + 4:]))
+            i = int.from_bytes(buffer[hdr_size + 4:], byteorder='big')
+            return (True, shelved_integer_number(memory_resource, name, i))
 
         # not a string
         return (False, None)
@@ -173,8 +174,6 @@ class shelved_integer_number(ShelvedCommon):
         Materialize the value either from persistent memory or cached value
         '''
         return self._cached_value
-        # materialization alternative - return float.fromhex((bytearray(self._view)).decode())
-
 
     def __repr__(self):
         return str(self._get_value())

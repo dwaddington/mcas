@@ -107,8 +107,9 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * @param dax_config Vector of dax-path, address, arena_id tuples.
    * @param force_reset
    */
-  dax_manager(const common::log_source &ls, const std::vector<config_t>& dax_config,
-                 bool force_reset = false);
+  dax_manager(const common::log_source &ls,
+              const std::vector<config_t>& dax_config,
+              bool force_reset = false);
 
   /**
    * Destructor will not unmap memory/nor invalidate pointers?
