@@ -58,6 +58,12 @@ namespace ccpm
 			}
 			container_cc(const container_cc &) = delete;
 			container_cc &operator=(const container_cc &) = delete;
+			/*
+			 * The explanation for the log (base class) move constructor
+			 * applies here too.
+			 */
+			container_cc(container_cc &&other) = default;
+
 			cca& mr() { return *_cca; }
       void set_cca(ccpm::cca& cca_) { _cca = &cca_; }
 		};

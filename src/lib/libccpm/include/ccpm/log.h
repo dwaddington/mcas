@@ -47,6 +47,14 @@ public:
 
   log(const log &) = delete;
   log &operator=(const log &) = delete;
+  /*
+   * Restoration of a log from persistent memory is done by moving the
+   * log to itself with a move constructor. The persisted log has a vft
+   * pointer, which is invalid when the log is rediscovered in persistent
+   * memory. The move constructor creates valid vft pointer and (we hope)
+   * preserves the rest of the log member data.
+   */
+  log(log &&) = default;
 
   ~log();
   /*
