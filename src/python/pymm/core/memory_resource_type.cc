@@ -123,6 +123,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
   if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
   }
+  else if (backend == "hstore") {
+    comp = load_component("libcomponent-hstore.so", hstore_factory);
+  }  
   else if (backend == "hstore-mm") {
     comp = load_component("libcomponent-hstore-mm.so", hstore_factory);
     if(checked_mm_plugin_path.empty()) {
