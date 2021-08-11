@@ -116,7 +116,9 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   }
   else {
     ccaptr = new ccpm::cca(&pe, rv, ccpm::accept_all);
-    ccv = reinterpret_cast<cc_vector*>(::base(ccaptr->get_root()));
+    void *root_base = ::base(ccaptr->get_root());
+    /* reconstruct the cc_vector vft (see note on move constructor in ccpm/log.h */
+    ccv = new (root_base) cc_vector(std::move(*static_cast<cc_vector *>(root_base)));
     ccv->rollback(); /* in case we're recovering from crash */
   }
 
