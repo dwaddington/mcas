@@ -117,15 +117,18 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
 {
   PLOG("load_backend: (%s) (%s) (%s)", backend.c_str(), path.c_str(), mm_plugin_path.c_str());
   IBase* comp = nullptr;
+  std::string checked_mm_plugin_path = mm_plugin_path;
+
+  
   if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
   }
   else if (backend == "hstore-mm") {
     comp = load_component("libcomponent-hstore-mm.so", hstore_factory);
+    if(checked_mm_plugin_path.empty()) {
+      checked_mm_plugin_path = "libmm-plugin-ccpm.so";
+    }
   }
-  else if (backend == "hstore-mr") {
-    comp = load_component("libcomponent-hstore-mr.so", hstore_factory);
-  }  
   else if (backend == "mapstore") {
     comp = load_component("libcomponent-mapstore.so", mapstore_factory);
   }
@@ -135,10 +138,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
   }
 
   /* try adding default path if needed */
-  std::string checked_mm_plugin_path = mm_plugin_path;
   if(checked_mm_plugin_path != "") /* empty means use default */
   {   
-    std::string path = mm_plugin_path;
+    std::string path = checked_mm_plugin_path;
     if(access(path.c_str(), F_OK) != 0) { /* is not accessible */
         path = LIB_INSTALL_PATH + path;
         if(access(path.c_str(), F_OK) != 0) {
@@ -154,12 +156,12 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
   auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
   assert(fact);  
 
-  if(backend == "hstore-mm" || backend == "hstore-mc" || backend == "hstore-mr") {
+  if(backend == "hstore-mm") {
     
     std::stringstream ss;
     ss << "[{\"path\":\"" << path << "\",\"addr\":" << load_addr << "}]";
     PLOG("dax config: %s", ss.str().c_str());
-    
+    PLOG("mm plugin: %s", checked_mm_plugin_path.c_str());
     store = fact->create(debug_level,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
