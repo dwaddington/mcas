@@ -17,11 +17,13 @@ def log(*args):
 class TestBefore(unittest.TestCase):
     def setUp(self):
         global force_new
-        self.s = pymm.shelf('myShelf-A',size_mb=1024,pmem_path='/mnt/pmem0/a',force_new=False)
+        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0/1',force_new=False)
+        self.s2 = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0/2',force_new=False)
         print(self.s.items)
     
     def tearDown(self):
         del self.s
+        del self.s2        
         
     def test_check_A(self):
         print(self.s.A)
