@@ -32,18 +32,18 @@ typedef struct
   Element_type type;
   union {
     unsigned long tag;
-    double inline_float64;
+    double        inline_float64;
     long long int inline_longlongint;
   };
 } Element;
 
 using logged_ptr = ccpm::value_tracked<Element, ccpm::tracker_log>;
-using cc_list_ptr = ccpm::container_cc<eastl::list<logged_ptr, ccpm::allocator_tl>>;
+using cc_list_element = ccpm::container_cc<eastl::list<logged_ptr, ccpm::allocator_tl>>;
 
 typedef struct {
   PyObject_HEAD
   ccpm::cca * heap;
-  cc_list_ptr * list;
+  cc_list_element * list;
 } List;
 
 namespace
@@ -92,6 +92,7 @@ static PyObject * present_element(const Element& element)
     PyTuple_SetItem(tuple, 1, Py_True);
     break;
   case INLINE_FLOAT:
+    PNOTICE("PRESENTING FLOAT...(%g)",element.inline_float64);
     PyTuple_SetItem(tuple, 0, PyFloat_FromDouble(element.inline_float64));
     PyTuple_SetItem(tuple, 1, Py_False);
     break;
@@ -118,7 +119,7 @@ static PyObject * ListType_method_getitem(List *self, PyObject *args, PyObject *
                                     "O|",
                                     const_cast<char**>(kwlist),
                                     &slice_criteria)) {
-     PyErr_SetString(PyExc_RuntimeError, "ListType_method_append unable to parse args");
+     PyErr_SetString(PyExc_RuntimeError, "ListType_method_getitem unable to parse args");
      return NULL;
   }
 
@@ -172,8 +173,6 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
 
   assert(self->list);
 
-  // this causes SEGV ?
-  //  self->list->rollback(); /* recovery check */
   
   if(element_tag > 0) { /* add a reference to an already shelved item */
     self->list->container->push_back(Element{SHELF_REFERENCE,element_tag});
@@ -195,7 +194,9 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
     else if(PyFloat_Check(element_object)) {
       double value = PyFloat_AsDouble(element_object);
       self->list->container->push_back(Element{INLINE_FLOAT,value});
-      PLOG("Appended INLINE float64");      
+      auto x = self->list->container->back();
+      PLOG("Appended INLINE float64 (value=%g)", x.inline_float64);
+      PLOG("Appended INLINE float64 (value=%g)", value);      
     }
     // else if(PyUnicode_Check(element_object)) {
     // }
@@ -255,16 +256,17 @@ ListType_init(List *self, PyObject *args, PyObject *kwds)
   ccpm::region_vector_t rv(ccpm::region_vector_t::value_type(common::make_byte_span(buffer->buf,buffer->len)));
   if(rehydrate) {
     self->heap = new ccpm::cca(&persister, rv, ccpm::accept_all);
-    self->list = reinterpret_cast<cc_list_ptr*>(::base(self->heap->get_root()));
-
+    void * root_base = ::base(self->heap->get_root());
+    self->list = new (root_base) cc_list_element(std::move(*static_cast<cc_list_element*>(root_base)));
+    self->list->rollback(); /* recovery check */
   }
   else {
     self->heap = new ccpm::cca(&persister, rv);
-    void *root = self->heap->allocate_root(sizeof(cc_list_ptr)); //heap.allocate(list_size);
+    void *root = self->heap->allocate_root(sizeof(cc_list_element)); //heap.allocate(list_size);
     assert(root);
     assert(self->heap);
 
-    self->list = new (root) cc_list_ptr(&persister, *(self->heap));
+    self->list = new (root) cc_list_element(&persister, *(self->heap));
   }
 
   return 0;
