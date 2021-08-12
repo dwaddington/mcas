@@ -71,12 +71,12 @@ class TestBackends(unittest.TestCase):
         print(s.items)
         log("OK!")
 
-    def test_hstore_mm_rcalb(self):
-        log("Running shelf with hstore-mm and rcalb MM plugin ...")
-        pmem_path="%s/test_hstore_mm_rcalb" % (self.pmem_root,)
+    def test_hstore_mm_default(self):
+        log("Running shelf with hstore-mm and default MM plugin ...")
+        pmem_path="%s/test_hstore_mm_default" % (self.pmem_root,)
         os.system("rm -Rf %s" % (pmem_path,))
         os.mkdir(pmem_path)
-        s = pymm.shelf('myShelf6',size_mb=8,backend='hstore-mm',pmem_path=pmem_path,mm_plugin='libmm-plugin-rcalb.so')
+        s = pymm.shelf('myShelf_mm_default',size_mb=8,backend='hstore-mm',pmem_path=pmem_path)
         s.x = pymm.ndarray((10,10,))
         s.y = pymm.ndarray((100,100,))
         print(s.items)
@@ -91,7 +91,19 @@ class TestBackends(unittest.TestCase):
         s.x = pymm.ndarray((10,10,))
         s.y = pymm.ndarray((100,100,))
         print(s.items)
+        log("OK!")        
+
+    def test_hstore_mm_rcalb(self):
+        log("Running shelf with hstore-mm and rcalb MM plugin ...")
+        pmem_path="%s/test_hstore_mm_rcalb" % (self.pmem_root,)
+        os.system("rm -Rf %s" % (pmem_path,))
+        os.mkdir(pmem_path)
+        s = pymm.shelf('myShelf6',size_mb=8,backend='hstore-mm',pmem_path=pmem_path,mm_plugin='libmm-plugin-rcalb.so')
+        s.x = pymm.ndarray((10,10,))
+        s.y = pymm.ndarray((100,100,))
+        print(s.items)
         log("OK!")
+
 
 if __name__ == '__main__':
     unittest.main()

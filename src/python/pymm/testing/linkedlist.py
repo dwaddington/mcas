@@ -16,7 +16,7 @@ force_new=True
 class TestLinkedList(unittest.TestCase):
     def setUp(self):
         global force_new
-        self.s = pymm.shelf('myShelf',size_mb=2048,backend="hstore-cc",force_new=force_new)
+        self.s = pymm.shelf('myShelf',size_mb=2048,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=force_new)
         force_new=False
 
     def tearDown(self):
@@ -41,6 +41,8 @@ class TestLinkedList(unittest.TestCase):
 
         print(self.s.x)
         self.assertTrue(self.s.x[0] == 123)
+        print(self.s.x[1])
+        print(type(self.s.x[1]))
         self.assertTrue(self.s.x[1] == 1.321)
             
         print(self.s.x[3])

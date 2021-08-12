@@ -140,7 +140,7 @@ class shelved_linked_list(ShelvedCommon):
         Add element to end of list
         '''
         if issubclass(type(element), ShelvedCommon): # implies it already on the shelf
-            return self._internal.append(element=None, name=element._name)
+            return self._internal.append(element=None, name=element.name)
         elif (isinstance(element, float) or isinstance(element, int)): # inline value
             return self._internal.append(element)
         elif (isinstance(element, np.ndarray) or
