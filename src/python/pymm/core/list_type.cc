@@ -27,15 +27,21 @@ typedef enum
    INLINE_LONGLONGINT = 3,
   } Element_type;
 
-typedef struct
+class Element
 {
+public:
+  Element() {}
+  Element(const Element_type& type_, const double value_) : type(type_), inline_float64(value_) {}
+  Element(const Element_type& type_, const unsigned long tag_) : type(type_), tag(tag_) {}
+  Element(const Element_type& type_, const long long int value_) : type(type_), inline_longlongint(value_) {}
+  
   Element_type type;
   union {
     unsigned long tag;
     double        inline_float64;
     long long int inline_longlongint;
   };
-} Element;
+};
 
 using logged_ptr = ccpm::value_tracked<Element, ccpm::tracker_log>;
 using cc_list_element = ccpm::container_cc<eastl::list<logged_ptr, ccpm::allocator_tl>>;
@@ -92,7 +98,6 @@ static PyObject * present_element(const Element& element)
     PyTuple_SetItem(tuple, 1, Py_True);
     break;
   case INLINE_FLOAT:
-    PNOTICE("PRESENTING FLOAT...(%g)",element.inline_float64);
     PyTuple_SetItem(tuple, 0, PyFloat_FromDouble(element.inline_float64));
     PyTuple_SetItem(tuple, 1, Py_False);
     break;
@@ -175,7 +180,7 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
 
   
   if(element_tag > 0) { /* add a reference to an already shelved item */
-    self->list->container->push_back(Element{SHELF_REFERENCE,element_tag});
+    self->list->container->push_back(Element(SHELF_REFERENCE,element_tag));
     PLOG("Appended SHELF_REFERENCE (%lu)",element_tag);
   }
   else {
@@ -188,15 +193,13 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
         PyErr_SetString(PyExc_RuntimeError, "ListType_method_append long overflowed system's long long type");
         return NULL;
       }
-      self->list->container->push_back(Element{INLINE_LONGLONGINT,value});
+      self->list->container->push_back(Element(INLINE_LONGLONGINT,value));
       PLOG("Appended INLINE long long int");
     }
     else if(PyFloat_Check(element_object)) {
       double value = PyFloat_AsDouble(element_object);
-      self->list->container->push_back(Element{INLINE_FLOAT,value});
-      auto x = self->list->container->back();
-      PLOG("Appended INLINE float64 (value=%g)", x.inline_float64);
-      PLOG("Appended INLINE float64 (value=%g)", value);      
+      self->list->container->push_back(Element(INLINE_FLOAT,value));
+      PLOG("Appending INLINE float64 (value=%g)", value);
     }
     // else if(PyUnicode_Check(element_object)) {
     // }

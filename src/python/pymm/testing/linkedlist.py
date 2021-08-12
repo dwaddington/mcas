@@ -23,7 +23,7 @@ class TestLinkedList(unittest.TestCase):
         del self.s
     
 
-    def test_list_construction(self):
+    def test_A_list_construction(self):
 
         log("Testing: pymm.linked_list construction")
         self.s.x = pymm.linked_list()
@@ -42,16 +42,26 @@ class TestLinkedList(unittest.TestCase):
         print(self.s.x)
         self.assertTrue(self.s.x[0] == 123)
         print(self.s.x[1])
-        print(type(self.s.x[1]))
         self.assertTrue(self.s.x[1] == 1.321)
             
         print(self.s.x[3])
         self.assertTrue(self.s.x[3] == "Hello list!")
 
-        print(self.s.items)
-        self.s.x[3] = "Goodbye";
-        self.assertTrue(self.s.x[3] == "Goodbye")
         print("Length of list:{}".format(len(self.s.x)))
+        self.assertTrue(len(self.s.x) == 4)
+        print(self.s.x)
+
+
+    def XXX_test_B_add_shelf_ndarray(self):
+        log("creating an ndarray on shelf, then adding to list")
+        self.s.n = pymm.ndarray((3,8,))
+        self.s.x.append(self.s.n)
+        print(self.s.x)
+        
+#        print(self.s.items)
+#        self.s.x[3] = "Goodbye";
+#        self.assertTrue(self.s.x[3] == "Goodbye")
+#
 
 
 if __name__ == '__main__':
