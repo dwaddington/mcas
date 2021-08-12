@@ -54,12 +54,17 @@ module_core = Extension('mcas',
 
 
 setup (name = 'McasApiPackage',
-       version='0.2',
+       version='1.0',
        author='Daniel Waddington',
        author_email='daniel.waddington@ibm.com',
        description='MCAS API library',
        package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
        packages=['mcas_pkg'],
+       classifiers=[
+           "Programming Language :: Python :: 3",
+           "License :: OSI Approved :: Apache 2.0 License",
+           "Operating System :: OS Independent",
+       ],
        ext_modules=[module_core],
        python_requires='>=3.5',
 )
