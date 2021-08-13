@@ -75,6 +75,23 @@ class TestNdarray(unittest.TestCase):
         self.s.erase('r2')
         self.s.erase('r3')
 
+    def test_ndarray_slicing(self):
+        log("Testing: np.ndarray slicing ...")
+        d = np.ones((3,5,),dtype=np.uint8)
+        self.s.w = d
+        self.s.w_flat = self.s.w.reshape(-1)
+        self.assertTrue(np.array_equal(self.s.w_flat, np.ones((3*5,),dtype=np.uint8)))
+        self.s.x = np.arange(0,10)
+        self.assertTrue(self.s.x[-1] == 9)
+        self.assertTrue(self.s.x[-2] == 8)
+        self.assertTrue(np.array_equal(self.s.x[-2:],[8,9]))
+        self.assertTrue(np.array_equal(self.s.x[:-2],np.arange(0,8)))
+        self.assertTrue(np.array_equal(self.s.x[::-1],[9,8,7,6,5,4,3,2,1,0]))
+        self.assertTrue(np.array_equal(self.s.x[1::-1],[1,0]))
+        self.assertTrue(np.array_equal(self.s.x[-3::-1],[7,6,5,4,3,2,1,0]))
+        self.assertTrue(np.array_equal(self.s.x[:-3:-1],[9,8]))
+
+
 
 if __name__ == '__main__':
     unittest.main()
