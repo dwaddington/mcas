@@ -91,6 +91,19 @@ class TestNdarray(unittest.TestCase):
         self.assertTrue(np.array_equal(self.s.x[-3::-1],[7,6,5,4,3,2,1,0]))
         self.assertTrue(np.array_equal(self.s.x[:-3:-1],[9,8]))
 
+    def test_column_access(self):
+        log("Testing: column access...")
+        A = np.zeros((3, 4,),dtype=np.uint8)
+        A[1] = 1
+        A[:,0] = 2
+        print(A)
+        self.s.B = np.zeros((3, 4,), dtype=np.uint8)
+        self.s.B[1] = 1
+        self.s.B[:,0] = 2
+        print(self.s.B)
+        self.s.erase('B')
+
+
 
 
 if __name__ == '__main__':
