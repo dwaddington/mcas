@@ -95,14 +95,19 @@ class TestNdarray(unittest.TestCase):
         log("Testing: column access...")
         A = np.zeros((3, 4,),dtype=np.uint8)
         A[1] = 1
+        A[2] = np.arange(0,4)
         A[:,0] = 2
-        print(A)
+        b = np.arange(3).reshape(3,1)
+        q = (np.random.randn(3,1) - b/10).reshape(-1)
+        # q is ndarray [x,y,z]
+        A[:,0] = q
+
         self.s.B = np.zeros((3, 4,), dtype=np.uint8)
         self.s.B[1] = 1
         self.s.B[:,0] = 2
+        self.s.B[:,0] = q
         print(self.s.B)
         self.s.erase('B')
-
 
 
 
