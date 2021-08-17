@@ -98,6 +98,8 @@ class torch_tensor(Shadow):
     
 # concrete subclass for torch tensor
 #
+# Note: currently the gradient tensor is not preserved.  this is consistent with pickling
+#
 class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''PyTorch tensor that is stored in a memory resource'''
     __array_priority__ = -100.0 # sets subclass as higher priority
@@ -131,8 +133,8 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             # use shelved_ndarray under the hood and make a subclass from it
             base_ndarray = shelved_ndarray(memory_resource, name=name, shape=ndshape, dtype=np_dtype, type=1)
 
-            # create and store metadata header
-            metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1) # type=1 indicate torch_tensor
+            # create and store metadata header : type=1 indicates torch_tensor
+            metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
             builder = flatbuffers.Builder(32)
 
             # create tensor specific sub-header
@@ -152,6 +154,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
             base_ndarray = shelved_ndarray(memory_resource, name=name, dtype=hdr['dtype'], shape=hdr['shape'],
                                            strides=hdr['strides'], order=order, type=1)
+
             
         self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
         self._base_ndarray = base_ndarray
@@ -161,8 +164,8 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         self._memory_resource = memory_resource
         self._metadata_key = metadata_key
         self.name_on_shelf = name
-
-        self.requires_grad = equires_grad
+        self.requires_grad = requires_grad
+        self.retains_grad = False # by default .grad is not there
         return self
 
     def __delete__(self, instance):
