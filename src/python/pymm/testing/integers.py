@@ -44,9 +44,14 @@ class TestNdarray(unittest.TestCase):
         self.s.count += 1
         self.s.n = np.arange(0,9).reshape(3,3)
         print(self.s.n)
+        self.s.p = self.s.n / 3
+        print(self.s.p)
         self.s.p = self.s.n / int(self.s.count)
+        print(self.s.p)
         self.s.p = self.s.n / self.s.count
         print(self.s.p)
+        self.s.erase('p')
+        self.s.erase('n')
         
         
 

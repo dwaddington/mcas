@@ -249,7 +249,7 @@ class shelved_integer_number(ShelvedCommon):
         return self._get_value() / value
 
     def __rtruediv__(self, value):
-        return float(self._cached_value)
+        return value / self._cached_value
 
     def __floordiv__(self, value):
         return self._get_value() // value
