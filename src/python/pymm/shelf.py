@@ -11,6 +11,9 @@
 #    limitations under the License.
 #
 
+#    Here is useful info for shelf type implementation:
+#    https://rszalski.github.io/magicmethods/#representations
+
 import pymmcore
 import pymm
 import gc
