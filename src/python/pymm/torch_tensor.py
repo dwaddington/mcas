@@ -85,8 +85,8 @@ class torch_tensor(Shadow):
         new_tensor = shelved_torch_tensor(memory_resource,
                                           name,
                                           shape = tensor.shape,
-                                          dtype = tensor.dtype,
-                                          requires_grad = tensor.requires_grad)
+                                          dtype = tensor.dtype)
+
         
         # now copy the data
         if tensor.dim() is 0:
@@ -104,7 +104,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''PyTorch tensor that is stored in a memory resource'''
     __array_priority__ = -100.0 # sets subclass as higher priority
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', requires_grad=False):
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
 
         torch_to_numpy_dtype_dict = {
             torch.bool  : np.bool,
@@ -137,12 +137,6 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
             builder = flatbuffers.Builder(32)
 
-            # create tensor specific sub-header
-            TorchTensor.TorchTensorStart(builder)
-            TorchTensor.TorchTensorAddRequiresGrad(builder, requires_grad)
-            subhdr = TorchTensor.TorchTensorEnd(builder)
-            builder.Finish(subhdr)
-
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
@@ -164,8 +158,8 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         self._memory_resource = memory_resource
         self._metadata_key = metadata_key
         self.name_on_shelf = name
-        self.requires_grad = requires_grad
-        self.retains_grad = False # by default .grad is not there
+        self.requires_grad = False # by default .grad is not there
+        self.retains_grad = False # by default .grad is not there 
         return self
 
     def __delete__(self, instance):
