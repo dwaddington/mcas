@@ -140,7 +140,6 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
-            print('ENTITY ALREADY EXISTS ENTITY ALREADY EXISTS ENTITY ALREADY EXISTS ENTITY ALREADY EXISTS')
             # entity already exists, load metadata
             del value_named_memory # the shelved_ndarray ctor will need to reopen it
             metadata = memory_resource.get_named_memory(metadata_key)
