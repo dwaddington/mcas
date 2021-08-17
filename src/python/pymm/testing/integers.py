@@ -52,6 +52,17 @@ class TestNdarray(unittest.TestCase):
         print(self.s.p)
         self.s.erase('p')
         self.s.erase('n')
+
+    def test_rmod_operation(self):
+        log("Test: rmod op")
+        self.s.c = 10
+        print('18%10={}'.format(18 % self.s.c))
+        print('10%3={}'.format(self.s.c % 3))
+        self.assertTrue(18 % self.s.c == 8)
+        self.assertTrue(self.s.c % 3 == 1)
+
+        
+        
         
         
 
