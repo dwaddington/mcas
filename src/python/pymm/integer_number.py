@@ -30,7 +30,7 @@ class integer_number(Shadow):
     Integer number object that is stored in the memory resource.  Uses value cache.
     '''
     def __init__(self, number_value):
-        self.number_value = number_value
+        self.number_value = int(number_value)
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
@@ -75,7 +75,7 @@ class shelved_integer_number(ShelvedCommon):
     def __init__(self, memory_resource, name, number_value):
 
         memref = memory_resource.open_named_memory(name)
-
+        number_value = int(number_value)
         if memref == None:
             # create new value
             builder = flatbuffers.Builder(32)
@@ -116,7 +116,7 @@ class shelved_integer_number(ShelvedCommon):
 
         # set up the view of the data
         # materialization alternative - self._view = memoryview(memref.buffer[32:])
-        self._cached_value = number_value
+        self._cached_value = int(number_value)
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -249,7 +249,7 @@ class shelved_integer_number(ShelvedCommon):
         return self._get_value() / value
 
     def __rtruediv__(self, value):
-        return self._get_value() / value
+        return float(self._cached_value)
 
     def __floordiv__(self, value):
         return self._get_value() // value
