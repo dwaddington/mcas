@@ -39,7 +39,10 @@ unsigned debug_level = 0;
 
 /* forward decls */
 PyObject * unmarshall_nparray(byte * ptr);
-void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, const char * dtype_str = nullptr, int type = 0);  
+void create_ndarray_header(PyArrayObject * src_ndarray,
+                           std::string& out_hdr,
+                           const char * dtype_str = nullptr,
+                           int type = 0);  
 
 PyObject * pymcas_ndarray_header_size(PyObject * self,
                                       PyObject * args,

@@ -21,11 +21,19 @@ enum Constants : uint32 {
   Magic = 4009738240,
 }
 
+union Any { TorchTensor }
+
+
 table Header {
   magic   : uint32;
   type    : DataType;
   version : uint16;
   resvd   : uint16;
+}
+
+table TorchTensor {
+  requires_grad : bool = false;
+  is_leaf : bool = false;
 }
 
 root_type Header;

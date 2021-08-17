@@ -175,6 +175,9 @@ class shelved_integer_number(ShelvedCommon):
         '''
         return self._cached_value
 
+    def __index__(self):
+        return int(self._get_value())
+    
     def __repr__(self):
         return str(self._get_value())
 

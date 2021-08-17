@@ -90,6 +90,9 @@ class TestNdarray(unittest.TestCase):
         self.assertTrue(np.array_equal(self.s.x[1::-1],[1,0]))
         self.assertTrue(np.array_equal(self.s.x[-3::-1],[7,6,5,4,3,2,1,0]))
         self.assertTrue(np.array_equal(self.s.x[:-3:-1],[9,8]))
+        self.s.i = 1
+        self.s.w[:,int(self.s.i)]
+        self.s.w[:,self.s.i]
 
     def test_column_access(self):
         log("Testing: column access...")
@@ -109,7 +112,24 @@ class TestNdarray(unittest.TestCase):
         print(self.s.B)
         self.s.erase('B')
 
+    def test_column_access_2(self):
+        log("Testing: column access variation...")
+        self.s.A = np.zeros((3, 4,),dtype=np.uint8)
+        self.s.b = np.arange(3).reshape(3,1)
+        self.s.c = np.arange(3).reshape(3,1)
+        self.s.A[:, 0] = (self.s.b - self.s.c).reshape(-1)
+
+    def test_matrixop_and_reshape(self):
+        self.s.theta = pymm.ndarray((3, 4,))
+        self.s.theta.fill(2.0)
+        self.s.moment = pymm.ndarray((3, 4,))
+        self.s.moment.fill(1.2)
+        self.s.theta_deviation = (self.s.theta - self.s.moment).reshape(-1)        
+    
+        
 
 
 if __name__ == '__main__':
     unittest.main()
+
+    

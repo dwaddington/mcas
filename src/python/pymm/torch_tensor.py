@@ -17,6 +17,13 @@ import torch
 import pymmcore
 import numpy as np
 import copy
+import flatbuffers
+
+import PyMM.Meta.Header as Header
+import PyMM.Meta.Constants as Constants
+import PyMM.Meta.TorchTensor as TorchTensor
+import PyMM.Meta.DataType as DataType
+from flatbuffers import util
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
@@ -126,9 +133,18 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
             # create and store metadata header
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1) # type=1 indicate torch_tensor
+            builder = flatbuffers.Builder(32)
+
+            # create tensor specific sub-header
+            TorchTensor.TorchTensorStart(builder)
+            TorchTensor.TorchTensorAddRequiresGrad(builder, requires_grad)
+            subhdr = TorchTensor.TorchTensorEnd(builder)
+            builder.Finish(subhdr)
+
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
+            print('ENTITY ALREADY EXISTS ENTITY ALREADY EXISTS ENTITY ALREADY EXISTS ENTITY ALREADY EXISTS')
             # entity already exists, load metadata
             del value_named_memory # the shelved_ndarray ctor will need to reopen it
             metadata = memory_resource.get_named_memory(metadata_key)
@@ -146,16 +162,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         self._metadata_key = metadata_key
         self.name_on_shelf = name
 
-        if requires_grad == False:
-            self.requires_grad_ = None
-            self.retains_grad = False
-        else:
-            # raise RuntimeError('required grad not supported by PyMM .. eek')
-            self.requires_grad_ = True
-            self.grad = torch.Variable()
-            self.retains_grad = True
-
-        
+        self.requires_grad = equires_grad
         return self
 
     def __delete__(self, instance):
