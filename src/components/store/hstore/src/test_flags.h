@@ -19,10 +19,12 @@
 
 #if defined MCAS_HSTORE_TEST_PERISHABLE
 #define TEST_HSTORE_PERISHABLE MCAS_HSTORE_TEST_PERISHABLE
-#define AK_USE MCAS_HSTORE_TEST_PERISHABLE
+#define AK_USED MCAS_HSTORE_TEST_PERISHABLE
 #else
 #define TEST_HSTORE_PERISHABLE 0 /* true only when testing crash-consistency */
-#define AK_USE 0
+#ifndef AK_USED
+#define AK_USED 0
+#endif
 #endif
 
 #endif

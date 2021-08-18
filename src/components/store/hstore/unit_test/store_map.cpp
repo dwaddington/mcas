@@ -12,6 +12,7 @@
 */
 #include "store_map.h"
 
+#include <common/env.h>
 #include <common/json.h>
 #include <string>
 
@@ -19,6 +20,8 @@ const std::string store_map::impl_default = "hstore-cc";
 const store_map::impl_map_t store_map::impl_map = {
   { "hstore-cc", { "hstore-cc", component::hstore_factory } }
   , { "hstore-mc", { "hstore-mc", component::hstore_factory } }
+  , { "hstore-mm", { "hstore-mm", component::hstore_factory } }
+  , { "hstore-mt", { "hstore-mt", component::hstore_factory } }
   , { "hstore", { "hstore", component::hstore_factory } }
 };
 
@@ -67,8 +70,8 @@ const auto fsdax_location =
 const std::string store_map::location =
   /* If a custom store location was specified, use it */
   store_loc           ? store_loc
-  /* if USE_ODP was set, probably using fsdax. Use the default fsdax location */
-  : getenv("USE_ODP") ? fsdax_location.str()
+  /* if USE_ODP was set to true, probably using fsdax. Use the default fsdax location */
+  : common::env_value<bool>("USE_ODP", false) ? fsdax_location.str()
   /* Use the default devdax location */
   :                     devdax_location.str()
   ;

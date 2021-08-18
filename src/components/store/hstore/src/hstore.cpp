@@ -51,6 +51,8 @@
 
 /* globals */
 
+struct alloc_key {};
+
 thread_local std::map<void *, hstore::open_pool_type *> tls_cache = {};
 
 /* forced because pool_t is an integral tye, not a pointer */
@@ -115,6 +117,7 @@ hstore::hstore(
 	)
   , _pools_mutex{}
   , _pools{}
+  , _lock_mutex{}
 {
 }
 
@@ -265,6 +268,7 @@ status_t hstore::close_pool(const pool_t p)
 
 status_t hstore::delete_pool(const std::string& name_)
 {
+	/* ERROR: deletion of a pool which is still open is an uncaught error */
   auto path = pool_path(name_);
 
   try {
@@ -664,6 +668,7 @@ try
 #if 0 /* As with mapstore, allocator (not hstore) deals with non-2^n alignments */
 	if ( ( alignment & (alignment - 1) ) != 0  ) { return E_BAD_ALIGNMENT; }
 #endif
+  std::unique_lock<std::mutex> g(_lock_mutex);
   auto r = session->lock(AK_INSTANCE TM_REF key, type, out_value, out_value_len, alignment);
 
   out_key = r.key;
@@ -701,7 +706,7 @@ try
 }
 catch ( const std::bad_alloc &e )
 {
-  CPLOG(0, "%s: %s", __func__, e.what());
+  PLOG("%s: %s", __func__, e.what());
   return E_TOO_LARGE;
 }
 
@@ -714,11 +719,9 @@ auto hstore::unlock(const pool_t pool,
      is a write lock
   */
   const auto session = static_cast<session_type *>(locate_session(pool));
-  return
-    session
-    ? session->unlock_indefinite(TM_REF key_, flags_)
-    : E_POOL_NOT_FOUND
-    ;
+  if ( ! session ) { return E_POOL_NOT_FOUND; }
+  std::unique_lock<std::mutex> g(_lock_mutex);
+  return session->unlock_indefinite(TM_REF key_, flags_);
 }
 
 auto hstore::erase(const pool_t pool,

@@ -15,7 +15,7 @@
 #ifndef MCAS_HSTORE_HEAP_RC_EPHEMERAL_H
 #define MCAS_HSTORE_HEAP_RC_EPHEMERAL_H
 
-#include <common/logging.h> /* log_source */
+#include "heap_ephemeral.h"
 #include "injectee.h"
 
 #include "hstore_config.h"
@@ -33,7 +33,7 @@
 #include <cstddef> /* size_t */
 
 struct heap_rc_ephemeral
-	: private common::log_source
+	: private heap_ephemeral
 	, public injectee
 {
 private:
@@ -102,7 +102,7 @@ public:
 	void free_tracked(const void *p, std::size_t sz, unsigned numa_node);
 	std::size_t free(persistent_t<void *> &p, std::size_t sz_);
 	std::size_t free(persistent_t<void *> &p, std::size_t sz_, unsigned numa_node);
-	bool is_reconstituted(const void *p) const;
+	bool is_reconstituted(const void *p);
 	bool is_crash_consistent() const { return false; }
 	using common::log_source::debug_level;
 };

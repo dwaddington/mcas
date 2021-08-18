@@ -54,7 +54,7 @@ heap_cc_ephemeral::heap_cc_ephemeral(
 	, const std::vector<byte_span> &rv_full_
 	, byte_span pool0_heap_
 )
-	: common::log_source(debug_level_)
+	: heap_ephemeral(debug_level_)
 	, _heap(std::move(p))
 	, _managed_regions(id_, backing_file_, rv_full_)
 	, _capacity(
@@ -146,6 +146,7 @@ void heap_cc_ephemeral::add_managed_region(
 	, const unsigned // numa_node
 )
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	CPLOG(0, "%s before IHeap::add_regions size %zu", __func__, _heap->get_regions().size());
 	for ( const auto &r : _heap->get_regions() )
 	{
@@ -169,6 +170,7 @@ void heap_cc_ephemeral::allocate(
 	, std::size_t alignment_
 )
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	if ( S_OK != _heap->allocate(*reinterpret_cast<void **>(&p_), sz_, alignment_) )
 	{
 		throw std::bad_alloc{};
@@ -179,6 +181,7 @@ void heap_cc_ephemeral::allocate(
 
 std::size_t heap_cc_ephemeral::free(persistent_t<void *> &p_, std::size_t sz_)
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	/* Our free does not know the true size, because alignment is not known.
 	 * But the pool free will know, as it can see how much has been allocated.
 	 *
@@ -221,6 +224,7 @@ std::size_t heap_cc_ephemeral::free(persistent_t<void *> &p_, std::size_t sz_)
 
 void heap_cc_ephemeral::free_tracked(const void *p_, std::size_t sz_, unsigned)
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	_heap->free(const_cast<void *&>(p_), sz_);
 	_allocated -= sz_;
 	_hist_free.enter(sz_);

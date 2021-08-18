@@ -278,6 +278,7 @@ Four normal back ends are available:
  - hstore: a persistent KV store
  - hstore-cc: a variation of hstore with less steady-state speed but faster crash rebuild.
  - hstore-mm: a variation of hstore which dynamically loads its memory allocatoor from mm-plugin-path
+ - hstore-mt: a variation of hstore like mm, but with some locking enabled to allow multithreaded calls to the IKVStore lock() and unlock() functions
 These testing backends are also built and installed:
  - hstore-nt: like hstore, but does not write timestamps on put operations does not functions (such as some scans) which need timestamps
  - hstore-cc-pe: like hstore-cc, but supports tests which periodically cause hstore to "crash" in order to test crash consistency

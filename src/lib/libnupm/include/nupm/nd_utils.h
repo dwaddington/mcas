@@ -26,6 +26,7 @@
 #include <daxctl/libdaxctl.h>
 #include <numa.h>
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -82,6 +83,12 @@ class ND_control_exception : public Exception {
  * NVDIMM control class
  *
  */
+
+struct ND_ctx_delete
+{
+	void operator()(libndctl::ndctl_ctx *c) const { libndctl::ndctl_unref(c); }
+};
+
 class ND_control {
  private:
   static constexpr unsigned      MAX_NUMA_ZONES = 4;
@@ -116,7 +123,7 @@ class ND_control {
  protected:
   bool                               _pmem_present = true;
   unsigned                           _n_sockets;
-  struct libndctl::ndctl_ctx *       _ctx;
+  std::unique_ptr<libndctl::ndctl_ctx, ND_ctx_delete> _ctx;
   struct libndctl::ndctl_bus *       _bus;
   std::map<std::string, int>         _ns_to_socket;
   std::map<std::string, std::string> _ns_to_dax;

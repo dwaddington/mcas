@@ -14,9 +14,8 @@
 #ifndef MCAS_HSTORE_HEAP_CC_EPHEMERAL_H
 #define MCAS_HSTORE_HEAP_CC_EPHEMERAL_H
 
-#include <common/logging.h> /* log_source */
+#include "heap_ephemeral.h"
 
-#include "hstore_config.h"
 #include "histogram_log2.h"
 #include "hop_hash_log.h"
 #include "persistent.h"
@@ -39,7 +38,7 @@ namespace impl
 }
 
 struct heap_cc_ephemeral
-  : private common::log_source
+	: private heap_ephemeral
 {
 private:
 	using byte_span = common::byte_span;
@@ -107,7 +106,7 @@ public:
 			}
 		}
 public:
-	using common::log_source::debug_level;
+	using heap_ephemeral::debug_level;
 
 	/* initial construction */
 	explicit heap_cc_ephemeral(

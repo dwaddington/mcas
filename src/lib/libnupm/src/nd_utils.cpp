@@ -105,12 +105,14 @@ ND_control::ND_control() : _n_sockets(unsigned(numa_num_configured_nodes()))
   , _mappings()
 {
   /* initialize context */
-  if (ndctl_new(&_ctx) != 0)
+  libndctl::ndctl_ctx *ctx;
+  if (ndctl_new(&ctx) != 0)
     throw ND_control_exception("ndctl_new failed unexpectedly");
+  _ctx.reset(ctx);
 
   /* get hold of NFIT bus, there should only be one */
   struct ndctl_bus *bus;
-  ndctl_bus_foreach(_ctx, bus)
+  ndctl_bus_foreach(_ctx.get(), bus)
   {
     if (strcmp(ndctl_bus_get_provider(bus), "ACPI.NFIT") != 0 &&
         strcmp(ndctl_bus_get_provider(bus), "e820") != 0)

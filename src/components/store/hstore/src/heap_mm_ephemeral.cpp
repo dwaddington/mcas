@@ -30,7 +30,7 @@ heap_mm_ephemeral::heap_mm_ephemeral(
 	, nupm::region_descriptor managed_regions_
 	, std::size_t capacity_
 )
-	: common::log_source(debug_level_)
+	: heap_ephemeral(debug_level_)
 	, _managed_regions(std::move(managed_regions_))
 	, _capacity(capacity_)
 	, _hist_alloc()
@@ -44,6 +44,7 @@ void heap_mm_ephemeral::add_managed_region(
 	, const byte_span r_heap
 )
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	add_managed_region_to_heap(r_heap);
 	CPLOG(0, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
 	_managed_regions.address_map_push_back(r_full);

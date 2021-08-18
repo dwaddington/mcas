@@ -19,14 +19,6 @@
 
 #include "hstore_config.h"
 
-#if THREAD_SAFE_HASH == 1
-/* thread-safe hash */
-#include <mutex>
-#else
-/* not a thread-safe hash */
-#include "dummy_shared_mutex.h"
-#endif
-
 #include "hstore_alloc_type.h"
 
 #include "hop_hash.h"
@@ -63,14 +55,13 @@ private:
   using mapped_type = typename hstore_kv_types<dealloc_type>::mapped_type;
   using allocator_segment_type = std::allocator_traits<alloc_type>::rebind_alloc<std::pair<const key_type, mapped_type>>;
   using string_view = common::string_view;
+  using hstore_shared_mutex = hstore_impl::shared_mutex;
 #if THREAD_SAFE_HASH == 1
   /* thread-safe hash */
-  using hstore_shared_mutex = std::shared_timed_mutex;
   static constexpr auto thread_model = THREAD_MODEL_MULTI_PER_POOL;
   static constexpr auto is_thread_safe = true;
 #else
 /* not a thread-safe hash */
-  using hstore_shared_mutex = dummy::shared_mutex;
   static constexpr auto thread_model = THREAD_MODEL_SINGLE_PER_POOL;
   static constexpr auto is_thread_safe = false;
 #endif
@@ -98,6 +89,11 @@ private:
   pools_map _pools;
   auto locate_session(pool_t pid) -> open_pool_type *;
   auto move_pool(pool_t pid) -> std::shared_ptr<open_pool_type>;
+  /* The lock and unlock functions provide shared and exclusive access to data.
+   * This lock protects the bits which track the shared and exclusive access.
+   * It is a "global" lock; more granularity would be better.
+   */
+  std::mutex _lock_mutex;
 
 public:
   /**

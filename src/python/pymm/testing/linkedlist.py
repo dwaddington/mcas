@@ -42,6 +42,7 @@ class TestLinkedList(unittest.TestCase):
         print(self.s.x)
         self.assertTrue(self.s.x[0] == 123)
         print(self.s.x[1])
+        print(type(self.s.x[1]))
         self.assertTrue(self.s.x[1] == 1.321)
             
         print(self.s.x[3])
