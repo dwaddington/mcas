@@ -14,7 +14,7 @@
 #ifndef MCAS_HSTORE_HEAP_MM_EPHEMERAL_H
 #define MCAS_HSTORE_HEAP_MM_EPHEMERAL_H
 
-#include <common/logging.h> /* log_source */
+#include "heap_ephemeral.h"
 
 #include "hstore_config.h"
 #include "histogram_log2.h"
@@ -32,7 +32,7 @@
 #include <vector>
 
 struct heap_mm_ephemeral
-  : private common::log_source
+	: private heap_ephemeral
 {
 private:
 	using byte_span = common::byte_span;
@@ -51,6 +51,7 @@ private:
 	 */
 	nupm::region_descriptor _managed_regions;
 protected:
+	using heap_ephemeral::_alloc_mutex;
 	std::size_t _capacity;
 #if 0 // MM does not support allocation query
 	std::size_t _allocated;

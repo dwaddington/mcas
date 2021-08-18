@@ -23,14 +23,14 @@
 #include <cstddef> /* size_t */
 
 /* Does lock complain if the locked value is misaligned? According to mapstore, no. */
-#define RESULT_CHECKS_ALIGNMENT 0
+#define HSTORE_LOCK_RESULT_CHECKS_ALIGNMENT 0
 
 struct lock_result
 {
 	enum class e_state
 	{
 		extant, created, not_created, creation_failed,
-#if RESULT_CHECKS_ALIGNMENT
+#if HSTORE_LOCK_RESULT_CHECKS_ALIGNMENT
 		 misaligned,
 #endif
 	} state;

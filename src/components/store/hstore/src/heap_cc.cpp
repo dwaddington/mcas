@@ -103,11 +103,7 @@ heap_cc::heap_cc(
 	, const string_view backing_file_
 
 )
-	: _pool0_full(pool0_full_)
-	, _pool0_heap(pool0_heap_)
-	, _numa_node(numa_node_)
-	, _more_region_uuids_size(0)
-	, _more_region_uuids()
+	: heap(pool0_full_, pool0_heap_, numa_node_)
 	, _eph(
 		std::make_unique<heap_cc_ephemeral>(
 			debug_level_
@@ -149,11 +145,7 @@ heap_cc::heap_cc(
 	, impl::allocation_state_pin *const aspk_
 	, impl::allocation_state_extend *const asx_
 )
-	: _pool0_full(this->_pool0_full)
-	, _pool0_heap(this->_pool0_heap)
-	, _numa_node(this->_numa_node)
-	, _more_region_uuids_size(this->_more_region_uuids_size)
-	, _more_region_uuids(this->_more_region_uuids)
+	: heap(*this)
 	, _eph(
 		std::make_unique<heap_cc_ephemeral>(
 			debug_level_

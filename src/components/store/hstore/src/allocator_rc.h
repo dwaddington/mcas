@@ -60,11 +60,13 @@ template <typename T, typename Heap, typename Persister = persister>
 		allocator_rc &operator=(const allocator_rc &a_) = delete;
 
 		void extend_arm()
+			AK_ACTUAL0
 		{
 			this->pool()->extend_arm();
 		}
 
 		void extend_disarm()
+			AK_ACTUAL0
 		{
 			this->pool()->extend_disarm();
 		}
@@ -106,6 +108,7 @@ template <typename T, typename Heap, typename Persister = persister>
 
 		/* Should not be called for the crash-consistent allocoator */
 		void reconstitute(
+			AK_ACTUAL
 			size_type s
 			, const void *location
 			, const char * = nullptr

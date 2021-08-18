@@ -175,6 +175,7 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 
 void heap_mc_ephemeral::add_managed_region_to_heap(byte_span r_heap)
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	ccpm::region_span::value_type rs[1] { r_heap };
 	_heap->add_regions(rs);
 }
@@ -185,6 +186,7 @@ void heap_mc_ephemeral::allocate(
 	, std::size_t alignment_
 )
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	if ( S_OK != _heap->allocate(*reinterpret_cast<void **>(&p_), sz_, alignment_) )
 	{
 		throw std::bad_alloc{};
@@ -197,6 +199,7 @@ void heap_mc_ephemeral::allocate(
 
 std::size_t heap_mc_ephemeral::free(persistent_t<void *> &p_, std::size_t sz_)
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	/* Our free does not know the true size, because alignment is not known.
 	 * But the pool free will know, as it can see how much has been allocated.
 	 *
@@ -239,6 +242,7 @@ std::size_t heap_mc_ephemeral::free(persistent_t<void *> &p_, std::size_t sz_)
 
 void heap_mc_ephemeral::free_tracked(const void *p_, std::size_t sz_)
 {
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	_heap->free(const_cast<void *&>(p_), sz_);
 #if 0
 	_allocated -= sz_;

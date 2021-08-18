@@ -16,7 +16,10 @@ prefix()
 run_hstore() {
   typeset ado_prereq="$1"
   shift
-  # run each test
+  # unit tests for multithreaded lock/unlock
+  DAX_RESET=1 MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so STORE=hstore-mt ./src/components/store/hstore/unit_test/hstore-testmt
+  DAX_RESET=1 MM_PLUGIN_PATH=./dist/lib/libmm-plugin-rcalb.so STORE=hstore-mt ./src/components/store/hstore/unit_test/hstore-testmt
+  # run performance tests
   prefix
   GOAL=140000 ELEMENT_COUNT=2000000 STORE=hstore PERFTEST=put $DIR/mcas-hstore-put-0.sh $1
   prefix

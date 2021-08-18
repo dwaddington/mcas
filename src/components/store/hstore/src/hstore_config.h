@@ -58,7 +58,9 @@
 #define HEAP_CONSISTENT 0
 #endif
 
+#ifndef THREAD_SAFE_HASH
 #define THREAD_SAFE_HASH 0
+#endif
 #define PREFIX_STATIC "HSTORE %s %s:%d "
 #define LOCATION_STATIC __func__, __FILE__, __LINE__
 #define PREFIX PREFIX_STATIC "%p "
@@ -74,6 +76,22 @@
 #if ! defined ENABLE_TIMESTAMPS
 #error Top level CMaleLists.txt should have defined ENABLE_TIMESTAMPS
 #define ENABLE_TIMESTAMPS 1
+#endif
+
+#if THREAD_SAFE_HASH == 1
+/* thread-safe hash */
+#include <shared_mutex>
+namespace hstore_impl
+{
+	using shared_mutex = std::shared_timed_mutex;
+}
+#else
+/* not a thread-safe hash */
+#include "dummy_shared_mutex.h"
+namespace hstore_impl
+{
+	using shared_mutex = dummy::shared_mutex;
+}
 #endif
 
 #endif

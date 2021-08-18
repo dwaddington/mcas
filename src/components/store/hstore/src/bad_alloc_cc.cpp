@@ -15,7 +15,9 @@
 
 bad_alloc_cc::bad_alloc_cc(AK_ACTUAL std::size_t pad, std::size_t count, std::size_t size)
 	: _what(std::string(__func__) + ": " + std::to_string(pad) + "+" + std::to_string(count) + "*" + std::to_string(size))
-{}
+{
+	AK_REF_VOID;
+}
 
 const char *bad_alloc_cc::what() const noexcept
 {

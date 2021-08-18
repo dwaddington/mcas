@@ -15,7 +15,7 @@
 #ifndef MCAS_HSTORE_HEAP_CC_H
 #define MCAS_HSTORE_HEAP_CC_H
 
-#include "hstore_config.h"
+#include "heap.h"
 
 #include "as_emplace.h"
 #include "cptr.h"
@@ -52,15 +52,11 @@ namespace impl
 struct heap_cc_ephemeral;
 
 struct heap_cc
+	: public heap
 {
 	using byte_span = common::byte_span;
 	using string_view = common::string_view;
 private:
-	byte_span _pool0_full; /* entire extent of pool 0 */
-	byte_span _pool0_heap; /* portion of pool 0 which can be used for the heap */
-	unsigned _numa_node;
-	std::size_t _more_region_uuids_size;
-	std::array<std::uint64_t, 1024U> _more_region_uuids;
 	std::unique_ptr<heap_cc_ephemeral> _eph;
 	pin_control<heap_cc> _pin_data;
 	pin_control<heap_cc> _pin_key;

@@ -14,6 +14,7 @@
 #ifndef MCAS_HSTORE_HEAP_MM_H
 #define MCAS_HSTORE_HEAP_MM_H
 
+#include "heap.h"
 #include "hstore_config.h"
 
 #include "histogram_log2.h"
@@ -51,15 +52,9 @@ struct cptr;
 struct heap_mm_ephemeral;
 
 struct heap_mm
+	: public heap
 {
 private:
-	using byte_span = common::byte_span;
-	using string_view = common::string_view;
-	byte_span _pool0_full; /* entire extent of pool 0 */
-	byte_span _pool0_heap; /* portion of pool 0 which can be used for the heap */
-	unsigned _numa_node;
-	std::size_t _more_region_uuids_size;
-	std::array<std::uint64_t, 1024U> _more_region_uuids;
 	tracked_header _tracked_anchor;
 	std::unique_ptr<heap_mm_ephemeral> _eph;
 	pin_control<heap_mm> _pin_data;

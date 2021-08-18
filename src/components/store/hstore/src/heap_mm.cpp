@@ -176,11 +176,7 @@ heap_mm::heap_mm(
 	, const string_view id_
 	, const string_view backing_file_
 )
-	: _pool0_full(pool0_full_)
-	, _pool0_heap(pool0_heap_)
-	, _numa_node(numa_node_)
-	, _more_region_uuids_size(0)
-	, _more_region_uuids()
+	: heap(pool0_full_, pool0_heap_, numa_node_)
 	, _tracked_anchor(debug_level_, &_tracked_anchor, &_tracked_anchor, sizeof(_tracked_anchor), sizeof(_tracked_anchor))
 	, _eph(
 		make_ephemeral_1(
@@ -325,11 +321,7 @@ heap_mm::heap_mm(
 	, impl::allocation_state_pin *const aspk_
 	, impl::allocation_state_extend *const asx_
 )
-	: _pool0_full(this->_pool0_full)
-	, _pool0_heap(this->_pool0_heap)
-	, _numa_node(this->_numa_node)
-	, _more_region_uuids_size(this->_more_region_uuids_size)
-	, _more_region_uuids(this->_more_region_uuids)
+	: heap(*this)
 	, _tracked_anchor(this->_tracked_anchor)
 	, _eph(
 		make_mm_ephemeral_2(
