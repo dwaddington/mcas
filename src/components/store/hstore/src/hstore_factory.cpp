@@ -15,6 +15,7 @@
 
 #include "dax_manager.h"
 
+#include <common/byte_span.h>
 #include <common/json.h>
 #include <common/string_view.h>
 #include <common/utils.h>
@@ -63,11 +64,16 @@ auto hstore_factory::create(
 #if HEAP_MM
   auto plugin_path_it = mc.find(+k_mm_plugin_path);
   if(plugin_path_it != mc.end()) {
-    PLOG("hstore parameters: plugin(%s)", plugin_path_it->second.c_str());
+    if ( 0 < debug_level_ )
+    {
+      PLOG("hstore parameters: plugin(%s)", plugin_path_it->second.c_str());
+    }
   }
 #endif
   auto owner_it = mc.find(+k_owner);
   auto name_it = mc.find(+k_name);
+  auto dax_base_it = mc.find(+k_dax_base);
+  auto dax_size_it = mc.find(+k_dax_size);
   auto dax_config_it = mc.find(+k_dax_config);
 
   namespace c_json = common::json;
@@ -75,6 +81,8 @@ auto hstore_factory::create(
   using common::string_view;
   unsigned map_debug_level = unsigned(debug_it == mc.end() ? 0 : std::stoul(debug_it->second));
   unsigned effective_debug_level = std::max(debug_level_, map_debug_level);
+	auto dax_base = dax_base_it == mc.end() ? nullptr : reinterpret_cast<byte *>(std::stoul(dax_base_it->second));
+	auto dax_size = dax_size_it == mc.end() ? std::size_t(0) : std::stoul(dax_size_it->second);
   component::IKVStore *obj =
     new hstore(
       effective_debug_level
@@ -87,6 +95,7 @@ auto hstore_factory::create(
           common::log_source(effective_debug_level)
           , dax_config_it == mc.end() ? json::array().str() : dax_config_it->second
           , bool(std::getenv("DAX_RESET"))
+          , common::make_byte_span(dax_base, dax_size)
         )
     );
   obj->add_ref();

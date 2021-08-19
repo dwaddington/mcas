@@ -82,6 +82,8 @@ class IKVStore_factory : public component::IBase {
   static constexpr const char *k_name = "name";
   static constexpr const char *k_dax_config = "dax_config";
   static constexpr const char *k_mm_plugin_path = "mm_plugin_path";
+  static constexpr const char *k_dax_base = "dax_base";
+  static constexpr const char *k_dax_size = "dax_size";
 
   /* this is the preferred create method - the others will be deprecated */
   virtual IKVStore* create(unsigned debug_level, const map_create& params)

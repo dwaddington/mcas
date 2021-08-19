@@ -213,6 +213,8 @@ TEST_F(KVStore_test, Instantiate)
           , { +component::IKVStore_factory::k_dax_config, store_map::location }
           , { +component::IKVStore_factory::k_debug, debug_level() }
           , { +component::IKVStore_factory::k_mm_plugin_path, common::env_value<const char *>("MM_PLUGIN_PATH", "no_plugin_path") }
+          , { +component::IKVStore_factory::k_dax_base, std::to_string(1ull << 38) }
+          , { +component::IKVStore_factory::k_dax_size, std::to_string(1ull << 37) }
         }
     );
 }
@@ -1152,10 +1154,10 @@ TEST_F(KVStore_test, AllocDealloc4K)
     ASSERT_LT(0, int64_t(pool));
   }
 
-  /* Many 4K frees */
+  /* Many 4K-aligned frees */
   for ( auto v : allocations )
   {
-    auto r = _kvstore->free_pool_memory(pool, v, 4096);
+    auto r = _kvstore->free_pool_memory(pool, v, 8);
     EXPECT_EQ(S_OK, r);
   }
 }
@@ -1174,14 +1176,16 @@ TEST_F(KVStore_test, AllocDealloc)
     }
   }
 
-  void *v = nullptr;
+  status_t r = S_OK;
 #if 0
-  /* alignment is now a "hint", so 0 alignment is no longer an error */
-  auto r = _kvstore->allocate_pool_memory(pool, 100, 0, v);
+  void *v = nullptr;
+  /* In this function alignment is now a "hint", so 0 alignment is no longer an error */
+  r = _kvstore->allocate_pool_memory(pool, 100, 0, v);
   EXPECT_EQ(component::IKVStore::E_BAD_ALIGNMENT, r); /* zero aligmnent */
-#endif
-  auto r = _kvstore->allocate_pool_memory(pool, 100, 1, v);
+  /* exceedingly small elignment is also no longer an error */
+  r = _kvstore->allocate_pool_memory(pool, 100, 1, v);
   EXPECT_EQ(component::IKVStore::E_BAD_ALIGNMENT, r); /* alignment less than sizeof(void *) */
+#endif
 
   /* allocate various sizes */
   void *v128 = nullptr;

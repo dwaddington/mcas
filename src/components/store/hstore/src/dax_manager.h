@@ -17,6 +17,7 @@
 
 #include <nupm/dax_manager.h>
 
+#include <common/byte_span.h>
 #include <string>
 
 struct dax_manager
@@ -27,6 +28,7 @@ public:
 		const common::log_source &ls_
 		, const std::string &dax_map
 		, bool force_reset = false
+		, common::byte_span dax_span = common::make_byte_span(nullptr, 0)
 	);
 };
 

@@ -386,6 +386,7 @@ dax_manager::dax_manager(
   const common::log_source &ls_,
   const std::vector<config_t>& dax_configs,
   bool force_reset
+	, common::byte_span address_span_
 )
   : common::log_source(ls_)
   , _nd()
@@ -399,13 +400,15 @@ dax_manager::dax_manager(
   /* Maximum expected need is about 6 TiB (12 512GiB DIMMs).
    * Start, arbitrarily, at 0x10000000000
    */
-  byte *free_address_begin = reinterpret_cast<byte *>(uintptr_t(1) << 40);
-  auto free_address_end    = free_address_begin + (std::size_t(1) << 40);
-  auto i = boost::icl::interval<byte *>::right_open(free_address_begin, free_address_end);
+	if ( ::data(address_span_) == nullptr )
+	{
+		address_span_ = common::make_byte_span(reinterpret_cast<byte *>(uintptr_t(1) << 40), (std::size_t(1) << 40));
+	}
+  auto i = boost::icl::interval<byte *>::right_open(::data(address_span_), ::data_end(address_span_));
   _address_fs_available.insert(i);
 
   /* set up each configuration */
-  for(const auto& config: dax_configs) {
+  for ( const auto& config: dax_configs ) {
 
     CPLOG(0, DEBUG_PREFIX "region (%s,%lx)", config.path.c_str(), config.addr);
 

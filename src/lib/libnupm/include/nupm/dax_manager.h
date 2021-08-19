@@ -109,7 +109,9 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    */
   dax_manager(const common::log_source &ls,
               const std::vector<config_t>& dax_config,
-              bool force_reset = false);
+              bool force_reset = false
+		, common::byte_span address_span_ = common::make_byte_span(nullptr, 0)
+	);
 
   /**
    * Destructor will not unmap memory/nor invalidate pointers?
