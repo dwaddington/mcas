@@ -251,8 +251,14 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def __add__(self, value):
         return super().__add__(value).asndarray()
 
+    def __radd__(self, value):
+        return super().__radd__(value).asndarray()
+
     def __mul__(self, value):
         return super().__mul__(value).asndarray()
+
+    def __rmul__(self, value):
+        return super().__rmul__(value).asndarray()
 
     def __sub__(self, value):
         return super().__sub__(value).asndarray()
@@ -260,8 +266,17 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def __div__(self, value):
         return super().__div__(value).asndarray()
 
+    def __rdivmod__(self, value):
+        return super().__rdivmod__(value).asndarray()
+
+    def __divmod__(self, value):
+        return super().__divmod__(value).asndarray()
+
     def __mod__(self, value):
         return super().__mod__(value).asndarray()
+
+    def __rmod__(self, value):
+        return super().__rmod__(value).asndarray()
 
     def __pow__(self, value):
         return super().__pow__(value).asndarray()

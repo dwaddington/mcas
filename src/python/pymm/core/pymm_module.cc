@@ -11,7 +11,7 @@
    limitations under the License.
 */
 #define PYMMCORE_API_VERSION "v0.1.10"
-#define STATUS_TEXT "(CC=off)"
+#define STATUS_TEXT "(CC=env)"
 #define PAGE_SIZE 4096
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
