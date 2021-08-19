@@ -252,7 +252,7 @@ int main(int argc, char* argv[])
         throw General_exception("prctl failed");
 
       /* capture output from child process */
-      if(use_log) {
+      if(use_log||true) {
         int fd = ::open("ado.log", O_CREAT|O_WRONLY, 0600);
         ::dup2(fd, 1);
         ::dup2(fd, 2);
