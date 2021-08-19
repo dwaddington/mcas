@@ -281,6 +281,7 @@ dax_manager::dax_manager(
 	const common::log_source &ls_
 	, const std::string &dax_map
 	, bool force_reset
+	, common::byte_span dax_span
 )
-	: nupm::dax_manager(ls_, parse_devdax_string(ls_.debug_level(), dax_map), force_reset)
+	: nupm::dax_manager(ls_, parse_devdax_string(ls_.debug_level(), dax_map), force_reset, dax_span)
 {}
