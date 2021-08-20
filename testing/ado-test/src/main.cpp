@@ -631,6 +631,44 @@ TEST_F(ADO_test, BaseAddr)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+TEST_F(ADO_test, StressCallbacks)
+{
+  const std::string testname = "StressCallbacks";
+  const std::string poolname = "THIS_IS_A_TEST_POOL";
+  mcas->delete_pool(poolname);
+
+  auto pool = mcas->create_pool(poolname, MiB(1), /* size */
+                                0, /* flags */
+                                50, /* obj count */
+                                IMCAS::Addr{0xBB00000000});
+
+  ASSERT_FALSE(pool == IKVStore::POOL_ERROR);
+
+  /* create keys key-X where X is 0..99 */
+  for(unsigned i=0;i<100;i++) {
+    std::stringstream ss;
+    ss << "key-" << i;
+    mcas->put(pool, ss.str(), ss.str());
+  }
+
+  /* erase any prior ADO testname key */
+  mcas->erase(pool, testname);
+
+  std::vector<IMCAS::ADO_response> response;
+  status_t rc;
+
+  rc = mcas->invoke_ado(pool,
+                        testname,
+                        "RUN!TEST-StressCallbacks",
+                        IMCAS::ADO_FLAG_CREATE_ON_DEMAND,
+                        response,
+                        KiB(4));
+ 
+  ASSERT_OK(mcas->close_pool(pool));
+
+  ASSERT_OK(mcas->delete_pool(poolname));
+}
+
 TEST_F(ADO_test, PutSignal)
 {
   const std::string testname = "PutSignal";

@@ -11,6 +11,9 @@
   limitations under the License.
 */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "testing.h"
 
 #include <api/interfaces.h>
@@ -660,6 +663,42 @@ namespace
     return rc;
   }
 
+  status_t stressCallbacks(
+    IADO_plugin *ap_
+    , uint64_t work_key_
+    /* work_key_ is required for these callbacks only: create_key, open_key, resize_value, unlock */
+    , const std::vector<string_view> & args_
+    , const string_view key_
+    , value_space_t & values_
+    , response_buffer_vector_t & // response_buffers_
+  )
+  {
+    int rc = S_OK;
+    PLOG("ADO_testing_plugin: running (key=%.*s)\n", int(key_.size()), key_.begin());
+
+    /* open other existing keys */
+    std::vector<component::IKVStore::key_t> handles;
+    for(unsigned i=0;i<100;i++) {
+        std::stringstream ss;
+        ss << "key-" << i;
+        void * value = nullptr;
+        const char * key_ptr = nullptr;
+        size_t value_len = 0;
+        component::IKVStore::key_t key_handle;
+        ASSERT_OK(ap_->cb_open_key(work_key_, ss.str(), 0,  value, value_len, &key_ptr, &key_handle), "cb_open_key failed");
+        PLOG("callback got key (%s) %p %p", ss.str().c_str(), reinterpret_cast<void*>(key_handle), key_ptr);
+        handles.push_back(key_handle);
+    }
+
+    /* unlock them all */
+    for(auto handle : handles) {
+      ASSERT_OK(ap_->cb_unlock(work_key_, handle), "cb_unlock failed");
+      PLOG("unlocked pair (%p)", reinterpret_cast<void*>(handle));
+    }
+
+    return rc;
+  }
+
   /* this gets run for ado-perf performance test */
   status_t other(
     IADO_plugin * // ap_
@@ -747,6 +786,7 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
     { "RUN!TEST-BasicAdoResponse", basicAdoResponse },
     { "RUN!TEST-RepeatInvokeAdo", repeatInvokeAdo },
     { "RUN!TEST-BaseAddr", baseAddr },
+    { "RUN!TEST-StressCallbacks", stressCallbacks },
     { "ADO::Signal::post-erase", adoSignal },
     { "ADO::Signal::post-put", adoSignal },
     { "ADO::Signal::post-get", adoSignal },
@@ -791,3 +831,5 @@ extern "C" void *factory_createInstance(component::uuid_t interface_iid)
 }
 
 #undef RESET_STATE
+
+#pragma GCC diagnostic pop

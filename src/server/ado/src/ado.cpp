@@ -399,7 +399,8 @@ int main(int argc, char* argv[])
           status_t rc = S_OK;
           if(work_id == 0 || key_handle == nullptr) return E_INVAL;
           ipc.send_unlock_request(work_id, key_handle);
-          ipc.recv_unlock_response(rc);
+          if(!ipc.recv_unlock_response(rc))
+            throw General_exception("ipc_unclock recv unexpected response");
           return rc;
         };
 
@@ -407,7 +408,8 @@ int main(int argc, char* argv[])
                            {
                              status_t rc = S_OK;
                              ipc.send_configure_request(options);
-                             ipc.recv_configure_response(rc);
+                             if(!ipc.recv_configure_response(rc))
+                               throw General_exception("ipc_configure recv unexpected response");
                              return rc;
                            };
 
