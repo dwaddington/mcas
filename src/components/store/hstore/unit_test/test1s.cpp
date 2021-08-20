@@ -10,6 +10,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
+#include "memo_lock.h"
 #include "store_map.h"
 
 #pragma GCC diagnostic push
@@ -35,57 +37,6 @@
 using namespace component;
 
 namespace {
-
-struct memo_lock
-{
-private:
-  component::IKVStore * _kvstore;
-  component::IKVStore::pool_t *_pool;
-public:
-  IKVStore::key_t k;
-  memo_lock(
-    component::IKVStore *kvstore_
-    , component::IKVStore::pool_t *pool_
-  )
-    : _kvstore(kvstore_)
-    , _pool(pool_)
-    , k()
-  {}
-  memo_lock(const memo_lock &) = delete;
-  memo_lock &operator=(const memo_lock &) = delete;
-  ~memo_lock()
-  {
-    if ( IKVStore::KEY_NONE != k )
-    {
-      auto r = _kvstore->unlock(*_pool, k);
-      EXPECT_EQ(S_OK, r);
-    }
-  }
-};
-
-struct shared_lock
-  : private memo_lock
-{
-  using memo_lock::k;
-  shared_lock(
-    component::IKVStore *kvstore_
-    , component::IKVStore::pool_t *pool_
-  )
-    : memo_lock(kvstore_, pool_)
-  {}
-};
-
-struct exclusive_lock
-  : private memo_lock
-{
-  using memo_lock::k;
-  exclusive_lock(
-    component::IKVStore *kvstore_
-    , component::IKVStore::pool_t *pool_
-  )
-    : memo_lock(kvstore_, pool_)
-  {}
-};
 
 // The fixture for testing class Foo.
 class KVStore_test : public ::testing::Test {
@@ -868,7 +819,7 @@ TEST_F(KVStore_test, LockMany)
     std::size_t value0_len = 0;
 
     /* Lock existing, unlocked value */
-    shared_lock rk0(_kvstore, &pool);
+    shared_lock rk0(_kvstore, pool);
     size_t alignment = 0;
     auto r0 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_READ, value0, value0_len, alignment, rk0.k);
     EXPECT_EQ(S_OK, r0);
@@ -882,7 +833,7 @@ TEST_F(KVStore_test, LockMany)
     /* Lock existing, shared-lock value again */
     void * value1 = nullptr;
     std::size_t value1_len = 0;
-    shared_lock rk1(_kvstore, &pool);
+    shared_lock rk1(_kvstore, pool);
     alignment = 0;
     auto r1 = _kvstore->lock(pool, key, IKVStore::STORE_LOCK_READ, value1, value1_len, alignment, rk1.k);
     EXPECT_EQ(S_OK, r1);
@@ -912,7 +863,7 @@ TEST_F(KVStore_test, LockMany)
     try
     {
       alignment = 0;
-      exclusive_lock m3(_kvstore, &pool);
+      exclusive_lock m3(_kvstore, pool);
       auto r3 = _kvstore->lock(pool, key_new, IKVStore::STORE_LOCK_WRITE, value3, value3_len, alignment, m3.k);
       /* Used to return S_OK; no longer does so */
       EXPECT_EQ(S_OK_CREATED, r3);

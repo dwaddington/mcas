@@ -478,8 +478,11 @@ RETRY:
 				}
 			}
 
+#if 0
+/* removed becauuse it does not account for small sizes combined with large alignments */
 			/* Should have at most doubled the number of elements */
 			assert(run_length_for_alignment <= run_length_for_use * 2);
+#endif
 
 			auto level_it = _level.begin() + level_ix;
 			/* Additional run length may have pushed the allocation to a higher level.

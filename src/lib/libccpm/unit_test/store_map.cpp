@@ -45,7 +45,7 @@ const std::string store_map::location =
   ? store_loc
   : json::array(
       json::object(
-        json::member("path", "/dev/dax0.0")
+        json::member("path", "/dev/dax1.0")
         , json::member("addr", 0x9000000000)
       )
     ).str()

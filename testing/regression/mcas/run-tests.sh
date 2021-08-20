@@ -16,9 +16,13 @@ prefix()
 run_hstore() {
   typeset ado_prereq="$1"
   shift
-  # unit tests for multithreaded lock/unlock
-  DAX_RESET=1 MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so STORE=hstore-mt ./src/components/store/hstore/unit_test/hstore-testmt
-  DAX_RESET=1 MM_PLUGIN_PATH=./dist/lib/libmm-plugin-rcalb.so STORE=hstore-mt ./src/components/store/hstore/unit_test/hstore-testmt
+  # hstore unit tests: basic
+  #DAX_RESET=1 STORE=hstore ./src/components/store/hstore/unit_test/hstore-test1 # (out of space)
+  DAX_RESET=1 STORE=hstore-cc ./src/components/store/hstore/unit_test/hstore-test1
+  DAX_RESET=1 HAS_CAPACITY=0 STORE=hstore-mm MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-test1
+  # hstore unit tests: multithreaded lock/unlock
+  DAX_RESET=1 STORE=hstore-mt MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-testmt
+  DAX_RESET=1 STORE=hstore-mt MM_PLUGIN_PATH=./dist/lib/libmm-plugin-rcalb.so ./src/components/store/hstore/unit_test/hstore-testmt
   # run performance tests
   prefix
   GOAL=140000 ELEMENT_COUNT=2000000 STORE=hstore PERFTEST=put $DIR/mcas-hstore-put-0.sh $1

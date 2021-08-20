@@ -106,6 +106,7 @@ public:
 	void allocate(persistent_t<void *> &p, std::size_t sz, std::size_t alignment) override;
 	void *allocate_tracked(std::size_t sz, std::size_t alignment);
 	void add_managed_region_to_heap(byte_span r_heap) override;
+	void reconstitute_managed_region_to_heap(byte_span r_heap, ccpm::ownership_callback_t f) override;
 	std::size_t free(persistent_t<void *> &p, std::size_t sz) override;
 	void free_tracked(const void *p, std::size_t sz) override;
 	bool is_reconstituted(const void *p);

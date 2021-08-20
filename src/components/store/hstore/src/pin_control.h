@@ -20,24 +20,14 @@ struct cptr;
 template <typename Heap>
 	struct pin_control
 	{
-#if 1
 		using arm_fn_type = void (Heap::*)(cptr &) const;
-#endif
 		using get_cptr_fn_type = char *(Heap::*)() const;
 		using disarm_fn_type = void (Heap::*)() const;
-#if 1
-		arm_fn_type _arm; // (cptr &cptr) const;
-#else
-		void (Heap::*_arm)(cptr &) const;
-#endif
-		disarm_fn_type _disarm; //  * (*pin_get_cptr)() const;
-		get_cptr_fn_type _get_cptr; // void (*pin_disarm)() const;
+		arm_fn_type _arm;
+		disarm_fn_type _disarm;
+		get_cptr_fn_type _get_cptr;
 
-#if 1
 		pin_control(arm_fn_type a_, disarm_fn_type d_, get_cptr_fn_type c_)
-#else
-		pin_control(void (Heap::*a_)(cptr &) const,  disarm_fn_type d_, get_cptr_fn_type c_)
-#endif
 			: _arm(a_)
 			, _disarm(d_)
 			, _get_cptr(c_)

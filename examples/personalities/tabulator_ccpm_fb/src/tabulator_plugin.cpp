@@ -105,6 +105,7 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   /* new_root == true indicates this is a "fresh" key and therefore needs initializing */
   ccpm::region_vector_t rv(common::make_byte_span(value, value_len));
   if(new_root) {
+    PNOTICE("FRESH");
     ccaptr = new ccpm::cca(&pe, rv);
     ccv = new (ccaptr->allocate_root(sizeof(cc_vector))) cc_vector(&pe, *ccaptr);
     /* initialize vector */
@@ -115,43 +116,50 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
     ccv->commit();
   }
   else {
+    PNOTICE("RECONSTITUING ");
     ccaptr = new ccpm::cca(&pe, rv, ccpm::accept_all);
     void *root_base = ::base(ccaptr->get_root());
     /* reconstruct the cc_vector vft (see note on move constructor in ccpm/log.h */
     ccv = new (root_base) cc_vector(std::move(*static_cast<cc_vector *>(root_base)));
     ccv->rollback(); /* in case we're recovering from crash */
   }
-
+  PNOTICE("Past CCV!!!! %d", __LINE__);
   auto& min = (double&) ccv->container->at(0);
   auto& max = (double&) ccv->container->at(1);
   auto& mean = (double&) ccv->container->at(2);
   auto& count = (double&) ccv->container->at(3);
-    
+  PNOTICE("**Past CCV!!!! %d", __LINE__);    
   /* check ADO message */
   auto msg = Proto::GetMessage(in_work_request);
+  PNOTICE("**Past CCV!!!! %d", __LINE__);    
   if(msg->element_as_UpdateRequest()) {
 
     auto request = msg->element_as_UpdateRequest();
     auto sample = request->sample();
-
+    PNOTICE("**Past CCV!!!! %d", __LINE__);    
     /* update min,max,mean,count with new sample */
     if(min == -1.0 || sample < min) {
       ccv->add(&min, sizeof(double)); /* add to transaction */
       min = sample;
     }
+    PNOTICE("**Past CCV!!!! %d", __LINE__);    
 
     if(max == -1.0 || sample > max) {
       ccv->add(&max, sizeof(double)); /* add to transaction */
       max = sample;
     }
-
+    PNOTICE("**Past CCV!!!! %d", __LINE__);    
     auto tmp = count * mean;
     tmp += sample;
     count += 1.0;
     mean = tmp / count;
+    PNOTICE("**Past CCV!!!! %d", __LINE__);    
     ccv->add(&count, sizeof(double)); /* add to transaction */
+    PNOTICE("**Past CCV!!!! %d", __LINE__);    
     ccv->add(&mean, sizeof(double)); /* add to transaction */
+    PNOTICE(">>Past CCV!!!! %d", __LINE__);    
     ccv->commit();
+    PNOTICE("**Past CCV!!!! %d", __LINE__);    
 
     /* print status */
     PINF("key(%.*s) min:%g max:%g mean:%g count:%g",
@@ -171,7 +179,7 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   }
   else if(msg->element_as_QueryRequest()) {
     PNOTICE("QueryRequest!");
-
+  PNOTICE("Past CCV!!!! %d", __LINE__);
     /* create response message */
     {
       using namespace Proto;
@@ -184,10 +192,10 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
                                     fbb.GetSize(),
                                     response_buffer_t::alloc_type_malloc{});
     }
-
+    PNOTICE("Past CCV!!!! %d", __LINE__);
   }
   else throw Logic_exception("unknown protocol message type");  
-
+  PNOTICE("Past CCV!!!! %d", __LINE__);
   /* clean up */
   delete ccaptr;
   
@@ -203,12 +211,14 @@ void Tabulator_plugin::launch_event(const uint64_t                  auth_id,
                                     const size_t                    expected_obj_count,
                                     const std::vector<std::string>& params)
 {
+  PLOG("Tabulator_plugin: launched");
 }
 
 
 /* called just before ADO shutdown */
 status_t Tabulator_plugin::shutdown()
 {
+  PLOG("Tabulator_plugin: shutdown");
   return S_OK;
 }
 

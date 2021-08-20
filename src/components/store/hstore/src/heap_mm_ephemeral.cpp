@@ -44,8 +44,19 @@ void heap_mm_ephemeral::add_managed_region(
 	, const byte_span r_heap
 )
 {
-	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	add_managed_region_to_heap(r_heap);
+	CPLOG(0, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
+	_managed_regions.address_map_push_back(r_full);
+	_capacity += ::size(r_heap);
+}
+
+void heap_mm_ephemeral::reconstitute_managed_region(
+	const byte_span r_full
+	, const byte_span r_heap
+	, ccpm::ownership_callback_t f
+)
+{
+	reconstitute_managed_region_to_heap(r_heap, f);
 	CPLOG(0, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
 	_managed_regions.address_map_push_back(r_full);
 	_capacity += ::size(r_heap);

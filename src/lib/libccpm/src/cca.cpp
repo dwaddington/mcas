@@ -90,6 +90,10 @@ void ccpm::cca::add_regions(const region_span regions_)
 	{
 		_top.push_back(std::make_unique<area_top>(_persist, r, trace_level, std::cerr));
 	}
+	if ( trace_fine() )
+	{
+		this->print(std::cerr);
+	}
 }
 
 bool ccpm::cca::includes(const void *addr) const

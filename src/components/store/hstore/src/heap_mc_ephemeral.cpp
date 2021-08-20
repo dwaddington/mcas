@@ -43,6 +43,7 @@ namespace
 
 heap_mc_ephemeral::heap_mc_ephemeral(
 	unsigned debug_level_
+	, bool restore_not_clear
 	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
 	, impl::allocation_state_pin *aspk_
@@ -55,7 +56,19 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 )
 	: heap_mm_ephemeral(
 		debug_level_
-		, nupm::region_descriptor((p_->add_regions(ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)), id_), backing_file_, rv_full_)
+		, nupm::region_descriptor(
+			(
+				(
+					restore_not_clear
+					? (void)0
+					: p_->add_regions(
+						ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)
+					)
+				)
+				, id_
+			)
+			, backing_file_, rv_full_
+		)
 		, ::size(pool0_heap_)
 			+
 			::size(
@@ -77,7 +90,6 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 	, _aspk(aspk_)
 	, _asx(asx_)
 {
-
   for ( const auto &r : rv_full_ )
   {
     CPLOG(2, "%s : %p.%zx", __func__, ::base(r), ::size(r));
@@ -85,37 +97,9 @@ heap_mc_ephemeral::heap_mc_ephemeral(
   CPLOG(2, "%s : pool0_heap: %p.%zx", __func__, ::base(pool0_heap_), ::size(pool0_heap_));
 }
 
-/* initial */
-	/* heap_mc version */
 heap_mc_ephemeral::heap_mc_ephemeral(
 	unsigned debug_level_
-	, common::string_view plugin_path_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, string_view id_
-	, string_view backing_file_
-	, const std::vector<byte_span> rv_full_
-	, const byte_span pool0_heap_
-)
-	: heap_mc_ephemeral(
-		debug_level_
-		, ase_, aspd_, aspk_, asx_
-		, std::make_unique<heap_mc_shim>(
-			plugin_path_
-			, &p_cc
-		)
-		, id_
-		, backing_file_
-		, rv_full_
-		, pool0_heap_
-	)
-{
-}
-	/* heap_mm version */
-heap_mc_ephemeral::heap_mc_ephemeral(
-	unsigned debug_level_
+	, bool restore_not_clear
 	, MM_plugin_wrapper &&pw_
 	, impl::allocation_state_emplace *ase_
 	, impl::allocation_state_pin *aspd_
@@ -128,6 +112,7 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 )
 	: heap_mc_ephemeral(
 		debug_level_
+		, restore_not_clear
 		, ase_, aspd_, aspk_, asx_
 		, std::make_unique<heap_mc_shim>(
 			std::move(pw_)
@@ -140,44 +125,18 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 {
 }
 
-/* crash-consistent reconstitute */
-	/* heap_mc version */
-heap_mc_ephemeral::heap_mc_ephemeral(
-	unsigned debug_level_
-	, common::string_view plugin_path_
-	, impl::allocation_state_emplace *ase_
-	, impl::allocation_state_pin *aspd_
-	, impl::allocation_state_pin *aspk_
-	, impl::allocation_state_extend *asx_
-	, string_view id_
-	, string_view backing_file_
-	, const std::vector<byte_span> rv_full_
-	, const byte_span pool0_heap_
-	, ccpm::ownership_callback_t ownership_callback_
-)
-	: heap_mc_ephemeral(
-		debug_level_
-		, ase_, aspd_, aspk_, asx_
-		, std::make_unique<heap_mc_shim>(
-			plugin_path_
-			, &p_cc
-			, ccpm::region_span(&*ccpm::region_vector_t(pool0_heap_).begin(), 1)
-			, ownership_callback_
-		)
-		, id_
-		, backing_file_
-		, rv_full_
-		, pool0_heap_
-	)
-{
-}
-	/* heap_mm version idefined above, same as initial create */
-
 void heap_mc_ephemeral::add_managed_region_to_heap(byte_span r_heap)
 {
 	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	ccpm::region_span::value_type rs[1] { r_heap };
 	_heap->add_regions(rs);
+}
+
+void heap_mc_ephemeral::reconstitute_managed_region_to_heap(byte_span r_heap, ccpm::ownership_callback_t f)
+{
+	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
+	ccpm::region_span::value_type rs[1] { r_heap };
+	_heap->reconstitute(rs, f);
 }
 
 void heap_mc_ephemeral::allocate(
