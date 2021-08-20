@@ -122,12 +122,12 @@ class MCAS_client
 
   virtual pool_t create_pool(const std::string &  name,
                              const size_t         size,
-                             const unsigned int   flags              = 0,
+                             const flags_t        flags              = 0,
                              const uint64_t       expected_obj_count = 0,
                              const IKVStore::Addr base = IKVStore::Addr{0}) override;
 
   virtual pool_t open_pool(const std::string &  name,
-                           const unsigned int   flags = 0,
+                           const flags_t        flags = 0,
                            const IKVStore::Addr base = IKVStore::Addr{0}) override;
 
   virtual status_t close_pool(const pool_t pool) override;
@@ -142,13 +142,13 @@ class MCAS_client
                        const std::string &key,
                        const void *       value,
                        const size_t       value_len,
-                       const unsigned int flags = IMCAS::FLAGS_NONE) override;
+                       flags_t            flags = IMCAS::FLAGS_NONE) override;
 
   virtual status_t put_direct(const pool_t                 pool,
                               const std::string &          key,
                               gsl::span<const common::const_byte_span> values,
                               gsl::span<const IMCAS::memory_handle_t> handles,
-                              const unsigned int           flags) override;
+                              flags_t                      flags) override;
 
   status_t put_direct(const pool_t       pool,
                               const std::string& key,
@@ -173,14 +173,14 @@ class MCAS_client
                              const void *           value,
                              const size_t           value_len,
                              async_handle_t &       out_handle,
-                             const unsigned int     flags = IMCAS::FLAGS_NONE) override;
+                             flags_t                flags = IMCAS::FLAGS_NONE) override;
 
   virtual status_t async_put_direct(const IKVStore::pool_t          pool,
                                     const std::string&              key,
                                     gsl::span<const common::const_byte_span> values,
                                     async_handle_t &                out_handle,
                                     gsl::span<const IMCAS::memory_handle_t> handles,
-                                    const unsigned int              flags) override;
+                                    flags_t                         flags) override;
 
   virtual status_t check_async_completion(async_handle_t &handle) override;
 

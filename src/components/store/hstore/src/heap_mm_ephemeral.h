@@ -22,6 +22,7 @@
 #include <mm_plugin_itf.h>
 #include "persistent.h"
 
+#include <ccpm/interfaces.h> /* ownership_callback, (IHeap_expandable, region_vector_t) */
 #include <common/byte_span.h>
 #include <common/string_view.h>
 #include <nupm/region_descriptor.h>
@@ -115,6 +116,12 @@ public:
 		return n;
 	}
 	void add_managed_region(byte_span r_full, byte_span r_heap);
+	void reconstitute_managed_region(
+		const byte_span r_full
+		, const byte_span r_heap
+		, ccpm::ownership_callback_t f
+	);
+	virtual void reconstitute_managed_region_to_heap(byte_span r_heap, ccpm::ownership_callback_t f) = 0;
 	virtual bool is_crash_consistent() const = 0;
 	virtual bool can_reconstitute() const = 0;
 };

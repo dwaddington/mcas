@@ -172,14 +172,14 @@ public:
                const std::string  key,
                const void *       value,
                const size_t       value_len,
-               const unsigned int flags);
+               component::IMCAS::flags_t flags);
 
   status_t put(const pool_t       pool,
                const void *       key,
                const size_t       key_len,
                const void *       value,
                const size_t       value_len,
-               const unsigned int flags);
+               component::IMCAS::flags_t flags);
 
   status_t put_direct(pool_t                               pool,
                       const void *                         key,
@@ -187,7 +187,7 @@ public:
                       gsl::span<const common::const_byte_span> values,
                       component::Registrar_memory_direct * rmd,
                       gsl::span<const component::IMCAS::memory_handle_t> handles,
-                      unsigned int                         flags);
+                      component::IMCAS::flags_t            flags);
 
   status_t async_put(const pool_t                      pool,
                      const void *                      key,
@@ -195,7 +195,7 @@ public:
                      const void *                      value,
                      size_t                            value_len,
                      component::IMCAS::async_handle_t &out_handle,
-                     unsigned int                      flags);
+                     component::IMCAS::flags_t         flags);
 
   status_t async_put_direct(const component::IMCAS::pool_t       pool,
                             const void *                         key,
@@ -204,7 +204,7 @@ public:
                             component::IMCAS::async_handle_t &   out_handle,
                             component::Registrar_memory_direct * rmd,
                             gsl::span<const component::IKVStore::memory_handle_t> handles,
-                            unsigned int                         flags);
+                            component::IMCAS::flags_t            flags);
 
   status_t async_get_direct(TM_FORMAL const component::IMCAS::pool_t       pool,
                             const void *                         key,
@@ -214,7 +214,7 @@ public:
                             component::IMCAS::async_handle_t &   out_handle,
                             component::Registrar_memory_direct * rmd,
                             component::IKVStore::memory_handle_t handle,
-                            unsigned int                         flags);
+                            component::IMCAS::flags_t            flags);
 
   status_t check_async_completion(component::IMCAS::async_handle_t &handle);
 

@@ -20,12 +20,26 @@
 #include "pin_control.h"
 #include "test_flags.h"
 
+/* 
+ * code to arm and disarm 
+ */
 template <typename Pool>
 	struct monitor_pin
 	{
 	private:
 		Pool _p;
+		/*
+		 * The three functions provide by pin:
+		 *  arm
+		 *  disarm
+		 *  get cptr
+		 */
 		pin_control<typename Pool::shared_type> _c;
+		/*
+		 * The 8 bytes in the "pointer" position of a Value.
+		 * A pointer if the old value was outline;
+		 * part of the value if the value was inline.
+		 */
 		char *_old_cptr;
 		bool heap_consistent() const { return _p->is_crash_consistent(); }
 		monitor_pin(const monitor_pin &) = delete;
@@ -37,15 +51,16 @@ template <typename Pool>
 				, _c(c_)
 				, _old_cptr(heap_consistent() ? nullptr : v_.get_cptr().P)
 			{
+				/* arm the pin (remember that we are about to pin) */
 				((*_p).*(_c._arm))(v_.get_cptr());
 			}
 
 		char *get_cptr() const
 		{
 			return
-				_old_cptr
-				? _old_cptr
-				: ((*_p).*_c._get_cptr)() // pin_data_get_cptr()
+				_p->is_crash_consistent()
+				? ((*_p).*_c._get_cptr)() // pin_data_get_cptr()
+				: _old_cptr
 				;
 		}
 

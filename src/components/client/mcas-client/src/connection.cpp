@@ -1540,7 +1540,7 @@ status_t Connection_handler::put_direct(pool_t                               poo
                       gsl::span<const common::const_byte_span> values_,
                       component::Registrar_memory_direct * rmd_,
                       gsl::span<const component::IMCAS::memory_handle_t> handles_,
-                      unsigned int                         flags_)
+                      const component::IMCAS::flags_t      flags_)
 {
   TM_ROOT()
   component::IMCAS::async_handle_t async_handle = component::IMCAS::ASYNC_HANDLE_INIT;
@@ -1560,7 +1560,7 @@ status_t Connection_handler::async_put(const IMCAS::pool_t    pool,
                                        const void *           value,
                                        const size_t           value_len,
                                        IMCAS::async_handle_t &out_handle,
-                                       const unsigned int     flags)
+                                       const IMCAS::flags_t   flags)
 {
   API_LOCK();
 
@@ -1612,7 +1612,7 @@ status_t Connection_handler::async_put_direct(const IMCAS::pool_t               
                                               component::IMCAS::async_handle_t &         out_async_handle_,
                                               component::Registrar_memory_direct *       rmd_,
                                               const gsl::span<const component::IKVStore::memory_handle_t> mem_handles_,
-                                              const unsigned int                         flags_)
+                                              const component::IMCAS::flags_t            flags_)
 {
   TM_ROOT()
   API_LOCK();
@@ -1695,7 +1695,7 @@ status_t Connection_handler::async_get_direct(TM_ACTUAL const IMCAS::pool_t     
                                               component::IMCAS::async_handle_t &         out_async_handle_,
                                               component::Registrar_memory_direct *       rmd_,
                                               const component::IKVStore::memory_handle_t mem_handle_,
-                                              const unsigned int                         flags_)
+                                              const component::IMCAS::flags_t            flags_)
 {
   TM_SCOPE()
   API_LOCK();

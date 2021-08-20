@@ -383,7 +383,7 @@ protected:
                               const std::string&    key,
                               gsl::span<const common::const_byte_span> values,
                               gsl::span<const memory_handle_t> handles = gsl::span<const memory_handle_t>(),
-                              const unsigned int    flags  = FLAGS_NONE)
+                              flags_t        flags  = FLAGS_NONE)
   {
     return error_value(E_NOT_SUPPORTED, pool, key, values, handles, flags);
   }
@@ -406,7 +406,7 @@ protected:
                               const void*           value,
                               const size_t          value_len,
                               const memory_handle_t handle = MEMORY_HANDLE_NONE,
-                              const unsigned int    flags  = FLAGS_NONE)
+                              flags_t        flags  = FLAGS_NONE)
   {
     return put_direct(
       pool

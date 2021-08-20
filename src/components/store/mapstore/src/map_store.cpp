@@ -1079,7 +1079,7 @@ Map_store::~Map_store() {
 
 IKVStore::pool_t Map_store::create_pool(const std::string &name,
                                         const size_t nsize,
-                                        unsigned int flags,
+                                        const flags_t flags,
                                         uint64_t /*args*/,
                                         IKVStore::Addr /*base addr unused */)
 {
@@ -1123,7 +1123,7 @@ IKVStore::pool_t Map_store::create_pool(const std::string &name,
 }
 
 IKVStore::pool_t Map_store::open_pool(const std::string &name,
-                                      unsigned int /*flags*/,
+                                      const flags_t /*flags*/,
                                       component::IKVStore::Addr /* base_addr_unused */)
 {
   const std::string &key = name;
@@ -1204,7 +1204,7 @@ status_t Map_store::delete_pool(const std::string &poolname)
 
 status_t Map_store::put(IKVStore::pool_t pid, const std::string &key,
                         const void *value, size_t value_len,
-                        unsigned int flags)
+                        const flags_t flags)
 {
   auto session = get_session(pid);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
@@ -1234,7 +1234,7 @@ status_t Map_store::get_direct(const pool_t pid, const std::string &key,
 status_t Map_store::put_direct(const pool_t pid, const std::string &key,
                                const void *value, const size_t value_len,
                                memory_handle_t /*memory_handle*/,
-                               unsigned int flags)
+                               const flags_t flags)
 {
   return Map_store::put(pid, key, value, value_len, flags);
 }
