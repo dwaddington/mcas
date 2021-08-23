@@ -296,6 +296,14 @@ namespace ccpm
 	{
 	}
 
+	log::log(log &&other, persister_type persister_, heap_type mr_)
+		: _persister(persister_)
+		, _mr(mr_)
+		, _root(std::move(other._root))
+	{
+	}
+
+
 	log::~log()
 	{
 		commit();
