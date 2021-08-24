@@ -176,7 +176,7 @@ ccpm::area_ctl::area_ctl(
 
 auto ccpm::area_ctl::sub_size(level_ix_t level) -> std::size_t
 {
-	return area_ctl::min_alloc_size * (1U << log2_alloc_states_per_word * level);
+	return area_ctl::min_alloc_size * (std::size_t(1) << log2_alloc_states_per_word * level);
 }
 
 auto ccpm::area_ctl::sub_size() const -> std::size_t
