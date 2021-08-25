@@ -39,7 +39,7 @@ namespace ccpm
 	/* Our atomic_words require a power of 2 number of bits, or else
 	 * we have to rewrite the area_ctl::sub_size() function.
 	 */
-	static_assert(1U << log2_alloc_states_per_word == alloc_states_per_word, "alloc_states_per_word not a power of 2");
+	static_assert(unsigned(1) << log2_alloc_states_per_word == alloc_states_per_word, "alloc_states_per_word not a power of 2");
 
 	/* in the atomic word at ix, return the index of a start of a run of n free
 	 * elements (or sub_states_per_word-n, if there is no such run)

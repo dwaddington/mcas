@@ -7,6 +7,7 @@
 #pragma GCC diagnostic pop
 
 #include <ccpm/cca.h>
+#include <common/env.h> /* env_value */
 #include <common/errors.h>
 #include <common/logging.h>
 #include <common/utils.h>
@@ -18,6 +19,7 @@
 #endif
 #include <libpmem.h>
 #include <cstdlib> // alligned_alloc
+#include <iostream> // cerr
 #include <string> // stoull
 
 struct {
@@ -62,7 +64,16 @@ class Libccpm_test : public ::testing::Test {
 
 TEST_F(Libccpm_test, ccpm_cca_scenario_A)
 {
-  std::size_t size = MB(128);
+	std::size_t size_mb = common::env_value<unsigned>("SIZE_MB",128);
+	/*
+	 * Values of SIZE_MB larger than available DRAM and/or swap space 
+	 * may be accomodated by changing value of /proc/sys/vm/overcommit_memory,
+	 * e.g.
+	 *   # echo 1 > /proc/sys/vm/overcommit_memory
+	 * to remove all limits on overcommit.
+	 */
+	std::cerr << "size is " << size_mb << "MiB" << "\n";
+  std::size_t size = MiB(size_mb);
   auto pr = aligned_alloc(4096,size);
   ASSERT_NE(nullptr, pr);
 
@@ -97,6 +108,35 @@ TEST_F(Libccpm_test, ccpm_cca_scenario_A)
     p = nullptr;
 
     PLOG("allocations OK");
+
+		std::vector<std::pair<int,std::vector<void *>>> alloc_sizes;
+		for ( int exp = 30; exp >= 0; exp -= 4 )
+		{
+			alloc_sizes.push_back({exp,std::vector<void *>{}});
+			auto &allocs = alloc_sizes.back().second;
+			auto rc = ccheap.allocate(p, 2UL<<exp, 8);
+			while ( rc == S_OK )
+			{
+				allocs.push_back(p);
+				p = nullptr;
+				rc = ccheap.allocate(p, 2UL<<exp, 8);
+			}
+
+			ccheap.print(std::cerr);
+			PLOG("allocation: 2^%u: %zu", exp, allocs.size());
+		}
+
+		for ( ; ! alloc_sizes.empty() ; alloc_sizes.pop_back() )
+		{
+			auto exp = alloc_sizes.back().first;
+			auto &allocs = alloc_sizes.back().second;
+			for ( ; ! allocs.empty(); allocs.pop_back() )
+			{
+				ccheap.free(allocs.back(), 2UL<<exp);
+				EXPECT_EQ(nullptr, allocs.back());
+			}
+			
+		}
   }
 }
 
@@ -175,7 +215,7 @@ TEST_F(Libccpm_test, ccpm_cca)
     }
     catch ( const std::domain_error &e )
     {
-      std::cerr << "Expected falure: " << e.what() << "\n";
+      std::cerr << "Expected failure: " << e.what() << "\n";
     }
   }
 }

@@ -63,9 +63,17 @@ namespace ccpm
 			 * applies here too.
 			 */
 			container_cc(container_cc &&other) = default;
+			container_cc(container_cc &&other, log::persister_type persister_, cca *cca)
+				: log(std::move(static_cast<log &&>(other)), persister_, cca)
+				, _cca(cca)
+				, _allocator(std::move(other._allocator))
+				, container(std::move(other.container))
+			{
+				PLOG("CCA at %p", static_cast<void *>(_cca));
+			}
 
 			cca& mr() { return *_cca; }
-      void set_cca(ccpm::cca& cca_) { _cca = &cca_; }
+			void set_cca(ccpm::cca& cca_) { _cca = &cca_; }
 		};
 }
 
