@@ -101,13 +101,13 @@ class Rca_AVL_internal : private common::log_source {
     _allocators[numa_node_u]->free(reinterpret_cast<addr_t>(ptr));
   }
 
-  void debug_dump(std::string *out_str)
+  void debug_dump(std::ostream &out_str)
   {
     if(_allocators[0])
-      _allocators[0]->dump_info(out_str);
+      _allocators[0]->dump_info(&out_str);
 
     if(_allocators[1])
-    _allocators[1]->dump_info(out_str);
+    _allocators[1]->dump_info(&out_str);
   }
 
  private:
@@ -158,9 +158,23 @@ void Rca_AVL::free(void *ptr, int numa_node, size_t // size unused
   _rca->free(ptr, numa_node);
 }
 
-void Rca_AVL::debug_dump(std::string *out_log)
+void Rca_AVL::debug_dump(std::ostream &out_log)
 {
   _rca->debug_dump(out_log);
+}
+
+void Rca_AVL::debug_dump(std::string *out_log)
+{
+  if ( out_log )
+  {
+    std::ostringstream ss;
+    debug_dump(ss);
+    out_log->append(ss.str());
+  }
+  else
+  {
+    debug_dump(std::cerr);
+  }
 }
 
 }  // namespace nupm

@@ -25,6 +25,7 @@
 #include <common/memory.h>
 #include <memory>
 #include <string>
+#include <iosfwd> /* ostream */
 
 namespace nupm
 {
@@ -89,6 +90,7 @@ class Rca_AVL : public common::Reconstituting_allocator {
    * console
    */
   void debug_dump(std::string *out_log = nullptr);
+  void debug_dump(std::ostream &out_log);
 
  private:
   std::unique_ptr<Rca_AVL_internal> _rca;
