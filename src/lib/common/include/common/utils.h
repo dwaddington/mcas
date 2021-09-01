@@ -119,10 +119,10 @@ extern "C"
 #define REDUCE_GB(X) (X >> 30)
 #define REDUCE_TB(X) (X >> 40)
 
-#define KB(X) (X << 10)
-#define MB(X) (X << 20)
-#define GB(X) ((1ULL << 30) * X)
-#define TB(X) ((1ULL << 40) * X)
+#define KB(X) (std::size_t(X) << 10)
+#define MB(X) (std::size_t(X) << 20)
+#define GB(X) (std::size_t(X) << 30)
+#define TB(X) (std::size_t(X) << 40)
 
 #define REDUCE_KiB(X) (X >> 10)
 #define REDUCE_MiB(X) (X >> 20)

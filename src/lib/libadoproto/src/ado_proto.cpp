@@ -777,7 +777,10 @@ bool ADO_protocol_builder::recv_unlock_response(status_t& status)
      mcas::ipc::Message::type(buffer) == MSG_TYPE::CHIRP) {
     auto * chirp = reinterpret_cast<const Chirp*>(buffer);
     status = chirp->status;
-    return chirp->type == chirp_t::UNLOCK_RESPONSE;
+    if(chirp->type == chirp_t::UNLOCK_RESPONSE) {
+      free_ipc_buffer(buffer);
+      return true;
+    }
   }
   return false;
 }
@@ -802,6 +805,7 @@ status_t ADO_protocol_builder::send_unlock_response(const status_t status)
 {
   auto buffer = get_buffer().release();
   new (buffer) mcas::ipc::Chirp(chirp_t::UNLOCK_RESPONSE, status);
+  CPLOG(3, "ADO_protocol_builder:send_unlock_response");
   return send_callback(buffer);
 }
 
@@ -843,7 +847,10 @@ bool ADO_protocol_builder::recv_configure_response(status_t& status)
      mcas::ipc::Message::type(buffer) == MSG_TYPE::CHIRP) {
     auto * chirp = reinterpret_cast<const Chirp*>(buffer);
     status = chirp->status;
-    return chirp->type == chirp_t::CONFIGURE_RESPONSE;
+    if(chirp->type == chirp_t::CONFIGURE_RESPONSE) {
+      free_ipc_buffer(buffer);
+      return true;
+    }
   }
   return false;
 }

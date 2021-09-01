@@ -105,6 +105,7 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   /* new_root == true indicates this is a "fresh" key and therefore needs initializing */
   ccpm::region_vector_t rv(common::make_byte_span(value, value_len));
   if(new_root) {
+    PNOTICE("FRESH");
     ccaptr = new ccpm::cca(&pe, rv);
     ccv = new (ccaptr->allocate_root(sizeof(cc_vector))) cc_vector(&pe, *ccaptr);
     /* initialize vector */
@@ -115,25 +116,26 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
     ccv->commit();
   }
   else {
+    PNOTICE("RECONSTITUING ");
     ccaptr = new ccpm::cca(&pe, rv, ccpm::accept_all);
     void *root_base = ::base(ccaptr->get_root());
-    /* reconstruct the cc_vector vft (see note on move constructor in ccpm/log.h */
-    ccv = new (root_base) cc_vector(std::move(*static_cast<cc_vector *>(root_base)));
+    /* Reconstruct the cc_vector vft (see note on move constructor in ccpm/log.h.
+	 * The log contains stale pointers to the DRAM-located persister and cca;
+	 * supply new addresses for those.
+	 */
+    ccv = new (root_base) cc_vector(std::move(*static_cast<cc_vector *>(root_base)), &pe, ccaptr);
     ccv->rollback(); /* in case we're recovering from crash */
   }
-
   auto& min = (double&) ccv->container->at(0);
   auto& max = (double&) ccv->container->at(1);
   auto& mean = (double&) ccv->container->at(2);
   auto& count = (double&) ccv->container->at(3);
-    
   /* check ADO message */
   auto msg = Proto::GetMessage(in_work_request);
   if(msg->element_as_UpdateRequest()) {
 
     auto request = msg->element_as_UpdateRequest();
     auto sample = request->sample();
-
     /* update min,max,mean,count with new sample */
     if(min == -1.0 || sample < min) {
       ccv->add(&min, sizeof(double)); /* add to transaction */
@@ -144,7 +146,6 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
       ccv->add(&max, sizeof(double)); /* add to transaction */
       max = sample;
     }
-
     auto tmp = count * mean;
     tmp += sample;
     count += 1.0;
@@ -171,7 +172,6 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
   }
   else if(msg->element_as_QueryRequest()) {
     PNOTICE("QueryRequest!");
-
     /* create response message */
     {
       using namespace Proto;
@@ -184,10 +184,8 @@ status_t Tabulator_plugin::do_work(const uint64_t work_key,
                                     fbb.GetSize(),
                                     response_buffer_t::alloc_type_malloc{});
     }
-
   }
   else throw Logic_exception("unknown protocol message type");  
-
   /* clean up */
   delete ccaptr;
   
@@ -203,12 +201,14 @@ void Tabulator_plugin::launch_event(const uint64_t                  auth_id,
                                     const size_t                    expected_obj_count,
                                     const std::vector<std::string>& params)
 {
+  PLOG("Tabulator_plugin: launched");
 }
 
 
 /* called just before ADO shutdown */
 status_t Tabulator_plugin::shutdown()
 {
+  PLOG("Tabulator_plugin: shutdown");
   return S_OK;
 }
 

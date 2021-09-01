@@ -35,15 +35,18 @@ add_executable(libccpm-test2 test2.cpp)
 add_executable(libccpm-test3 test3.cpp)
 add_executable(libccpm-test5 test5.cpp store_map.cpp)
 add_executable(libccpm-test6 test6.cpp store_map.cpp)
+add_executable(libccpm-test7 test7.cpp store_map.cpp)
 
 target_compile_options(libccpm-test1 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test2 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test3 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test5 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 target_compile_options(libccpm-test6 PUBLIC "$<$<CONFIG:Debug>:-O0>")
+target_compile_options(libccpm-test7 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 
 target_link_libraries(libccpm-test1 ${ASAN_LIB} ${GTEST_LIB} nupm) # add profiler for google profiler
 target_link_libraries(libccpm-test2 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem) # add profiler for google profiler
 target_link_libraries(libccpm-test3 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem) # add profiler for google profiler
 target_link_libraries(libccpm-test5 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem)
 target_link_libraries(libccpm-test6 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem profiler)
+target_link_libraries(libccpm-test7 ${ASAN_LIB} ${GTEST_LIB} ccpm pmem)

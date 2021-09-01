@@ -169,7 +169,6 @@ public:
    *                    The pointer shall be altered iff the function returns S_OK.
    *
    * @param size Size of memory to free in bytes
-   * @param alignment Alignment for memory
    *
    * @return : S_OK, E_INVAL
    **/

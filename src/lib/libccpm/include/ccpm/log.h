@@ -55,6 +55,7 @@ public:
    * preserves the rest of the log member data.
    */
   log(log &&) = default;
+  log(log &&other, persister_type, heap_type);
 
   ~log();
   /*

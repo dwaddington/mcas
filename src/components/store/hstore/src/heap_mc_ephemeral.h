@@ -65,6 +65,7 @@ private:
 	static constexpr unsigned hist_report_upper_bound = 34U;
 	explicit heap_mc_ephemeral(
 		unsigned debug_level_
+		, bool restore_not_clear
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
 		, impl::allocation_state_pin *aspk
@@ -81,6 +82,7 @@ public:
 	friend struct heap_mm;
 
 	using common::log_source::debug_level;
+#if 0
 	/* heap_mc version */
 	explicit heap_mc_ephemeral(
 		unsigned debug_level
@@ -94,9 +96,11 @@ public:
 		, const std::vector<byte_span> rv_full
 		, byte_span pool0_heap_
 	);
+#endif
 	/* heap_mm version */
 	explicit heap_mc_ephemeral(
 		unsigned debug_level
+		, bool restore_not_clear
 		, MM_plugin_wrapper &&pw
 		, impl::allocation_state_emplace *ase
 		, impl::allocation_state_pin *aspd
@@ -108,6 +112,7 @@ public:
 		, byte_span pool0_heap_
 	);
 
+#if 0
 	/* heap_mc version */
 	explicit heap_mc_ephemeral(
 		unsigned debug_level
@@ -136,12 +141,14 @@ public:
 		, byte_span pool0_heap
 		, ccpm::ownership_callback_t f
 	);
+#endif
 	void allocate(persistent_t<void *> &p, std::size_t sz, std::size_t alignment) override;
 	std::size_t free(persistent_t<void *> &p_, std::size_t sz_) override;
 	void free_tracked(const void *p, std::size_t sz) override;
 	heap_mc_ephemeral(const heap_mc_ephemeral &) = delete;
 	heap_mc_ephemeral& operator=(const heap_mc_ephemeral &) = delete;
 	void add_managed_region_to_heap(byte_span r_heap) override;
+	void reconstitute_managed_region_to_heap(byte_span r_heap, ccpm::ownership_callback_t f) override;
 	bool is_crash_consistent() const override;
 	bool can_reconstitute() const override;
 };

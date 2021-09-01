@@ -119,7 +119,7 @@ namespace
 	}
 
 	using string_view = common::string_view;
-	std::unique_ptr<heap_mm_ephemeral> make_ephemeral_1(
+	std::unique_ptr<heap_mm_ephemeral> make_ephemeral_clear(
 		const unsigned debug_level_
 		, const string_view plugin_path_
 		, impl::allocation_state_emplace *const ase_
@@ -141,6 +141,7 @@ namespace
 			? std::unique_ptr<heap_mm_ephemeral>(
 				new heap_mc_ephemeral(
 					debug_level_
+					, false /* clear, not restore */
 					, std::move(pw)
 					, ase_
 					, aspd_
@@ -160,8 +161,8 @@ namespace
 }
 
 /* When used with ADO, this space apparently needs a 2MiB alignment.
- * 4 KiB produces sometimes produces a disagreement between server and AOo mappings
- * which manifest as incorrect key and data values as seen on the ADO side.
+ * 4 KiB sometimes produces a disagreement between server and ADO mappings
+ * which manifests as incorrect key and data values as seen on the ADO side.
  */
 heap_mm::heap_mm(
 	const unsigned debug_level_
@@ -179,7 +180,7 @@ heap_mm::heap_mm(
 	: heap(pool0_full_, pool0_heap_, numa_node_)
 	, _tracked_anchor(debug_level_, &_tracked_anchor, &_tracked_anchor, sizeof(_tracked_anchor), sizeof(_tracked_anchor))
 	, _eph(
-		make_ephemeral_1(
+		make_ephemeral_clear(
 			debug_level_
 			, plugin_path_
 			, ase_
@@ -195,9 +196,11 @@ heap_mm::heap_mm(
 	, _pin_data(&heap_mm::pin_data_arm, &heap_mm::pin_data_disarm, &heap_mm::pin_data_get_cptr)
 	, _pin_key(&heap_mm::pin_key_arm, &heap_mm::pin_key_disarm, &heap_mm::pin_key_get_cptr)
 {
+#if 0
 	if ( _eph->is_crash_consistent() )
 	{
 		/* cursor now locates the best-aligned region */
+		_eph->add_managed_region(_pool0_full, _pool0_heap);
 		hop_hash_log<trace_heap_summary>::write(
 			LOG_LOCATION
 			, " pool ", ::base(_pool0_heap), " .. ", ::end(_pool0_heap)
@@ -207,6 +210,7 @@ heap_mm::heap_mm(
 		VALGRIND_CREATE_MEMPOOL(::base(_pool0_heap), 0, false);
 	}
 	else
+#endif
 	{
 		void *last = ::end(pool0_heap_);
 		if ( 0 < debug_level_ )
@@ -217,7 +221,26 @@ heap_mm::heap_mm(
 			PLOG("%s: pool0 heap %p: 0x%zx", __func__, ::base(_pool0_heap), ::size(_pool0_heap));
 		}
 		/* cursor now locates the best-aligned region */
-		_eph->add_managed_region(_pool0_full, _pool0_heap);
+		if ( _eph->is_crash_consistent() )
+		{
+#if 0
+			_eph->reconstitute_managed_region(
+				_pool0_full
+				, _pool0_heap
+				, [ase_, aspd_, aspk_, asx_] (const void *p) -> bool {
+					/* To answer whether the map or the allocator owns pointer p?
+					 * "true" means that the map (us, the callee) owns p
+					 */
+					auto cp = const_cast<void *>(p);
+					return ase_->is_in_use(cp) || aspd_->is_in_use(p) || aspk_->is_in_use(p) || asx_->is_in_use(p, true);
+				}
+			);
+#endif
+		}
+		else
+		{
+			_eph->add_managed_region(_pool0_full, _pool0_heap);
+		}
 		hop_hash_log<trace_heap_summary>::write(
 			LOG_LOCATION
 			, " pool ", ::base(_pool0_full), " .. ", ::end(_pool0_full)
@@ -232,7 +255,7 @@ heap_mm::heap_mm(
 namespace
 {
 	using string_view = common::string_view;
-	std::unique_ptr<heap_mm_ephemeral> make_mm_ephemeral_2(
+	std::unique_ptr<heap_mm_ephemeral> make_mm_ephemeral_reconstitute(
 		unsigned debug_level_
 		, const string_view plugin_path_
 		, const std::unique_ptr<dax_manager> &dax_manager_
@@ -273,6 +296,7 @@ namespace
 			? std::unique_ptr<heap_mm_ephemeral>(
 				new heap_mc_ephemeral(
 					debug_level_
+					, true /* reconstitute, not clear */
 					, std::move(pw)
 					, ase_
 					, aspd_
@@ -324,7 +348,7 @@ heap_mm::heap_mm(
 	: heap(*this)
 	, _tracked_anchor(this->_tracked_anchor)
 	, _eph(
-		make_mm_ephemeral_2(
+		make_mm_ephemeral_reconstitute(
 			debug_level_
 			, plugin_path_
 			, dax_manager_
@@ -348,6 +372,23 @@ heap_mm::heap_mm(
 {
 	if ( is_crash_consistent() )
 	{
+/* Might be a good idea to construct a heap_mc_ephemeral with *no* regions and
+ * add the reconstiuted region here. But for the moment we let let
+ * make_mm_ephemeral_reconstitute do that work.
+ */
+#if 0
+		_eph->reconstitute_managed_region(
+			_pool0_full
+			, _pool0_heap
+			, [ase_, aspd_, aspk_, asx_] (const void *p) -> bool {
+				/* To answer whether the map or the allocator owns pointer p?
+				 * "true" means that the map (us, the callee) owns p
+				 */
+				auto cp = const_cast<void *>(p);
+				return ase_->is_in_use(cp) || aspd_->is_in_use(p) || aspk_->is_in_use(p) || asx_->is_in_use(p, true);
+			}
+		);
+#endif
 		hop_hash_log<trace_heap_summary>::write(
 			LOG_LOCATION
 			, " pool ", ::base(_pool0_heap), " .. ", ::end(_pool0_heap)
@@ -925,26 +966,26 @@ impl::allocation_state_pin *heap_mm::aspk() const
 
 char *heap_mm::pin_data_get_cptr() const
 {
-	return nullptr;
-	auto eph = dynamic_cast<heap_mc_ephemeral *>(_eph.get());
-	assert( ! _eph->is_crash_consistent() || eph->_aspd->is_armed());
-	return
-		eph
-		? eph->_aspd->get_cptr()
-		: nullptr
-		;
+	/*
+	 * Should only be called by monitor_pin, and then only when heap is a
+	 * consistent type. If not crash consistent, call is an error and
+	 * dynamic_cast will throw an exception.
+	 */
+	auto &eph = dynamic_cast<heap_mc_ephemeral &>(*_eph);
+	assert( eph._aspd->is_armed() );
+	return eph._aspd->get_cptr();
 }
 
 char *heap_mm::pin_key_get_cptr() const
 {
-	return nullptr;
-	auto eph = dynamic_cast<heap_mc_ephemeral *>(_eph.get());
-	assert( ! _eph->is_crash_consistent() || eph->_aspk->is_armed());
-	return
-		eph
-		? eph->_aspk->get_cptr()
-		: nullptr
-		;
+	/*
+	 * Should only be called by monitor_pin, and then only when heap is a
+	 * consistent type. If not crash consistent, call is an error and
+	 * dynamic_cast will throw an exception.
+	 */
+	auto &eph = dynamic_cast<heap_mc_ephemeral &>(*_eph);
+	assert( eph._aspk->is_armed() );
+	return eph._aspk->get_cptr();
 }
 
 void heap_mm::pin_data_arm(

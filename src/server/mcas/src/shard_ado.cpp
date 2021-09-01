@@ -1361,8 +1361,10 @@ void Shard::process_messages_from_ado()
 
           if(ado->check_for_implicit_unlock(work_id, key_handle)) {
             CPLOG(2, "ADO callback: unlock request target lock is implicit");
-            if(rc == S_OK)
+            if(rc == S_OK) {
               ado->remove_deferred_unlock(work_id, key_handle);
+              CPLOG(2, "ADO callback: unlock request removed deferred unlock");
+            }
           }
 
           if (ado->send_unlock_response(rc) != S_OK)
@@ -1382,6 +1384,7 @@ void Shard::process_messages_from_ado()
       }
 
       /* release buffer */
+      CPLOG(3, "ADO callback releasing buffer %p", reinterpret_cast<void*>(buffer));
       ado->free_callback_buffer(buffer);
     }
   }

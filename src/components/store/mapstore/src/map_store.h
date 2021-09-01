@@ -82,12 +82,12 @@ public:
   virtual int get_capability(Capability cap) const override;
 
   virtual pool_t create_pool(const std::string &name, const size_t size,
-                             unsigned int flags = 0,
+                             flags_t flags = 0,
                              uint64_t expected_obj_count = 0,
                              component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}) override;
 
   virtual pool_t open_pool(const std::string &name,
-                           unsigned int flags = 0,
+                           flags_t flags = 0,
                            component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}) override;
 
   virtual status_t close_pool(const pool_t pid) override;
@@ -96,7 +96,7 @@ public:
 
   virtual status_t put(const pool_t pool, const std::string &key,
                        const void *value, const size_t value_len,
-                       unsigned int flags = FLAGS_NONE) override;
+                       flags_t flags = FLAGS_NONE) override;
 
   virtual status_t get(const pool_t pool, const std::string &key,
                        void *&out_value, size_t &out_value_len) override;
@@ -108,7 +108,7 @@ public:
   virtual status_t put_direct(const pool_t pool, const std::string &key,
                               const void *value, const size_t value_len,
                               IKVStore::memory_handle_t handle = HANDLE_NONE,
-                              unsigned int flags = FLAGS_NONE) override;
+                              flags_t flags = FLAGS_NONE) override;
 
   virtual status_t resize_value(const pool_t pool, const std::string &key,
                                 const size_t new_size,

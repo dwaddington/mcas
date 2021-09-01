@@ -114,3 +114,7 @@ bool heap_mr_ephemeral::is_reconstituted(const void * p_)
 
 bool heap_mr_ephemeral::is_crash_consistent() const { return false; }
 bool heap_mr_ephemeral::can_reconstitute() const { return true; }
+void heap_mr_ephemeral::reconstitute_managed_region_to_heap(byte_span, ccpm::ownership_callback_t)
+{
+	throw std::domain_error("mr cannot reconstitute");
+}

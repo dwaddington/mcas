@@ -10,6 +10,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
+#include "memo_lock.h"
+#include "pool_open.h"
 #include "store_map.h"
 
 #pragma GCC diagnostic push
@@ -46,125 +49,6 @@
 using namespace component;
 
 namespace {
-
-struct pool_open
-{
-private:
-	common::moveable_ptr<IKVStore> _kvstore;
-	IKVStore::pool_t _id;
-public:
-	pool_open(component::IKVStore *kvstore_, common::string_view name_)
-		: _kvstore(kvstore_)
-		, _id(_kvstore->open_pool(std::string(name_)))
-	{}
-	pool_open(component::IKVStore *kvstore_, IKVStore::pool_t id_)
-		: _kvstore(kvstore_)
-		, _id(id_)
-	{}
-	~pool_open()
-	{
-		if ( _kvstore )
-		{
-			auto rc = _kvstore->close_pool(_id);
-			EXPECT_EQ(S_OK, rc);
-		}
-	}
-	component::IKVStore::pool_t id() const { return _id; }
-};
-
-struct pool_create
-{
-private:
-	common::moveable_ptr<IKVStore> _kvstore;
-	std::string _name;
-	IKVStore::pool_t _id;
-public:
-	template <typename ... Args>
-		pool_create(component::IKVStore *kvstore_, common::string_view name_, Args ... args)
-			: _kvstore(kvstore_)
-			, _name(name_)
-			, _id(_kvstore->create_pool(_name, args...))
-	{
-	}
-	~pool_create()
-	{
-		if ( _kvstore && _id != +IKVStore::POOL_ERROR )
-		{
-			auto rc = _kvstore->delete_pool(_name);
-			EXPECT_EQ(S_OK, rc);
-		}
-	}
-	component::IKVStore::pool_t create_id() const { return _id; }
-};
-
-struct pool_temp
-	: protected pool_create
-	, public pool_open
-{
-	template <typename ... Args>
-		pool_temp(component::IKVStore *kvstore_, common::string_view name_, Args ... args)
-			: pool_create(kvstore_, name_, args...)
-			, pool_open(kvstore_, this->create_id())
-		{}
-};
-
-struct memo_lock
-{
-private:
-	component::IKVStore *_kvstore;
-	component::IKVStore::pool_t _pool;
-	std::string _th;
-public:
-	IKVStore::key_t k;
-	memo_lock(
-		component::IKVStore *kvstore_
-		, pool_open & pool_
-		, std::string th_
-	)
-		: _kvstore(kvstore_)
-		, _pool(pool_.id())
-		, _th(th_)
-		, k(IKVStore::KEY_NONE)
-	{
-	}
-	memo_lock(const memo_lock &) = delete;
-	memo_lock &operator=(const memo_lock &) = delete;
-	~memo_lock()
-	{
-		if ( IKVStore::KEY_NONE != k )
-		{
-			XLOG(_th, " unlock");
-			auto r = _kvstore->unlock(_pool, k, component::IKVStore::UNLOCK_FLAGS_FLUSH);
-			EXPECT_EQ(S_OK, r);
-		}
-	}
-};
-
-struct shared_lock
-	: private memo_lock
-{
-	using memo_lock::k;
-	shared_lock(
-		component::IKVStore *kvstore_
-		, pool_open & pool_
-		, std::string th_
-	)
-		: memo_lock(kvstore_, pool_, th_)
-	{}
-};
-
-struct exclusive_lock
-	: private memo_lock
-{
-	using memo_lock::k;
-	exclusive_lock(
-		component::IKVStore *kvstore_
-		, pool_open & pool_
-		, std::string th_
-	)
-		: memo_lock(kvstore_, pool_, th_)
-	{}
-};
 
 // The fixture for testing class KVStore_test.
 class KVStore_test : public ::testing::Test
