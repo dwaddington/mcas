@@ -40,8 +40,6 @@ public:
 		, std::size_t bytes
 	);
 
-	status_t remaining(std::size_t& out_size) const;
-
 	status_t inject_allocation(void *ptr, std::size_t size);
 
 	void add_managed_region(byte_span region);

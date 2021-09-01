@@ -93,11 +93,9 @@ status_t heap_mc_shim::free(
 		;
 }
 
-status_t heap_mc_shim::remaining(
-	std::size_t & // out_size
-) const
+status_t heap_mc_shim::remaining(std::size_t &out_size) const
 {
-	throw std::runtime_error("remaining not supported");
+	return _mm.bytes_remaining(&out_size);
 }
 
 ccpm::region_vector_t heap_mc_shim::get_regions() const
@@ -132,7 +130,7 @@ bool heap_mc_shim::includes(
 	const void * // ptr
 ) const
 {
-	throw std::runtime_error("remaining not supported");
+	throw std::runtime_error("includes not supported");
 }
 
 bool heap_mc_shim::is_crash_consistent() const

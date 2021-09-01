@@ -15,6 +15,7 @@
 
 #include "hstore_config.h"
 #include "mm_plugin_itf.h"
+#include <common/errors.h> /* S_OK */
 #include <stdexcept> /* runtime_error */
 
 
@@ -57,14 +58,6 @@ status_t heap_mr_shim::inject_allocation(void *ptr, std::size_t size)
 {
 	return _mm.inject_allocation(ptr, size);
 }
-
-status_t heap_mr_shim::remaining(
-	std::size_t & // out_size
-) const
-{
-	throw std::runtime_error("remaining not supported");
-}
-
 
 void heap_mr_shim::add_managed_region(byte_span region_)
 {

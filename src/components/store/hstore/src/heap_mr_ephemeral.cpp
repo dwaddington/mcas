@@ -30,9 +30,10 @@ heap_mr_ephemeral::heap_mr_ephemeral(
 	, const string_view id_
 	, const string_view backing_file_
 )
-	: heap_mm_ephemeral(debug_level_, nupm::region_descriptor{id_, backing_file_, {}}, 0U)
+	: heap_mm_ephemeral(debug_level_, nupm::region_descriptor{id_, backing_file_, {}})
 	, _heap(std::make_unique<heap_mr_shim>(plugin_path_))
 	, _allocated(0)
+	, _capacity(0)
 	, _reconstituted()
 {}
 
@@ -43,9 +44,10 @@ heap_mr_ephemeral::heap_mr_ephemeral(
 	, const string_view id_
 	, const string_view backing_file_
 )
-	: heap_mm_ephemeral(debug_level_, nupm::region_descriptor{id_, backing_file_, {}}, 0U)
+	: heap_mm_ephemeral(debug_level_, nupm::region_descriptor{id_, backing_file_, {}})
 	, _heap(std::make_unique<heap_mr_shim>(std::move(pw_)))
 	, _allocated(0)
+	, _capacity(0)
 	, _reconstituted()
 {}
 
@@ -56,6 +58,7 @@ heap_mr_ephemeral::~heap_mr_ephemeral()
 void heap_mr_ephemeral::add_managed_region_to_heap(byte_span r_heap)
 {
 	_heap->add_managed_region(r_heap);
+	_capacity += ::size(r_heap);
 }
 
 void heap_mr_ephemeral::inject_allocation(

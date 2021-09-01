@@ -230,6 +230,15 @@ extern "C"
    */
   status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, size_t size);
 
+  /**
+   * Report bytes remaining
+   *
+   * @param bytes_remaining Bytes remaining for allocation
+   *
+   * @return S_OK, E_NOT_IMPL
+   */
+  status_t mm_plugin_bytes_remaining(mm_plugin_heap_t heap, size_t *bytes_remaining);
+
   /** 
    * Get debugging information
    * 
@@ -279,6 +288,7 @@ extern "C"
     status_t (*mm_plugin_callocate)(mm_plugin_heap_t heap, size_t n, void ** out_ptr);
     status_t (*mm_plugin_reallocate)(mm_plugin_heap_t heap, void ** in_out_ptr, size_t size);
     status_t (*mm_plugin_usable_size)(mm_plugin_heap_t heap, void * ptr, size_t * out_size);
+    status_t (*mm_plugin_bytes_remaining)(mm_plugin_heap_t heap, size_t * bytes_remaining);
     void     (*mm_plugin_debug)(mm_plugin_heap_t heap);
     status_t (*mm_plugin_inject_allocation)(mm_plugin_heap_t heap, void * ptr, size_t size);
     int (*mm_plugin_is_crash_consistent)(mm_plugin_heap_t heap);
@@ -335,6 +345,7 @@ public:
     LOAD_SYMBOL(mm_plugin_debug);
     LOAD_SYMBOL(mm_plugin_destroy);
     LOAD_SYMBOL(mm_plugin_inject_allocation);
+    LOAD_SYMBOL(mm_plugin_bytes_remaining);
     LOAD_SYMBOL(mm_plugin_is_crash_consistent);
     LOAD_SYMBOL(mm_plugin_can_inject_allocation);
 
@@ -409,11 +420,15 @@ public:
   inline status_t usable_size(void * ptr, size_t * out_size) noexcept {
     return _ft.mm_plugin_usable_size(_heap, ptr, out_size);
   }
+
+  inline status_t bytes_remaining(size_t *bytes_remaining) const noexcept {
+    return _ft.mm_plugin_bytes_remaining(_heap, bytes_remaining);
+  }
     
   inline void debug(mm_plugin_heap_t heap) noexcept {
     return _ft.mm_plugin_debug(_heap);
   }
-    
+
   inline status_t inject_allocation(void * ptr, size_t size) noexcept {
     return _ft.mm_plugin_inject_allocation(_heap, ptr, size);
   }

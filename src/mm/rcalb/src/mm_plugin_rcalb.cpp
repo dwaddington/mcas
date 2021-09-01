@@ -168,6 +168,11 @@ PUBLIC status_t mm_plugin_inject_allocation(mm_plugin_heap_t heap, void * ptr, s
   return S_OK;
 }
 
+PUBLIC status_t mm_plugin_bytes_remaining(mm_plugin_heap_t heap, size_t *size)
+{
+  return E_NOT_IMPL;
+}
+
 PUBLIC int mm_plugin_is_crash_consistent(mm_plugin_heap_t heap)
 {
   return false;

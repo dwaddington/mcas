@@ -45,6 +45,7 @@ private:
 	> _heap;
 
 	std::size_t _allocated;
+	std::size_t _capacity;
 	/* The set of reconstituted addresses. Only needed during recovery.
 	 * Potentially large, so should be erased after recovery. But there
 	 * is no mechanism to erase it yet.
@@ -101,7 +102,8 @@ public:
 			}
 		}
 
-	std::size_t allocated() const {  return _allocated; }
+	std::size_t allocated() const override { return _allocated; }
+	std::size_t capacity() const override { return _capacity; }
 	void inject_allocation(void *p, std::size_t sz) override;
 	void allocate(persistent_t<void *> &p, std::size_t sz, std::size_t alignment) override;
 	void *allocate_tracked(std::size_t sz, std::size_t alignment);

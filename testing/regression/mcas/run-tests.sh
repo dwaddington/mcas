@@ -19,7 +19,7 @@ run_hstore() {
   # hstore unit tests: basic
   #DAX_RESET=1 STORE=hstore ./src/components/store/hstore/unit_test/hstore-test1 # (out of space)
   DAX_RESET=1 STORE=hstore-cc ./src/components/store/hstore/unit_test/hstore-test1
-  DAX_RESET=1 HAS_CAPACITY=0 STORE=hstore-mm MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-test1
+  DAX_RESET=1 STORE=hstore-mm MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-test1
   # hstore unit tests: multithreaded lock/unlock
   DAX_RESET=1 STORE=hstore-mt MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-testmt
   DAX_RESET=1 STORE=hstore-mt MM_PLUGIN_PATH=./dist/lib/libmm-plugin-rcalb.so ./src/components/store/hstore/unit_test/hstore-testmt
