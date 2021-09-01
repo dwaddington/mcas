@@ -52,7 +52,7 @@ static const struct file_operations wbinvd_fops = {
 
 static int __init wbinvd_init(void)
 {
-	procfile = proc_create(PROCFILE_NAME,0400,NULL,&wbinvd_ops);
+	procfile = proc_create(PROCFILE_NAME,0444,NULL,&wbinvd_ops);
 	if(!procfile) {
 		proc_remove(procfile);
 		pr_alert("%s: Error: Could not initialize /proc/%s\n",THIS_MODULE->name,PROCFILE_NAME);
