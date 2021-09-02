@@ -941,9 +941,12 @@ void heap_mm::free_tracked(
 
 unsigned heap_mm::percent_used() const
 {
-	/* mc does not support allocation query */
-	auto eph = dynamic_cast<heap_mr_ephemeral *>(_eph.get());
-	return ( eph  && eph->capacity() != 0 ) ? unsigned(eph->allocated() * 100U / eph->capacity()) :  0xFFFFU;
+	return
+		unsigned(
+			_eph->capacity()
+			? _eph->allocated() * 100U / _eph->capacity()
+			: 100U
+		);
 }
 
 bool heap_mm::is_reconstituted(const void * p_) const

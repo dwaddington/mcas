@@ -27,7 +27,7 @@ template <typename Allocator>
 			: _a(a_)
 		{
 #if HSTORE_TRACE_EXTEND
-			PLOG(PREFIX "ctor %d", LOCATION, USE_CC_HEAP);
+			PLOG(PREFIX "ctor", LOCATION);
 #endif
 			if ( _a.pool()->is_crash_consistent() )
 			{

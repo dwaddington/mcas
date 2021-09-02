@@ -28,11 +28,9 @@
 heap_mm_ephemeral::heap_mm_ephemeral(
 	unsigned debug_level_
 	, nupm::region_descriptor managed_regions_
-	, std::size_t capacity_
 )
 	: heap_ephemeral(debug_level_)
 	, _managed_regions(std::move(managed_regions_))
-	, _capacity(capacity_)
 	, _hist_alloc()
 	, _hist_inject()
 	, _hist_free()
@@ -47,7 +45,6 @@ void heap_mm_ephemeral::add_managed_region(
 	add_managed_region_to_heap(r_heap);
 	CPLOG(0, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
 	_managed_regions.address_map_push_back(r_full);
-	_capacity += ::size(r_heap);
 }
 
 void heap_mm_ephemeral::reconstitute_managed_region(
@@ -59,5 +56,4 @@ void heap_mm_ephemeral::reconstitute_managed_region(
 	reconstitute_managed_region_to_heap(r_heap, f);
 	CPLOG(0, "%s : %p.%zx", __func__, ::base(r_heap), ::size(r_heap));
 	_managed_regions.address_map_push_back(r_full);
-	_capacity += ::size(r_heap);
 }

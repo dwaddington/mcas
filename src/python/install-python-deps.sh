@@ -10,6 +10,7 @@ pip3 install torch --user -I
 pip3 install torchvision --user -I
 pip3 install flatbuffers --user -I
 pip3 install parallel_sort --user -I
+pip3 install cython --user -I
 
 # we use a custom version of numpy that allows overloading of memory allocators
 # this is temporary until new features enter the mainline

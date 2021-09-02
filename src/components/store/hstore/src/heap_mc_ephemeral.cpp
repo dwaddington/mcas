@@ -69,20 +69,6 @@ heap_mc_ephemeral::heap_mc_ephemeral(
 			)
 			, backing_file_, rv_full_
 		)
-		, ::size(pool0_heap_)
-			+
-			::size(
-				std::accumulate(
-/* Note: rv_full_ must contain at least the first element, representing pool 0 */
-					rv_full_.begin() + 1
-					, rv_full_.end()
-					, byte_span{}
-					, [] (const auto &a, const auto &b) -> byte_span
-						{
-							return {nullptr, ::size(a) + ::size(b)};
-						}
-				)
-			)
 	)
 	, _heap(std::move(p_))
 	, _ase(ase_)
@@ -150,9 +136,6 @@ void heap_mc_ephemeral::allocate(
 	{
 		throw std::bad_alloc{};
 	}
-#if 0
-	_allocated += sz_;
-#endif
 	_hist_alloc.enter(sz_);
 }
 
@@ -164,7 +147,7 @@ std::size_t heap_mc_ephemeral::free(persistent_t<void *> &p_, std::size_t sz_)
 	 *
 	 * The free, however, does not return a size. Pretend that it does.
 	 */
-#if USE_CC_HEAP == 4
+
 	/* Note: order of testing is important. An extend arm+allocate) can occur while
 	 * emplace is armed, but not vice-versa
 	 */
@@ -184,17 +167,13 @@ std::size_t heap_mc_ephemeral::free(persistent_t<void *> &p_, std::size_t sz_)
 	{
 		CPLOG(1, PREFIX "leaky deallocation of %p of %zu", LOCATION, persistent_ref(p_), sz_);
 	}
-#endif
+
 	/* IHeap interface does not support abstract pointers. Cast to regular pointer */
 	auto sz = (_heap->free(*reinterpret_cast<void **>(&p_), sz_), sz_);
 	/* We would like to carry the persistent_t through to the crash-conssitent allocator,
 	 * but for now just assume that the allocator has modifed p_, and call tick to indicate that.
 	 */
 	perishable::tick();
-#if 0
-	assert(sz <= _allocated);
-	_allocated -= sz;
-#endif
 	_hist_free.enter(sz);
 	return sz;
 }
@@ -203,11 +182,29 @@ void heap_mc_ephemeral::free_tracked(const void *p_, std::size_t sz_)
 {
 	std::unique_lock<hstore_impl::shared_mutex> alloc_lk(_alloc_mutex);
 	_heap->free(const_cast<void *&>(p_), sz_);
-#if 0
-	_allocated -= sz_;
-#endif
 	_hist_free.enter(sz_);
 }
 
 bool heap_mc_ephemeral::is_crash_consistent() const { return true; }
 bool heap_mc_ephemeral::can_reconstitute() const { return false; }
+
+std::size_t heap_mc_ephemeral::capacity() const
+{
+	const auto mr = get_managed_regions();
+	return std::accumulate(
+		mr.address_map().begin()
+		, mr.address_map().end()
+		, std::size_t(0)
+		, [] (size_t a, const auto &b) -> std::size_t
+			{
+				return a + ::size(b);
+			}
+	);
+}
+
+std::size_t heap_mc_ephemeral::allocated() const
+{
+	std::size_t r;
+	auto rc = _heap->remaining(r);
+	return capacity() - (rc == S_OK ? r : 0);
+}
