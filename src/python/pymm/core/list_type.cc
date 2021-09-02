@@ -54,14 +54,14 @@ typedef struct {
 
 namespace
 {
-	struct pmem_persister final
-		: public ccpm::persister
-	{
-		void persist(common::byte_span s) override
-		{
-			::pmem_persist(::base(s), ::size(s));
-		}
-	};
+struct pmem_persister final
+  : public ccpm::persister
+{
+  void persist(common::byte_span s) override
+  {
+    ::pmem_persist(::base(s), ::size(s));
+  }
+};
 }
 
 static pmem_persister persister;
@@ -124,8 +124,8 @@ static PyObject * ListType_method_getitem(List *self, PyObject *args, PyObject *
                                     "O|",
                                     const_cast<char**>(kwlist),
                                     &slice_criteria)) {
-     PyErr_SetString(PyExc_RuntimeError, "ListType_method_getitem unable to parse args");
-     return NULL;
+    PyErr_SetString(PyExc_RuntimeError, "ListType_method_getitem unable to parse args");
+    return NULL;
   }
 
   if (PyLong_Check(slice_criteria)) {
@@ -147,14 +147,86 @@ static PyObject * ListType_method_getitem(List *self, PyObject *args, PyObject *
     assert(it != self->list->container->end());
 
     return present_element(*it);
-    
-    //    for ( auto it = container->begin(); it != container->end(); ++it ) {
-    //    }
-
   }
   
   Py_RETURN_NONE;
 }
+
+static PyObject * ListType_method_setitem(List *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"item",
+                                 "value",
+                                 "tag",
+                                 NULL};
+
+  long index = -1;
+  PyObject * value_obj = nullptr;
+  unsigned long element_tag = 0;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "lO|k",
+                                    const_cast<char**>(kwlist),
+                                    &index,
+                                    &value_obj,
+                                    &element_tag)) {
+    PyErr_SetString(PyExc_RuntimeError, "ListType_method_setitem unable to parse args");
+    return NULL;
+  }
+
+  long list_size = self->list->container->size();
+  if(index < 0L)
+    index = list_size - labs(index);
+
+  if(index >= list_size) {
+    PyErr_SetString(PyExc_RuntimeError, "invalid slice criteria");
+    return NULL;
+  }
+
+  /* locate element of list to modify */
+  auto it = self->list->container->begin();
+  while(index > 0) {
+    it ++;
+    index --;
+  }
+  assert(it != self->list->container->end());
+
+  unsigned long removed_tag = it->tag;
+  if(it->type != SHELF_REFERENCE) removed_tag = 0;
+
+  if(element_tag > 0) { /* tag reference to an already shelved item */
+    it->type = SHELF_REFERENCE;
+    it->tag = element_tag;
+    PLOG("Appended SHELF_REFERENCE (%lu)",element_tag);
+    self->list->commit();
+  }
+  else {
+    /* handle inlined types */
+    if(PyLong_Check(value_obj)) { /* 64bit long number inline */
+      int overflow = 0;
+      long long value = PyLong_AsLongLongAndOverflow(value_obj, &overflow);
+      if(overflow) {
+        PyErr_SetString(PyExc_RuntimeError, "ListType_method_setitem long overflowed system's long long type");
+        return NULL;
+      }
+      it->type = INLINE_LONGLONGINT;
+      it->inline_longlongint = value;
+    }
+    else if(PyFloat_Check(value_obj)) { /* 64bit float inline */
+      double value = PyFloat_AsDouble(value_obj);
+      it->type = INLINE_FLOAT;
+      it->inline_float64 = value;
+    }
+    else {
+      PyErr_SetString(PyExc_RuntimeError, "ListType_method_setitem don't know how to append this type");
+      return NULL;
+    }
+  }
+
+  self->list->commit();
+  return PyLong_FromUnsignedLong(removed_tag);
+}
+
 
 
 static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *kwds)
@@ -172,8 +244,8 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
                                     const_cast<char**>(kwlist),
                                     &element_object,
                                     &element_tag)) {
-     PyErr_SetString(PyExc_RuntimeError, "ListType_method_append unable to parse args");
-     return NULL;
+    PyErr_SetString(PyExc_RuntimeError, "ListType_method_append unable to parse args");
+    return NULL;
   }
 
   assert(self->list);
@@ -194,12 +266,10 @@ static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *k
         return NULL;
       }
       self->list->container->push_back(Element(INLINE_LONGLONGINT,value));
-      PLOG("Appended INLINE long long int");
     }
     else if(PyFloat_Check(element_object)) {
       double value = PyFloat_AsDouble(element_object);
       self->list->container->push_back(Element(INLINE_FLOAT,value));
-      PLOG("Appending INLINE float64 (value=%g)", value);
     }
     // else if(PyUnicode_Check(element_object)) {
     // }
@@ -223,7 +293,8 @@ PyObject * ListType_method_size(List *self, PyObject *args)
 static PyMethodDef ListType_methods[] = 
   {
    {"append", (PyCFunction) ListType_method_append, METH_VARARGS | METH_KEYWORDS, "append(a) -> append 'a' to list"},
-   {"getitem", (PyCFunction) ListType_method_getitem, METH_VARARGS | METH_KEYWORDS, "getitem(item) -> access slice"},
+   {"getitem", (PyCFunction) ListType_method_getitem, METH_VARARGS | METH_KEYWORDS, "getitem(item) -> get element in list"},
+   {"setitem", (PyCFunction) ListType_method_setitem, METH_VARARGS | METH_KEYWORDS, "setitem(item,value) -> set element in list"},
    {"size", (PyCFunction) ListType_method_size, METH_NOARGS, "size() -> get size of list"},
    {NULL}  /* Sentinel */
   };
@@ -244,13 +315,13 @@ ListType_init(List *self, PyObject *args, PyObject *kwds)
                                     const_cast<char**>(kwlist),
                                     &memoryview_object,
                                     &rehydrate)) {
-     PyErr_SetString(PyExc_RuntimeError, "ListType ctor unable to parse args");
-     return -1;
+    PyErr_SetString(PyExc_RuntimeError, "ListType ctor unable to parse args");
+    return -1;
   }
 
   if (! PyMemoryView_Check(memoryview_object)) {
     PyErr_SetString(PyExc_RuntimeError, "ListType ctor parameter is not a memory view");
-     return -1;
+    return -1;
   }
   Py_buffer * buffer = PyMemoryView_GET_BUFFER(memoryview_object);
   assert(buffer);
@@ -277,45 +348,45 @@ ListType_init(List *self, PyObject *args, PyObject *kwds)
 
 
 PyTypeObject ListType = {
-  PyVarObject_HEAD_INIT(NULL, 0)
-  "pymm.pymmcore.List",           /* tp_name */
-  sizeof(List)   ,      /* tp_basicsize */
-  0,                       /* tp_itemsize */
-  (destructor) ListType_dealloc,      /* tp_dealloc */
-  0,                       /* tp_print */
-  0,                       /* tp_getattr */
-  0,                       /* tp_setattr */
-  0,                       /* tp_reserved */
-  0,                       /* tp_repr */
-  0,                       /* tp_as_number */
-  0,                       /* tp_as_sequence */
-  0,                       /* tp_as_mapping */
-  0,                       /* tp_hash */
-  0,                       /* tp_call */
-  0,                       /* tp_str */
-  0,                       /* tp_getattro */
-  0,                       /* tp_setattro */
-  0,                       /* tp_as_buffer */
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
-  "ListType",              /* tp_doc */
-  0,                       /* tp_traverse */
-  0,                       /* tp_clear */
-  0,                       /* tp_richcompare */
-  0,                       /* tp_weaklistoffset */
-  0,                       /* tp_iter */
-  0,                       /* tp_iternext */
-  ListType_methods,        /* tp_methods */
-  0, //ListType_members,         /* tp_members */
-  0,                       /* tp_getset */
-  0,                       /* tp_base */
-  0,                       /* tp_dict */
-  0,                       /* tp_descr_get */
-  0,                       /* tp_descr_set */
-  0,                       /* tp_dictoffset */
-  (initproc)ListType_init,  /* tp_init */
-  0,            /* tp_alloc */
-  ListType_new,             /* tp_new */
-  0, /* tp_free */
+                         PyVarObject_HEAD_INIT(NULL, 0)
+                         "pymm.pymmcore.List",           /* tp_name */
+                         sizeof(List)   ,      /* tp_basicsize */
+                         0,                       /* tp_itemsize */
+                         (destructor) ListType_dealloc,      /* tp_dealloc */
+                         0,                       /* tp_print */
+                         0,                       /* tp_getattr */
+                         0,                       /* tp_setattr */
+                         0,                       /* tp_reserved */
+                         0,                       /* tp_repr */
+                         0,                       /* tp_as_number */
+                         0,                       /* tp_as_sequence */
+                         0,                       /* tp_as_mapping */
+                         0,                       /* tp_hash */
+                         0,                       /* tp_call */
+                         0,                       /* tp_str */
+                         0,                       /* tp_getattro */
+                         0,                       /* tp_setattro */
+                         0,                       /* tp_as_buffer */
+                         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+                         "ListType",              /* tp_doc */
+                         0,                       /* tp_traverse */
+                         0,                       /* tp_clear */
+                         0,                       /* tp_richcompare */
+                         0,                       /* tp_weaklistoffset */
+                         0,                       /* tp_iter */
+                         0,                       /* tp_iternext */
+                         ListType_methods,        /* tp_methods */
+                         0, //ListType_members,         /* tp_members */
+                         0,                       /* tp_getset */
+                         0,                       /* tp_base */
+                         0,                       /* tp_dict */
+                         0,                       /* tp_descr_get */
+                         0,                       /* tp_descr_set */
+                         0,                       /* tp_dictoffset */
+                         (initproc)ListType_init,  /* tp_init */
+                         0,            /* tp_alloc */
+                         ListType_new,             /* tp_new */
+                         0, /* tp_free */
 };
 
 

@@ -26,16 +26,16 @@ class TestLinkedList(unittest.TestCase):
 
     def test_B_list_append(self):
         global shelf
-        # APPEND
         log("Testing: pymm.linked_list append method")
-        shelf.x.append(123)
-        shelf.x.append(1.321)
-        shelf.x.append(np.ndarray((3,3,),dtype=np.uint8))
-        shelf.x.append("Hello list!")  
+        shelf.x.append(123) # will be stored inline
+        shelf.x.append(1.321) # will be stored inline
+        shelf.x.append(np.ndarray((3,3,),dtype=np.uint8)) # will be stored as item in index
+        shelf.x.append("Hello list!") # will be stored as item in index
+        shelf.x.append("Goodbye list!") # will be stored as item in index
+        print(shelf.items)
 
     def test_C_list_access(self):
         global shelf
-        # ELEMENT ACCESS
         log("Testing: pymm.linked_list access")
         print(shelf.x[0])
         print(shelf.x[1])
@@ -49,12 +49,25 @@ class TestLinkedList(unittest.TestCase):
             
         print(shelf.x[3])
         self.assertTrue(shelf.x[3] == "Hello list!")
+        
 
-        # LEN
-
+    def test_D_list_item_assignment(self):
+        global shelf
+        log("Testing: pymm.linked_list item assignment")
+        shelf.x[0] = 999
+        self.assertTrue(shelf.x[0] == 999)
+        shelf.x[1] = np.ndarray(3,)
+        shelf.x[1] = np.ndarray(4,)
+        
+    def test_E_list_len(self):
+        global shelf
         print("Length of list:{}".format(len(shelf.x)))
-        self.assertTrue(len(shelf.x) == 4)
+        self.assertTrue(len(shelf.x) == 5)
         print(shelf.x)
+
+    def xxxtest_E_list_iterate(self):
+        for e in shelf.x:
+            print(e)
 
 
     def XXX_test_B_add_shelf_ndarray(self):
