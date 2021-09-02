@@ -178,7 +178,7 @@ static PyObject * ListType_method_setitem(List *self, PyObject *args, PyObject *
   if(index < 0L)
     index = list_size - labs(index);
 
-  if(index >= list_size) {
+  if(index < 0L or index >= list_size) {
     PyErr_SetString(PyExc_RuntimeError, "invalid slice criteria");
     return NULL;
   }

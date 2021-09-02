@@ -173,10 +173,16 @@ class shelved_linked_list(ShelvedCommon):
                     
 
     def __len__(self):
+        '''
+        Return number of elements in list
+        '''
         return self._internal.size()
 
     
     def __getitem__(self, item):
+        '''
+        Magic method for [] index access
+        '''
         if isinstance(item, int):
             value, item_in_index = self._internal.getitem(item)
             if item_in_index: # reference to item in index
@@ -218,7 +224,15 @@ class shelved_linked_list(ShelvedCommon):
         print(key)
         
     def __iter__(self):
-        pass
+        self.__iterpos = 0
+        return self
+
+    def __next__(self):
+        if self.__iterpos >= self.__len__():
+            raise StopIteration
+        result = self.__getitem__(self.__iterpos)
+        self.__iterpos += 1
+        return result
         
               
         
