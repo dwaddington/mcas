@@ -5,7 +5,6 @@ import skimage as img
 from skimage import data, io, filters
 import urllib.request, urllib.parse, urllib.error
 import random
-import simplejpeg
 
 def display(image):
     io.imshow(image)
@@ -29,8 +28,7 @@ shelf = pymm.shelf('imageExample',size_mb=32,backend='hstore-cc',pmem_path='/mnt
 #
 if 'testImage' not in shelf.items:
     print('Loading test image from file...')
-    data = open('./n01560419_100.JPEG','rb').read()
-    shelf.testImage = simplejpeg.decode_jpeg(data)
+    shelf.testImage = data.coins()
 
 # create segmented image on shelf
 #
