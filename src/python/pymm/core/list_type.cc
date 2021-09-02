@@ -98,7 +98,6 @@ static PyObject * present_element(const Element& element)
     PyTuple_SetItem(tuple, 1, Py_True);
     break;
   case INLINE_FLOAT:
-    PNOTICE("PRESENTING FLOAT...(%g)",element.inline_float64);
     PyTuple_SetItem(tuple, 0, PyFloat_FromDouble(element.inline_float64));
     PyTuple_SetItem(tuple, 1, Py_False);
     break;
