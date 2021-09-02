@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 #pragma GCC diagnostic pop
 
+#include <common/rand.h>
 #include <memory>
 
 //#define GPERF_TOOLS
@@ -167,6 +168,82 @@ TEST_F(Libnupm_test, RCA_LB_allocator)
     a.deallocate(vv, alloc_size, alignment);
   }
 }
+
+#undef SHOW_ORDER
+
+TEST_F(Libnupm_test, RCA_LB_allocator_issue155)
+{
+  std::size_t region_size = GB(4);
+  int numa_node = 0;
+  auto v0 = std::make_unique<char[]>(region_size);
+  ASSERT_NE(nullptr, v0);
+  auto v1 = std::make_unique<char[]>(region_size);
+  ASSERT_NE(nullptr, v0);
+  /* AVL_range_allocator requires an addr_t, defined in comanche common/types.h */
+  nupm::Rca_LB lb(0);
+  lb.add_managed_region(v0.get(), region_size, numa_node);
+
+  nupm::allocator_adaptor<char, nupm::Rca_LB> heap(lb);
+
+  /* test allocating COUNT elements 50:50 of the two sizes/alignment pairs
+     allocate and free in all permutations */
+
+  const std::size_t COUNT = 7; /* careful, this gets mighty big, mighty fast! */
+
+  typedef struct { char* ptr; size_t len; size_t alignment; } info_t;
+
+  std::vector<unsigned> rel_order;  
+  for(unsigned i=0;i<COUNT;i++)
+    rel_order.push_back(i);
+
+  std::vector<unsigned> alloc_order;  
+  for(unsigned i=0;i<COUNT;i++)
+    alloc_order.push_back(i);
+
+  std::sort(alloc_order.begin(), alloc_order.end());
+
+  /* generate release permutations */
+  do {
+
+#ifdef SHOW_ORDER
+    std::cout << "Allocation_Order: ";
+    for(auto i : alloc_order)
+      std::cout << i << " ";
+    std::cout << "\n";
+#endif
+
+    std::sort(rel_order.begin(), rel_order.end());
+
+    do { /* permutate on allocation orders */
+
+#ifdef SHOW_ORDER
+      std::cout << "Rel_Order: ";
+      for(auto i : rel_order)
+        std::cout << i << " ";
+      std::cout << "\n";
+#endif
+      /* run permutation */
+      std::vector<info_t> allocations;
+      const std::size_t ELEMENT_SIZES[] = {1048576, 134217752, 268435480, 536870936, 1073741848};
+      const std::size_t ALIGNMENT_SIZES[] = {1048576, 8, 8, 8, 8};
+
+      for(unsigned i=0;i<COUNT;i++) {
+        /* change to 5 to enable 1GB allocations */
+        auto j = abs(rand()) % 4; /* randomly pick, not exhaustive but hopefully enough */
+        assert(j < 5);
+        allocations.push_back({heap.allocate(ELEMENT_SIZES[j], ALIGNMENT_SIZES[j]), ELEMENT_SIZES[j], ALIGNMENT_SIZES[j]});
+      }
+
+      for(auto i: rel_order) {
+        auto& element = allocations[i];
+        heap.deallocate(element.ptr, element.len, element.alignment);
+      }
+    }
+    while(next_permutation(rel_order.begin(), rel_order.end()));
+  }
+  while(next_permutation(alloc_order.begin(), alloc_order.end()));
+}
+
 
 int main(int argc, char **argv)
 {
