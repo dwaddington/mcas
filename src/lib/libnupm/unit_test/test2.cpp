@@ -8,7 +8,6 @@
 #include <gtest/gtest.h>
 #pragma GCC diagnostic pop
 
-#include <common/rand.h>
 #include <memory>
 
 //#define GPERF_TOOLS
