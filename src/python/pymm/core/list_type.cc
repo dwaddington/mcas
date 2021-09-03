@@ -1,6 +1,7 @@
 #ifndef __PYMM_LIST_TYPE_H__
 #define __PYMM_LIST_TYPE_H__
 
+#include <limits.h>
 #include <common/errors.h>
 #include <common/logging.h>
 #include <common/utils.h>
@@ -134,8 +135,8 @@ static PyObject * ListType_method_getitem(List *self, PyObject *args, PyObject *
     if(index < 0L)
       index = list_size - labs(index);
 
-    if(index >= list_size) {
-      PyErr_SetString(PyExc_RuntimeError, "invalid slice criteria");
+    if(index < 0 or index >= list_size) {
+      PyErr_SetString(PyExc_RuntimeError, "out of bounds item index");
       return NULL;
     }
 
@@ -152,6 +153,7 @@ static PyObject * ListType_method_getitem(List *self, PyObject *args, PyObject *
   Py_RETURN_NONE;
 }
 
+
 static PyObject * ListType_method_setitem(List *self, PyObject *args, PyObject *kwds)
 {
   static const char *kwlist[] = {"item",
@@ -159,7 +161,7 @@ static PyObject * ListType_method_setitem(List *self, PyObject *args, PyObject *
                                  "tag",
                                  NULL};
 
-  long index = -1;
+  long index;
   PyObject * value_obj = nullptr;
   unsigned long element_tag = 0;
 
@@ -179,7 +181,7 @@ static PyObject * ListType_method_setitem(List *self, PyObject *args, PyObject *
     index = list_size - labs(index);
 
   if(index < 0L or index >= list_size) {
-    PyErr_SetString(PyExc_RuntimeError, "invalid slice criteria");
+    PyErr_SetString(PyExc_RuntimeError, "out of bounds item index");
     return NULL;
   }
 
@@ -227,6 +229,48 @@ static PyObject * ListType_method_setitem(List *self, PyObject *args, PyObject *
   return PyLong_FromUnsignedLong(removed_tag);
 }
 
+
+static PyObject * ListType_method_delitem(List *self, PyObject *args, PyObject *kwds)
+{
+  static const char *kwlist[] = {"item",
+                                 NULL};
+
+  long index;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "l|",
+                                    const_cast<char**>(kwlist),
+                                    &index)) {
+    PyErr_SetString(PyExc_RuntimeError, "ListType_method_getitem unable to parse args");
+    return NULL;
+  }
+
+  long list_size = self->list->container->size();
+  if(index < 0L)
+    index = list_size - labs(index);
+
+  if(index < 0 or index >= list_size) {
+    PyErr_SetString(PyExc_RuntimeError, "out of bounds item index");
+    return NULL;
+  }
+
+  auto it = self->list->container->begin();
+  while(index > 0) {
+    it ++;
+    index --;
+  }
+  assert(it != self->list->container->end());
+
+  unsigned long removed_tag = it->tag;
+  if(it->type != SHELF_REFERENCE) removed_tag = 0;
+
+  self->list->container->erase(it);
+
+  self->list->commit();
+  /* return optional tag for removal from shelf */
+  return PyLong_FromUnsignedLong(removed_tag);
+}
 
 
 static PyObject * ListType_method_append(List *self, PyObject *args, PyObject *kwds)
@@ -295,6 +339,7 @@ static PyMethodDef ListType_methods[] =
    {"append", (PyCFunction) ListType_method_append, METH_VARARGS | METH_KEYWORDS, "append(a) -> append 'a' to list"},
    {"getitem", (PyCFunction) ListType_method_getitem, METH_VARARGS | METH_KEYWORDS, "getitem(item) -> get element in list"},
    {"setitem", (PyCFunction) ListType_method_setitem, METH_VARARGS | METH_KEYWORDS, "setitem(item,value) -> set element in list"},
+   {"delitem", (PyCFunction) ListType_method_delitem, METH_VARARGS | METH_KEYWORDS, "delitem(item) -> delete element from list"},
    {"size", (PyCFunction) ListType_method_size, METH_NOARGS, "size() -> get size of list"},
    {NULL}  /* Sentinel */
   };

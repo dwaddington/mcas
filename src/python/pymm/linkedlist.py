@@ -156,7 +156,7 @@ class shelved_linked_list(ShelvedCommon):
     @methodcheck(types=[int])
     def __erase_tagged_object__(self, tag):
         '''
-        Erase a tagged object from the shelf
+        Erase a tagged object from the shelf (iff tag > 0)
         '''
         if isinstance(tag, int):
             if tag > 0:
@@ -224,15 +224,31 @@ class shelved_linked_list(ShelvedCommon):
         print(key)
         
     def __iter__(self):
+        '''
+        Iterator method
+        '''
         self.__iterpos = 0
         return self
 
     def __next__(self):
+        '''
+        Iterator next method
+        '''
         if self.__iterpos >= self.__len__():
             raise StopIteration
         result = self.__getitem__(self.__iterpos)
         self.__iterpos += 1
         return result
+
+    @methodcheck(types=[int])
+    def __delitem__(self, item):
+        '''
+        Magic method for del self[key] operations
+        '''
+        rc = self._internal.delitem(item)
+        self.__erase_tagged_object__(rc)
+        return
+
         
               
         

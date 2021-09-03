@@ -74,7 +74,6 @@ class TestLinkedList(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             shelf.x[-100] = 0
 
-        
     def test_E_list_len(self):
         global shelf
         log("Testing: pymm.linked_list : length of list:{}".format(len(shelf.x)))
@@ -89,6 +88,20 @@ class TestLinkedList(unittest.TestCase):
             print(e)
             count += 1
         self.assertTrue(count == 6)
+
+    def test_F_list_element_del(self):
+        global shelf
+        log("Testing: pymm.linked_list: item del")
+        shelf.y = pymm.linked_list()
+        shelf.y.append(1)
+        shelf.y.append(2)
+        shelf.y.append(3)
+        del shelf.y[1]
+        self.assertTrue(len(shelf.y) == 2)
+        self.assertTrue(shelf.y[0] == 1)
+        self.assertTrue(shelf.y[1] == 3)
+        shelf.erase('y')
+        
 
 
     def XXX_test_B_add_shelf_ndarray(self):
