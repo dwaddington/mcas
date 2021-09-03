@@ -102,6 +102,8 @@ class TestLinkedList(unittest.TestCase):
         self.assertTrue(shelf.y[1] == 3)
         shelf.erase('y')
         
+    def test_G_list_printstr(self):
+        print(list(shelf.x))
 
 
     def XXX_test_B_add_shelf_ndarray(self):

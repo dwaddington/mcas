@@ -186,6 +186,12 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     def as_tensor(self):
         '''Cast class to torch.Tensor subclass'''
         return self.as_subclass(torch.Tensor)
+
+    def __str__(self):
+        return str(self.as_tensor())
+
+    def __repr__(self):
+        return repr(self.as_tensor())
     
     def update_metadata(self, array):
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str, type=1)
