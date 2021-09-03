@@ -75,6 +75,61 @@ class TestNdarray(unittest.TestCase):
         self.s.erase('r2')
         self.s.erase('r3')
 
+    def test_ndarray_slicing(self):
+        log("Testing: np.ndarray slicing ...")
+        d = np.ones((3,5,),dtype=np.uint8)
+        self.s.w = d
+        self.s.w_flat = self.s.w.reshape(-1)
+        self.assertTrue(np.array_equal(self.s.w_flat, np.ones((3*5,),dtype=np.uint8)))
+        self.s.x = np.arange(0,10)
+        self.assertTrue(self.s.x[-1] == 9)
+        self.assertTrue(self.s.x[-2] == 8)
+        self.assertTrue(np.array_equal(self.s.x[-2:],[8,9]))
+        self.assertTrue(np.array_equal(self.s.x[:-2],np.arange(0,8)))
+        self.assertTrue(np.array_equal(self.s.x[::-1],[9,8,7,6,5,4,3,2,1,0]))
+        self.assertTrue(np.array_equal(self.s.x[1::-1],[1,0]))
+        self.assertTrue(np.array_equal(self.s.x[-3::-1],[7,6,5,4,3,2,1,0]))
+        self.assertTrue(np.array_equal(self.s.x[:-3:-1],[9,8]))
+        self.s.i = 1
+        self.s.w[:,int(self.s.i)]
+        self.s.w[:,self.s.i]
+
+    def test_column_access(self):
+        log("Testing: column access...")
+        A = np.zeros((3, 4,),dtype=np.uint8)
+        A[1] = 1
+        A[2] = np.arange(0,4)
+        A[:,0] = 2
+        b = np.arange(3).reshape(3,1)
+        q = (np.random.randn(3,1) - b/10).reshape(-1)
+        # q is ndarray [x,y,z]
+        A[:,0] = q
+
+        self.s.B = np.zeros((3, 4,), dtype=np.uint8)
+        self.s.B[1] = 1
+        self.s.B[:,0] = 2
+        self.s.B[:,0] = q
+        print(self.s.B)
+        self.s.erase('B')
+
+    def test_column_access_2(self):
+        log("Testing: column access variation...")
+        self.s.A = np.zeros((3, 4,),dtype=np.uint8)
+        self.s.b = np.arange(3).reshape(3,1)
+        self.s.c = np.arange(3).reshape(3,1)
+        self.s.A[:, 0] = (self.s.b - self.s.c).reshape(-1)
+
+    def test_matrixop_and_reshape(self):
+        self.s.theta = pymm.ndarray((3, 4,))
+        self.s.theta.fill(2.0)
+        self.s.moment = pymm.ndarray((3, 4,))
+        self.s.moment.fill(1.2)
+        self.s.theta_deviation = (self.s.theta - self.s.moment).reshape(-1)        
+    
+        
+
 
 if __name__ == '__main__':
     unittest.main()
+
+    

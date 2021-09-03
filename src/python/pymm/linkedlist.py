@@ -25,9 +25,8 @@ from flatbuffers import util
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
-
 from .float_number import float_number
-
+from .check import methodcheck
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -149,19 +148,39 @@ class shelved_linked_list(ShelvedCommon):
             self._tag += 1
             tag = self._tag
             name = '_' + self._name + '_' + str(tag)
-            self._shelf.__setattr__(name, element)
+            self._shelf.__setattr__(name, element) # like saying shelf.name = element
             return self._internal.append(element=None, tag=tag)
 
         raise RuntimeError('unhandled type')
 
+    @methodcheck(types=[int])
+    def __erase_tagged_object__(self, tag):
+        '''
+        Erase a tagged object from the shelf
+        '''
+        if isinstance(tag, int):
+            if tag > 0:
+                name = self.__build_tagged_object_name__(tag)
+                print("Erasing object (it was overwritten) :{}".format(name))
+                self._shelf.erase(name)
+
+    @methodcheck(types=[int])
+    def __build_tagged_object_name__(self, tag):
+        '''
+        Generate name of a tagged object
+        '''
+        return '_' + self._name + '_' + str(tag)
+                    
+
     def __len__(self):
         return self._internal.size()
 
+    
     def __getitem__(self, item):
         if isinstance(item, int):
             value, item_in_index = self._internal.getitem(item)
-            if item_in_index:
-                name = '_' + self._name + '_' + str(value)
+            if item_in_index: # reference to item in index
+                name = self.__build_tagged_object_name__(value)
                 try:
                     return self._shelf.__getattr__(name)
                 except RuntimeError:
@@ -169,6 +188,38 @@ class shelved_linked_list(ShelvedCommon):
             return value
         else:
             raise RuntimeError('slice criteria not supported')
+
+    def __setitem__(self, item, value):
+        '''
+        Magic method for item assignment
+        '''
+        if isinstance(item, int):
+
+            if issubclass(type(value), ShelvedCommon): # implies it already on the shelf
+                rc = self._internal.setitem(item=item, value=None, name=element.name)
+            elif (isinstance(value, float) or isinstance(value, int)): # inline value
+                rc = self._internal.setitem(item=item, value=value)
+            elif (isinstance(value, np.ndarray) or # other items that will be created implicitly as shelf items
+                  isinstance(value, str)):
+                # use shelf to store value
+                self._tag += 1
+                tag = self._tag
+                name = '_' + self._name + '_' + str(tag)
+                self._shelf.__setattr__(name, value) # like saying shelf.name = element
+                rc = self._internal.setitem(item=item, value=None, tag=tag)
+            else:
+                raise RuntimeError('unhandled type')
+
+            self.__erase_tagged_object__(rc)
+            return
+        else:
+            raise RuntimeError('slice criteria not supported')
+
+        print(key)
+        
+    def __iter__(self):
+        pass
+        
               
         
 

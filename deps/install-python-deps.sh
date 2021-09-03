@@ -1,5 +1,7 @@
 #!/bin/bash
 #
+# PLEASE RUN THIS AS NON-ROOT
+#
 # PP uses .site local installs
 #
 # Python3 should be installed

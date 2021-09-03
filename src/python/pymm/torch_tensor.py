@@ -17,6 +17,13 @@ import torch
 import pymmcore
 import numpy as np
 import copy
+import flatbuffers
+
+import PyMM.Meta.Header as Header
+import PyMM.Meta.Constants as Constants
+import PyMM.Meta.TorchTensor as TorchTensor
+import PyMM.Meta.DataType as DataType
+from flatbuffers import util
 
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
@@ -78,8 +85,8 @@ class torch_tensor(Shadow):
         new_tensor = shelved_torch_tensor(memory_resource,
                                           name,
                                           shape = tensor.shape,
-                                          dtype = tensor.dtype,
-                                          requires_grad = tensor.requires_grad)
+                                          dtype = tensor.dtype)
+
         
         # now copy the data
         if tensor.dim() is 0:
@@ -91,11 +98,13 @@ class torch_tensor(Shadow):
     
 # concrete subclass for torch tensor
 #
+# Note: currently the gradient tensor is not preserved.  this is consistent with pickling
+#
 class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''PyTorch tensor that is stored in a memory resource'''
     __array_priority__ = -100.0 # sets subclass as higher priority
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', requires_grad=False):
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
 
         torch_to_numpy_dtype_dict = {
             torch.bool  : np.bool,
@@ -124,8 +133,10 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             # use shelved_ndarray under the hood and make a subclass from it
             base_ndarray = shelved_ndarray(memory_resource, name=name, shape=ndshape, dtype=np_dtype, type=1)
 
-            # create and store metadata header
-            metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1) # type=1 indicate torch_tensor
+            # create and store metadata header : type=1 indicates torch_tensor
+            metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
+            builder = flatbuffers.Builder(32)
+
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
@@ -136,6 +147,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
             base_ndarray = shelved_ndarray(memory_resource, name=name, dtype=hdr['dtype'], shape=hdr['shape'],
                                            strides=hdr['strides'], order=order, type=1)
+
             
         self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
         self._base_ndarray = base_ndarray
@@ -145,17 +157,8 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         self._memory_resource = memory_resource
         self._metadata_key = metadata_key
         self.name_on_shelf = name
-
-        if requires_grad == False:
-            self.requires_grad_ = None
-            self.retains_grad = False
-        else:
-            # raise RuntimeError('required grad not supported by PyMM .. eek')
-            self.requires_grad_ = True
-            self.grad = torch.Variable()
-            self.retains_grad = True
-
-        
+        self.requires_grad = False # by default .grad is not there
+        self.retains_grad = False # by default .grad is not there 
         return self
 
     def __delete__(self, instance):

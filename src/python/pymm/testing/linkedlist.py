@@ -12,46 +12,74 @@ def colored(r, g, b, text):
 def log(*args):
     print(colored(0,255,255,*args))
 
+global shelf
 force_new=True
 class TestLinkedList(unittest.TestCase):
-    def setUp(self):
-        global force_new
-        self.s = pymm.shelf('myShelf',size_mb=2048,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=force_new)
-        force_new=False
 
-    def tearDown(self):
-        del self.s
-    
 
-    def test_list_construction(self):
-
+    def test_A_list_construction(self):
+        global shelf
+        shelf = pymm.shelf('myShelf',size_mb=2048,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=force_new)
         log("Testing: pymm.linked_list construction")
-        self.s.x = pymm.linked_list()
-        print(self.s.x)
+        shelf.x = pymm.linked_list()
+        print(shelf.x)
 
+    def test_B_list_append(self):
+        global shelf
         log("Testing: pymm.linked_list append method")
-        self.s.x.append(123)
-        self.s.x.append(1.321)
-        self.s.x.append(np.ndarray((3,3,),dtype=np.uint8))
-    
-        print(self.s.x[0])
-        print(self.s.x[1])
-        print(self.s.x[2])
-        self.s.x.append("Hello list!")
+        shelf.x.append(123) # will be stored inline
+        shelf.x.append(1.321) # will be stored inline
+        shelf.x.append(np.ndarray((3,3,),dtype=np.uint8)) # will be stored as item in index
+        shelf.x.append("Hello list!") # will be stored as item in index
+        shelf.x.append("Goodbye list!") # will be stored as item in index
+        print(shelf.items)
 
-        print(self.s.x)
-        self.assertTrue(self.s.x[0] == 123)
-        print(self.s.x[1])
-        print(type(self.s.x[1]))
-        self.assertTrue(self.s.x[1] == 1.321)
+    def test_C_list_access(self):
+        global shelf
+        log("Testing: pymm.linked_list access")
+        print(shelf.x[0])
+        print(shelf.x[1])
+        print(shelf.x[2])
+
+        print(shelf.x)
+        self.assertTrue(shelf.x[0] == 123)
+        print(shelf.x[1])
+        print(type(shelf.x[1]))
+        self.assertTrue(shelf.x[1] == 1.321)
             
-        print(self.s.x[3])
-        self.assertTrue(self.s.x[3] == "Hello list!")
+        print(shelf.x[3])
+        self.assertTrue(shelf.x[3] == "Hello list!")
+        
 
-        print(self.s.items)
-        self.s.x[3] = "Goodbye";
-        self.assertTrue(self.s.x[3] == "Goodbye")
-        print("Length of list:{}".format(len(self.s.x)))
+    def test_D_list_item_assignment(self):
+        global shelf
+        log("Testing: pymm.linked_list item assignment")
+        shelf.x[0] = 999
+        self.assertTrue(shelf.x[0] == 999)
+        shelf.x[1] = np.ndarray(3,)
+        shelf.x[1] = np.ndarray(4,)
+        
+    def test_E_list_len(self):
+        global shelf
+        print("Length of list:{}".format(len(shelf.x)))
+        self.assertTrue(len(shelf.x) == 5)
+        print(shelf.x)
+
+    def xxxtest_E_list_iterate(self):
+        for e in shelf.x:
+            print(e)
+
+
+    def XXX_test_B_add_shelf_ndarray(self):
+        log("creating an ndarray on shelf, then adding to list")
+        shelf.n = pymm.ndarray((3,8,))
+        shelf.x.append(shelf.n)
+        print(shelf.x)
+        
+#        print(shelf.items)
+#        shelf.x[3] = "Goodbye";
+#        self.assertTrue(shelfy.x[3] == "Goodbye")
+#
 
 
 if __name__ == '__main__':

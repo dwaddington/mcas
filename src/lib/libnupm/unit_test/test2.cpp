@@ -172,20 +172,15 @@ TEST_F(Libnupm_test, RCA_LB_allocator)
 
 TEST_F(Libnupm_test, RCA_LB_allocator_issue155)
 {
-  std::size_t region_size = GB(4);
+  std::size_t region_size = GB(20);
   int numa_node = 0;
   auto v0 = std::make_unique<char[]>(region_size);
-  ASSERT_NE(nullptr, v0);
-  auto v1 = std::make_unique<char[]>(region_size);
   ASSERT_NE(nullptr, v0);
   /* AVL_range_allocator requires an addr_t, defined in comanche common/types.h */
   nupm::Rca_LB lb(0);
   lb.add_managed_region(v0.get(), region_size, numa_node);
 
   nupm::allocator_adaptor<char, nupm::Rca_LB> heap(lb);
-
-  /* test allocating COUNT elements 50:50 of the two sizes/alignment pairs
-     allocate and free in all permutations */
 
   const std::size_t COUNT = 7; /* careful, this gets mighty big, mighty fast! */
 
@@ -228,7 +223,7 @@ TEST_F(Libnupm_test, RCA_LB_allocator_issue155)
 
       for(unsigned i=0;i<COUNT;i++) {
         /* change to 5 to enable 1GB allocations */
-        auto j = abs(rand()) % 4; /* randomly pick, not exhaustive but hopefully enough */
+        auto j = abs(rand()) % 5; /* randomly pick, not exhaustive but hopefully enough */
         assert(j < 5);
         allocations.push_back({heap.allocate(ELEMENT_SIZES[j], ALIGNMENT_SIZES[j]), ELEMENT_SIZES[j], ALIGNMENT_SIZES[j]});
       }
