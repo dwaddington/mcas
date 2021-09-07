@@ -176,7 +176,7 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
           /* uses XPMEM kernel module */
           xpmem_segid_t seg_id = ::xpmem_make(::base(r), ::size(r), XPMEM_PERMIT_MODE, reinterpret_cast<void*>(0666));
           if (seg_id == -1)
-            throw Logic_exception("xpmem_make failed unexpectedly");
+            throw Logic_exception("xpmem_make(%p,0x%zx,0x%x,%p) failed unexpectedly", ::base(r), ::size(r), XPMEM_PERMIT_MODE, reinterpret_cast<void*>(0666));
 
           if (ado->send_memory_map(std::uint64_t(seg_id), ::size(r), ::base(r)) != S_OK)
             throw Logic_exception("initial send_memory_map failed");

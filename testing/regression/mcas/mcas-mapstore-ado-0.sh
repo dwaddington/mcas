@@ -11,7 +11,9 @@ NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
 # launch MCAS server
-./dist/bin/mcas --config "$("./dist/testing/mapstore-ado0.py" "$NODE_IP")" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
+CONFIG_STR="$("./dist/testing/cfg_mapstore_ado.py" "$NODE_IP")"
+[ 0 -lt $DEBUG ] && echo ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
+./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!
 
 # give time to start server
@@ -19,6 +21,7 @@ sleep 3
 
 CLIENT_LOG="test$TESTID-client.log"
 # launch client
+[ 0 -lt $DEBUG ] && echo ./dist/bin/ado-test --src_addr "$NODE_IP" --server $NODE_IP
 ./dist/bin/ado-test --src_addr "$NODE_IP" --server $NODE_IP &> $CLIENT_LOG &
 CLIENT_PID=$!
 

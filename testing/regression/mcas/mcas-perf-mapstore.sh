@@ -17,7 +17,7 @@ NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 PERF_OPTS=${PERF_OPTS:-"--skip_json_reporting"}
 
-CONFIG_STR="$("./dist/testing/mapstore-0.py" "$NODE_IP")"
+CONFIG_STR="$("./dist/testing/cfg_mapstore.py" "$NODE_IP")"
 
 # launch MCAS server
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
