@@ -236,7 +236,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                     &p_backend,
                                     &p_mm_plugin,
                                     &force_new)) {
-    PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+    PyErr_SetString(PyExc_RuntimeError, "MemoryResource_init: bad arguments");
     PWRN("bad arguments or argument types to MemoryResource constructor");
     return -1;
   }
@@ -648,7 +648,7 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
 
   Py_buffer * pybuffer = PyMemoryView_GET_BUFFER(mview);
 
-  PNOTICE("persisting %p %lu", pybuffer->buf, pybuffer->len);
+  //  PNOTICE("persisting %p %lu", pybuffer->buf, pybuffer->len);
   pmem_persist(pybuffer->buf, pybuffer->len); /* part of libpmem */
   
   return PyLong_FromLong(0);

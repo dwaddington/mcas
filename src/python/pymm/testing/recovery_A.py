@@ -21,22 +21,15 @@ class TestBefore(unittest.TestCase):
         os.system("rm -Rf /mnt/pmem0/2")
         os.system("mkdir -p /mnt/pmem0/1")
         os.system("mkdir -p /mnt/pmem0/2")
-        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0/1',force_new=True)
+        self.s = pymm.shelf('myShelf', size_mb=1024, backend='hstore-cc', pmem_path='/mnt/pmem0/1', load_addr=0x900000000, force_new=True)
 
-        # can't create two shelves of the same type
-        #self.s2 = pymm.shelf('myShelf-2',size_mb=1024,pmem_path='/mnt/pmem0/2',force_new=True)
-
-        # this breaks
-        #self.s2 = pymm.shelf('myShelf-2',size_mb=1024,pmem_path='/mnt/pmem0/2',force_new=True,backend='hstore-mm')
-        # this also breaks
-        #self.s2 = pymm.shelf('myShelf-2',size_mb=1024,pmem_path='/mnt/pmem0/2',force_new=True,backend='hstore')
-        # this works OK.
-        self.s2 = pymm.shelf('myShelf-2',size_mb=1024,pmem_path='/mnt/pmem0/2',force_new=True,backend='mapstore')
+        # can't create two shelves of the same type (we need to do some work around setting the base address)
+        #self.s2 = pymm.shelf('myShelf-2',size_mb=1024, backend='hstore-cc', pmem_path='/mnt/pmem0/2',force_new=True)
         print("Setup OK")
         
     def tearDown(self):
         del self.s
-        del self.s2
+        #del self.s2
         
     def test_write_A(self):
         self.s.A = np.ndarray((3,8),dtype=np.uint8)

@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -m unittest
 #
-# "before" part of recovery test 
+# "after" part of recovery test 
 #
 import unittest
 import pymm
@@ -17,13 +17,13 @@ def log(*args):
 class TestBefore(unittest.TestCase):
     def setUp(self):
         global force_new
-        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0/1',force_new=False)
-        self.s2 = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0/2',force_new=False)
+        self.s = pymm.shelf('myShelf',size_mb=1024, backend='hstore-cc', pmem_path='/mnt/pmem0/1',force_new=False)
+        #self.s2 = pymm.shelf('myShelf-2',size_mb=1024, backend='hstore-cc', pmem_path='/mnt/pmem0/2',force_new=False)
         print(self.s.items)
     
     def tearDown(self):
         del self.s
-        del self.s2        
+        #del self.s2        
         
     def test_check_A(self):
         print(self.s.A)
@@ -32,7 +32,7 @@ class TestBefore(unittest.TestCase):
         x[1] += 1
         self.assertTrue(np.array_equal(self.s.A,x))
 
-    def test_check_B(self):
+    def xtest_check_B(self):
         print(self.s.B)
         self.assertTrue(np.array_equal(self.s.B, np.zeros((3,8,))))
 

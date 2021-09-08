@@ -130,9 +130,9 @@ class MemoryResource(pymmcore.MemoryResource):
     resources.  It is backed by an MCAS store component and corresponds
     to a pool.
     '''
-    def __init__(self, name, size_mb, pmem_path, backend=None, mm_plugin=None, force_new=False):
+    def __init__(self, name, size_mb, pmem_path, load_addr, backend=None, mm_plugin=None, force_new=False):
         self._named_memory = {}
-        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
+        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path, load_addr=load_addr, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
         
         # todo check for outstanding transactions
         all_items = super()._MemoryResource_get_named_memory_list()
