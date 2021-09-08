@@ -22,6 +22,7 @@ class MemoryReference():
         self.mr = memory_resource
         self.buffer = memview
         self.varname = name
+        self.tx_log = []
         if os.getenv('PYMM_DEBUG') != None:
             self._debug_level = int(os.getenv('PYMM_DEBUG'))
         else:
@@ -50,7 +51,7 @@ class MemoryReference():
         if self._use_sw_tx:
             if self._debug_level > 0:
                 print('tx_begin')
-            self.__tx_begin_swcopy()
+            self.__tx_add_swcopy()
 
     def tx_commit(self):
 
@@ -62,13 +63,16 @@ class MemoryReference():
             self.__tx_commit_swcopy()
     
 
-    def __tx_begin_swcopy(self):
+    def __tx_add_swcopy(self):
         '''
         Start consistent transaction (very basic copy-off undo-log)
         '''
-        (self.tx_handle, mem) = self.mr._MemoryResource_create_named_memory(self.varname + '-tx', len(self.buffer))
-        if self.tx_handle is None:
+        name = self.varname + '-tx-' + len(self.tx_log)
+        (tx_handle, mem) = self.mr._MemoryResource_create_named_memory(name, len(self.buffer))
+        if tx_handle is None:
             raise RuntimeError('tx_begin failed')
+
+        self.tx_log.append((tx_handle, name))
         # copy data, then persist
         mem[:]= self.buffer;
         self.mr._MemoryResource_persist_memory_view(mem)
@@ -79,10 +83,13 @@ class MemoryReference():
         '''
         Commit consistent transaction
         '''
-        self.mr.release_named_memory_by_handle(self.tx_handle)
-        self.mr.erase_named_memory(self.varname + '-tx')
+        for tx_entry in self.tx_log:
+            self.mr.release_named_memory_by_handle(tx_entry[0])
+            self.mr.erase_named_memory(tx_entry[1])
+        self.tx_log = []
         if self._debug_level > 0:
             print('tx_commit OK!')
+        
         
     def persist(self):
         '''

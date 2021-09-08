@@ -18,7 +18,7 @@ force_new=True
 class TestAssignment(unittest.TestCase):
     def setUp(self):
         global force_new
-        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=force_new)
+        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/dev/dax0.0',force_new=force_new)
         force_new=False
     
     def tearDown(self):
@@ -55,26 +55,21 @@ class TestAssignment(unittest.TestCase):
         w = torch.tensor([2,2,2],dtype=torch.uint8)
         self.s.w.fill_(9)
         w.fill_(9)
-        print(self.s.w)
-        print(w)
-
+        print("self.s.w = {}".format(self.s.w))
+        print("w = {}".format(w))
         self.assertTrue(torch.equal(self.s.w, w))
 
         log("Testing: pymm.ndarray RHS ...")
-        self.s.x = pymm.torch_tensor((100,100,100),dtype=torch.uint8)
-        self.s.x = pymm.torch_tensor([[1,1,1],[2,2,2]],dtype=torch.uint8)
-        x = torch.tensor([[1,1,1],[2,2,2]],dtype=torch.uint8)
-        self.s.x.fill_(8)
-        self.s.x[1] = 9
-        x.fill_(8)
-        x[1] = 9
-        print(self.s.x)
-        print(x)
+        #self.s.x = pymm.torch_tensor((100,100,100),dtype=torch.uint8)
+
+        self.s.x = pymm.torch_tensor([[1,1,1,1],[2,2,2,2]],dtype=torch.uint8)
+        x = torch.tensor([[1,1,1,1],[2,2,2,2]],dtype=torch.uint8)
+        
+        print("self.s.x =\n {}".format(self.s.x))
+        print("x =\n {}".format(x))
 
         self.assertTrue(torch.equal(self.s.x, x))
         
-        self.s.erase('x')
-        self.s.erase('w')
         log("Testing: ndarray OK!")
 
 
