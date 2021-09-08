@@ -72,6 +72,7 @@ class shelf():
     def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, backend=None, mm_plugin=None, force_new=False):
         self.name = name
         self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
+        
         if self.mr == None:
             raise RuntimeError('shelf initialization failed')
         
