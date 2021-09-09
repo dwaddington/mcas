@@ -23,15 +23,17 @@ run_hstore() {
   done
 }
 
-if has_devdax
-then raw_store_size=$(cat "/sys/dev/char/$(ls -l /dev/dax0.0 | awk '{gsub(",",":") ; print $5 $6}')/size")
-  echo "DAXTYPE=devdax RAW_STORE_SIZE=$raw_store_size run_hstore has_module_mcasmod $1"
-  DAXTYPE=devdax RAW_STORE_SIZE=$raw_store_size run_hstore has_module_mcasmod $1
+DEVDAX_PFX="$(find_devdax)"
+if test -n "$DEVDAX_PFX"
+then raw_store_size=$(cat "/sys/dev/char/$(ls -l ${DEVDAX_PFX}.0 | awk '{gsub(",",":") ; print $5 $6}')/size")
+  echo "DAX_PREFIX=${$DEVDAX_PFX} RAW_STORE_SIZE=$raw_store_size run_hstore has_module_mcasmod $1"
+  DAX_PREFIX="$DEVDAX_PFX" RAW_STORE_SIZE=$raw_store_size run_hstore has_module_mcasmod $1
 fi
 
-if has_fsdax
+FSDAX_DIR="$(find_fsdax)"
+if test -n "$FSDAX_DIR"
 then raw_store_size=$(($(df /mnt/pmem1 --output=avail | tail -1)*1024))
-  echo "DAXTYPE=fsdax USE_ODP=1 RAW_STORE_SIZE=$raw_store_size run_hstore true $1"
-  DAXTYPE=fsdax USE_ODP=1 RAW_STORE_SIZE=$raw_store_size run_hstore true $1
+  echo "DAX_PREFIX=${FSDAX_DIR} USE_ODP=1 RAW_STORE_SIZE=$raw_store_size run_hstore true $1"
+  DAX_PREFIX="$FSDAX_DIR" USE_ODP=1 RAW_STORE_SIZE=$raw_store_size run_hstore true $1
 fi
 

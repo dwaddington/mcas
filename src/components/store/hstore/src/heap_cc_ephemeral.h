@@ -45,8 +45,6 @@ private:
 	using string_view = common::string_view;
 	std::unique_ptr<ccpm::IHeap_expandable> _heap;
 	nupm::region_descriptor _managed_regions;
-	std::size_t _capacity;
-	std::size_t _allocated;
 	impl::allocation_state_emplace *_ase;
 	impl::allocation_state_pin *_aspd;
 	impl::allocation_state_pin *_aspk;
@@ -137,8 +135,8 @@ public:
 	heap_cc_ephemeral(const heap_cc_ephemeral &) = delete;
 	heap_cc_ephemeral& operator=(const heap_cc_ephemeral &) = delete;
 
-	std::size_t capacity() const { return _capacity; }
-	std::size_t allocated() const { return _allocated; }
+	std::size_t capacity() const; // { return _capacity; }
+	std::size_t allocated() const; // { return _allocated; }
 	void add_managed_region(byte_span r_full, byte_span r_heap, unsigned numa_node);
 	void allocate(persistent_t<void *> &p, std::size_t sz, std::size_t alignment);
 	std::size_t free(persistent_t<void *> &p_, std::size_t sz_);

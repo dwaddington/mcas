@@ -27,6 +27,11 @@ class MemoryReference():
         else:
             self._debug_level = 0
 
+        if os.getenv('PYMM_USE_SW_TX') != None:
+            self._use_sw_tx = (int(os.getenv('PYMM_USE_SW_TX')) > 0)
+        else:
+            self._use_sw_tx = False
+
     def __del__(self):
         if self._debug_level > 0:
             print("releasing named memory {} @ {}".format(self.varname, hex(pymmcore.memoryview_addr(self.buffer))))
@@ -39,19 +44,22 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-        #print('tx_begin')
 
         #pymmcore.valgrind_trigger(1)
-        # disable SW copy
-        #self.__tx_begin_swcopy()
-        pass
+
+        if self._use_sw_tx:
+            if self._debug_level > 0:
+                print('tx_begin')
+            self.__tx_begin_swcopy()
 
     def tx_commit(self):
-        #print('tx_commit')
+
         #pymmcore.valgrind_trigger(2)
-        # disable SW copy 
-        #self.__tx_commit_swcopy()
-        pass
+
+        if self._use_sw_tx:
+            if self._debug_level > 0:
+                print('tx_commit')
+            self.__tx_commit_swcopy()
     
 
     def __tx_begin_swcopy(self):

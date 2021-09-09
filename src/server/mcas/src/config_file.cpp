@@ -733,12 +733,12 @@ Config_file::Config_file(unsigned debug_level_, rapidjson::Document&& doc)
     for (unsigned i = 0; i < shard_count(); i++) {
       auto net  = get_shard_optional(config::net, i);
       auto addr = get_shard_optional(config::addr, i);
-      PLOG("shard: %s(%d) %s(%d) %s(%s) %s(%s)", config::core, get_shard_core(i), config::core, get_shard_port(i),
+      PLOG("shard: %s(%d) %s(%d) %s(%s) %s(%s)", config::core, get_shard_core(i), config::port, get_shard_port(i),
            config::addr, addr ? addr->c_str() : "<none>", config::net, net ? net->c_str() : "<none>");
     }
-
-    PLOG("%s: %s", config::net_providers, _net_providers ? _net_providers->c_str() : "<none>");
   }
+  CPLOG(0, "%s: %s", config::net_providers, _net_providers ? _net_providers->c_str() : "<none>");
+  CPLOG(0, "%s: %s", config::ado_path, _ado_path ? _ado_path->c_str() : "<none>");
 }
 
 std::string Config_file::get_ado_cores() const

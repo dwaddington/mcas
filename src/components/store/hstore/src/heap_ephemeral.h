@@ -40,13 +40,14 @@ public:
 		, _alloc_mutex()
 	{}
 
-#if 0
 	/* functions which ought to be virtualized across the heap_ephemeral types */
+#if 0
 	virtual void add_managed_region(byte_span r_full, byte_span r_heap) = 0;
 	virtual nupm::region_descriptor get_managed_regions() const = 0;
 	virtual nupm::region_descriptor set_managed_regions(nupm::region_descriptor n) = 0;
-	virtual std::size_t capacity() const = 0;
 #endif
+	virtual std::size_t allocated() const = 0;
+	virtual std::size_t capacity() const = 0;
 };
 
 #endif

@@ -30,7 +30,7 @@ class integer_number(Shadow):
     Integer number object that is stored in the memory resource.  Uses value cache.
     '''
     def __init__(self, number_value):
-        self.number_value = number_value
+        self.number_value = int(number_value)
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
@@ -75,7 +75,7 @@ class shelved_integer_number(ShelvedCommon):
     def __init__(self, memory_resource, name, number_value):
 
         memref = memory_resource.open_named_memory(name)
-
+        number_value = int(number_value)
         if memref == None:
             # create new value
             builder = flatbuffers.Builder(32)
@@ -116,7 +116,7 @@ class shelved_integer_number(ShelvedCommon):
 
         # set up the view of the data
         # materialization alternative - self._view = memoryview(memref.buffer[32:])
-        self._cached_value = number_value
+        self._cached_value = int(number_value)
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -175,6 +175,9 @@ class shelved_integer_number(ShelvedCommon):
         '''
         return self._cached_value
 
+    def __index__(self):
+        return int(self._get_value())
+    
     def __repr__(self):
         return str(self._get_value())
 
@@ -186,6 +189,13 @@ class shelved_integer_number(ShelvedCommon):
 
     def __bool__(self):
         return bool(self._get_value())
+
+    def __coerce__(self, other):
+        if isinstance(other, int):
+            return (int(self._get_value()), other)
+        return None
+
+
 
     # in-place arithmetic
     def __iadd__(self, value): # +=
@@ -249,7 +259,7 @@ class shelved_integer_number(ShelvedCommon):
         return self._get_value() / value
 
     def __rtruediv__(self, value):
-        return self._get_value() / value
+        return value / self._cached_value
 
     def __floordiv__(self, value):
         return self._get_value() // value
@@ -278,7 +288,14 @@ class shelved_integer_number(ShelvedCommon):
     def __ne__(self, x):
         return self._get_value() != x
 
+    def __mod__(self, x):
+        return self._get_value() % x
 
+    def __rmod__(self, x):
+        return x % self._get_value()
+
+
+        
     # TODO: MOSHIK TO FINISH
 #    ['__abs__', '__add__', '__and__', '__bool__', '__ceil__', '__class__', '__delattr__', '__dir__', '__divmod__', '__doc__', '__eq__', '__float__', '__floor__', '__floordiv__', '__format__', '__ge__', '__getattribute__', '__getnewargs__', '__gt__', '__hash__', '__index__', '__init__', '__init_subclass__', '__int__', '__invert__', '__le__', '__lshift__', '__lt__', '__mod__', '__mul__', '__ne__', '__neg__', '__new__', '__or__', '__pos__', '__pow__', '__radd__', '__rand__', '__rdivmod__', '__reduce__', '__reduce_ex__', '__repr__', '__rfloordiv__', '__rlshift__', '__rmod__', '__rmul__', '__ror__', '__round__', '__rpow__', '__rrshift__', '__rshift__', '__rsub__', '__rtruediv__', '__rxor__', '__setattr__', '__sizeof__', '__str__', '__sub__', '__subclasshook__', '__truediv__', '__trunc__', '__xor__', 'bit_length', 'conjugate', 'denominator', 'from_bytes', 'imag', 'numerator', 'real', 'to_bytes']
 

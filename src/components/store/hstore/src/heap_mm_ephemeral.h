@@ -53,10 +53,6 @@ private:
 	nupm::region_descriptor _managed_regions;
 protected:
 	using heap_ephemeral::_alloc_mutex;
-	std::size_t _capacity;
-#if 0 // MM does not support allocation query
-	std::size_t _allocated;
-#endif
 
 protected:
 	using hist_type = util::histogram_log2<std::size_t>;
@@ -99,11 +95,12 @@ public:
 	explicit heap_mm_ephemeral(
 		unsigned debug_level
 		, nupm::region_descriptor managed_regions
-		, std::size_t capacity
 	);
 	virtual ~heap_mm_ephemeral() {}
 
-	std::size_t capacity() const { return _capacity; }
+	virtual std::size_t allocated() const = 0;
+	virtual std::size_t capacity() const = 0;
+
 	virtual void allocate(persistent_t<void *> &p, std::size_t sz, std::size_t alignment) = 0;
 	virtual std::size_t free(persistent_t<void *> &p_, std::size_t sz_) = 0;
 	virtual void free_tracked(const void *p, std::size_t sz) = 0;

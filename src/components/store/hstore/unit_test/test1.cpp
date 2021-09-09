@@ -38,8 +38,6 @@
 
 using namespace component;
 
-static const bool has_capacity = common::env_value<bool>("HAS_CAPACITY", true);
-
 namespace {
 
 // The fixture for testing class Foo.
@@ -229,7 +227,6 @@ TEST_F(KVStore_test, CreatePool)
 TEST_F(KVStore_test, BasicGet0)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -617,7 +614,6 @@ TEST_F(KVStore_test, CountByBucket)
 TEST_F(KVStore_test, ClosePool)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -644,7 +640,6 @@ TEST_F(KVStore_test, OpenPool)
   }
   ASSERT_LT(0, int64_t(pool));
 
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -760,7 +755,6 @@ TEST_F(KVStore_test, Size2b)
 TEST_F(KVStore_test, GetMany)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1037,7 +1031,6 @@ TEST_F(KVStore_test, BasicUpdate)
 TEST_F(KVStore_test, BasicErase)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1086,7 +1079,6 @@ TEST_F(KVStore_test, EraseMany)
 TEST_F(KVStore_test, AllocDealloc4K)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1132,7 +1124,6 @@ TEST_F(KVStore_test, AllocDealloc4K)
 TEST_F(KVStore_test, AllocDealloc)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
@@ -1208,7 +1199,6 @@ TEST_F(KVStore_test, AllocDealloc)
 TEST_F(KVStore_test, DeletePool)
 {
   ASSERT_NE(nullptr, _kvstore);
-  if ( has_capacity )
   {
     std::vector<uint64_t> attr;
     auto r = _kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);

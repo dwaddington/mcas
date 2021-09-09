@@ -464,8 +464,8 @@ void heap_mr::free_tracked(
 
 unsigned heap_mr::percent_used() const
 {
-	auto eph = dynamic_cast<heap_mr_ephemeral *>(_eph.get());
-    return ( eph  && _eph->capacity() != 0 ) ? unsigned(eph->allocated() * 100U / eph->capacity()) :  0xFFFFU;
+	auto cap = eph->capacity();
+	return unsigned(cap == 0 ? 100U : eph->allocated() * 100U / cap);
 }
 
 bool heap_mr::is_reconstituted(const void * p_) const

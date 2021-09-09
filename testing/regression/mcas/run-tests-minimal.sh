@@ -26,15 +26,17 @@ then sleep $DELAY
 fi
 sleep $DELAY
 
-if has_devdax
-then DAXTYPE=devdax run_minimal_hstore has_module_mcasmod $1
+DEVDAX_PFX="$(find_devdax)"
+if test -n "$DEVDAX_PFX"
+then DAX_PREFIX="$DEVDAX_PFX" run_minimal_hstore has_module_mcasmod $1
   sleep $DELAY
   # Conflict test, as coded, works only for devdax, not fsdax
   # Conflict in fsdax occurs when data files exist, not when only arenas exist
   $DIR/mcas-hstore-dax-conflict-0.sh $1
 fi
 
-if has_fsdax
-then DAXTYPE=fsdax USE_ODP=1 run_minimal_hstore true $1
+FSDAX_DIR="$(find_fsdax)"
+if test -n "$FSDAX_DIR"
+then DAX_PREFIX="$FSDAX_DIR" USE_ODP=1 run_minimal_hstore true $1
 fi
 
