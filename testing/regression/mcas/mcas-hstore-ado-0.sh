@@ -4,17 +4,18 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
-DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
+DAX_PREFIX="${DAX_PREFIX:-$(choose_dax)}"
 STORETYPE=hstore
-TESTID="$(basename --suffix .sh -- $0)-$DAXTYPE"
+TESTID="$(basename --suffix .sh -- $0)-$(dax_type $DAX_PREFIX)"
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
-CONFIG_STR="$("./dist/testing/hstore-ado0.py" "$STORETYPE" "$DAXTYPE" "$NODE_IP" 11911)"
 
 # launch MCAS server
+NUMA_NODE=$(numa_node $DAX_PREFIX)
+CONFIG_STR="$("./dist/testing/cfg_hstore_ado.py" "$NODE_IP" "$STORETYPE" "$DAX_PREFIX" --port 11911 --numa-node "$NUMA_NODE")"
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
 SERVER_PID=$!

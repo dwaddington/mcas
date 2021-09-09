@@ -4,7 +4,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
-DAXTYPE="${DAXTYPE:-$(choose_dax_type)}"
+DAX_PREFIX="${DAX_PREFIX:-$(choose_dax)}"
 STORETYPE=hstore
 KEY_LENGTH=${KEY_LENGTH:-8}
 VALUE_LENGTH=${VALUE_LENGTH:-8}
@@ -13,16 +13,17 @@ RECOMMENDED_ELEMENT_COUNT=$(scale_by_transport 2000000 $SOCKET_SCALE)
 PERFTEST=put
 RECOMMENDED_GOAL=185000 # wildly high for socket test
 # testname-keylength-valuelength-store-netprovider
-TESTID="$(basename --suffix .sh -- $0)-$KEY_LENGTH-$VALUE_LENGTH-$DAXTYPE-sock"
+TESTID="$(basename --suffix .sh -- $0)-$KEY_LENGTH-$VALUE_LENGTH-$(dax_type $DAX_PREFIX)-sock"
 
 # parameters for MCAS server and client
 NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
 # parameters for MCAS server
-SERVER_CONFIG="hstore-$DAXTYPE-sock-0"
+SERVER_CONFIG="hstore-$(dax_type $DAX_PREFIX)-sock-0"
 
-CONFIG_STR="$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP")"
+NUMA_NODE=$(numa_node $DAX_PREFIX)
+CONFIG_STR="$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP" --numa-node "$NUMA_NODE")"
 # launch MCAS server
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &

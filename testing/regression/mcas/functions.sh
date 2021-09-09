@@ -16,14 +16,13 @@ node_ip() {
 	node_192net_ip
     fi
 }
-    
 
 has_mlx5 () {
  test -f /sys/class/infiniband/mlx5_0/ports/1/state
 }
 
 color_any () {
-	color=$1
+	typeset -ir color=$1
 	shift
     echo -e "\e[${color}m$@\e[0m"
 }
@@ -47,36 +46,36 @@ pass_fail_by_code () {
 }
 
 pass_fail () {
-    typeset LOG=$1
-    typeset TESTID=$2
-    if cat $LOG | grep -q 'FAILED TEST' ; then
-        echo "Test $TESTID: $(color_fail fail)"
-    elif cat $LOG | grep -q 'PASSED' ; then
-        echo "Test $TESTID: $(color_pass passed)"
+    typeset -r log=$1
+    typeset -r testid=$2
+    if cat $log | grep -q 'FAILED TEST' ; then
+        echo "Test $testid: $(color_fail fail)"
+    elif cat $log | grep -q 'PASSED' ; then
+        echo "Test $testid: $(color_pass passed)"
     else
-        echo "Test $TESTID: $(color_fail fail) (no results)"
+        echo "Test $testid: $(color_fail fail) (no results)"
     fi
 }
 
 pass_by_iops () {
-    typeset LOG=$1
+    typeset -r log=$1
     shift
-    typeset TESTID=$1
+    typeset -r testid=$1
     shift
-    typeset -i GOAL=$(scale_by_transport "$@")
+    typeset -ir goal=$(scale_by_transport "$@")
 
-    iops=$(cat $LOG | grep -Po 'IOPS: \K[0-9]*')
+    iops=$(cat $log | grep -Po 'IOPS: \K[0-9]*')
 
-    exception=$(cat $LOG | grep 'exception' | head -1)
+    exception=$(cat $log | grep 'exception' | head -1)
 
     if [ -n "$exception" ]; then
-        echo "Test $TESTID: $(color_fail fail) ($exception)"
+        echo "Test $testid: $(color_fail fail) ($exception)"
     elif [ -z "$iops" ]; then
-        echo "Test $TESTID: $(color_fail fail) (no data)"
-    elif [ "$iops" -lt $GOAL ]; then
-        echo "Test $TESTID: $(color_fail fail) ($iops of $GOAL IOPS)"
+        echo "Test $testid: $(color_fail fail) (no data)"
+    elif [ "$iops" -lt $goal ]; then
+        echo "Test $testid: $(color_fail fail) ($iops of $goal IOPS)"
     else
-        echo "Test $TESTID: $(color_pass passed) ($iops of $GOAL IOPS)"
+        echo "Test $testid: $(color_pass passed) ($iops of $goal IOPS)"
     fi
 }
 
@@ -86,7 +85,7 @@ pass_by_iops () {
 # scaling up would be easier and lead to smaller input numbers, but the
 # historical input numbers are for mlx5, and therefore large numbers.
 scale_by_transport () {
- typeset -i base=$1
+ typeset -ir base=$1
  # in presence of a second parameter, scale down by that parameter
  factor=${2:-1}
  # in absence of an mlx5 adaptor, scale down by 1000
@@ -96,46 +95,78 @@ scale_by_transport () {
  echo $(( (base + factor - 1) / factor ))
 }
 
-has_devdax () {
- test -c /dev/dax0.0
+find_devdax () {
+ for i in 0 1
+ do
+  d=/dev/dax$i
+  if test -c "$d.0"
+  then echo $d
+    return
+  fi
+ done
 }
 
-has_fsdax () {
- test -d /mnt/pmem1
+find_fsdax () {
+ for i in 0 1
+ do
+  d=/mnt/pmem$i
+  if findmnt $d 2>/dev/null -a test -w $d
+  then echo $d
+   return
+  fi
+ done
+}
+
+has_module() {
+ /usr/sbin/lsmod | grep "^$1 " &> /dev/null
 }
 
 has_module_mcasmod () {
- /sbin/modinfo mcasmod &> /dev/null
+ has_module mcasmod
 }
 
 has_module_xpmem () {
- /sbin/modinfo xpmem &> /dev/null
+ has_module xpmem
 }
 
 # Decide whether to use device DAX or FS DAX, depending on whether this system has devdax configured
-choose_dax_type() {
- if [[ -n "$DAXTYPE" ]]
- then
-  echo $DAXTYPE
- else
-  if has_devdax
-  then echo devdax
-  else echo fsdax
-  fi
+choose_dax() {
+ t="${DAX_PREFIX:-}"
+ if test -z "$t"
+ then t="$(find_devdax)"
  fi
+ if test -z "$t"
+ then t="$(find_fsdax)"
+ fi
+ echo $t
+}
+
+dax_type() {
+ case "$1" in
+  /mnt*) echo "fsdax"
+  ;;
+  /dev/dax*) echo "devdax"
+  ;;
+  *) echo "?"
+  esac
+}
+
+# determine numa node from DAX_PREFIX (arg 1): the numeric suffix of the DAX prefix.
+numa_node() {
+ echo "$1" | egrep -o '[0-9]+$'
 }
 
 # Pick a CPU number to use, but not larger than the max CPU number on this system
 clamp_cpu () {
- typeset -i CPU_DESIRED=$1
- typeset -i CPU_MAX=$(($(/bin/grep ^processor /proc/cpuinfo | wc -l) - 1))
- echo $((CPU_DESIRED < CPU_MAX ? CPU_DESIRED : CPU_MAX))
+ typeset -ir cpu_desired=$1
+ typeset -ir cpu_max=$(($(/bin/grep ^processor /proc/cpuinfo | wc -l) - 1))
+ echo $((cpu_desired < cpu_max ? cpu_desired : cpu_max))
 }
 
 # scale the first input by percentages represented by subsequent inputs
 scale() {
-  typeset -i sf=900 # (2*3*5)^2, an attempt to lessen rounding effects
-  base=$(($1*sf))
+  typeset -ir sf=900 # (2*3*5)^2, an attempt to lessen rounding effects
+  typeset -i base=$(($1*sf))
   shift
   for i in $@
   do base=$((base*i/100))
