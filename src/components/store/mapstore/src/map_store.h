@@ -94,6 +94,8 @@ public:
 
   virtual status_t delete_pool(const std::string &name) override;
 
+  virtual status_t get_pool_names(std::list<std::string>& inout_pool_names) override;
+
   virtual status_t put(const pool_t pool, const std::string &key,
                        const void *value, const size_t value_len,
                        flags_t flags = FLAGS_NONE) override;

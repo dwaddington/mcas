@@ -55,7 +55,7 @@ struct alloc_key {};
 
 thread_local std::map<void *, hstore::open_pool_type *> tls_cache = {};
 
-/* forced because pool_t is an integral tye, not a pointer */
+/* forced because pool_t is an integral type, not a pointer */
 void *to_ptr(component::IKVStore::pool_t p) { return reinterpret_cast<void *>(p); }
 component::IKVStore::pool_t to_pool_t(void *v) { return reinterpret_cast<component::IKVStore::pool_t>(v); }
 
@@ -285,6 +285,16 @@ status_t hstore::delete_pool(const std::string& name_)
 
   CPLOG(1, PREFIX "pool deleted: %s", LOCATION, name_.c_str());
   return S_OK;
+}
+
+status_t hstore::get_pool_names(std::list<std::string>& inout_pool_names)
+{
+  /* Clem to implement */
+  // for(auto& p : _pools) { /* not sure if this is open pools */
+  // }  
+  PWRN("get_pool_names: needs implementing");
+  inout_pool_names.push_back("dummy");
+  return E_NOT_IMPL;
 }
 
 auto hstore::grow_pool( //

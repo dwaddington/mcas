@@ -127,7 +127,6 @@ const int effective_map_locked = init_map_lock_mask();
  */
 class Pool_instance {
 
-
 private:
   
   unsigned debug_level() const { return _debug_level; }
@@ -155,7 +154,7 @@ private:
     bool is_end() const { return _iter == _end; }
     bool check_mark(uint32_t writes) const { return _mark == writes; }
 
-    const Pool_instance *   _pool;
+    const Pool_instance * _pool;
     uint32_t              _mark;
     map_t::const_iterator _iter;
     map_t::const_iterator _end;
@@ -211,7 +210,7 @@ public:
     _ref_count--;
   }      
 
-  const std::string & name() const { return _name; }
+  const std::string& name() const { return _name; }
   
 private:
   
@@ -1165,6 +1164,7 @@ status_t Map_store::close_pool(const pool_t pid)
   return S_OK;
 }
 
+ 
 status_t Map_store::delete_pool(const std::string &poolname)
 { 
   Std_lock_guard g(_pool_sessions_lock);
@@ -1201,6 +1201,16 @@ status_t Map_store::delete_pool(const std::string &poolname)
   
   return S_OK;
 }
+
+status_t Map_store::get_pool_names(std::list<std::string>& inout_pool_names)
+{
+  for (auto &h : _pools) {
+    assert(h.second);
+    inout_pool_names.push_back(h.second->name());
+  }
+  return S_OK;
+}
+
 
 status_t Map_store::put(IKVStore::pool_t pid, const std::string &key,
                         const void *value, size_t value_len,
