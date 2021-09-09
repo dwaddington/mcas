@@ -69,7 +69,10 @@ class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
     '''
-    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, backend=None, mm_plugin=None, force_new=False, load_addr='0x900000000'):
+    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, load_addr='0x900000000',
+                 backend=None, mm_plugin=None, force_new=False, ):
+        if not(isinstance(load_addr, str)):
+            raise RuntimeError('shelf ctor parameter load_addr should be string')
         self.name = name
         self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, backend=backend,
                                  mm_plugin=mm_plugin, load_addr=load_addr, force_new=force_new)

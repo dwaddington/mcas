@@ -13,29 +13,52 @@ def colored(r, g, b, text):
 
 def log(*args):
     print(colored(0,255,255,*args))
-    
-class TestBefore(unittest.TestCase):
+
+shelf = 0
+shelf2 = 0
+class TestRecovery(unittest.TestCase):
+
     def setUp(self):
-        global force_new
-        self.s = pymm.shelf('myShelf',size_mb=1024, backend='hstore-cc', pmem_path='/mnt/pmem0/1',force_new=False)
-        #self.s2 = pymm.shelf('myShelf-2',size_mb=1024, backend='hstore-cc', pmem_path='/mnt/pmem0/2',force_new=False)
-        print(self.s.items)
-    
-    def tearDown(self):
-        del self.s
-        #del self.s2        
+        global shelf
+        global shelf2
+
+        if shelf == 0:
+            log("Recovery: running test setup...")
+
+            shelf = pymm.shelf('myShelf', load_addr='0x700000000',
+                               backend='hstore-cc', pmem_path='/mnt/pmem0/1', force_new=False)
+
+            shelf2 = pymm.shelf('myShelf-2', load_addr='0x800000000',
+                                backend='hstore-cc', pmem_path='/mnt/pmem0/2', force_new=False)
+
+            print("Shelf.items = {}".format(shelf.items))
+            print("Shelf2.items = {}".format(shelf2.items))
+            log("Recovery: shelf init OK")
         
     def test_check_A(self):
-        print(self.s.A)
-        x = np.ndarray((3,8),dtype=np.uint8)
-        x.fill(1)
-        x[1] += 1
-        self.assertTrue(np.array_equal(self.s.A,x))
+        global shelf
+        global shelf2
+        print(shelf.A[1][2])
+        y = np.ndarray((3,8),dtype=np.uint8)
+        y.fill(1)
+        y[1] += 1
+        self.assertTrue(shelf.A[1][2] == 2)
+        self.assertTrue(np.array_equal(shelf.A, y))
 
-    def xtest_check_B(self):
-        print(self.s.B)
-        self.assertTrue(np.array_equal(self.s.B, np.zeros((3,8,))))
+    def test_check_B(self):
+        global shelf
+        global shelf2
+        self.assertTrue(np.array_equal(shelf.B, np.zeros((3,8,))))
+        print(shelf.B)
 
+    def test_check_C(self):
+        global shelf
+        global shelf2
+        self.assertTrue(shelf2.A == 99)
+        print(shelf2.A)
+
+        
+        
 
 if __name__ == '__main__':
     unittest.main()
