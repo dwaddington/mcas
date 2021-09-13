@@ -16,12 +16,30 @@
 #define __NUPM_DAX_DATA_H__
 
 #include <libpmem.h>
+#include <city.h> /* CityHash */
 #include <common/pointer_cast.h>
+#include <common/string_view.h>
 #include <common/types.h>
 #include <common/utils.h>
 #include <boost/icl/split_interval_map.hpp>
+#include <gsl/span>
 #include <algorithm>
+#include <list>
 #include <stdexcept>
+
+namespace
+{
+	std::uint64_t make_uuid(const common::string_view name_)
+	{
+		if ( 255 < name_.size() )
+		{
+			throw std::invalid_argument("invalid file name (too long)");
+		}
+		auto region_id = ::CityHash64(name_.begin(), name_.size());
+		if (region_id == 0) throw std::invalid_argument("invalid region_id (and extreme bad luck!)");
+		return region_id;
+	}
+}
 
 namespace nupm
 {
@@ -32,14 +50,13 @@ static unsigned constexpr dm_region_log_grain_size = DM_REGION_LOG_GRAIN_SIZE; /
 
 class DM_undo_log {
   static constexpr unsigned MAX_LOG_COUNT = 4;
-  static constexpr unsigned MAX_LOG_SIZE  = 64;
+  static constexpr unsigned MAX_LOG_SIZE  = 272;
   struct log_entry_t {
     byte   log[MAX_LOG_SIZE];
     void * ptr;
     size_t length; /* zero indicates log freed */
   };
 
- public:
   void log(void *ptr, size_t length)
   {
     assert(length > 0);
@@ -61,6 +78,14 @@ class DM_undo_log {
     }
     throw API_exception("undo log full");
   }
+
+ public:
+  template <typename T>
+    void log(T *ptr)
+    {
+      static_assert(sizeof *ptr <= MAX_LOG_SIZE, "object too big to log");
+      log(ptr, sizeof *ptr);
+    }
 
   void clear_log()
   {
@@ -88,10 +113,17 @@ class DM_undo_log {
 
 class DM_region {
 public:
+  /* "grain" is the unit of suballocation within a region. It is a fixed power
+   * of 2 common to all regions in the devdax namespace.
+   */
   using grain_offset_t = uint32_t;
   grain_offset_t offset_grain;
   grain_offset_t length_grain;
   uint64_t region_id;
+  /* File name. Saved and returned.
+   * Internal logic uses region_id (file name hash) to reduce code changes.
+   */
+  char file_name[256];
 
  public:
   /* re-zeroing constructor */
@@ -108,12 +140,13 @@ public:
 } __attribute__((packed));
 
 /* Note: "region" has at least two meanings:
- *  1. The space which begins with a DM_region_header
- *  2. The space described by a DM_region
+ *  1. The space starting with, and described by, DM_region_header. ndctl calls this a namespace.
+ e  2. The space described by DM_region
  */
 class DM_region_header {
  private:
   static constexpr uint16_t DEFAULT_MAX_REGIONS = 1024;
+  using string_view = common::string_view;
 
   uint32_t    _magic;         // 4
   uint32_t    _version;       // 8
@@ -123,6 +156,20 @@ class DM_region_header {
   uint16_t    _resvd;         // 24
   uint8_t     _padding[40];   // 64
   DM_undo_log _undo_log;
+
+  /*
+   * Following this data, there is
+   * 1. region_table_base, immediately following (this + 1)
+   * 2. arena_base, at ptr_cast<byte>(this) + grain_size. Code assumes
+   *    (but does not verify) that DM_region_header plus all DM_region
+   *    descriptors fit within a single grain.
+   *
+   * grain 0:
+   *    "region_header"
+   *    "region_table"
+   * grains 1 and following:
+   *    "arena"
+   */
 
  public:
   auto grain_size() const { return std::size_t(1) << _log_grain_size; }
@@ -140,7 +187,7 @@ class DM_region_header {
     (void)_resvd; // unused
     (void)_padding; // unused
     DM_region *region_p = region_table_base();
-    /* initialize first region with all capacity */
+    /* initialize first region with all capacity with size of space, and size of grain */
     region_p->initialize(device_size - grain_size(), grain_size());
     _undo_log.clear_log();
     region_p++;
@@ -166,8 +213,8 @@ class DM_region_header {
         _magic, _version, _device_size, _region_count);
     PINF(" base [%p]", common::p_fmt(this));
 
-    for (uint16_t r = 0; r < _region_count; r++) {
-      auto reg = region_table_base()[r];
+    const auto regions = region_table_span();
+    for (auto const & reg : regions ) {
       if (reg.region_id > 0) {
         PINF(" - USED: %lu (%lx-%lx)", reg.region_id,
              grain_to_bytes(reg.offset_grain),
@@ -182,12 +229,12 @@ class DM_region_header {
     }
   }
 
-  void *get_region(uint64_t region_id, size_t *out_size)
+  void *get_region(string_view name_, size_t *out_size)
   {
-    if (region_id == 0) throw std::invalid_argument("invalid region_id");
+    auto region_id = make_uuid(name_);
 
-    for (uint16_t r = 0; r < _region_count; r++) {
-      auto reg = region_table_base()[r];
+    const auto regions = region_table_span();
+    for (auto const & reg : regions ) {
       if (reg.region_id == region_id) {
 #if 0
         PLOG("%s: found matching region (%lx)", __func__, region_id);
@@ -199,58 +246,65 @@ class DM_region_header {
     return nullptr; /* not found */
   }
 
-  void erase_region(uint64_t region_id)
+  void erase_region(string_view name_)
   {
-    if (region_id == 0) throw std::invalid_argument("invalid region_id");
+    auto region_id = make_uuid(name_);
 
-    for (uint16_t r = 0; r < _region_count; r++) {
-      DM_region *reg = &region_table_base()[r];
-      if (reg->region_id == region_id) {
-        reg->region_id = 0; /* power-fail atomic */
-        pmem_flush(&reg->region_id, sizeof(reg->region_id));
+    const auto regions = region_table_span();
+    for (auto & reg : regions ) {
+      if (reg.region_id == region_id) {
+        reg.region_id = 0; /* power-fail atomic */
+        pmem_flush(&reg.region_id, sizeof(reg.region_id));
         return;
       }
     }
     throw std::runtime_error("region not found");
   }
 
-  void *allocate_region(uint64_t region_id, DM_region::grain_offset_t size_in_grain)
+  void *allocate_region(string_view name_, DM_region::grain_offset_t size_in_grain)
   {
-    if (region_id == 0) throw std::invalid_argument("invalid region_id");
+    auto region_id = make_uuid(name_);
 
-    for (uint16_t r = 0; r < _region_count; r++) {
-      auto reg = region_table_base()[r];
+    const auto regions = region_table_span();
+    for (auto & reg : regions ) {
       if (reg.region_id == region_id)
         throw std::bad_alloc();
     }
 
-    uint32_t new_offset;
-    bool     found = false;
-    for (uint16_t r0 = 0; r0 < _region_count; ++r0) {
-      DM_region *reg = &region_table_base()[r0];
-      if (reg->region_id == 0 && reg->length_grain >= size_in_grain) {
-        if (reg->length_grain == size_in_grain) {
+    bool found = false;
+    for (DM_region & reg : regions)
+    {
+      /* If we have found a sufficiently large free region */
+      if (reg.region_id == 0 && reg.length_grain >= size_in_grain) {
+        if (reg.length_grain == size_in_grain) {
           /* exact match */
-          void *rp = arena_base() + grain_to_bytes(reg->offset_grain);
-          // zero region
-          tx_atomic_write(reg, region_id);
+          void *rp = arena_base() + grain_to_bytes(reg.offset_grain);
+          /* write file name to region */
+          pmem_memcpy_persist(reg.file_name, name_.begin(), name_.size());
+          pmem_memcpy_persist(&reg.file_name[name_.size()], "\0", 1);
+          // claim region
+          tx_atomic_write(&reg, region_id);
           return rp;
         }
         else {
           /* cut out */
-          new_offset = reg->offset_grain;
+          const uint32_t new_offset = reg.offset_grain;
 
-          auto changed_length = reg->length_grain - size_in_grain;
-          auto changed_offset = reg->offset_grain + size_in_grain;
+          const auto changed_length = reg.length_grain - size_in_grain;
+          const auto changed_offset = reg.offset_grain + size_in_grain;
 
-          for (uint16_t r = 0; r < _region_count; ++r) {
-            DM_region *reg_n = &region_table_base()[r];
-            if (reg_n->region_id == 0 && reg_n->length_grain == 0) {
-              void *rp = arena_base() + grain_to_bytes(new_offset);
-              tx_atomic_write(reg_n, boost::numeric_cast<uint16_t>(changed_offset), boost::numeric_cast<uint16_t>(changed_length), reg,
-                              new_offset, size_in_grain, region_id);
-              return rp;
-            }
+	  /* reg_n is the new region for unallocated space */
+          auto reg_n = std::find_if(regions.begin(), regions.end(), [] (const DM_region &r) { return r.region_id == 0 && r.length_grain == 0; });
+          if ( reg_n != regions.end() )
+          {
+            void *rp = arena_base() + grain_to_bytes(new_offset);
+            /* write file name to region */
+            pmem_memcpy_persist(reg.file_name, name_.begin(), name_.size());
+            pmem_memcpy_persist(&reg.file_name[name_.size()], "\0", 1);
+            // claim region
+            tx_atomic_write(&*reg_n, boost::numeric_cast<uint16_t>(changed_offset), boost::numeric_cast<uint16_t>(changed_length), &reg,
+                            new_offset, size_in_grain, region_id);
+            return rp;
           }
         }
       }
@@ -263,13 +317,14 @@ class DM_region_header {
 
   size_t get_max_available() const
   {
+    auto regions = region_table_span();
     auto max_grain_element =
       std::max_element(
-        &region_table_base()[0]
-			, &region_table_base()[_region_count]
+        regions.begin()
+	, regions.end()
         , [] (const DM_region &a, const DM_region &b) -> bool { return a.length_grain < b.length_grain; }
       );
-    return grain_to_bytes( max_grain_element == &region_table_base()[_region_count] ? 0 : max_grain_element->length_grain);
+    return grain_to_bytes( max_grain_element == regions.end() ? 0 : max_grain_element->length_grain);
   }
 
   inline size_t grain_to_bytes(unsigned grain) const { return size_t(grain) << _log_grain_size; }
@@ -284,10 +339,29 @@ class DM_region_header {
     return (_magic == DM_REGION_MAGIC) && (_version == DM_REGION_VERSION);
   }
 
+  std::list<std::string> names_list()
+  {
+    std::list<std::string> nl;
+    auto regions = region_table_span();
+    for ( const auto &r : regions )
+    {
+      if ( 0 != r.region_id )
+      {
+        nl.push_back(std::string(r.file_name));
+      }
+    }
+    return nl;
+  }
+
  private:
   void tx_atomic_write(DM_region *dst, uint64_t region_id)
   {
-    _undo_log.log(&dst->region_id, sizeof(region_id));
+#pragma GCC diagnostic push
+#if 9 <= __GNUC__
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
+    _undo_log.log(&dst->region_id);
+#pragma GCC diagnostic pop
     dst->region_id = region_id;
     pmem_flush(&dst->region_id, sizeof(region_id));
     _undo_log.clear_log();
@@ -301,8 +375,8 @@ class DM_region_header {
                        uint32_t   size1,
                        uint64_t   region_id1)
   {
-    _undo_log.log(dst0, sizeof(DM_region));
-    _undo_log.log(dst1, sizeof(DM_region));
+    _undo_log.log(dst0);
+    _undo_log.log(dst1);
 
     dst0->offset_grain = offset0;
     dst0->length_grain = size0;
@@ -321,8 +395,11 @@ class DM_region_header {
     return common::pointer_cast<unsigned char>(this) + grain_size();
   }
 
+  /* region descriptors immediately follow the DM_region_header. */
   inline DM_region *region_table_base() { return common::pointer_cast<DM_region>(this + 1); }
   inline const DM_region *region_table_base() const { return common::pointer_cast<const DM_region>(this + 1); }
+  gsl::span<DM_region> region_table_span() { return gsl::span<DM_region>(region_table_base(), _region_count); }
+  gsl::span<const DM_region> region_table_span() const { return gsl::span<const DM_region>(region_table_base(), _region_count); }
 
   inline DM_region *region(size_t idx)
   {

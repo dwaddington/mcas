@@ -541,11 +541,16 @@ auto dax_manager::resize_region(
   return arena->region_get(id_);
 }
 
-
 void dax_manager::erase_region(const string_view & name, arena_id_t arena_id)
 {
   guard_t           g(_reentrant_lock);
   lookup_arena(arena_id)->region_erase(name, this);
+}
+
+std::list<std::string> dax_manager::names_list(arena_id_t arena_id)
+{
+	guard_t g(_reentrant_lock);
+	return lookup_arena(arena_id)->names_list();
 }
 
 size_t dax_manager::get_max_available(arena_id_t arena_id)

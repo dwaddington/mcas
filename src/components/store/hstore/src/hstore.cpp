@@ -287,14 +287,23 @@ status_t hstore::delete_pool(const std::string& name_)
   return S_OK;
 }
 
-status_t hstore::get_pool_names(std::list<std::string>& inout_pool_names)
+auto hstore::get_pool_names(std::list<std::string> &pool_names) -> status_t
 {
   /* Clem to implement */
-  // for(auto& p : _pools) { /* not sure if this is open pools */
-  // }  
-  PWRN("get_pool_names: needs implementing");
-  inout_pool_names.push_back("dummy");
-  return E_NOT_IMPL;
+  /* Suggestion was *open* pools, but we alreadly know the names of open pools
+   * else we could not have opened them. Return names of *all* pools.
+   */
+  try
+  {
+    auto names = _pool_manager->names_list();
+    pool_names.splice(pool_names.end(), names);
+  }
+  catch ( const std::bad_alloc &e )
+  {
+    CPLOG(0, "%s: %s", __func__, e.what());
+    return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+  }
+  return S_OK;
 }
 
 auto hstore::grow_pool( //
