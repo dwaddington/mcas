@@ -25,10 +25,10 @@
 #include <common/string_view.h>
 #include <gsl/pointers>
 
-#include <cstring> /* strerror */
-
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib> /* getenv */
+#include <string>
+#include <vector>
 
 struct dax_manager;
 
@@ -104,6 +104,8 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     void pool_close_check(const string_view) override;
 
     void pool_delete(const pool_path &path_) override;
+
+    std::list<std::string> names_list() const override;
 
     /* ERROR: want get_pool_regions(<proper type>, std::vector<::iovec>&) */
     nupm::region_descriptor pool_get_regions(const open_pool_handle &) const override;

@@ -14,16 +14,7 @@
 #include "arena_dev.h"
 
 #include "dax_data.h"
-#include <city.h> /* CityHash */
 #include <cinttypes>
-
-namespace
-{
-	std::uint64_t make_uuid(const arena_dev::string_view id_)
-	{
-		return ::CityHash64(id_.begin(), id_.size());
-	}
-}
 
 arena_dev::arena_dev(const common::log_source &ls_, string_view path_, gsl::not_null<nupm::DM_region_header *> hdr)
   : arena(ls_)
@@ -39,7 +30,7 @@ void arena_dev::debug_dump() const
 auto arena_dev::region_get(const string_view id_) -> region_descriptor
 {
   std::size_t len = 0;
-  auto base = _hdr->get_region(make_uuid(id_), &len);
+  auto base = _hdr->get_region(id_, &len);
   region_descriptor::address_map_t v;
   if ( base != nullptr )
   {
@@ -60,7 +51,7 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
       region_descriptor::address_map_t(
         1
         , common::make_byte_span(
-            _hdr->allocate_region(make_uuid(id_), size_in_grains)
+            _hdr->allocate_region(id_, size_in_grains)
             , size_in_grains * _hdr->grain_size()
           )
       )
@@ -69,7 +60,7 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
 
 void arena_dev::region_erase(const string_view id_, gsl::not_null<registry_memory_mapped *>)
 {
-  _hdr->erase_region(make_uuid(id_));
+  _hdr->erase_region(id_);
 }
 
 void arena_dev::region_resize(
@@ -81,3 +72,8 @@ void arena_dev::region_resize(
 }
 
 std::size_t arena_dev::get_max_available() { return _hdr->get_max_available(); }
+
+std::list<std::string> arena_dev::names_list() const
+{
+	return _hdr->names_list();
+}

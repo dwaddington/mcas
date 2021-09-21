@@ -55,7 +55,7 @@ struct alloc_key {};
 
 thread_local std::map<void *, hstore::open_pool_type *> tls_cache = {};
 
-/* forced because pool_t is an integral tye, not a pointer */
+/* forced because pool_t is an integral type, not a pointer */
 void *to_ptr(component::IKVStore::pool_t p) { return reinterpret_cast<void *>(p); }
 component::IKVStore::pool_t to_pool_t(void *v) { return reinterpret_cast<component::IKVStore::pool_t>(v); }
 
@@ -284,6 +284,25 @@ status_t hstore::delete_pool(const std::string& name_)
   }
 
   CPLOG(1, PREFIX "pool deleted: %s", LOCATION, name_.c_str());
+  return S_OK;
+}
+
+auto hstore::get_pool_names(std::list<std::string> &pool_names) -> status_t
+{
+  /* Clem to implement */
+  /* Suggestion was *open* pools, but we alreadly know the names of open pools
+   * else we could not have opened them. Return names of *all* pools.
+   */
+  try
+  {
+    auto names = _pool_manager->names_list();
+    pool_names.splice(pool_names.end(), names);
+  }
+  catch ( const std::bad_alloc &e )
+  {
+    CPLOG(0, "%s: %s", __func__, e.what());
+    return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+  }
   return S_OK;
 }
 

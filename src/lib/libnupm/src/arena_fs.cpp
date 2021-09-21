@@ -339,3 +339,40 @@ std::size_t arena_fs::get_max_available()
 {
   return 0; /* .. until someone needs an actual value */
 }
+
+namespace
+{
+	using namespace std::string_literals;
+	const std::string ext_data = ".data"s;
+	const std::string ext_map = ".map"s;
+}
+
+std::list<std::string> arena_fs::names_list() const
+{
+	std::list<std::string> nl;
+	const std::string dir_str = _dir;
+	auto remove_front = dir_str.size() + 1;
+	auto remove_all = remove_front + ext_data.size();
+	for ( const auto &de : fs::recursive_directory_iterator(_dir) )
+	{
+		auto p = de.path();
+		if ( p.extension() == ext_data )
+		{
+			const std::string n = p;
+			/* From front of n, remove directory path and separator.
+			 * From back of n, remove length of ".data"
+			 */
+			nl.push_back(n.substr(remove_front, n.size() - remove_all));
+		}
+	}
+	return nl;
+}
+
+auto arena_fs::path_data(string_view id) const -> path
+{
+	return _dir / ( std::string(id) + ext_data );
+}
+auto arena_fs::path_map(string_view id) const -> path
+{
+	return _dir / ( std::string(id) + ext_map );
+}

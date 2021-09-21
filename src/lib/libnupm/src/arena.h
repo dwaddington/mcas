@@ -21,7 +21,7 @@
 #include <sys/uio.h> /* ::iovec */
 
 #include <cstddef>
-#include <vector>
+#include <list>
 
 namespace nupm
 {
@@ -51,6 +51,7 @@ struct arena
   virtual std::size_t get_max_available() = 0;
   virtual bool is_file_backed() const = 0;
   virtual std::string describe() const = 0;
+  virtual std::list<std::string> names_list() const = 0;
 protected:
   using common::log_source::debug_level;
 };

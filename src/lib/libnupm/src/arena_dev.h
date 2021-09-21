@@ -41,6 +41,7 @@ public:
   bool is_file_backed() const override { return false; }
   void debug_dump() const override;
   std::string describe() const override { return _path; }
+  std::list<std::string> names_list() const override;
 };
 
 #endif

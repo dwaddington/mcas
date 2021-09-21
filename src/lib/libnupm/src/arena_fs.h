@@ -49,16 +49,8 @@ private:
 		, gsl::not_null<registry_memory_mapped *> mh
 		, const std::vector<byte_span> &mapping
 	);
-	path path_data(string_view id) const
-	{
-		using namespace std::string_literals;
-		return _dir / ( std::string(id) + ".data"s );
-	}
-	path path_map(string_view id) const
-	{
-		using namespace std::string_literals;
-		return _dir / ( std::string(id) + ".map"s );
-	}
+	path path_data(string_view id) const;
+	path path_map(string_view id) const;
 	static std::vector<byte_span> get_mapping(const path &path_map, const std::size_t expected_size);
 public:
 	arena_fs(const common::log_source &ls, path dir);
@@ -72,6 +64,7 @@ public:
 	static std::pair<std::vector<byte_span>, std::size_t> get_mapping(const path &path_map);
 	static std::vector<common::memory_mapped> fd_mmap(int fd, const std::vector<byte_span> &map, int flags, ::off_t size);
 	std::string describe() const override { return _dir.string(); }
+	std::list<std::string> names_list() const override;
 };
 
 #endif

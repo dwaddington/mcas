@@ -120,7 +120,7 @@ public:
    * Component/interface management
    *
    */
-  DECLARE_VERSION(0.1f);
+  DECLARE_VERSION(1.0f);
   DECLARE_COMPONENT_UUID(
     0x1f1bf8cf,0xc2eb,0x4710,0x9bf1,0x63,0xf5,0xe8,0x1a,0xcf,0xbd
   );
@@ -163,6 +163,8 @@ public:
                    ) override;
 
   status_t delete_pool(const std::string &name) override;
+
+  status_t get_pool_names(std::list<std::string>& inout_pool_names) override;
 
   status_t close_pool(pool_t pid) override;
 

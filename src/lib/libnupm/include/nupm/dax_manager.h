@@ -43,6 +43,7 @@
   #include <experimental/filesystem>
   #define _NUPM_FILESYSTEM_STD_ 0
 #endif
+#include <list>
 #include <map>
 #include <mutex>
 #include <string>
@@ -171,6 +172,12 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * @param arena_id Arena identifier
    */
   void erase_region(const string_view & id, arena_id_t arena_id);
+
+  /**
+   * Return a list of region names
+   *
+   */
+  std::list<std::string> names_list(arena_id_t arena_id);
 
   /**
    * Get the maximum "hole" size.

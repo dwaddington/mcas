@@ -23,7 +23,6 @@
 
 #include <cinttypes> /* PRIx64 */
 #include <cstdlib> /* getenv */
-#include <cstring> /* strerror */
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
   unsigned hstore_nupm<Region, Table, Allocator, LockType>::name_to_numa_node(const common::string_view name)
@@ -265,8 +264,15 @@ template <typename Region, typename Table, typename Allocator, typename LockType
   }
 
 template <typename Region, typename Table, typename Allocator, typename LockType>
-  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_get_regions(const open_pool_handle & pool_) const
+  auto hstore_nupm<Region, Table, Allocator, LockType>::pool_get_regions(const open_pool_handle &pool_) const
   -> nupm::region_descriptor
   {
     return pool_->get_regions();
+  }
+
+template <typename Region, typename Table, typename Allocator, typename LockType>
+  auto hstore_nupm<Region, Table, Allocator, LockType>::names_list() const
+  -> std::list<std::string>
+  {
+    return _dax_manager->names_list(_numa_node);
   }

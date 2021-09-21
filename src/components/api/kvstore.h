@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <functional>
 #include <map>
+#include <list>
 #include <mutex>
 #include <vector>
 
@@ -311,6 +312,15 @@ protected:
    */
   virtual status_t delete_pool(const std::string& name) = 0;
 
+  /** 
+   * Get a list of pool names
+   * 
+   * @param inout_pool_names [inout] List of pool names
+   * 
+   * @return S_OK or E_NOT_IMPL;
+   */
+  virtual status_t get_pool_names(std::list<std::string>& inout_pool_names) = 0;
+  
   /**
    * Get mapped memory regions for pool.  This is used for pre-registration with
    * DMA engines.
