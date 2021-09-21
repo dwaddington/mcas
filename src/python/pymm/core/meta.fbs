@@ -16,9 +16,13 @@ enum DataType : uint16 {
   ThisIsPyMM    = 100,
 }
 
+enum DataSubType : uint16 {
+  None = 0,
+}
+
 enum Constants : uint32 {
-  Version = 1,
-  Magic = 4009738240,
+  HdrSize = 24,
+  Magic = 10001,
 }
 
 union Any { TorchTensor }
@@ -27,8 +31,7 @@ union Any { TorchTensor }
 table Header {
   magic   : uint32;
   type    : DataType;
-  version : uint16;
-  resvd   : uint16;
+  subtype : DataSubType;
 }
 
 table TorchTensor {

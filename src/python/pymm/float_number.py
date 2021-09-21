@@ -47,7 +47,7 @@ class float_number(Shadow):
             return (False, None)
 
         hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
+        if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
         root = Header.Header()
@@ -82,7 +82,6 @@ class shelved_float_number(ShelvedCommon):
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
             Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
 
             hdr = Header.HeaderEnd(builder)
@@ -103,7 +102,7 @@ class shelved_float_number(ShelvedCommon):
         else:
 
             hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != 28:
+            if hdr_size != Constants.Constants().HdrSize:
                 raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
             
             root = Header.Header()
@@ -131,7 +130,6 @@ class shelved_float_number(ShelvedCommon):
         # create header
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddVersion(builder, Constants.Constants().Version)
         Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
 
         hdr = Header.HeaderEnd(builder)

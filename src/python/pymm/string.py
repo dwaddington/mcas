@@ -47,7 +47,7 @@ class string(Shadow):
             return (False, None)
 
         hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
+        if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
         root = Header.Header()
@@ -89,7 +89,6 @@ class shelved_string(ShelvedCommon):
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
 
             if encoding == 'ascii':
                 Header.HeaderAddType(builder, DataType.DataType().AsciiString)
@@ -170,7 +169,6 @@ class shelved_string(ShelvedCommon):
         # create header
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddVersion(builder, Constants.Constants().Version)
 
         if self.encoding == 'ascii':
             Header.HeaderAddType(builder, DataType.DataType().AsciiString)

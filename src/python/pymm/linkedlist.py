@@ -62,7 +62,7 @@ class linked_list(Shadow):
             return (False, None)
 
         hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
+        if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
         root = Header.Header()
@@ -101,7 +101,6 @@ class shelved_linked_list(ShelvedCommon):
             builder = flatbuffers.Builder(32)
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
             Header.HeaderAddType(builder, DataType.DataType().LinkedList)
             hdr = Header.HeaderEnd(builder)
             builder.FinishSizePrefixed(hdr)
@@ -123,7 +122,7 @@ class shelved_linked_list(ShelvedCommon):
         else:
 
             hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != 28:
+            if hdr_size != Constants.Constants().HdrSize:
                 raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
             
             root = Header.Header()

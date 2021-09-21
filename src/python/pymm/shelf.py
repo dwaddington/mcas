@@ -53,9 +53,6 @@ class ShelvedCommon:
             return self._value_named_memory.addr()
         if name == 'namedmemory':
             return self._value_named_memory
-
-#        else:
-#            raise AttributeError()
             
 
 class Shadow:
@@ -92,7 +89,7 @@ class shelf():
                     continue
                     
                 hdr_size = util.GetSizePrefix(buffer, 0)
-                if hdr_size != 28:
+                if hdr_size != Constants.Constants().HdrSize:
                     print("WARNING: invalid header for '{}'; prior version?".format(varname))
                     continue
 
@@ -159,13 +156,6 @@ class shelf():
                         continue
 
                     
-                    
-                # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
-                # if existing == True:
-                #     self.__dict__[varname] = value
-                #     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
-                #     continue
-
                 print("Value '{}' is unknown type!".format(varname))
 
 
@@ -304,7 +294,8 @@ class shelf():
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
                 isinstance(value, pymm.float_number) or
-                isinstance(value, pymm.integer_number)
+                isinstance(value, pymm.integer_number) or
+                isinstance(value, pymm.bytes)
         )
 
     def supported_types(self):

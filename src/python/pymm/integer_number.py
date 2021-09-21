@@ -47,7 +47,7 @@ class integer_number(Shadow):
             return (False, None)
 
         hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
+        if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
         root = Header.Header()
@@ -82,7 +82,6 @@ class shelved_integer_number(ShelvedCommon):
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
             Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
 
             hdr = Header.HeaderEnd(builder)
@@ -103,8 +102,8 @@ class shelved_integer_number(ShelvedCommon):
         else:
 
             hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != 28:
-                raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
+            if hdr_size != Constants.Constants().HdrSize:
+                raise RuntimeError("invalid header - prior version (hdr_size={})".format(hdr_size))
             
             root = Header.Header()
             hdr = root.GetRootAsHeader(memref.buffer[4:], 0) # size prefix is 4 bytes
@@ -132,7 +131,6 @@ class shelved_integer_number(ShelvedCommon):
         # create header
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddVersion(builder, Constants.Constants().Version)
         Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
 
         hdr = Header.HeaderEnd(builder)
