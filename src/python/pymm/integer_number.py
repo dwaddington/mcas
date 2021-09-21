@@ -19,6 +19,7 @@ import gc
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
+import PyMM.Meta.DataSubType as DataSubType
 
 from flatbuffers import util
 from .memoryresource import MemoryResource
@@ -46,7 +47,7 @@ class integer_number(Shadow):
         if buffer is None:
             return (False, None)
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
+        hdr_size = util.GetSizePrefix(buffer, 0) + 4
         if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
@@ -57,7 +58,7 @@ class integer_number(Shadow):
             return (False, None)
 
         if (hdr.Type() == DataType.DataType().NumberInteger):
-            i = int.from_bytes(buffer[hdr_size + 4:], byteorder='big')
+            i = int.from_bytes(buffer[hdr_size:], byteorder='big')
             return (True, shelved_integer_number(memory_resource, name, i))
 
         # not a string
@@ -102,7 +103,7 @@ class shelved_integer_number(ShelvedCommon):
         else:
 
             hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != Constants.Constants().HdrSize:
+            if (hdr_size + 4)  != Constants.Constants().HdrSize:
                 raise RuntimeError("invalid header - prior version (hdr_size={})".format(hdr_size))
             
             root = Header.Header()
@@ -112,10 +113,11 @@ class shelved_integer_number(ShelvedCommon):
                 raise RuntimeError("bad magic number - corrupt data?")
                 
             self._type = hdr.Type()
+            
 
         # set up the view of the data
         # materialization alternative - self._view = memoryview(memref.buffer[32:])
-        self._cached_value = int(number_value)
+        self._cached_value = int(number_value)        
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -132,7 +134,8 @@ class shelved_integer_number(ShelvedCommon):
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
         Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
-
+        Header.HeaderAddType(builder, DataSubType.DataSubType().NotApplicable)
+        
         hdr = Header.HeaderEnd(builder)
         builder.FinishSizePrefixed(hdr)
         hdr_ba = builder.Output()

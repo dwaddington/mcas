@@ -89,9 +89,9 @@ class shelf():
                     continue
                     
                 hdr_size = util.GetSizePrefix(buffer, 0)
-                if hdr_size != Constants.Constants().HdrSize:
-                    print("WARNING: invalid header for '{}'; prior version?".format(varname))
-                    continue
+#                if hdr_size != Constants.Constants().HdrSize:
+#                    print("WARNING: invalid header for '{}'; prior version hdr_size={}".format(varname, hdr_size))
+#                    continue
 
                 root = Header.Header()
                 hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
@@ -216,6 +216,8 @@ class shelf():
             self.__dict__[name] = pymm.float_number.build_from_copy(self.mr, name, value)
         elif isinstance(value, int):
             self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)
+        elif isinstance(value, bytes):
+            self.__dict__[name] = pymm.bytes.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')            
         elif type(value) == type(None):
@@ -236,7 +238,8 @@ class shelf():
                 return None
             return self.__dict__[name]
         if not name in self.__dict__:
-            raise RuntimeError('invalid member {}'.format(name))
+            return None
+            #raise RuntimeError('invalid member {}'.format(name))
         else:
             return self.__dict__[name]
 #            return weakref.ref(self.__dict__[name])
