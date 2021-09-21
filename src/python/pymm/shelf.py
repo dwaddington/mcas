@@ -105,10 +105,7 @@ class shelf():
                 # call appropriate existing_instance for detected type
                 
                 # type: pymm.string
-                if (stype == DataType.DataType().AsciiString or
-                    stype == DataType.DataType().Utf8String or
-                    stype == DataType.DataType().Utf16String or
-                    stype == DataType.DataType().Latin1String):
+                if (stype == DataType.DataType().String):
                     (existing, value) = pymm.string.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value

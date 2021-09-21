@@ -18,6 +18,7 @@ import gc
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
+import PyMM.Meta.DataSubType as DataSubType
 
 from flatbuffers import util
 from .memoryresource import MemoryResource
@@ -56,16 +57,18 @@ class string(Shadow):
         if(hdr.Magic() != Constants.Constants().Magic):
             return (False, None)
 
-        stype = hdr.Type()
-        
-        if stype == DataType.DataType().AsciiString:
-            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
-        elif stype == DataType.DataType().Utf8String:
-            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-8'))
-        elif stype == DataType.DataType().Utf16String:
-            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-16'))
-        elif stype == DataType.DataType().Latin1String:
-            return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'latin-1'))
+        data_type = hdr.Type()
+
+        if data_type == DataType.DataType().String:
+            data_subtype = hdr.Subtype()
+            if data_subtype == DataSubType.DataSubType().Ascii:
+                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
+            elif data_subtype == DataSubType.DataSubType().Utf8:
+                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-8'))
+            elif data_subtype == DataSubType.DataSubType().Utf16:
+                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-16'))
+            elif data_subtype == DataSubType.DataSubType().Latin1:
+                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'latin-1'))
 
         # not a string
         return (False, None)
@@ -89,15 +92,16 @@ class shelved_string(ShelvedCommon):
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-
+            Header.HeaderAddType(builder, DataType.DataType().String)
+            
             if encoding == 'ascii':
-                Header.HeaderAddType(builder, DataType.DataType().AsciiString)
+                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
             elif encoding == 'utf-8':
-                Header.HeaderAddType(builder, DataType.DataType().Utf8String)
+                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
             elif encoding == 'utf-16':
-                Header.HeaderAddType(builder, DataType.DataType().Utf16String)
+                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
             elif encoding == 'latin-1':
-                Header.HeaderAddType(builder, DataType.DataType().Latin1String)
+                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
             else:
                 raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
                     
@@ -169,15 +173,16 @@ class shelved_string(ShelvedCommon):
         # create header
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-
+        Header.HeaderAddType(builder, DataType.DataType().String)
+        
         if self.encoding == 'ascii':
-            Header.HeaderAddType(builder, DataType.DataType().AsciiString)
+            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
         elif self.encoding == 'utf-8':
-            Header.HeaderAddType(builder, DataType.DataType().Utf8String)
+            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
         elif self.encoding == 'utf-16':
-            Header.HeaderAddType(builder, DataType.DataType().Utf16String)
+            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
         elif self.encoding == 'latin-1':
-            Header.HeaderAddType(builder, DataType.DataType().Latin1String)
+            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
         else:
             raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
             

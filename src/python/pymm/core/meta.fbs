@@ -4,12 +4,8 @@ enum DataType : uint16 {
   Unknown       = 0,
   Opaque        = 1,
   NumPyArray    = 2,
-  TorchTensor   = 4,  
-  AsciiString   = 8,
-  Utf8String    = 9,
-  Utf16String   = 10,
-  Latin1String  = 11,
-  OtherString   = 12,
+  TorchTensor   = 4,
+  String        = 8,
   NumberFloat   = 21,
   NumberInteger = 22,
   LinkedList    = 23,
@@ -17,12 +13,16 @@ enum DataType : uint16 {
 }
 
 enum DataSubType : uint16 {
-  None = 0,
+  NotApplicable = 0,
+  Ascii  = 10,
+  Utf8   = 11,
+  Utf16  = 12,
+  Latin1 = 13,
 }
 
 enum Constants : uint32 {
   HdrSize = 24,
-  Magic = 10001,
+  Magic = 202100001,
 }
 
 union Any { TorchTensor }
@@ -31,7 +31,7 @@ union Any { TorchTensor }
 table Header {
   magic   : uint32;
   type    : DataType;
-  subtype : DataSubType;
+  subtype : DataSubType = NotApplicable;
 }
 
 table TorchTensor {
