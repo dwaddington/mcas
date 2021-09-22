@@ -24,6 +24,9 @@ class TestBytes(unittest.TestCase):
         print(shelf.x)
         shelf.x += b'!  '
         print(shelf.x)
+        print(shelf.x.decode())
+        self.assertTrue(shelf.x.decode() == 'hello world!  ')
+        
         log("Testing: pymm.bytes methods")
         print(shelf.x.capitalize())
         print(shelf.x.hex())
@@ -54,6 +57,9 @@ class TestBytes(unittest.TestCase):
         print(type(shelf.d[1:3]))
         self.assertTrue(isinstance(shelf.d[1:3], bytes))
         self.assertTrue(list(shelf.d[1:3]) == [101,108])
+        
+        log("Testing: pymm.bytes magic methods")
+        print(str(shelf.d))
 
         log("Garbage collecting...")
         gc.collect()

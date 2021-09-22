@@ -146,10 +146,10 @@ class shelved_bytes(ShelvedCommon):
         self._name = name
 
     def __repr__(self):
-        # TODO - some how this is keeping a reference? gc.collect() clears it.
-        #
-        # creates a new string
-        return str(self.view,self.encoding)
+        return python_type_bytes(self.view)
+
+    def __str__(self):
+        return str(python_type_bytes(self.view)) #,self.encoding)
 
     def __len__(self):
         return len(self.view)
