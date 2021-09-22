@@ -26,6 +26,11 @@ class TestBytes(unittest.TestCase):
         print(shelf.x)
         print(shelf.x.decode())
         self.assertTrue(shelf.x.decode() == 'hello world!  ')
+
+        log("Testing: pymm.bytes iterable ctor")
+        shelf.z = pymm.bytes(range(3))
+        self.assertTrue(shelf.z == b'\x00\x01\x02')
+        print(shelf.z)
         
         log("Testing: pymm.bytes methods")
         print(shelf.x.capitalize())

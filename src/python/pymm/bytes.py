@@ -33,16 +33,23 @@ class bytes(Shadow):
     '''
     String object that is stored in the memory resource.
     '''
-    def __init__(self, string:str=None, encoding:str=None, errors=None, iterable_of_ints=None):
-        if isinstance(string, str):
+    def __init__(self, param0=None, encoding=None, errors=None, iterable_of_ints=None):
+        if isinstance(param0, str):
             if errors == None:
-                self.bytes_value = python_type_bytes(string, encoding)
+                self.bytes_value = python_type_bytes(param0, encoding)
             else:
-                self.bytes_value = python_type_bytes(string, encoding, errors)
+                self.bytes_value = python_type_bytes(param0, encoding, errors)
             self.encoding = encoding
-        elif iterable_of_ints != None:
-            self.bytes_value = python_type_bytes(iterable_of_ints)
-            self.encoding = None
+        else:
+            try:
+                # check for iterable
+                iter(param0)
+                self.bytes_value = python_type_bytes(param0)
+                self.encoding = None
+                return
+            except:
+                raise RuntimeException("given bytes ctor parameters not handled")
+            
         
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
