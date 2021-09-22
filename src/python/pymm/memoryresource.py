@@ -16,12 +16,69 @@ import os
 
 from .check import methodcheck
 
+class TxHandler:
+    '''
+    Transaction handler for persistent memory
+    '''
+    def __init__(self, name:str, memory_view:memoryview, memory_resource: pymmcore.MemoryResource):
+        self.name = name
+        self.memory_view = memory_view
+        self.memory_resource = memory_resource
+        self.tx_log = []  # undo log
+
+    def tx_add(self):
+        #pymmcore.valgrind_trigger(1)
+        self.__tx_add_undocopy()
+
+    def tx_begin(self):
+        #pymmcore.valgrind_trigger(1)
+        self.__tx_add_undocopy()
+
+    def tx_commit(self):
+        #pymmcore.valgrind_trigger(2)
+        self.__tx_commit_undocopy()
+
+    def __tx_add_undocopy(self):
+        '''
+        Start consistent transaction (very basic copy-off undo-log)
+        '''
+        name = self.name + '-' + str(len(self.tx_log)) + '-tx' 
+        (tx_handle, mem) = self.memory_resource._MemoryResource_create_named_memory(name, len(self.memory_view))
+        if tx_handle is None:
+            raise RuntimeError('tx_begin failed')
+
+        self.tx_log.append((tx_handle, name))
+        # copy data, then persist
+        mem[:]= self.memory_view
+        self.memory_resource._MemoryResource_persist_memory_view(self.memory_view)
+        print('tx_begin: copy of {}:{} to ({}, {})'
+              .format(hex(pymmcore.memoryview_addr(self.memory_view)), len(self.memory_view), name, hex(pymmcore.memoryview_addr(mem))))
+
+    def __tx_commit_undocopy(self):
+        '''
+        Commit consistent transaction
+        '''
+        for tx_entry in self.tx_log:
+            self.memory_resource.release_named_memory_by_handle(tx_entry[0])
+            self.memory_resource.erase_named_memory(tx_entry[1])
+        self.tx_log = []
+        print('tx_commit OK!')
+        
+
+
+    
 class MemoryReference():
-    def __init__(self, internal_handle, memory_resource, memview, name):
+    '''
+    MemoryReference represents a contiguous region of memory associated with a variable
+    value or metadata region
+    '''
+    def __init__(self, internal_handle, memory_resource, memview, name, tx_handler: TxHandler):
         self.handle = internal_handle
         self.mr = memory_resource
         self.buffer = memview
         self.varname = name
+        self.tx_handler = tx_handler
+
         if os.getenv('PYMM_DEBUG') != None:
             self._debug_level = int(os.getenv('PYMM_DEBUG'))
         else:
@@ -35,6 +92,7 @@ class MemoryReference():
     def __del__(self):
         if self._debug_level > 0:
             print("releasing named memory {} @ {}".format(self.varname, hex(pymmcore.memoryview_addr(self.buffer))))
+        self.persist()
         self.mr.release_named_memory_by_handle(self.handle)
 
     def addr(self):
@@ -44,46 +102,20 @@ class MemoryReference():
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
     def tx_begin(self):
-
-        #pymmcore.valgrind_trigger(1)
-
+        '''
+        Add region of memory to transaction
+        '''
         if self._use_sw_tx:
-            if self._debug_level > 0:
-                print('tx_begin')
-            self.__tx_begin_swcopy()
+            self.tx_handler.tx_begin()
 
     def tx_commit(self):
-
-        #pymmcore.valgrind_trigger(2)
-
+        '''
+        Commit/flush changes and remove undo log
+        '''        
         if self._use_sw_tx:
-            if self._debug_level > 0:
-                print('tx_commit')
-            self.__tx_commit_swcopy()
-    
-
-    def __tx_begin_swcopy(self):
-        '''
-        Start consistent transaction (very basic copy-off undo-log)
-        '''
-        (self.tx_handle, mem) = self.mr._MemoryResource_create_named_memory(self.varname + '-tx', len(self.buffer))
-        if self.tx_handle is None:
-            raise RuntimeError('tx_begin failed')
-        # copy data, then persist
-        mem[:]= self.buffer;
-        self.mr._MemoryResource_persist_memory_view(mem)
-        if self._debug_level > 0:
-            print('tx_begin: copy @ {}'.format(hex(pymmcore.memoryview_addr(mem)), len(mem)))
-
-    def __tx_commit_swcopy(self):
-        '''
-        Commit consistent transaction
-        '''
-        self.mr.release_named_memory_by_handle(self.tx_handle)
-        self.mr.erase_named_memory(self.varname + '-tx')
-        if self._debug_level > 0:
-            print('tx_commit OK!')
-        
+            self.persist()
+            self.tx_handler.tx_commit()
+            
     def persist(self):
         '''
         Flush any cached memory (normally for persistence)
@@ -98,9 +130,11 @@ class MemoryResource(pymmcore.MemoryResource):
     resources.  It is backed by an MCAS store component and corresponds
     to a pool.
     '''
-    def __init__(self, name, size_mb, pmem_path, backend=None, mm_plugin=None, force_new=False):
+    def __init__(self, name, size_mb, pmem_path, load_addr, backend=None, mm_plugin=None, force_new=False):
         self._named_memory = {}
-        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
+        super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path,
+                         load_addr=load_addr, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
+        
         # todo check for outstanding transactions
         all_items = super()._MemoryResource_get_named_memory_list()
         recoveries = [val for val in all_items if val.endswith('-tx')]
@@ -119,21 +153,21 @@ class MemoryResource(pymmcore.MemoryResource):
         '''
         Create a contiguous piece of memory and name it
         '''
-        (handle, mem) = super()._MemoryResource_create_named_memory(name, size, alignment, zero)
+        (handle, mview) = super()._MemoryResource_create_named_memory(name, size, alignment, zero)
         if handle == None:
             return None
 
-        return MemoryReference(handle,self,mem,name)
+        return MemoryReference(handle, self, mview, name, TxHandler(name, mview, self))
 
     @methodcheck(types=[str])
     def open_named_memory(self, name):
         '''
-        Open existing name memory
+        Open existing named memory
         '''
-        (handle, mem) = super()._MemoryResource_open_named_memory(name)
+        (handle, mview) = super()._MemoryResource_open_named_memory(name)
         if handle == None:
             return None
-        return MemoryReference(handle,self,mem,name)
+        return MemoryReference(handle, self, mview, name, TxHandler(name, mview, self))
 
     @methodcheck(types=[MemoryReference])
     def release_named_memory(self, ref : MemoryReference):
@@ -185,3 +219,4 @@ class MemoryResource(pymmcore.MemoryResource):
         Swap the names of two named memories; must be released
         '''
         return super()._MemoryResource_atomic_swap_names(a,b)
+

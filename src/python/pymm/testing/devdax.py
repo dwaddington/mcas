@@ -22,7 +22,7 @@ def log(*args):
 class TestDevDaxSupport(unittest.TestCase):
 
     def setUp(self):
-        self.s = pymm.shelf('myShelf',size_mb=1024,backend='hstore-cc',pmem_path='/dev/dax0.0')
+        self.s = pymm.shelf('myShelf',size_mb=1024,backend='hstore-cc',pmem_path='/dev/dax1.0',force_new=True)
         print(self.s.items)
 
     def tearDown(self):

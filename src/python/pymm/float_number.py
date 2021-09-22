@@ -19,6 +19,7 @@ import gc
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
+import PyMM.Meta.DataSubType as DataSubType
 
 from flatbuffers import util
 from .memoryresource import MemoryResource
@@ -46,8 +47,9 @@ class float_number(Shadow):
         if buffer is None:
             return (False, None)
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
+        hdr_size = util.GetSizePrefix(buffer, 0) + 4
+
+        if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
         root = Header.Header()
@@ -57,7 +59,7 @@ class float_number(Shadow):
             return (False, None)
 
         if (hdr.Type() == DataType.DataType().NumberFloat):
-            f = float.fromhex((buffer[hdr_size + 4:]).decode())
+            f = float.fromhex((buffer[hdr_size:]).decode())
             return (True, shelved_float_number(memory_resource, name, f))
 
         # not a string
@@ -82,7 +84,6 @@ class shelved_float_number(ShelvedCommon):
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
             Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
 
             hdr = Header.HeaderEnd(builder)
@@ -101,10 +102,9 @@ class shelved_float_number(ShelvedCommon):
             memref.buffer[hdr_len:] = value_bytes
             memref.tx_commit()
         else:
-
             hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != 28:
-                raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
+            if (hdr_size + 4) != Constants.Constants().HdrSize:
+                raise RuntimeError("invalid header: size {}".format(hdr_size))
             
             root = Header.Header()
             hdr = root.GetRootAsHeader(memref.buffer[4:], 0) # size prefix is 4 bytes
@@ -114,8 +114,6 @@ class shelved_float_number(ShelvedCommon):
                 
             self._type = hdr.Type()
 
-        # set up the view of the data
-        # materialization alternative - self._view = memoryview(memref.buffer[32:])
         self._cached_value = float(number_value)
         self._name = name
         # hold a reference to the memory resource
@@ -131,9 +129,8 @@ class shelved_float_number(ShelvedCommon):
         # create header
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddVersion(builder, Constants.Constants().Version)
         Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
-
+        
         hdr = Header.HeaderEnd(builder)
         builder.FinishSizePrefixed(hdr)
         hdr_ba = builder.Output()
@@ -277,11 +274,14 @@ class shelved_float_number(ShelvedCommon):
     def __ne__(self, x):
         return self._get_value() != x
 
+    def __round__(self, places):
+        return float(self._get_value()).__round__(places)
 
 
     # TODO: MOSHIK TO FINISH
     
     def hex(self):
         return float(self._get_value()).hex()
+
         
 # ['__abs__', '__add__', '__and__', '__bool__', '__ceil__', '__class__', '__delattr__', '__dir__', '__divmod__', '__doc__', '__eq__', '__float__', '__floor__', '__floordiv__', '__format__', '__ge__', '__getattribute__', '__getnewargs__', '__gt__', '__hash__', '__index__', '__init__', '__init_subclass__', '__int__', '__invert__', '__le__', '__lshift__', '__lt__', '__mod__', '__mul__', '__ne__', '__neg__', '__new__', '__or__', '__pos__', '__pow__', '__radd__', '__rand__', '__rdivmod__', '__reduce__', '__reduce_ex__', '__repr__', '__rfloordiv__', '__rlshift__', '__rmod__', '__rmul__', '__ror__', '__round__', '__rpow__', '__rrshift__', '__rshift__', '__rsub__', '__rtruediv__', '__rxor__', '__setattr__', '__sizeof__', '__str__', '__sub__', '__subclasshook__', '__truediv__', '__trunc__', '__xor__', 'bit_length', 'conjugate', 'denominator', 'from_bytes', 'imag', 'numerator', 'real', 'to_bytes']

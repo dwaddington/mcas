@@ -178,6 +178,12 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def asndarray(self):
         return self.view(np.ndarray)
 
+    def __str__(self):
+        return str(self.asndarray())
+    
+    def __repr__(self):
+        return repr(self.asndarray())
+
     def dim(self):
         return len(super().shape)
     
@@ -296,6 +302,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def __xor__(self, value):
         return super().__xor__(value).asndarray()
 
+    
 
     # set item, e.g. x[2] = 2
     # if we want transactionality on this we override it - but beware, it will cost!

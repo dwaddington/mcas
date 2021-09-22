@@ -14,6 +14,7 @@
 import pymmcore
 import flatbuffers
 import gc
+import chardet
 
 import PyMM.Meta.Header as Header
 import PyMM.Meta.Constants as Constants
@@ -25,19 +26,39 @@ from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
 
-class string(Shadow):
+# create alias for Python bytes type
+python_type_bytes = bytes
+
+class bytes(Shadow):
     '''
     String object that is stored in the memory resource.
     '''
-    def __init__(self, string_value, encoding='utf-8'):
-        self.string_value = string_value
-        self.encoding = encoding
-
+    def __init__(self, param0=None, encoding=None, errors=None, iterable_of_ints=None):
+        if isinstance(param0, str):
+            if errors == None:
+                self.bytes_value = python_type_bytes(param0, encoding)
+            else:
+                self.bytes_value = python_type_bytes(param0, encoding, errors)
+            self.encoding = encoding
+        else:
+            try:
+                # check for iterable
+                iter(param0)
+                self.bytes_value = python_type_bytes(param0)
+                self.encoding = None
+                return
+            except:
+                raise RuntimeException("given bytes ctor parameters not handled")
+            
+        
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
         Create a concrete instance from the shadow
         '''
-        return shelved_string(memory_resource, name, string_value=self.string_value, encoding=self.encoding)
+        return shelved_bytes(memory_resource,
+                             name,
+                             bytes_value=self.bytes_value,
+                             encoding=self.encoding)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -48,7 +69,7 @@ class string(Shadow):
             return (False, None)
 
         hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != Constants.Constants().HdrSize):
+        if(hdr_size != 28):
             return (False, None)
 
         root = Header.Header()
@@ -59,27 +80,30 @@ class string(Shadow):
 
         data_type = hdr.Type()
 
-        if data_type == DataType.DataType().String:
+        if data_type == DataType.DataType().Bytes:
             data_subtype = hdr.Subtype()
             if data_subtype == DataSubType.DataSubType().Ascii:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
+                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='ascii'))
             elif data_subtype == DataSubType.DataSubType().Utf8:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-8'))
+                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='utf-8'))
             elif data_subtype == DataSubType.DataSubType().Utf16:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-16'))
+                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='utf-16'))
             elif data_subtype == DataSubType.DataSubType().Latin1:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'latin-1'))
+                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='latin-1'))
 
-        # not a string
+        # not a bytes object
         return (False, None)
 
     def build_from_copy(memory_resource: MemoryResource, name: str, value):
-        return shelved_string(memory_resource, name, string_value=value, encoding='utf-8')
+        encoding = chardet.detect(value)['encoding']
+        return shelved_bytes(memory_resource, name, bytes_value=value, encoding=encoding)
 
 
-class shelved_string(ShelvedCommon):
-    '''Shelved string with multiple encoding support'''
-    def __init__(self, memory_resource, name, string_value, encoding):
+class shelved_bytes(ShelvedCommon):
+    '''
+    Shelved bytes with multiple encoding support
+    '''
+    def __init__(self, memory_resource, name, bytes_value, encoding):
 
         if not isinstance(name, str):
             raise RuntimeException("invalid name type")
@@ -92,8 +116,8 @@ class shelved_string(ShelvedCommon):
             # create header
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddType(builder, DataType.DataType().String)
-            
+            Header.HeaderAddType(builder, DataType.DataType().Bytes)
+                                 
             if encoding == 'ascii':
                 Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
             elif encoding == 'utf-8':
@@ -102,22 +126,20 @@ class shelved_string(ShelvedCommon):
                 Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
             elif encoding == 'latin-1':
                 Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
-            else:
-                raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
-                    
+
             hdr = Header.HeaderEnd(builder)
             builder.FinishSizePrefixed(hdr)
             hdr_ba = builder.Output()
 
             # allocate memory
             hdr_len = len(hdr_ba)
-            value_len = len(string_value) + hdr_len
+            value_len = len(bytes_value) + hdr_len
 
             memref = memory_resource.create_named_memory(name, value_len, 1, False)
             # copy into memory resource
             memref.tx_begin()
             memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = bytes(string_value, encoding)
+            memref.buffer[hdr_len:] = bytes_value
             memref.tx_commit()
 
             self.view = memoryview(memref.buffer[hdr_len:])
@@ -131,10 +153,10 @@ class shelved_string(ShelvedCommon):
         self._name = name
 
     def __repr__(self):
-        # TODO - some how this is keeping a reference? gc.collect() clears it.
-        #
-        # creates a new string
-        return str(self.view,self.encoding)
+        return python_type_bytes(self.view)
+
+    def __str__(self):
+        return str(python_type_bytes(self.view)) #,self.encoding)
 
     def __len__(self):
         return len(self.view)
@@ -143,11 +165,10 @@ class shelved_string(ShelvedCommon):
         '''
         Magic method for slice handling
         '''
-        s = str(self.view,'utf-8')
         if isinstance(key, int):
-            return s[key]
+            return int(self.view[key])
         if isinstance(key, slice):
-            return s.__getitem__(key)
+            return python_type_bytes(self.view.__getitem__(key))
         else:
             raise TypeError
 
@@ -166,14 +187,14 @@ class shelved_string(ShelvedCommon):
     def __add__(self, value): # in-place append e.g, through +=
 
         # build a new value with different name, then swap & delete
-        new_str = str(self.view,self.encoding).__add__(value)
+        new_bytes = python_type_bytes(self.view.tobytes()).__add__(value)
         memory = self._memory_resource
         # create new value
         builder = flatbuffers.Builder(32)
         # create header
         Header.HeaderStart(builder)
         Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddType(builder, DataType.DataType().String)
+        Header.HeaderAddType(builder, DataType.DataType().Bytes)
         
         if self.encoding == 'ascii':
             Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
@@ -184,7 +205,7 @@ class shelved_string(ShelvedCommon):
         elif self.encoding == 'latin-1':
             Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
         else:
-            raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
+            raise RuntimeException('shelved_bytes does not recognize encoding {}'.format(encoding))
             
         hdr = Header.HeaderEnd(builder)
         builder.FinishSizePrefixed(hdr)
@@ -192,14 +213,14 @@ class shelved_string(ShelvedCommon):
 
         # allocate memory
         hdr_len = len(hdr_ba)
-        value_len = len(new_str) + hdr_len
+        value_len = len(new_bytes) + hdr_len
 
         memref = memory.create_named_memory(self._name + "-tmp", value_len, 1, False)
         
         # copy into memory resource
         #memref.tx_begin() # don't need transaction here?
         memref.buffer[0:hdr_len] = hdr_ba
-        memref.buffer[hdr_len:] = bytes(new_str, self.encoding)
+        memref.buffer[hdr_len:] = python_type_bytes(new_bytes)
         #memref.tx_commit()
 
         del memref # this will force release
@@ -219,46 +240,59 @@ class shelved_string(ShelvedCommon):
         return self
 
     def __eq__(self, value): # == operator
-        return (str(self.view,self.encoding).__eq__(value))
+        return (python_type_bytes(self.view).__eq__(value))
 
     def __ge__(self, value): # == operator
-        return (str(self.view,self.encoding).__ge__(value))
+        return (python_type_bytes(self.view).__ge__(value))
 
     def __gt__(self, value): # == operator
-        return (str(self.view,self.encoding).__gt__(value))
+        return (python_type_bytes(self.view).__gt__(value))
 
     def __le__(self, value): # == operator
-        return (str(self.view,self.encoding).__le__(value))
+        return (python_type_bytes(self.view).__le__(value))
 
     def __lt__(self, value): # == operator
-        return (str(self.view,self.encoding).__lt__(value))
+        return (python_type_bytes(self.view).__lt__(value))
 
     def __ne__(self, value): # == operator
-        return (str(self.view,self.encoding).__ne__(value))
+        return (python_type_bytes(self.view).__ne__(value))
 
     def __contains__(self, value): # in / not in operator
-        return (value in str(self.view,self.encoding))
+        return (value in python_type_bytes(self.view))
 
     def capitalize(self):
-        return str(self.view,self.encoding).capitalize()
+        return python_type_bytes(self.view).capitalize()
 
     def center(self, width, fillchar=' '):
-        return str(self.view,self.encoding).center(width, fillchar)
+        return python_type_bytes(self.view).center(width, fillchar)
     
-    def casefold(self):
-        return str(self.view,self.encoding).casefold()
-
     def count(self, start=0, end=0):
         if end > 0:
-            return str(self.view,self.encoding).count(start, end)
+            return python_type_bytes(self.view).count(start, end)
         else:
-            return str(self.view,self.encoding).count(start)
+            return python_type_bytes(self.view).count(start)
+
+    def decode(self, encoding='utf-8'):
+        return python_type_bytes(self.view).decode(encoding)
         
     def encode(self, encoding='utf-8', errors='strict'):
-        return str(self.view,self.encoding).encode(encoding, errors)
+        return python_type_bytes(self.view).encode(encoding, errors)
 
-    # TODO MOSHIK TO FINISH ..
+    def hex(self):
+        return python_type_bytes(self.view).hex()
 
-# string object methods
-#
-#  ['__add__', '__class__', '__contains__', '__delattr__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getitem__', '__getnewargs__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__iter__', '__le__', '__len__', '__lt__', '__mod__', '__mul__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__rmod__', '__rmul__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', 'capitalize', 'casefold', 'center', 'count', 'encode', 'endswith', 'expandtabs', 'find', 'format', 'format_map', 'index', 'isalnum', 'isalpha', 'isdecimal', 'isdigit', 'isidentifier', 'islower', 'isnumeric', 'isprintable', 'isspace', 'istitle', 'isupper', 'join', 'ljust', 'lower', 'lstrip', 'maketrans', 'partition', 'replace', 'rfind', 'rindex', 'rjust', 'rpartition', 'rsplit', 'rstrip', 'split', 'splitlines', 'startswith', 'strip', 'swapcase', 'title', 'translate', 'upper', 'zfill']
+    def strip(self, bytes=None):
+        return python_type_bytes(self.view).strip(bytes)
+
+    def lstrip(self, bytes=None):
+        return python_type_bytes(self.view).lstrip(bytes)
+
+    def rstrip(self, bytes=None):
+        return python_type_bytes(self.view).rstrip(bytes)
+    
+    
+
+
+# bytes object methods
+#'
+# ['__add__', '__class__', '__contains__', '__delattr__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getitem__', '__getnewargs__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__iter__', '__le__', '__len__', '__lt__', '__mod__', '__mul__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__rmod__', '__rmul__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', 'capitalize', 'center', 'count', 'decode', 'endswith', 'expandtabs', 'find', 'fromhex', 'hex', 'index', 'isalnum', 'isalpha', 'isdigit', 'islower', 'isspace', 'istitle', 'isupper', 'join', 'ljust', 'lower', 'lstrip', 'maketrans', 'partition', 'replace', 'rfind', 'rindex', 'rjust', 'rpartition', 'rsplit', 'rstrip', 'split', 'splitlines', 'startswith', 'strip', 'swapcase', 'title', 'translate', 'upper', 'zfill']

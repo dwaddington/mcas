@@ -53,9 +53,6 @@ class ShelvedCommon:
             return self._value_named_memory.addr()
         if name == 'namedmemory':
             return self._value_named_memory
-
-#        else:
-#            raise AttributeError()
             
 
 class Shadow:
@@ -69,9 +66,14 @@ class shelf():
     '''
     A shelf is a logical collection of variables held in CXL or persistent memory
     '''
-    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, backend=None, mm_plugin=None, force_new=False):
+    def __init__(self, name, pmem_path='/mnt/pmem0', size_mb=32, load_addr='0x900000000',
+                 backend=None, mm_plugin=None, force_new=False, ):
+        if not(isinstance(load_addr, str)):
+            raise RuntimeError('shelf ctor parameter load_addr should be string')
         self.name = name
-        self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
+        self.mr = MemoryResource(name, size_mb, pmem_path=pmem_path, backend=backend,
+                                 mm_plugin=mm_plugin, load_addr=load_addr, force_new=force_new)
+        
         if self.mr == None:
             raise RuntimeError('shelf initialization failed')
         
@@ -87,9 +89,9 @@ class shelf():
                     continue
                     
                 hdr_size = util.GetSizePrefix(buffer, 0)
-                if hdr_size != 28:
-                    print("WARNING: invalid header for '{}'; prior version?".format(varname))
-                    continue
+#                if hdr_size != Constants.Constants().HdrSize:
+#                    print("WARNING: invalid header for '{}'; prior version hdr_size={}".format(varname, hdr_size))
+#                    continue
 
                 root = Header.Header()
                 hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
@@ -103,11 +105,15 @@ class shelf():
                 # call appropriate existing_instance for detected type
                 
                 # type: pymm.string
-                if (stype == DataType.DataType().AsciiString or
-                    stype == DataType.DataType().Utf8String or
-                    stype == DataType.DataType().Utf16String or
-                    stype == DataType.DataType().Latin1String):
+                if (stype == DataType.DataType().String):
                     (existing, value) = pymm.string.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
+
+                elif (stype == DataType.DataType().Bytes):
+                    (existing, value) = pymm.bytes.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
@@ -154,13 +160,6 @@ class shelf():
                         continue
 
                     
-                    
-                # (existing, value) = pymm.pickled.existing_instance(self.mr, varname)
-                # if existing == True:
-                #     self.__dict__[varname] = value
-                #     print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
-                #     continue
-
                 print("Value '{}' is unknown type!".format(varname))
 
 
@@ -224,6 +223,8 @@ class shelf():
             self.__dict__[name] = pymm.float_number.build_from_copy(self.mr, name, value)
         elif isinstance(value, int):
             self.__dict__[name] = pymm.integer_number.build_from_copy(self.mr, name, value)
+        elif isinstance(value, bytes):
+            self.__dict__[name] = pymm.bytes.build_from_copy(self.mr, name, value)
         elif issubclass(type(value), pymm.ShelvedCommon):
             raise RuntimeError('persistent reference not yet supported - use a volatile one!')            
         elif type(value) == type(None):
@@ -244,7 +245,8 @@ class shelf():
                 return None
             return self.__dict__[name]
         if not name in self.__dict__:
-            raise RuntimeError('invalid member {}'.format(name))
+            return None
+            #raise RuntimeError('invalid member {}'.format(name))
         else:
             return self.__dict__[name]
 #            return weakref.ref(self.__dict__[name])
@@ -299,7 +301,8 @@ class shelf():
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
                 isinstance(value, pymm.float_number) or
-                isinstance(value, pymm.integer_number)
+                isinstance(value, pymm.integer_number) or
+                isinstance(value, pymm.bytes)
         )
 
     def supported_types(self):

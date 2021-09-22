@@ -31,6 +31,13 @@ from .check import methodcheck
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
 
+# TODO
+# __reversed__(self)
+#     Called to implement behavior for the reversed() built in function. Should return a reversed version of the sequence. Implement this only if the sequence class is ordered, like list or tuple.
+# __contains__(self, item)
+#     __contains__ defines behavior for membership tests using in and not in. Why isn't this part of a sequence protocol, you ask? Because when __contains__ isn't defined, Python just iterates over the sequence and returns True if it comes across the item it's looking for.
+# __missing__(self, key)
+#     __missing__ is used in subclasses of dict. It defines behavior for whenever a key is accessed that does not exist in a dictionary (so, for instance, if I had a dictionary d and said d["george"] when "george" is not a key in the dict, d.__missing__("george") would be called).
 
 class linked_list(Shadow):
     '''
@@ -55,7 +62,7 @@ class linked_list(Shadow):
             return (False, None)
 
         hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
+        if(hdr_size != Constants.Constants().HdrSize):
             return (False, None)
 
         root = Header.Header()
@@ -94,7 +101,6 @@ class shelved_linked_list(ShelvedCommon):
             builder = flatbuffers.Builder(32)
             Header.HeaderStart(builder)
             Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
             Header.HeaderAddType(builder, DataType.DataType().LinkedList)
             hdr = Header.HeaderEnd(builder)
             builder.FinishSizePrefixed(hdr)
@@ -116,7 +122,7 @@ class shelved_linked_list(ShelvedCommon):
         else:
 
             hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != 28:
+            if hdr_size != Constants.Constants().HdrSize:
                 raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
             
             root = Header.Header()
@@ -156,7 +162,7 @@ class shelved_linked_list(ShelvedCommon):
     @methodcheck(types=[int])
     def __erase_tagged_object__(self, tag):
         '''
-        Erase a tagged object from the shelf
+        Erase a tagged object from the shelf (iff tag > 0)
         '''
         if isinstance(tag, int):
             if tag > 0:
@@ -173,10 +179,16 @@ class shelved_linked_list(ShelvedCommon):
                     
 
     def __len__(self):
+        '''
+        Return number of elements in list
+        '''
         return self._internal.size()
 
     
     def __getitem__(self, item):
+        '''
+        Magic method for [] index access
+        '''
         if isinstance(item, int):
             value, item_in_index = self._internal.getitem(item)
             if item_in_index: # reference to item in index
@@ -218,7 +230,43 @@ class shelved_linked_list(ShelvedCommon):
         print(key)
         
     def __iter__(self):
-        pass
+        '''
+        Iterator method
+        '''
+        self.__iterpos = 0
+        return self
+
+    def __next__(self):
+        '''
+        Iterator next method
+        '''
+        if self.__iterpos >= self.__len__():
+            raise StopIteration
+        result = self.__getitem__(self.__iterpos)
+        self.__iterpos += 1
+        return result
+
+    @methodcheck(types=[int])
+    def __delitem__(self, item):
+        '''
+        Magic method for del self[key] operations
+        '''
+        rc = self._internal.delitem(item)
+        self.__erase_tagged_object__(rc)
+        return
+
+    def __str__(self):
+        '''
+        Produce human-readable output
+        '''
+        return str(list(self))
+
+    def __repr__(self):
+        '''
+        Produce machine readable output
+        '''
+        return str(list(self))
+
         
               
         

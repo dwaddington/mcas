@@ -45,10 +45,11 @@ class torch_tensor(Shadow):
     def __init__(self, shape, dtype=float, strides=None, order='C'):
 
         print(colored(255,0,0, 'WARNING: torch_tensor is experimental and unstable!'))
+
         # todo check params
         # todo check and invalidate param 'buffer'
         # save constructor parameters and type
-        self.__p_shape = shape
+        self.__p_shape = shape # carries data too
         self.__p_dtype = dtype
         self.__p_strides = strides
         self.__p_order = order
@@ -84,15 +85,16 @@ class torch_tensor(Shadow):
     def build_from_copy(memory_resource: MemoryResource, name: str, tensor):
         new_tensor = shelved_torch_tensor(memory_resource,
                                           name,
-                                          shape = tensor.shape,
+                                          shape = tensor.numpy(),
                                           dtype = tensor.dtype)
-
         
         # now copy the data
-        if tensor.dim() is 0:
-            new_tensor.data = tensor.clone()
-        else:
-            new_tensor[:] = tensor
+        np.copyto(new_tensor._base_ndarray, tensor.to('cpu').numpy())
+
+#        if tensor.dim() is 0:
+#            new_tensor.data = tensor.clone()
+#        else:
+
         return new_tensor
 
     
@@ -105,7 +107,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     __array_priority__ = -100.0 # sets subclass as higher priority
 
     def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
-
+        #print('shelved_torch_tensor: shape={} dtype={}'.format(shape, dtype))
         torch_to_numpy_dtype_dict = {
             torch.bool  : np.bool,
             torch.uint8 : np.uint8,
@@ -119,7 +121,8 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             torch.complex64 : np.complex64,
             torch.complex128 : np.complex128,
         }
-        np_dtype = torch_to_numpy_dtype_dict.get(dtype,None)
+
+        np_dtype = torch_to_numpy_dtype_dict.get(dtype, None)
 
         value_key = name + '-value'
         metadata_key = name
@@ -128,11 +131,18 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
         if value_named_memory == None: # does not exist yet
 
-            ndshape = get_shape(shape) # convert to ndarray shape
+            if isinstance(shape, torch.Size):
+                ndshape = [shape.numel()]
+            else:
+                ndshape = np.shape(shape)
 
             # use shelved_ndarray under the hood and make a subclass from it
             base_ndarray = shelved_ndarray(memory_resource, name=name, shape=ndshape, dtype=np_dtype, type=1)
 
+            # copy data
+            if isinstance(shape, list):
+                base_ndarray[:] = shape
+            
             # create and store metadata header : type=1 indicates torch_tensor
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
             builder = flatbuffers.Builder(32)
@@ -186,6 +196,12 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     def as_tensor(self):
         '''Cast class to torch.Tensor subclass'''
         return self.as_subclass(torch.Tensor)
+
+    def __str__(self):
+        return str(self.as_tensor())
+
+    def __repr__(self):
+        return repr(self.as_tensor())
     
     def update_metadata(self, array):
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str, type=1)
@@ -323,22 +339,23 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
 
 
-from collections.abc import Sequence
+# from collections.abc import Sequence
 
-def get_shape(lst):
-    def ishape(lst):
-        if isinstance(lst, torch.Size):
-            return lst
-        if isinstance(lst, float):
-            return []
+# def get_shape(lst):
+#     def ishape(lst):
+#         if isinstance(lst, torch.Size):
+#             return lst
+#         if isinstance(lst, float):
+#             return []
         
-        shapes = [ishape(x) if isinstance(x, list) else [] for x in list(lst)]
-        shape = shapes[0]
-        if shapes.count(shape) != len(shapes):
-            raise ValueError('Ragged list')
-        shape.append(len(lst))
-        return shape
+#         shapes = [ishape(x) if isinstance(x, list) else [] for x in list(lst)]
+
+#         shape = shapes[0]
+#         if shapes.count(shape) != len(shapes):
+#             raise ValueError('Ragged list')
+#         shape.append(len(lst))
+#         return shape
 
 
-    return tuple(ishape(lst))
-#    return tuple(reversed(ishape(lst)))
+#     return tuple(ishape(lst))
+# #    return tuple(reversed(ishape(lst)))

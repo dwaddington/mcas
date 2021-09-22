@@ -2,6 +2,8 @@
 #
 # testing transient memory (needs modified Numpy)
 #
+# developers see: https://rszalski.github.io/magicmethods/
+#
 import unittest
 import pymm
 import numpy as np
@@ -56,22 +58,56 @@ class TestLinkedList(unittest.TestCase):
         log("Testing: pymm.linked_list item assignment")
         shelf.x[0] = 999
         self.assertTrue(shelf.x[0] == 999)
-        shelf.x[1] = np.ndarray(3,)
-        shelf.x[1] = np.ndarray(4,)
-        
+        shelf.x[1] = np.ones(3,)
+        self.assertTrue(np.array_equal(shelf.x[1],np.ones(3,)))
+        shelf.x[1] = np.zeros(4,)
+        self.assertTrue(np.array_equal(shelf.x[1],np.zeros(4,)))
+        self.assertTrue(not '_x_4' in shelf.items)
+        # negative index
+        shelf.x.append(100)
+        shelf.x[-1] -= 1
+        shelf.x[-1] = 80
+        self.assertTrue(shelf.x[-1] == 80)
+        # out of bounds
+        with self.assertRaises(RuntimeError):
+            shelf.x[100] = 0
+        with self.assertRaises(RuntimeError):
+            shelf.x[-100] = 0
+
     def test_E_list_len(self):
         global shelf
-        print("Length of list:{}".format(len(shelf.x)))
-        self.assertTrue(len(shelf.x) == 5)
+        log("Testing: pymm.linked_list : length of list:{}".format(len(shelf.x)))
+        self.assertTrue(len(shelf.x) == 6)
         print(shelf.x)
 
-    def xxxtest_E_list_iterate(self):
+    def test_E_list_iterate(self):
+        global shelf
+        log("Testing: pymm.linked_list: iterating list:")
+        count = 0
         for e in shelf.x:
             print(e)
+            count += 1
+        self.assertTrue(count == 6)
+
+    def test_F_list_element_del(self):
+        global shelf
+        log("Testing: pymm.linked_list: item del")
+        shelf.y = pymm.linked_list()
+        shelf.y.append(1)
+        shelf.y.append(2)
+        shelf.y.append(3)
+        del shelf.y[1]
+        self.assertTrue(len(shelf.y) == 2)
+        self.assertTrue(shelf.y[0] == 1)
+        self.assertTrue(shelf.y[1] == 3)
+        shelf.erase('y')
+        
+    def test_G_list_printstr(self):
+        print(list(shelf.x))
 
 
     def XXX_test_B_add_shelf_ndarray(self):
-        log("creating an ndarray on shelf, then adding to list")
+        log("Testing: pymm.linked_list: creating an ndarray on shelf, then adding to list")
         shelf.n = pymm.ndarray((3,8,))
         shelf.x.append(shelf.n)
         print(shelf.x)

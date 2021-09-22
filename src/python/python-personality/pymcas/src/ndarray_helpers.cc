@@ -211,10 +211,10 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   flatbuffers::Offset<PyMM::Meta::Header> mloc;
   switch(type) {
   case 0:
-    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version);
+    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray);
     break;
   case 1:
-    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_TorchTensor, PyMM::Meta::Constants_Version);
+    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_TorchTensor);
     break;
   default:
     throw General_exception("bad type");
