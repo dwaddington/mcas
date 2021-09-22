@@ -16,8 +16,8 @@ def log(*args):
 
 shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 
-class TestNew(unittest.TestCase):
-    
+class TestBytes(unittest.TestCase):
+
     def test_bytes(self):
         log("Testing: pymm.bytes shadow type")
         shelf.x = pymm.bytes('hello world','utf-8')
@@ -31,23 +31,36 @@ class TestNew(unittest.TestCase):
         shelf.y = shelf.x.strip()
         print(shelf.y.decode())
         self.assertTrue(shelf.y.decode() == 'hello world!')
+
+        shelf.a = b'El ni\xc3\xb1o come camar\xc3\xb3n'
+        print(shelf.a.decode())
+
+        shelf.b =  b'\xd8\xe1\xb7\xeb\xa8\xe5 \xd2\xb7\xe1'
+        print(shelf.b.decode('cp855'))        
+
+        shelf.c = ord(b'n')
+        print(shelf.c)
+
+        log("Testing: pymm.bytes list conversion")
+        shelf.d = bytes([72, 101, 108, 108, 111])
+        print(shelf.d)
+        print(str(shelf.d))
+
+        log("Testing: pymm.bytes slice single element access")
+        self.assertTrue(shelf.d[1] == 101)
+        self.assertTrue(isinstance(shelf.d[1], int))
+        self.assertTrue(chr(shelf.d[1]) == 'e')
+        
+        print(type(shelf.d[1:3]))
+        self.assertTrue(isinstance(shelf.d[1:3], bytes))
+        self.assertTrue(list(shelf.d[1:3]) == [101,108])
+
+        log("Garbage collecting...")
         gc.collect()
-
-    def Xtest_bytes_recovery_A(self):
-        log("Testing: pymm.bytes (pre)recovery")
-        shelf = pymm.shelf('myShelfRec',size_mb=128,pmem_path='/mnt/pmem0',force_new=True)
-        shelf.x = pymm.bytes('hello world','utf-8')
-        shelf.s = "This is a string"
-        del shelf
-
-    def Xtest_bytes_recovery_B(self):
-        log("Testing: pymm.bytes recovery")
-        shelf = pymm.shelf('myShelfRec',pmem_path='/mnt/pmem0',force_new=False)
-        print(shelf.s)
-        print(shelf.x)
-
+        
 
 
 
 if __name__ == '__main__':
     unittest.main()
+    del shelf

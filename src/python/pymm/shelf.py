@@ -111,6 +111,13 @@ class shelf():
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
+
+                elif (stype == DataType.DataType().Bytes):
+                    (existing, value) = pymm.bytes.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue
                     
                 # type: pymm.ndarray
                 elif (stype == DataType.DataType().NumPyArray):

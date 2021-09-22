@@ -40,6 +40,9 @@ class TestRecovery(unittest.TestCase):
         shelf.i = 911
         shelf.nd = np.ones((3,))
         shelf.nd2 = np.identity(10)
+        shelf.b = 'This is a bytes type'
+        shelf.bm = 'This is a '
+        shelf.bm += 'modified bytes type'
         
         del shelf
         gc.collect()
@@ -53,13 +56,16 @@ class TestRecovery(unittest.TestCase):
         print(shelf.i)
         print(shelf.nd)
         print(shelf.nd2)
-        
+        print(shelf.b)
+        print(shelf.bm)
+               
         check(shelf.s == 'Hello', 'string recovery')
         check(shelf.f == 1.123, 'float recovery')
         check(round(shelf.fm,2) == 3.30, 'float modified recovery')
         check(shelf.i == 911, 'integer recovery')
         check(np.array_equal(shelf.nd, np.ones((3,))),'1D ndarray')
         check(np.array_equal(shelf.nd2, np.identity(10)),'2D ndarray')
+        check(str(shelf.b) == 'This is a bytes type', 'bytes')
         
 if __name__ == '__main__':
     unittest.main()
