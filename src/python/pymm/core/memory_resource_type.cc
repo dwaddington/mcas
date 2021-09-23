@@ -8,6 +8,7 @@
 #include <structmember.h>
 #include <libpmem.h>
 
+#include "meta_generated.h"
 #include "pymm_config.h"
 
 /* defaults */
@@ -652,6 +653,10 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
 
   Py_buffer * pybuffer = PyMemoryView_GET_BUFFER(mview);
 
+  /* update version in header */
+  PyMM::Meta::Header* hdr = PyMM::Meta::GetMutableHeader(reinterpret_cast<char*>(pybuffer->buf) + 4);
+  hdr->mutable_hdr()->mutate_version(hdr->hdr()->version() + 1);
+    
   //  PNOTICE("persisting %p %lu", pybuffer->buf, pybuffer->len);
   pmem_persist(pybuffer->buf, pybuffer->len); /* part of libpmem */
   

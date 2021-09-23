@@ -292,20 +292,59 @@ class shelf():
     def get_percent_used(self):
         return self.mr.get_percent_used()
 
+    @methodcheck(types=[])
+    def persist(self):
+        '''
+        Persist memory for all variables on the shelf
+        '''
+        for varname in self.get_item_names():
+            # get memory resource associated with variable
+            memory_resource = self.__dict__[varname]._value_named_memory
+            memory_resource.persist()
+        
+
+
+    @methodcheck(types=[bool])
+    def inspect(self, verbose=False):
+        '''
+        Inspect variables on shelf
+        '''
+        for varname in self.get_item_names():
+            # get header info
+            root = Header.Header()
+            memview = self.__dict__[varname]._value_named_memory.buffer
+            hdr = root.GetRootAsHeader(memview[4:], 0) # size prefix is 4 bytes
+            hdrsize = util.GetSizePrefix(memview, 0)
+
+            print('var {}: hdrsize={} addr={} magic={} type={} subtype={} txbits={} ver={}'
+                  .format(varname,
+                          hdrsize,
+                          self.__dict__[varname]._value_named_memory.addr(),
+                          hdr.Hdr().Magic(),
+                          hdr.Type(),
+                          hdr.Subtype(),
+                          hdr.Hdr().Txbits(),
+                          hdr.Hdr().Version()))
+
+            if verbose:
+                print('var {}: {}'.format(varname, bytes(memview[:hdrsize])))
+    
+
     def _is_supported_shadow_type(self, value):
         '''
         Helper function to return True if value is of a shadow type
         '''
         return (isinstance(value, pymm.ndarray) or
-                isinstance(value, pymm.string) or
                 isinstance(value, pymm.torch_tensor) or
+                isinstance(value, pymm.string) or
                 isinstance(value, pymm.float_number) or
                 isinstance(value, pymm.integer_number) or
                 isinstance(value, pymm.bytes)
         )
 
     def supported_types(self):
-        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.float_number"]
+        return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.float_number", "pymm.integer_number",
+                "pymm.bytes"]
 
 
 

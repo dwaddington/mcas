@@ -74,8 +74,8 @@ endif()
   add_custom_command(
     OUTPUT ${GENERATED}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND ${FLATC} --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND ${FLATC} --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND ${FLATC} --gen-mutable --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+    COMMAND ${FLATC} --gen-mutable --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
     COMMAND touch ${GENERATED}
     )
 
