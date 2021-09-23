@@ -209,12 +209,14 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   flatbuffers::FlatBufferBuilder builder;
   
   flatbuffers::Offset<PyMM::Meta::Header> mloc;
+  const PyMM::Meta::FixedHeader f{PyMM::Meta::Constants_Magic, 0, 0};
   switch(type) {
-  case 0:
-    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray);
+  case 0: {
+    mloc = PyMM::Meta::CreateHeader(builder, &f, PyMM::Meta::DataType_NumPyArray);
     break;
+  }
   case 1:
-    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_TorchTensor);
+    mloc = PyMM::Meta::CreateHeader(builder, &f, PyMM::Meta::DataType_TorchTensor);
     break;
   default:
     throw General_exception("bad type");
@@ -384,7 +386,8 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
     
     if(!meta_header ||
-       meta_header->magic() != PyMM::Meta::Constants_Magic ||
+       !meta_header->hdr() ||
+       meta_header->hdr()->magic() != PyMM::Meta::Constants_Magic ||
        meta_header->type() != expected_type) {
       Py_RETURN_NONE;
     }

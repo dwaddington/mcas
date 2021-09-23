@@ -18,6 +18,7 @@ import gc
 import numpy as np
 
 import PyMM.Meta.Header as Header
+import PyMM.Meta.FixedHeader as FixedHeader
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
 
@@ -98,9 +99,9 @@ class shelved_linked_list(ShelvedCommon):
         if memref == None:
 
             # create metadata
-            builder = flatbuffers.Builder(32)
+            builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
             Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+            Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder, Constants.Constants().Magic,0,0))
             Header.HeaderAddType(builder, DataType.DataType().LinkedList)
             hdr = Header.HeaderEnd(builder)
             builder.FinishSizePrefixed(hdr)

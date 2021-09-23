@@ -17,6 +17,7 @@ import gc
 import chardet
 
 import PyMM.Meta.Header as Header
+import PyMM.Meta.FixedHeader as FixedHeader
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
 import PyMM.Meta.DataSubType as DataSubType
@@ -112,10 +113,10 @@ class shelved_bytes(ShelvedCommon):
 
         if memref == None:
             # create new value
-            builder = flatbuffers.Builder(32)
+            builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
             # create header
             Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+            Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder,Constants.Constants().Magic,0,0))
             Header.HeaderAddType(builder, DataType.DataType().Bytes)
                                  
             if encoding == 'ascii':
@@ -144,7 +145,7 @@ class shelved_bytes(ShelvedCommon):
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
-            self.view = memoryview(memref.buffer[32:])
+            self.view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -190,10 +191,10 @@ class shelved_bytes(ShelvedCommon):
         new_bytes = python_type_bytes(self.view.tobytes()).__add__(value)
         memory = self._memory_resource
         # create new value
-        builder = flatbuffers.Builder(32)
+        builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
         # create header
         Header.HeaderStart(builder)
-        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+        Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder,Constants.Constants().Magic,0,0))
         Header.HeaderAddType(builder, DataType.DataType().Bytes)
         
         if self.encoding == 'ascii':

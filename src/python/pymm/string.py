@@ -16,6 +16,7 @@ import flatbuffers
 import gc
 
 import PyMM.Meta.Header as Header
+import PyMM.Meta.FixedHeader as FixedHeader
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
 import PyMM.Meta.DataSubType as DataSubType
@@ -49,17 +50,18 @@ class string(Shadow):
 
         hdr_size = util.GetSizePrefix(buffer, 0)
         if(hdr_size != Constants.Constants().HdrSize):
-            return (False, None)
+            raise RuntimeError('bad header size')
 
         root = Header.Header()
         hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
         
-        if(hdr.Magic() != Constants.Constants().Magic):
+        if(hdr.Hdr().Magic() != Constants.Constants().Magic):
             return (False, None)
 
         data_type = hdr.Type()
 
         if data_type == DataType.DataType().String:
+
             data_subtype = hdr.Subtype()
             if data_subtype == DataSubType.DataSubType().Ascii:
                 return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
@@ -88,10 +90,10 @@ class shelved_string(ShelvedCommon):
 
         if memref == None:
             # create new value
-            builder = flatbuffers.Builder(32)
+            builder = flatbuffers.Builder(Constants.Constants().HdrSize)
             # create header
             Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+            Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder, Constants.Constants().Magic, 0, 0))
             Header.HeaderAddType(builder, DataType.DataType().String)
             
             if encoding == 'ascii':
@@ -122,7 +124,7 @@ class shelved_string(ShelvedCommon):
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
-            self.view = memoryview(memref.buffer[32:])
+            self.view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -169,10 +171,10 @@ class shelved_string(ShelvedCommon):
         new_str = str(self.view,self.encoding).__add__(value)
         memory = self._memory_resource
         # create new value
-        builder = flatbuffers.Builder(32)
+        builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
         # create header
         Header.HeaderStart(builder)
-        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+        Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder, Constants.Constants().Magic,0,0))
         Header.HeaderAddType(builder, DataType.DataType().String)
         
         if self.encoding == 'ascii':

@@ -17,6 +17,7 @@ import struct
 import gc
 
 import PyMM.Meta.Header as Header
+import PyMM.Meta.FixedHeader as FixedHeader
 import PyMM.Meta.Constants as Constants
 import PyMM.Meta.DataType as DataType
 import PyMM.Meta.DataSubType as DataSubType
@@ -54,7 +55,7 @@ class integer_number(Shadow):
         root = Header.Header()
         hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
 
-        if(hdr.Magic() != Constants.Constants().Magic):
+        if(hdr.Hdr().Magic() != Constants.Constants().Magic):
             return (False, None)
 
         if (hdr.Type() == DataType.DataType().NumberInteger):
@@ -79,10 +80,10 @@ class shelved_integer_number(ShelvedCommon):
         number_value = int(number_value)
         if memref == None:
             # create new value
-            builder = flatbuffers.Builder(32)
+            builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
             # create header
             Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+            Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder,Constants.Constants().Magic,0,0))
             Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
 
             hdr = Header.HeaderEnd(builder)
@@ -109,14 +110,14 @@ class shelved_integer_number(ShelvedCommon):
             root = Header.Header()
             hdr = root.GetRootAsHeader(memref.buffer[4:], 0) # size prefix is 4 bytes
             
-            if(hdr.Magic() != Constants.Constants().Magic):
+            if(hdr.Hdr().Magic() != Constants.Constants().Magic):
                 raise RuntimeError("bad magic number - corrupt data?")
                 
             self._type = hdr.Type()
             
 
         # set up the view of the data
-        # materialization alternative - self._view = memoryview(memref.buffer[32:])
+        # materialization alternative - self._view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
         self._cached_value = int(number_value)        
         self._name = name
         # hold a reference to the memory resource
@@ -129,10 +130,10 @@ class shelved_integer_number(ShelvedCommon):
             raise TypeError('bad type for atomic_update_value')
 
         # create new integer 
-        builder = flatbuffers.Builder(32)
+        builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
         # create header
         Header.HeaderStart(builder)
-        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
+        Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder,Constants.Constants().Magic,0,0))
         Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
         Header.HeaderAddType(builder, DataSubType.DataSubType().NotApplicable)
         
@@ -166,7 +167,7 @@ class shelved_integer_number(ShelvedCommon):
         memref = memory.open_named_memory(self._name)
         self._value_named_memory = memref
         self._cached_value = value
-        # materialization alternative - self._view = memoryview(memref.buffer[32:])
+        # materialization alternative - self._view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
         return self
 
         

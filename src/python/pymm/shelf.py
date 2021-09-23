@@ -96,12 +96,11 @@ class shelf():
                 root = Header.Header()
                 hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
                 
-                if(hdr.Magic() != Constants.Constants().Magic):
-                    print("WARNING: bad magic number")
+                if(hdr.Hdr().Magic() != Constants.Constants().Magic):
+                    print("WARNING: bad magic {} number for variable: {}".format(hdr.Hdr().Magic(),varname))
                     continue
                 
                 stype = hdr.Type()
-
                 # call appropriate existing_instance for detected type
                 
                 # type: pymm.string

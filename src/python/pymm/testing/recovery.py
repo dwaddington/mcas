@@ -33,7 +33,8 @@ class TestRecovery(unittest.TestCase):
         shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 
         # different types
-        shelf.s = "Hello"
+        shelf.s = 'Hello'
+        print(list('Hello'))
         shelf.f = 1.123
         shelf.fm = 2.2
         shelf.fm += 1.1
@@ -43,6 +44,7 @@ class TestRecovery(unittest.TestCase):
         shelf.b = 'This is a bytes type'
         shelf.bm = 'This is a '
         shelf.bm += 'modified bytes type'
+        shelf.t = torch.tensor([[1,1,1,1,1],[2,2,2,2,2],[3,3,3,3,3]])
         
         del shelf
         gc.collect()
@@ -51,6 +53,7 @@ class TestRecovery(unittest.TestCase):
         log("Testing: recovering shelf and values")
         shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',force_new=False)
 
+        print(">{}<".format(shelf.s))
         print(shelf.f)
         print(shelf.fm)
         print(shelf.i)
@@ -58,7 +61,10 @@ class TestRecovery(unittest.TestCase):
         print(shelf.nd2)
         print(shelf.b)
         print(shelf.bm)
-               
+        print(list(shelf.s))
+        print(round(shelf.fm,2))
+        print(shelf.t)
+                
         check(shelf.s == 'Hello', 'string recovery')
         check(shelf.f == 1.123, 'float recovery')
         check(round(shelf.fm,2) == 3.30, 'float modified recovery')
@@ -66,6 +72,8 @@ class TestRecovery(unittest.TestCase):
         check(np.array_equal(shelf.nd, np.ones((3,))),'1D ndarray')
         check(np.array_equal(shelf.nd2, np.identity(10)),'2D ndarray')
         check(str(shelf.b) == 'This is a bytes type', 'bytes')
+        check(str(shelf.bm) == 'This is a modified bytes type', 'modified bytes')
+        check(shelf.t.equal(torch.tensor([[1,1,1,1,1],[2,2,2,2,2],[3,3,3,3,3]])), 'torch tensor')
         
 if __name__ == '__main__':
     unittest.main()

@@ -22,15 +22,20 @@ enum DataSubType : uint16 {
 }
 
 enum Constants : uint32 {
-  HdrSize = 28,
+  HdrSize = 36,
   Magic = 202100001,
 }
 
 union Any { TorchTensor }
 
+struct FixedHeader {
+  magic   : uint32;
+  txbits  : uint32 = 0;
+  version : uint32 = 0;
+}
 
 table Header {
-  magic   : uint32;
+  hdr     : FixedHeader (required);
   type    : DataType;
   subtype : DataSubType;
 }
