@@ -87,8 +87,7 @@ class shelf():
                 hdr = MetaHeader.from_buffer(memoryview(buffer))
                 
                 if (hdr.magic != int(HeaderMagic)):
-                    print(type(hdr.magic))
-                    print("WARNING: bad magic {} number for variable: {}".format(hdr.magic,varname))
+                    print("WARNING: (shelf.py) bad magic {} number for variable: {}".format(hdr.magic,varname))
                     continue
                 
                 stype = hdr.type
@@ -171,7 +170,7 @@ class shelf():
         Handle attribute assignment
         '''
         # constant members
-        if self.mr and name is 'mr':
+        if self.mr and name == 'mr':
             raise RuntimeError('invalid assignment')
 
         # selective pass through

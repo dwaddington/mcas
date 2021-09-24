@@ -33,16 +33,16 @@ def construct_header_from_buffer(buffer: memoryview):
     return hdr
 
 class MetaHeader(Structure):
-    _fields_ = [("magic", c_uint),
-                ("txbits", c_uint),
-                ("version", c_uint),
-                ("type", c_uint),
-                ("subtype", c_uint)
+    _fields_ = [("magic", c_uint32),
+                ("txbits", c_uint32),
+                ("version", c_uint32),
+                ("type", c_uint32),
+                ("subtype", c_uint32)
     ]
 
 
 HeaderSize = 20
-HeaderMagic = int(202100001)
+HeaderMagic = int(0xCAF0)
 
 DataType_Unknown       = int(0)
 DataType_Opaque        = int(1)

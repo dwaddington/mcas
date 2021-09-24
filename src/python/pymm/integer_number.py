@@ -89,32 +89,19 @@ class shelved_integer_number(ShelvedCommon):
 
     def _atomic_update_value(self, value):
         if not isinstance(value, int):
-            print("type(value):", type(value))
-            raise TypeError('bad type for atomic_update_value')
+            raise TypeError('bad type for atomic_update_value')        
 
-        # create new integer 
-        builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
-        # create header
-        Header.HeaderStart(builder)
-        Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder,Constants.Constants().Magic,0,0))
-        Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
-        Header.HeaderAddType(builder, DataSubType.DataSubType().NotApplicable)
-        
-        hdr = Header.HeaderEnd(builder)
-        builder.FinishSizePrefixed(hdr)
-        hdr_ba = builder.Output()
-
-        # allocate memory
-        hdr_len = len(hdr_ba)
+        # because we are doing swapping create new integer
         value_bytes = value.to_bytes((value.bit_length() + 7) // 8, 'big')
-        value_len = hdr_len + len(value_bytes) 
+        total_len = HeaderSize + len(value_bytes)
 
         memory = self._memory_resource
-        memref = memory.create_named_memory(self._name + '-tmp', value_len, 1, False)
-        # copy into memory resource
-        memref.tx_begin()
-        memref.buffer[0:hdr_len] = hdr_ba
-        memref.buffer[hdr_len:] = value_bytes
+        memref = memory.create_named_memory(self._name + '-tmp', total_len, 1, False)
+        memref.tx_begin() # not sure if we need this
+        hdr = construct_header_on_buffer(memref.buffer, DataType_NumberInteger)
+
+        # copy data into memory resource
+        memref.buffer[HeaderSize:] = value_bytes
         memref.tx_commit()
 
         del memref # this will force release

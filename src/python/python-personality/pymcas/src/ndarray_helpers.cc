@@ -206,7 +206,6 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   std::stringstream hdr;
 
 #ifdef PYMM
-
   MetaHeader metadata;
   metadata.magic = HeaderMagic;
   metadata.txbits = 0;
@@ -340,7 +339,7 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
   PyObject * bytes_memory_view  = nullptr;
   int type = 0;
-  
+
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwargs,
                                     "O|i",
@@ -360,35 +359,20 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   byte * ptr = (byte *) buffer->buf;
   
 #ifdef PYMM
-  auto total_len = *reinterpret_cast<uint32_t*>(ptr) + sizeof(uint32_t);
-  assert(buffer->len > total_len);
 
-  uint32_t expected_type;
-  switch(type) {
-  case 0:
-    expected_type = DataType_NumPyArray;
-    break;
-  case 1:
-    expected_type = DataType_TorchTensor;
-    break;
-  default:
-    throw General_exception("bad type");
-  }
+  auto hdr = reinterpret_cast<MetaHeader*>(ptr);
+  if(hdr->magic != HeaderMagic)
+    throw General_exception("magic check failed");
 
-  try {
-    auto meta_header = reinterpret_cast<MetaHeader *>(ptr);
+  if(type != 0 && type != 1)
+    throw General_exception("invalid type");
+  
+  if((type == 0 && hdr->type != DataType_NumPyArray) ||
+     (type == 1 && hdr->type != DataType_TorchTensor))
+    throw General_exception("mismatched type");
 
-    if(!meta_header ||
-       meta_header->magic != HeaderMagic ||
-       meta_header->type != expected_type) {
-      Py_RETURN_NONE;
-    }
-  }
-  catch(...) {
-    PERR("PyMM::Meta::GetHeader failed");
-  }
-
-  ptr += total_len;
+  ptr += HeaderSize;
+  
 #endif
 
   int ndims = *(reinterpret_cast<int*>(ptr));

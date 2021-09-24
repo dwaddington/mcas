@@ -61,8 +61,9 @@ class ndarray(Shadow):
         '''
         metadata = memory_resource.get_named_memory(name)
         if metadata is None:
-            return (False, None)
-        
+            raise RuntimeError('bad object name')
+#            return (False, None)
+
         if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
             return (False, None)
         else:
@@ -117,9 +118,9 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         value_key = name + '-value'
         metadata_key = name
 
-        value_named_memory = memory_resource.open_named_memory(value_key)
+        memref = memory_resource.open_named_memory(value_key)
 
-        if value_named_memory == None: # does not exist yet
+        if memref == None: # does not exist yet
             #
             # create a newly allocated named memory from MemoryResource
             #
@@ -128,13 +129,13 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                 alignment = 1
             else:
                 alignment = 8
-            value_named_memory = memory_resource.create_named_memory(value_key,
-                                                                     msize,
-                                                                     alignment,
-                                                                     zero) # zero memory
+            memref = memory_resource.create_named_memory(value_key,
+                                                         msize,
+                                                         alignment,
+                                                         zero) # zero memory
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
+            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=memref.buffer,
                                       strides=strides, order=order)
 
             # create and store metadata header
@@ -145,12 +146,12 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             # entity already exists, load metadata            
             metadata = memory_resource.get_named_memory(metadata_key)
             hdr = pymmcore.ndarray_read_header(memoryview(metadata),type=type)
-            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
+            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=memref.buffer,
                                       strides=hdr['strides'], order=order)
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = value_named_memory
+        self._value_named_memory = memref
         self._metadata_key = metadata_key
         self._value_key = value_key
         self.name = name

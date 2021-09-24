@@ -18,12 +18,12 @@ extern "C" {
 
   static constexpr uint32_t DataType_Unknown       = 0;
   static constexpr uint32_t DataType_Opaque        = 1;
-  static constexpr uint32_t DataType_NumPyArray    = 2;
-  static constexpr uint32_t DataType_TorchTensor   = 4;
-  static constexpr uint32_t DataType_String        = 8;
-  static constexpr uint32_t DataType_Bytes         = 9;
-  static constexpr uint32_t DataType_NumberFloat   = 21;
-  static constexpr uint32_t DataType_NumberInteger = 22;
+  static constexpr uint32_t DataType_String        = 2;
+  static constexpr uint32_t DataType_NumberFloat   = 3;
+  static constexpr uint32_t DataType_NumberInteger = 4;
+  static constexpr uint32_t DataType_Bytes         = 5;  
+  static constexpr uint32_t DataType_NumPyArray    = 10;
+  static constexpr uint32_t DataType_TorchTensor   = 11;
   static constexpr uint32_t DataType_LinkedList    = 23;
 
   static constexpr uint32_t DataSubType_None   = 0;

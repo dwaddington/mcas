@@ -162,10 +162,9 @@ class shelved_string(ShelvedCommon):
     
         
         # copy into memory resource
-        #memref.tx_begin() # don't need transaction here?
-
+        memref.tx_begin() # don't need transaction here?
         memref.buffer[HeaderSize:] = bytes(new_str, self.encoding)
-        #memref.tx_commit()
+        memref.tx_commit()
 
         del memref # this will force release
         del self._value_named_memory # this will force release
