@@ -17,12 +17,6 @@ import struct
 import gc
 import numpy as np
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.FixedHeader as FixedHeader
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-
-from flatbuffers import util
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon

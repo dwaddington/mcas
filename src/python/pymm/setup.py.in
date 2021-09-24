@@ -73,9 +73,9 @@ setuptools.setup(
     author='Daniel Waddington',
     author_email='daniel.waddington@ibm.com',
     description='Micro MCAS API library',
-    package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}', 'PyMM.Meta':'${CMAKE_CURRENT_BINARY_DIR}/PyMM/Meta' },
+    package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
     ext_modules=[pymm_module_core],
-    packages=['pymm','PyMM.Meta'],
+    packages=['pymm'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache 2.0 License",

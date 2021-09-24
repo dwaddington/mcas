@@ -8,7 +8,7 @@
 #include <structmember.h>
 #include <libpmem.h>
 
-#include "meta_generated.h"
+#include "metadata.h"
 #include "pymm_config.h"
 
 /* defaults */

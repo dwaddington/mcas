@@ -29,7 +29,7 @@
 /* for PyMM we do things slightly different to the Python Personality.
    we'd like to unify PP and PyMM eventually */
 #ifdef PYMM
-#include "meta_generated.h"
+#include "metadata.h"
 #endif
 
 namespace global
@@ -206,26 +206,20 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   std::stringstream hdr;
 
 #ifdef PYMM
-  flatbuffers::FlatBufferBuilder builder;
+
+  MetaHeader metadata;
+  metadata.magic = HeaderMagic;
+  metadata.txbits = 0;
+  metadata.version = 0;
+  metadata.subtype = 0;
   
-  flatbuffers::Offset<PyMM::Meta::Header> mloc;
-  const PyMM::Meta::FixedHeader f{PyMM::Meta::Constants_Magic, 0, 0};
-  switch(type) {
-  case 0: {
-    mloc = PyMM::Meta::CreateHeader(builder, &f, PyMM::Meta::DataType_NumPyArray);
-    break;
-  }
-  case 1:
-    mloc = PyMM::Meta::CreateHeader(builder, &f, PyMM::Meta::DataType_TorchTensor);
-    break;
-  default:
-    throw General_exception("bad type");
-  }
+  if(type == 0)
+    metadata.type = DataType_NumPyArray;
+  else if(type == 1)
+    metadata.type = DataType_TorchTensor;
+  else throw General_exception("bad type");
   
-  FinishSizePrefixedHeaderBuffer(builder, mloc); /* include size prefix */
-  auto meta_hdr = builder.GetBufferPointer();
-  auto meta_hdr_len = builder.GetSize();
-  hdr.write(reinterpret_cast<const char*>(meta_hdr), meta_hdr_len);
+  hdr.write(reinterpret_cast<const char*>(&metadata), sizeof(metadata));
 #endif
 
   /* number of dimensions */
@@ -369,26 +363,24 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   auto total_len = *reinterpret_cast<uint32_t*>(ptr) + sizeof(uint32_t);
   assert(buffer->len > total_len);
 
-  int expected_type;
+  uint32_t expected_type;
   switch(type) {
   case 0:
-    expected_type = PyMM::Meta::DataType_NumPyArray;
+    expected_type = DataType_NumPyArray;
     break;
   case 1:
-    expected_type = PyMM::Meta::DataType_TorchTensor;
+    expected_type = DataType_TorchTensor;
     break;
   default:
     throw General_exception("bad type");
   }
 
   try {
-    auto meta_header = PyMM::Meta::GetSizePrefixedHeader(ptr);
+    auto meta_header = reinterpret_cast<MetaHeader *>(ptr);
 
-    
     if(!meta_header ||
-       !meta_header->hdr() ||
-       meta_header->hdr()->magic() != PyMM::Meta::Constants_Magic ||
-       meta_header->type() != expected_type) {
+       meta_header->magic != HeaderMagic ||
+       meta_header->type != expected_type) {
       Py_RETURN_NONE;
     }
   }

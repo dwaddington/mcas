@@ -21,6 +21,7 @@ enum DataSubType : uint16 {
   Latin1 = 13,
 }
 
+
 enum Constants : uint32 {
   HdrSize = 36,
   Magic = 202100001,

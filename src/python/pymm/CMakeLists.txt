@@ -21,11 +21,11 @@ if (BUILD_PYTHON_SUPPORT)
   set(PKG_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pymm")
   
   find_program(PYTHON NAMES "python3.8" "python3.7" "python3.6" "python3.5")
-  find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
+#  find_program(FLATC NAMES flatc PATHS "${CMAKE_INSTALL_PREFIX}/bin" NO_DEFAULT_PATH)
 
-if (NOT FLATC)
-  message(FATAL_ERROR ": Flatc compiler not found")
-endif()
+#if (NOT FLATC)
+#  message(FATAL_ERROR ": Flatc compiler not found")
+#endif()
 
   get_filename_component(PYTHON_FILENAME ${PYTHON} NAME)
   # get python locations
@@ -70,18 +70,18 @@ endif()
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE DESTINATION ${PKG_SOURCE_DIR})
   file(COPY ${PACKAGE_SOURCE_FILES} DESTINATION ${PKG_SOURCE_DIR})
 
-  set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/meta_generated.h)
-  add_custom_command(
-    OUTPUT ${GENERATED}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND ${FLATC} --gen-mutable --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND ${FLATC} --gen-mutable --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
-    COMMAND touch ${GENERATED}
-    )
+  #set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/meta_generated.h)
+  # add_custom_command(
+  #   OUTPUT ${GENERATED}
+  #   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+  #   COMMAND ${FLATC} --gen-mutable --cpp -o ${CMAKE_CURRENT_BINARY_DIR}/core/ -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+  #   COMMAND ${FLATC} --gen-mutable --python -o ${CMAKE_CURRENT_BINARY_DIR} -c ${CMAKE_CURRENT_SOURCE_DIR}/core/meta.fbs
+  #   COMMAND touch ${GENERATED}
+  #   )
 
-  add_custom_target(${PROJECT_NAME}-meta ALL
-    DEPENDS ${GENERATED}
-    )
+  # add_custom_target(${PROJECT_NAME}-meta ALL
+  #   DEPENDS ${GENERATED}
+  #   )
 
   if(BUILD_PYMM_VALGRIND)
     message("-- Building Pymm with Valgrind support")
@@ -94,24 +94,24 @@ endif()
     add_custom_target(${PROJECT_NAME}-np ALL
       COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${PKG_SOURCE_DIR}
       COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} build
-      COMMAND cmake -E touch build.stamp
-      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
+ #     COMMAND cmake -E touch build.stamp
+#      DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
       )
-    add_custom_target(${PROJECT_NAME} ALL
-      DEPENDS build.stamp
-      )
+    #add_custom_target(${PROJECT_NAME} ALL
+    #  DEPENDS build.stamp
+    #  )
     
   else()
     message("-- Building Pymm with site package")
 
-    add_custom_target(${PROJECT_NAME} ALL
-      DEPENDS build.stamp
-      )
+  #  add_custom_target(${PROJECT_NAME} ALL
+  #    DEPENDS build.stamp
+  #    )
     
     add_custom_command(
-      OUTPUT build.stamp
+  #    OUTPUT build.stamp
       COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
-      COMMAND cmake -E touch build.stamp
+  #    COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
       )
 

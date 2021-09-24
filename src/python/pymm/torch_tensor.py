@@ -19,13 +19,8 @@ import numpy as np
 import copy
 import flatbuffers
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.TorchTensor as TorchTensor
-import PyMM.Meta.DataType as DataType
-from flatbuffers import util
-
 from numpy import uint8, ndarray, dtype, float
+
 from .memoryresource import MemoryResource
 from .ndarray import ndarray, shelved_ndarray
 from .shelf import Shadow

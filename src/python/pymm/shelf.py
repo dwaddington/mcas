@@ -22,14 +22,10 @@ import copy
 import numpy
 import torch
 import weakref
-
 import numpy as np
 import torch
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-
+from .metadata import *
 from .memoryresource import MemoryResource
 from .check import methodcheck
 from flatbuffers import util
@@ -88,30 +84,25 @@ class shelf():
                     print("WARNING: no named memory for '{}'".format(varname))
                     continue
                     
-                hdr_size = util.GetSizePrefix(buffer, 0)
-#                if hdr_size != Constants.Constants().HdrSize:
-#                    print("WARNING: invalid header for '{}'; prior version hdr_size={}".format(varname, hdr_size))
-#                    continue
-
-                root = Header.Header()
-                hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
+                hdr = MetaHeader.from_buffer(memoryview(buffer))
                 
-                if(hdr.Hdr().Magic() != Constants.Constants().Magic):
-                    print("WARNING: bad magic {} number for variable: {}".format(hdr.Hdr().Magic(),varname))
+                if (hdr.magic != int(HeaderMagic)):
+                    print(type(hdr.magic))
+                    print("WARNING: bad magic {} number for variable: {}".format(hdr.magic,varname))
                     continue
                 
-                stype = hdr.Type()
+                stype = hdr.type
                 # call appropriate existing_instance for detected type
                 
                 # type: pymm.string
-                if (stype == DataType.DataType().String):
+                if (stype == DataType_String):
                     (existing, value) = pymm.string.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
 
-                elif (stype == DataType.DataType().Bytes):
+                elif (stype == DataType_Bytes):
                     (existing, value) = pymm.bytes.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
@@ -119,7 +110,7 @@ class shelf():
                         continue
                     
                 # type: pymm.ndarray
-                elif (stype == DataType.DataType().NumPyArray):
+                elif (stype == DataType_NumPyArray):
                     (existing, value) = pymm.ndarray.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
@@ -127,7 +118,7 @@ class shelf():
                         continue
 
                 # type: pymm.torch_tensor
-                elif (stype == DataType.DataType().TorchTensor):
+                elif (stype == DataType_TorchTensor):
                     (existing, value) = pymm.torch_tensor.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
@@ -135,7 +126,7 @@ class shelf():
                         continue
 
                 # type: pymm.float_number
-                elif (stype == DataType.DataType().NumberFloat):
+                elif (stype == DataType_NumberFloat):
                     (existing, value) = pymm.float_number.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
@@ -143,7 +134,7 @@ class shelf():
                         continue
 
                 # type: pymm.integer_number
-                elif (stype == DataType.DataType().NumberInteger):
+                elif (stype == DataType_NumberInteger):
                     (existing, value) = pymm.integer_number.existing_instance(self.mr, varname)
                     if existing == True:
                         self.__dict__[varname] = value
@@ -151,7 +142,7 @@ class shelf():
                         continue
                     
                 # type: pymm.linked_list (needs shelf)
-                elif (stype == DataType.DataType().LinkedList):
+                elif (stype == DataType_LinkedList):
                     (existing, value) = pymm.linked_list.existing_instance(self, varname)
                     if existing == True:
                         self.__dict__[varname] = value

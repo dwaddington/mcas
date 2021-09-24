@@ -15,13 +15,7 @@ import pymmcore
 import flatbuffers
 import gc
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.FixedHeader as FixedHeader
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-import PyMM.Meta.DataSubType as DataSubType
-
-from flatbuffers import util
+from .metadata import *
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon
@@ -48,29 +42,28 @@ class string(Shadow):
         if buffer is None:
             return (False, None)
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != Constants.Constants().HdrSize):
-            raise RuntimeError('bad header size')
+#        hdr_size = util.GetSizePrefix(buffer, 0)
+#        if(hdr_size != Constants.Constants().HdrSize):
+#            raise RuntimeError('bad header size')
 
-        root = Header.Header()
-        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
+        hdr = MetaHeader.from_buffer(buffer)
         
-        if(hdr.Hdr().Magic() != Constants.Constants().Magic):
+        if (hdr.magic != HeaderMagic):
             return (False, None)
 
-        data_type = hdr.Type()
+        data_type = hdr.type
 
-        if data_type == DataType.DataType().String:
+        if data_type == DataType_String:
 
-            data_subtype = hdr.Subtype()
-            if data_subtype == DataSubType.DataSubType().Ascii:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
-            elif data_subtype == DataSubType.DataSubType().Utf8:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-8'))
-            elif data_subtype == DataSubType.DataSubType().Utf16:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-16'))
-            elif data_subtype == DataSubType.DataSubType().Latin1:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'latin-1'))
+            data_subtype = hdr.subtype
+            if data_subtype == DataSubType_Ascii:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'ascii'))
+            elif data_subtype == DataSubType_Utf8:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'utf-8'))
+            elif data_subtype == DataSubType_Utf16:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'utf-16'))
+            elif data_subtype == DataSubType_Latin1:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'latin-1'))
 
         # not a string
         return (False, None)
@@ -89,28 +82,36 @@ class shelved_string(ShelvedCommon):
         memref = memory_resource.open_named_memory(name)
 
         if memref == None:
-            # create new value
-            builder = flatbuffers.Builder(Constants.Constants().HdrSize)
-            # create header
-            Header.HeaderStart(builder)
-            Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder, Constants.Constants().Magic, 0, 0))
-            Header.HeaderAddType(builder, DataType.DataType().String)
+
+            hdr = MetaHeader()
+            hdr.magic = HeaderMagic
+            hdr.txbits = 0
+            hdr.version = 0
+            hdr.type = DataType_String
+
+            print("HELLLOOOOOOO");
+            # # create new value
+            # builder = flatbuffers.Builder(Constants.Constants().HdrSize)
+            # # create header
+            # Header.HeaderStart(builder)
+            # Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder, Constants.Constants().Magic, 0, 0))
+            # Header.HeaderAddType(builder, DataType.DataType().String)
             
             if encoding == 'ascii':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
+                hdr.subtype = DataSubType_Ascii
             elif encoding == 'utf-8':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
+                hdr.subtype = DataSubType_Utf8
             elif encoding == 'utf-16':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
+                hdr.subtype = DataSubType_Utf16
             elif encoding == 'latin-1':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
+                hdr.subtype = DataSubType_Latin1
             else:
                 raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
                     
-            hdr = Header.HeaderEnd(builder)
-            builder.FinishSizePrefixed(hdr)
-            hdr_ba = builder.Output()
-
+            # hdr = Header.HeaderEnd(builder)
+            # builder.FinishSizePrefixed(hdr)
+            # hdr_ba = builder.Output()
+            hdr_ba = bytearray(hdr)
             # allocate memory
             hdr_len = len(hdr_ba)
             value_len = len(string_value) + hdr_len
@@ -124,7 +125,7 @@ class shelved_string(ShelvedCommon):
 
             self.view = memoryview(memref.buffer[hdr_len:])
         else:
-            self.view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
+            self.view = memoryview(memref.buffer[HeaderSize:])
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource

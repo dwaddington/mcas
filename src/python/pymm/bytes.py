@@ -16,12 +16,6 @@ import flatbuffers
 import gc
 import chardet
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.FixedHeader as FixedHeader
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-import PyMM.Meta.DataSubType as DataSubType
-
 from flatbuffers import util
 from .memoryresource import MemoryResource
 from .shelf import Shadow
