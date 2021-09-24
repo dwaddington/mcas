@@ -88,14 +88,6 @@ class shelved_string(ShelvedCommon):
             hdr.txbits = 0
             hdr.version = 0
             hdr.type = DataType_String
-
-            print("HELLLOOOOOOO");
-            # # create new value
-            # builder = flatbuffers.Builder(Constants.Constants().HdrSize)
-            # # create header
-            # Header.HeaderStart(builder)
-            # Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder, Constants.Constants().Magic, 0, 0))
-            # Header.HeaderAddType(builder, DataType.DataType().String)
             
             if encoding == 'ascii':
                 hdr.subtype = DataSubType_Ascii
@@ -108,11 +100,8 @@ class shelved_string(ShelvedCommon):
             else:
                 raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
                     
-            # hdr = Header.HeaderEnd(builder)
-            # builder.FinishSizePrefixed(hdr)
-            # hdr_ba = builder.Output()
             hdr_ba = bytearray(hdr)
-            # allocate memory
+            # allocate named memory
             hdr_len = len(hdr_ba)
             value_len = len(string_value) + hdr_len
 
