@@ -159,10 +159,7 @@ class shelved_string(ShelvedCommon):
         total_len = HeaderSize + len(new_str)
         memref = memory.create_named_memory(self._name + "-tmp", total_len, 1, False)
 
-        hdr = MetaHeader.from_buffer(memref.buffer)
-        hdr.magic = HeaderMagic
-        hdr.txbits = 0
-        hdr.version = 0
+        hdr = init_header_from_buffer(memref.buffer)
         hdr.type = DataType_String
         
         if self.encoding == 'ascii':

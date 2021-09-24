@@ -10,6 +10,12 @@ def construct_header(type=0, subtype=0, txbits=0, version=0):
     hdr.type = type
     return hdr
 
+def init_header_from_buffer(buffer: memoryview):
+    hdr = MetaHeader.from_buffer(memref.buffer)
+    hdr.magic = HeaderMagic
+    hdr.txbits = 0
+    hdr.version = 0
+    return hdr
 
 class MetaHeader(Structure):
     _fields_ = [("magic", c_uint),
