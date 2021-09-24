@@ -241,12 +241,15 @@ class shelf():
 #            return weakref.ref(self.__dict__[name])
             
     @methodcheck(types=[])
-    def get_item_names(self):
+    def get_item_names(self, all=False):
         '''
         Get names of items on the shelf
         '''
         items = []
         for s in self.__dict__:
+            
+            if (not(all) and s[0] == '_'): # skip list implicit members
+                continue
             if issubclass(type(self.__dict__[s]), pymm.ShelvedCommon):
                 items.append(s) # or to add object itself...self.__dict__[s]
             elif issubclass(type(self.__dict__[s]), torch.Tensor):
@@ -299,7 +302,7 @@ class shelf():
         '''
         Inspect variables on shelf
         '''
-        for varname in self.get_item_names():
+        for varname in self.get_item_names(all=verbose):
             # get header info
             memview = self.__dict__[varname]._value_named_memory.buffer
 

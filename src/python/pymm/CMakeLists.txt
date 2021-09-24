@@ -80,7 +80,9 @@ if (BUILD_PYTHON_SUPPORT)
   else()
     message("-- Building Pymm with site package")
     add_custom_command(
-      COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution    
+      OUTPUT build.stamp
+      COMMAND ${EXTRA_FLAGS} ${PYTHON} ${SETUP_PY} bdist # build wheel binary distribution
+      COMMAND cmake -E touch build.stamp
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
       )
 

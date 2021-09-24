@@ -88,7 +88,8 @@ class TestRecovery(unittest.TestCase):
         check(shelf.l[1] == 2, 'linked list')
         check(shelf.l[2] == 'z', 'linked list')
 
-        shelf.inspect()
+        print(shelf.items)
+        shelf.inspect(verbose=True)
         
 if __name__ == '__main__':
     unittest.main()
