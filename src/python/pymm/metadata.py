@@ -11,7 +11,7 @@ def construct_header(type=0, subtype=0, txbits=0, version=0):
     return hdr
 
 def init_header_from_buffer(buffer: memoryview):
-    hdr = MetaHeader.from_buffer(memref.buffer)
+    hdr = MetaHeader.from_buffer(buffer)
     hdr.magic = HeaderMagic
     hdr.txbits = 0
     hdr.version = 0
