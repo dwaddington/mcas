@@ -41,18 +41,10 @@ class string(Shadow):
         if buffer is None:
             return (False, None)
 
-#        hdr_size = util.GetSizePrefix(buffer, 0)
-#        if(hdr_size != Constants.Constants().HdrSize):
-#            raise RuntimeError('bad header size')
+        # cast header structure on buffer
+        hdr = construct_header_from_buffer(buffer)
 
-        hdr = MetaHeader.from_buffer(buffer)
-        
-        if (hdr.magic != HeaderMagic):
-            return (False, None)
-
-        data_type = hdr.type
-
-        if data_type == DataType_String:
+        if (hdr.type == DataType_String):
 
             data_subtype = hdr.subtype
             if data_subtype == DataSubType_Ascii:
@@ -82,7 +74,12 @@ class shelved_string(ShelvedCommon):
 
         if memref == None:
 
-            hdr = construct_header(DataType_String)
+            # create new value
+            total_len = len(string_value) + HeaderSize
+            memref = memory_resource.create_named_memory(name, total_len, 1, False)
+
+            memref.tx_begin()
+            hdr = construct_header_on_buffer(memref.buffer, DataType_String)
             
             if encoding == 'ascii':
                 hdr.subtype = DataSubType_Ascii
@@ -95,21 +92,11 @@ class shelved_string(ShelvedCommon):
             else:
                 raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
                     
-            hdr_ba = bytearray(hdr)
-            # allocate named memory
-            hdr_len = len(hdr_ba)
-            value_len = len(string_value) + hdr_len
-
-            memref = memory_resource.create_named_memory(name, value_len, 1, False)
-            # copy into memory resource
-            memref.tx_begin()
-            memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = bytes(string_value, encoding)
+            # copy data into memory resource            
+            memref.buffer[HeaderSize:] = bytes(string_value, encoding)
             memref.tx_commit()
 
-            self.view = memoryview(memref.buffer[hdr_len:])
-        else:
-            self.view = memoryview(memref.buffer[HeaderSize:])
+        self.view = memoryview(memref.buffer[HeaderSize:])
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource

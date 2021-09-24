@@ -13,7 +13,7 @@ extern "C" {
     uint32_t subtype;
   } MetaHeader;
 
-  static constexpr uint32_t HeaderMagic = 202100001;
+  static constexpr uint32_t HeaderMagic = 0xCAF0;
   static constexpr uint32_t HeaderSize = sizeof(MetaHeader);
 
   static constexpr uint32_t DataType_Unknown       = 0;

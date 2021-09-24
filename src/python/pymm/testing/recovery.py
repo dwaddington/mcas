@@ -36,10 +36,10 @@ class TestRecovery(unittest.TestCase):
         shelf.s = 'Hello'
         shelf.s += ' world!'
         print(list('Hello'))
-#        shelf.f = 1.123
-        # shelf.fm = 2.2
-        # shelf.fm += 1.1
-        # shelf.i = 911
+        shelf.f = 1.123
+        shelf.fm = 2.2
+        shelf.fm += 1.1
+        shelf.i = 911
         # shelf.nd = np.ones((3,))
         # shelf.nd2 = np.identity(10)
         # shelf.b = 'This is a bytes type'
@@ -55,9 +55,9 @@ class TestRecovery(unittest.TestCase):
         shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',force_new=False)
 
         print(">{}<".format(shelf.s))
- #       print(shelf.f)
-        # print(shelf.fm)
-        # print(shelf.i)
+        print(shelf.f)
+        print(shelf.fm)
+        print(shelf.i)
         # print(shelf.nd)
         # print(shelf.nd2)
         # print(shelf.b)
@@ -67,9 +67,9 @@ class TestRecovery(unittest.TestCase):
         # print(shelf.t)
                 
         check(shelf.s == 'Hello world!', 'string recovery')
-#        check(shelf.f == 1.123, 'float recovery')
-        # check(round(shelf.fm,2) == 3.30, 'float modified recovery')
-        # check(shelf.i == 911, 'integer recovery')
+        check(shelf.f == 1.123, 'float recovery')
+        check(round(shelf.fm,2) == 3.30, 'float modified recovery')
+        check(shelf.i == 911, 'integer recovery')
         # check(np.array_equal(shelf.nd, np.ones((3,))),'1D ndarray')
         # check(np.array_equal(shelf.nd2, np.identity(10)),'2D ndarray')
         # check(str(shelf.b) == 'This is a bytes type', 'bytes')

@@ -12,13 +12,12 @@
 #
 
 import pymmcore
-import flatbuffers
 import struct
 import gc
 
+from .metadata import *
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 class integer_number(Shadow):
     '''
@@ -41,18 +40,10 @@ class integer_number(Shadow):
         if buffer is None:
             return (False, None)
 
-        hdr_size = util.GetSizePrefix(buffer, 0) + 4
-        if(hdr_size != Constants.Constants().HdrSize):
-            return (False, None)
+        hdr = construct_header_from_buffer(buffer)
 
-        root = Header.Header()
-        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-
-        if(hdr.Hdr().Magic() != Constants.Constants().Magic):
-            return (False, None)
-
-        if (hdr.Type() == DataType.DataType().NumberInteger):
-            i = int.from_bytes(buffer[hdr_size:], byteorder='big')
+        if (hdr.type == DataType_NumberInteger):
+            i = int.from_bytes(buffer[HeaderSize:], byteorder='big')
             return (True, shelved_integer_number(memory_resource, name, i))
 
         # not a string
@@ -71,43 +62,22 @@ class shelved_integer_number(ShelvedCommon):
 
         memref = memory_resource.open_named_memory(name)
         number_value = int(number_value)
+        
         if memref == None:
             # create new value
-            builder = flatbuffers.Builder(Constants.Constants().HdrSize + 4)
-            # create header
-            Header.HeaderStart(builder)
-            Header.HeaderAddHdr(builder, FixedHeader.CreateFixedHeader(builder,Constants.Constants().Magic,0,0))
-            Header.HeaderAddType(builder, DataType.DataType().NumberInteger)
-
-            hdr = Header.HeaderEnd(builder)
-            builder.FinishSizePrefixed(hdr)
-            hdr_ba = builder.Output()
-
-            # allocate memory
-            hdr_len = len(hdr_ba)
             value_bytes = number_value.to_bytes((number_value.bit_length() + 7) // 8, 'big')
-            value_len = hdr_len + len(value_bytes) 
+            total_len = HeaderSize + len(value_bytes)
+            memref = memory_resource.create_named_memory(name, total_len, 1, False)
 
-            memref = memory_resource.create_named_memory(name, value_len, 1, False)
-            # copy into memory resource
             memref.tx_begin()
-            memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = value_bytes
+            hdr = construct_header_on_buffer(memref.buffer, DataType_NumberInteger)
+            
+            # copy data into memory resource
+            memref.buffer[HeaderSize:] = value_bytes
             memref.tx_commit()
         else:
-
-            hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if (hdr_size + 4)  != Constants.Constants().HdrSize:
-                raise RuntimeError("invalid header - prior version (hdr_size={})".format(hdr_size))
-            
-            root = Header.Header()
-            hdr = root.GetRootAsHeader(memref.buffer[4:], 0) # size prefix is 4 bytes
-            
-            if(hdr.Hdr().Magic() != Constants.Constants().Magic):
-                raise RuntimeError("bad magic number - corrupt data?")
-                
-            self._type = hdr.Type()
-            
+            # validates
+            construct_header_from_buffer(memref.buffer)                            
 
         # set up the view of the data
         # materialization alternative - self._view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
