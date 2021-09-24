@@ -22,7 +22,7 @@ do
         x=`basename $i .py`
         printf "Running test: "
         printf %-20s $x
-        python3 $i &> $LOG
+        python $i &> $LOG
         if cat $LOG | grep -q 'FAILED' ; then
             printf "$(color_fail FAILED)\n"
         elif cat $LOG | grep -q 'Segmentation fault' ; then

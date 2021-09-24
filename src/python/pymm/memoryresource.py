@@ -149,7 +149,7 @@ class MemoryResource(pymmcore.MemoryResource):
         return [val for val in all_items if not val.endswith('-value')]
     
     @methodcheck(types=[str,int,int,bool])
-    def create_named_memory(self, name, size, alignment=8, zero=False):
+    def create_named_memory(self, name, size, alignment=256, zero=False):
         '''
         Create a contiguous piece of memory and name it
         '''

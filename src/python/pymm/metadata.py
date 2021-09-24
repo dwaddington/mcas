@@ -29,7 +29,7 @@ def init_header_from_buffer(buffer: memoryview):
 def construct_header_from_buffer(buffer: memoryview):
     hdr = MetaHeader.from_buffer(buffer)
     if hdr.magic != HeaderMagic:
-        raise RuntimeError('bad magic: construct header from buffer')
+        raise RuntimeError('bad magic: {} construct header from buffer'.format(hex(hdr.magic)))
     return hdr
 
 class MetaHeader(Structure):

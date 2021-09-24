@@ -67,7 +67,7 @@ class shelved_integer_number(ShelvedCommon):
             # create new value
             value_bytes = number_value.to_bytes((number_value.bit_length() + 7) // 8, 'big')
             total_len = HeaderSize + len(value_bytes)
-            memref = memory_resource.create_named_memory(name, total_len, 1, False)
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
 
             memref.tx_begin()
             hdr = construct_header_on_buffer(memref.buffer, DataType_NumberInteger)
@@ -96,7 +96,7 @@ class shelved_integer_number(ShelvedCommon):
         total_len = HeaderSize + len(value_bytes)
 
         memory = self._memory_resource
-        memref = memory.create_named_memory(self._name + '-tmp', total_len, 1, False)
+        memref = memory.create_named_memory(self._name + '-tmp', total_len, 8, False)
         memref.tx_begin() # not sure if we need this
         hdr = construct_header_on_buffer(memref.buffer, DataType_NumberInteger)
 

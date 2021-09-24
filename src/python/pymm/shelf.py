@@ -301,24 +301,25 @@ class shelf():
         '''
         for varname in self.get_item_names():
             # get header info
-            root = Header.Header()
             memview = self.__dict__[varname]._value_named_memory.buffer
-            hdr = root.GetRootAsHeader(memview[4:], 0) # size prefix is 4 bytes
-            hdrsize = util.GetSizePrefix(memview, 0)
 
-            print('var {}: hdrsize={} addr={} magic={} type={} subtype={} txbits={} ver={}'
-                  .format(varname,
-                          hdrsize,
-                          self.__dict__[varname]._value_named_memory.addr(),
-                          hdr.Hdr().Magic(),
-                          hdr.Type(),
-                          hdr.Subtype(),
-                          hdr.Hdr().Txbits(),
-                          hdr.Hdr().Version()))
+            try:
+                hdr = construct_header_from_buffer(memview)
 
-            if verbose:
-                print('var {}: {}'.format(varname, bytes(memview[:hdrsize])))
-    
+                print('var {}: addr={} magic={} type={} subtype={} txbits={} ver={}'
+                      .format(varname,
+                              self.__dict__[varname]._value_named_memory.addr(),
+                              hex(hdr.magic),
+                              hdr.type,
+                              hdr.subtype,
+                              hdr.txbits,
+                              hdr.version))
+
+                if verbose:
+                    print('var {}: {}'.format(varname, bytes(memview[:hdrsize])))
+            except:
+                pass
+            
 
     def _is_supported_shadow_type(self, value):
         '''

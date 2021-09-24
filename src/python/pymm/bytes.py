@@ -41,7 +41,7 @@ class bytes(Shadow):
                 self.encoding = None
                 return
             except:
-                raise RuntimeException("given bytes ctor parameters not handled")
+                raise RuntimeError("given bytes ctor parameters not handled")
             
         
     def make_instance(self, memory_resource: MemoryResource, name: str):
@@ -91,7 +91,7 @@ class shelved_bytes(ShelvedCommon):
     def __init__(self, memory_resource, name, bytes_value, encoding):
 
         if not isinstance(name, str):
-            raise RuntimeException("invalid name type")
+            raise RuntimeError("invalid name type")
 
         memref = memory_resource.open_named_memory(name)
 
@@ -99,7 +99,7 @@ class shelved_bytes(ShelvedCommon):
             
             # create new value
             total_len = HeaderSize + len(bytes_value)
-            memref = memory_resource.create_named_memory(name, total_len, 1, False)
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
 
             memref.tx_begin()
             hdr = construct_header_on_buffer(memref.buffer, DataType_Bytes)
@@ -113,7 +113,7 @@ class shelved_bytes(ShelvedCommon):
             elif encoding == 'latin-1':
                 hdr.subtype = DataSubType_Latin1
             else:
-                raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
+                hdr.subtype = DataSubType_Ascii
             
             # copy value into memory resource
             memref.buffer[HeaderSize:] = bytes_value
@@ -166,7 +166,7 @@ class shelved_bytes(ShelvedCommon):
         memory = self._memory_resource
 
         total_len = HeaderSize + len(new_bytes)
-        memref = memory.create_named_memory(self._name + "-tmp", total_len, 1, False)
+        memref = memory.create_named_memory(self._name + "-tmp", total_len, 8, False)
 
         hdr = init_header_from_buffer(memref.buffer)
         hdr.type = DataType_Bytes
@@ -180,7 +180,7 @@ class shelved_bytes(ShelvedCommon):
         elif self.encoding == 'latin-1':
             hdr.subtype = DataSubType_Latin1
         else:
-            raise RuntimeException('shelved string does not recognize encoding {}'.format(self.encoding))
+            raise RuntimeError('shelved string does not recognize encoding {}'.format(self.encoding))
     
         
         # copy into memory resource

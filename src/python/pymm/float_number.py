@@ -66,7 +66,7 @@ class shelved_float_number(ShelvedCommon):
             # create new value
             value_bytes = str.encode(number_value.hex())
             total_len = HeaderSize + len(value_bytes)
-            memref = memory_resource.create_named_memory(name, total_len, 1, False)
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
 
             memref.tx_begin()
             hdr = construct_header_on_buffer(memref.buffer, DataType_NumberFloat)
@@ -93,7 +93,7 @@ class shelved_float_number(ShelvedCommon):
         total_len = HeaderSize + len(value_bytes)
 
         memory = self._memory_resource
-        memref = memory.create_named_memory(self._name + '-tmp', total_len, 1, False)
+        memref = memory.create_named_memory(self._name + '-tmp', total_len, 8, False)
 
         memref.tx_begin() # not sure if we need this
         hdr = construct_header_on_buffer(memref.buffer, DataType_NumberFloat)

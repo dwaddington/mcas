@@ -62,7 +62,6 @@ class ndarray(Shadow):
         metadata = memory_resource.get_named_memory(name)
         if metadata is None:
             raise RuntimeError('bad object name')
-#            return (False, None)
 
         if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
             return (False, None)

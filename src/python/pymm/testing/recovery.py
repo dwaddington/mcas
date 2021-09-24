@@ -47,7 +47,11 @@ class TestRecovery(unittest.TestCase):
         shelf.b = b'This is a bytes type'
         shelf.bm = b'This is a '
         shelf.bm += b'modified bytes type'
-        # shelf.t = torch.tensor([[1,1,1,1,1],[2,2,2,2,2],[3,3,3,3,3]])
+        shelf.t = torch.tensor([[1,1,1,1,1],[2,2,2,2,2],[3,3,3,3,3]])
+        shelf.l = pymm.linked_list()
+        shelf.l.append(1)
+        shelf.l.append(2)
+        shelf.l.append('z')
         
         del shelf
         gc.collect()
@@ -65,9 +69,10 @@ class TestRecovery(unittest.TestCase):
         print(shelf.nd2)
         print(shelf.b)
         print(shelf.bm)
-        # print(list(shelf.s))
-        # print(round(shelf.fm,2))
-        # print(shelf.t)
+        print(list(shelf.s))
+        print(round(shelf.fm,2))
+        print(shelf.t)
+        print(shelf.l)
                 
         check(shelf.s == 'Hello world!', 'string recovery')
         check(shelf.f == 1.123, 'float recovery')
@@ -78,7 +83,12 @@ class TestRecovery(unittest.TestCase):
         check(np.array_equal(shelf.nd2, np.identity(10)),'2D ndarray')
         check(shelf.b == b'This is a bytes type', 'bytes')
         check(shelf.bm == b'This is a modified bytes type', 'modified bytes')
-        # check(shelf.t.equal(torch.tensor([[1,1,1,1,1],[2,2,2,2,2],[3,3,3,3,3]])), 'torch tensor')
+        check(shelf.t.equal(torch.tensor([[1,1,1,1,1],[2,2,2,2,2],[3,3,3,3,3]])), 'torch tensor')
+        check(shelf.l[0] == 1, 'linked list')
+        check(shelf.l[1] == 2, 'linked list')
+        check(shelf.l[2] == 'z', 'linked list')
+
+        shelf.inspect()
         
 if __name__ == '__main__':
     unittest.main()

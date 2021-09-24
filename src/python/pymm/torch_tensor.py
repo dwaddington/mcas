@@ -17,14 +17,12 @@ import torch
 import pymmcore
 import numpy as np
 import copy
-import flatbuffers
 
-from numpy import uint8, ndarray, dtype, float
-
+from .metadata import *
 from .memoryresource import MemoryResource
 from .ndarray import ndarray, shelved_ndarray
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
+from numpy import uint8, ndarray, dtype, float
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -104,7 +102,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
         #print('shelved_torch_tensor: shape={} dtype={}'.format(shape, dtype))
         torch_to_numpy_dtype_dict = {
-            torch.bool  : np.bool,
+            torch.bool  : bool,
             torch.uint8 : np.uint8,
             torch.int8  : np.int8,
             torch.int16 : np.int16,
@@ -122,9 +120,9 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         value_key = name + '-value'
         metadata_key = name
         
-        value_named_memory = memory_resource.open_named_memory(value_key)
+        memref = memory_resource.open_named_memory(value_key)
 
-        if value_named_memory == None: # does not exist yet
+        if memref == None: # does not exist yet
 
             if isinstance(shape, torch.Size):
                 ndshape = [shape.numel()]
@@ -140,13 +138,12 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             
             # create and store metadata header : type=1 indicates torch_tensor
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
-            builder = flatbuffers.Builder(32)
 
             memory_resource.put_named_memory(metadata_key, metadata)
 
         else:
             # entity already exists, load metadata
-            del value_named_memory # the shelved_ndarray ctor will need to reopen it
+            del memref # the shelved_ndarray ctor will need to reopen it
             metadata = memory_resource.get_named_memory(metadata_key)
             hdr = pymmcore.ndarray_read_header(memoryview(metadata), type=1) # type=1 indicate torch_tensor
 

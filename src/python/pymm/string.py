@@ -16,8 +16,7 @@ import gc
 
 from .metadata import *
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 class string(Shadow):
     '''
@@ -39,7 +38,7 @@ class string(Shadow):
         '''                        
         buffer = memory_resource.get_named_memory(name)
         if buffer is None:
-            return (False, None)
+            raise RuntimeError('bad object name')
 
         # cast header structure on buffer
         hdr = construct_header_from_buffer(buffer)
@@ -68,7 +67,7 @@ class shelved_string(ShelvedCommon):
     def __init__(self, memory_resource, name, string_value, encoding):
 
         if not isinstance(name, str):
-            raise RuntimeException("invalid name type")
+            raise RuntimeError("invalid name type")
 
         memref = memory_resource.open_named_memory(name)
 
@@ -76,7 +75,7 @@ class shelved_string(ShelvedCommon):
 
             # create new value
             total_len = len(string_value) + HeaderSize
-            memref = memory_resource.create_named_memory(name, total_len, 1, False)
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
 
             memref.tx_begin()
             hdr = construct_header_on_buffer(memref.buffer, DataType_String)
@@ -90,7 +89,7 @@ class shelved_string(ShelvedCommon):
             elif encoding == 'latin-1':
                 hdr.subtype = DataSubType_Latin1
             else:
-                raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
+                raise RuntimeError('shelved string does not recognize encoding {}'.format(encoding))
                     
             # copy data into memory resource            
             memref.buffer[HeaderSize:] = bytes(string_value, encoding)
@@ -144,7 +143,7 @@ class shelved_string(ShelvedCommon):
         
         memory = self._memory_resource
         total_len = HeaderSize + len(new_str)
-        memref = memory.create_named_memory(self._name + "-tmp", total_len, 1, False)
+        memref = memory.create_named_memory(self._name + "-tmp", total_len, 8, False)
 
         hdr = init_header_from_buffer(memref.buffer)
         hdr.type = DataType_String
@@ -158,7 +157,7 @@ class shelved_string(ShelvedCommon):
         elif self.encoding == 'latin-1':
             hdr.subtype = DataSubType_Latin1
         else:
-            raise RuntimeException('shelved string does not recognize encoding {}'.format(self.encoding))
+            raise RuntimeError('shelved string does not recognize encoding {}'.format(self.encoding))
     
         
         # copy into memory resource
