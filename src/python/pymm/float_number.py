@@ -16,6 +16,7 @@ import flatbuffers
 import struct
 import gc
 
+from .metadata import *
 from .memoryresource import MemoryResource
 from .shelf import Shadow
 from .shelf import ShelvedCommon

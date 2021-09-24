@@ -2,6 +2,15 @@ from ctypes import *
 
 # corresponds to core/metadata.h C definition
 
+def construct_header(type=0, subtype=0, txbits=0, version=0):
+    hdr = MetaHeader()
+    hdr.magic = HeaderMagic
+    hdr.txbits = txbits
+    hdr.version = version
+    hdr.type = type
+    return hdr
+
+
 class MetaHeader(Structure):
     _fields_ = [("magic", c_uint),
                 ("txbits", c_uint),

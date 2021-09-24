@@ -34,8 +34,9 @@ class TestRecovery(unittest.TestCase):
 
         # different types
         shelf.s = 'Hello'
+        shelf.s += ' world!'
         print(list('Hello'))
-        # shelf.f = 1.123
+#        shelf.f = 1.123
         # shelf.fm = 2.2
         # shelf.fm += 1.1
         # shelf.i = 911
@@ -54,7 +55,7 @@ class TestRecovery(unittest.TestCase):
         shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',force_new=False)
 
         print(">{}<".format(shelf.s))
-        # print(shelf.f)
+ #       print(shelf.f)
         # print(shelf.fm)
         # print(shelf.i)
         # print(shelf.nd)
@@ -65,8 +66,8 @@ class TestRecovery(unittest.TestCase):
         # print(round(shelf.fm,2))
         # print(shelf.t)
                 
-        check(shelf.s == 'Hello', 'string recovery')
-        # check(shelf.f == 1.123, 'float recovery')
+        check(shelf.s == 'Hello world!', 'string recovery')
+#        check(shelf.f == 1.123, 'float recovery')
         # check(round(shelf.fm,2) == 3.30, 'float modified recovery')
         # check(shelf.i == 911, 'integer recovery')
         # check(np.array_equal(shelf.nd, np.ones((3,))),'1D ndarray')
