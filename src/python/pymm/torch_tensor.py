@@ -119,10 +119,11 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
         value_key = name + '-value'
         metadata_key = name
-        
-        memref = memory_resource.open_named_memory(value_key)
 
-        if memref == None: # does not exist yet
+        metadata_memory = memory_resource.open_named_memory(metadata_key)
+        value_memory = memory_resource.open_named_memory(value_key)
+        
+        if value_memory == None: # does not exist yet
 
             if isinstance(shape, torch.Size):
                 ndshape = [shape.numel()]
@@ -140,20 +141,24 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
 
             memory_resource.put_named_memory(metadata_key, metadata)
-            del metadata
+            
         else:
             # entity already exists, load metadata
-            del memref # the shelved_ndarray ctor will need to reopen it
-            metadata = memory_resource.get_named_memory(metadata_key)
-            hdr = pymmcore.ndarray_read_header(memoryview(metadata), type=1) # type=1 indicate torch_tensor
+           
+            hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=1) # type=1 indicate torch_tensor
+
+            del value_memory # need to release references
+            del metadata_memory # need to release references
 
             base_ndarray = shelved_ndarray(memory_resource, name=name, dtype=hdr['dtype'], shape=hdr['shape'],
                                            strides=hdr['strides'], order=order, type=1)
 
+
+
             
         self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
         self._base_ndarray = base_ndarray
-       # self._metadata_named_memory = memory_resource.open_named_memory(metadata_key)
+        self._metadata_named_memory = base_ndarray._metadata_named_memory
         self._value_named_memory = base_ndarray._value_named_memory
 
         # hold a reference to the memory resource

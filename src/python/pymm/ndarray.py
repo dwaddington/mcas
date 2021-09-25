@@ -146,8 +146,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             metadata_memory = memory_resource.open_named_memory(metadata_key)
         else:
             # entity already exists, load metadata
-            if metadata_memory == None:
-                raise RuntimeError('metadata should not be None')
+            assert metadata_memory != None
             
             hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=type)
             self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_memory.buffer,
