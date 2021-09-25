@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -m unittest
 #
-# basic shelf assignment tests
+# basic transactions
 #
 import unittest
 import pymm
@@ -13,22 +13,28 @@ def colored(r, g, b, text):
 
 def log(*args):
     print(colored(0,255,255,*args))
-    
-force_new=True
+
+shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
+# shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0')
+
 class TestTransactions(unittest.TestCase):
-    def setUp(self):
-        global force_new
-        self.s = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=force_new)
-        force_new=False
-    
-    def tearDown(self):
-        del self.s
-        
+
     def test_transactions(self):
         log("Testing: transaction on matrix fill ...")
-        self.s.w = np.ndarray((100,100),dtype=np.uint8)
-        self.s.w.fill(9)
-        print(self.s.items)
+        shelf.f = 1.123
+        shelf.i = 645338
+        shelf.b = b'Hello'
+        shelf.n = pymm.ndarray((100,100),dtype=np.uint8)
+        # shelf.w = np.ndarray((100,100),dtype=np.uint8)
+        # shelf.w.fill(ord('a'))
+#        shelf.l = pymm.linked_list()
+#        shelf.l.append(1)
+#        shelf.l.append(2)
+        
+        print(shelf.items)
+        shelf.inspect(verbose=False)
+        shelf.persist()
+        shelf.inspect(verbose=False)
         
 if __name__ == '__main__':
     unittest.main()

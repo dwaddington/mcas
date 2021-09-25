@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <common/logging.h>
 #include <common/utils.h>
+#include <common/dump_utils.h>
 #include <api/mcas_itf.h>
 #include <api/kvstore_itf.h>
 #include <Python.h>
@@ -579,7 +580,8 @@ static PyObject * MemoryResource_put_named_memory(MemoryResource *self, PyObject
                                name,
                                data_ptr,
                                data_len);
-  
+  assert(s == S_OK);
+
   return PyLong_FromLong(s);
 }
 
@@ -615,8 +617,7 @@ static PyObject * MemoryResource_get_named_memory(MemoryResource *self, PyObject
 
 
   auto result = PyByteArray_FromStringAndSize(static_cast<const char *>(data_ptr), data_len);
-  //  ::free(data_ptr);
-  
+  mr->_store->free_memory(data_ptr);
   return result;
 }
 
@@ -653,6 +654,7 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
 
   Py_buffer * pybuffer = PyMemoryView_GET_BUFFER(mview);
 
+  PLOG("persisting memory @%p", pybuffer->buf);
   // /* update version in header */
   // PyMM::Meta::Header* hdr = PyMM::Meta::GetMutableHeader(reinterpret_cast<char*>(pybuffer->buf) + 4);
   // hdr->mutable_hdr()->mutate_version(hdr->hdr()->version() + 1);

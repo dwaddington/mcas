@@ -247,13 +247,12 @@ class shelf():
         '''
         items = []
         for s in self.__dict__:
-            
-            if (not(all) and s[0] == '_'): # skip list implicit members
+            if s == 'name' or s == 'mr':
                 continue
-            if issubclass(type(self.__dict__[s]), pymm.ShelvedCommon):
-                items.append(s) # or to add object itself...self.__dict__[s]
-            elif issubclass(type(self.__dict__[s]), torch.Tensor):
-                items.append(s)
+            if all==False and s[0] == '-':
+                continue
+            items.append(s)
+                
                 
         return items
             
@@ -292,8 +291,15 @@ class shelf():
         '''
         for varname in self.get_item_names():
             # get memory resource associated with variable
-            memory_resource = self.__dict__[varname]._value_named_memory
-            memory_resource.persist()
+            metadata_memory_resource = self.__dict__[varname]._metadata_named_memory
+            if self.__dict__[varname]._metadata_named_memory == None:
+                print('error: var {} has no metadata'.format(varname))
+                continue
+            else:
+                metadata_memory_resource.persist()
+            value_memory_resource = self.__dict__[varname]._value_named_memory
+            if value_memory_resource != None:
+                value_memory_resource.persist()
         
 
 
@@ -303,15 +309,20 @@ class shelf():
         Inspect variables on shelf
         '''
         for varname in self.get_item_names(all=verbose):
+
             # get header info
-            memview = self.__dict__[varname]._value_named_memory.buffer
+            if self.__dict__[varname]._metadata_named_memory == None:
+                print('error: var {} has no metadata'.format(varname))
+                continue
+            
+            metadata_memory = self.__dict__[varname]._metadata_named_memory.buffer
 
             try:
-                hdr = construct_header_from_buffer(memview)
+                hdr = construct_header_from_buffer(metadata_memory)
 
                 print('var {}: addr={} magic={} type={} subtype={} txbits={} ver={}'
                       .format(varname,
-                              self.__dict__[varname]._value_named_memory.addr(),
+                              self.__dict__[varname]._metadata_named_memory.addr(),
                               hex(hdr.magic),
                               hdr.type,
                               hdr.subtype,
@@ -319,9 +330,16 @@ class shelf():
                               hdr.version))
 
                 if verbose:
-                    print('var {}: {}'.format(varname, bytes(memview[:hdrsize])))
-            except:
+                    print('var {}: {}'.format(varname, bytes(metadata_memory[:HeaderSize])))
+                    
+            except RuntimeError:
+                print('var {}: failed header check!!'.format(varname))
+                print('var {}: {}'.format(varname, bytes(metadata_memory[:HeaderSize])))
                 pass
+
+            value_memory = self.__dict__[varname]._value_named_memory
+            if value_memory != None:
+                print('var {} has value memory {}'.format(varname, value_memory.addr()))
             
 
     def _is_supported_shadow_type(self, value):

@@ -123,7 +123,8 @@ class shelved_bytes(ShelvedCommon):
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self.encoding = encoding
         self._name = name
 
@@ -151,7 +152,7 @@ class shelved_bytes(ShelvedCommon):
         '''
         Flush cache and persistent all value memory
         '''
-        self._value_named_memory.persist()        
+        self._metadata_named_memory.persist()        
     
     def __getattr__(self, name):
         if name not in ("encoding"):
@@ -189,7 +190,7 @@ class shelved_bytes(ShelvedCommon):
         memref.tx_commit()
 
         del memref # this will force release
-        del self._value_named_memory # this will force release
+        del self._metadata_named_memory # this will force release
         gc.collect()
 
         # swap names
@@ -200,7 +201,8 @@ class shelved_bytes(ShelvedCommon):
 
         # open new data
         memref = memory.open_named_memory(self._name)
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self.view = memoryview(memref.buffer[HeaderSize:])
         return self
 

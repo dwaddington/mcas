@@ -85,7 +85,8 @@ class shelved_integer_number(ShelvedCommon):
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
 
     def _atomic_update_value(self, value):
         if not isinstance(value, int):
@@ -115,7 +116,8 @@ class shelved_integer_number(ShelvedCommon):
         memory.erase_named_memory(self._name + "-tmp")
         
         memref = memory.open_named_memory(self._name)
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self._cached_value = value
         # materialization alternative - self._view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
         return self

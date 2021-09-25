@@ -190,6 +190,7 @@ class MemoryResource(pymmcore.MemoryResource):
         '''
         super()._MemoryResource_erase_named_memory(name)
 
+    @methodcheck(types=[str,bytearray])
     def put_named_memory(self, name, value):
         '''
         Copy-based crash-consistent put of named memory value

@@ -140,7 +140,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
 
             memory_resource.put_named_memory(metadata_key, metadata)
-
+            del metadata
         else:
             # entity already exists, load metadata
             del memref # the shelved_ndarray ctor will need to reopen it
@@ -153,6 +153,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             
         self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
         self._base_ndarray = base_ndarray
+       # self._metadata_named_memory = memory_resource.open_named_memory(metadata_key)
         self._value_named_memory = base_ndarray._value_named_memory
 
         # hold a reference to the memory resource

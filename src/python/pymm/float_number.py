@@ -82,7 +82,8 @@ class shelved_float_number(ShelvedCommon):
         self._name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
 
     def _atomic_update_value(self, value):
         if not isinstance(value, float):
@@ -103,7 +104,7 @@ class shelved_float_number(ShelvedCommon):
         memref.tx_commit()
 
         del memref # this will force release
-        del self._value_named_memory # this will force release
+        del self._metadata_named_memory # this will force release
         gc.collect()
 
         # swap names
@@ -113,7 +114,8 @@ class shelved_float_number(ShelvedCommon):
         memory.erase_named_memory(self._name + "-tmp")
         
         memref = memory.open_named_memory(self._name)
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self._cached_value = value
         # materialization alternative - self._view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
         return self
