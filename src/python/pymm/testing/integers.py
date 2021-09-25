@@ -46,7 +46,7 @@ class TestNdarray(unittest.TestCase):
         shelf.erase('p')
         shelf.erase('n')
 
-    def xtest_rmod_operation(self):
+    def test_rmod_operation(self):
         log("Test: rmod op")
         shelf.c = 10
         print('18%10={}'.format(18 % shelf.c))
