@@ -14,7 +14,7 @@ def colored(r, g, b, text):
 def log(*args):
     print(colored(0,255,255,*args))
 
-shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
+shelf = pymm.shelf('myTransactionsShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 # shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0')
 
 class TestTransactions(unittest.TestCase):
@@ -28,9 +28,9 @@ class TestTransactions(unittest.TestCase):
         shelf.n = pymm.ndarray((100,100),dtype=np.uint8)
         shelf.w = np.ndarray((100,100),dtype=np.uint8)
         shelf.w.fill(ord('a'))
-        shelf.l = pymm.linked_list()
-        shelf.l.append(1)
-        shelf.l.append(2)
+        #shelf.l = pymm.linked_list()
+        #shelf.l.append(1)
+        #shelf.l.append(2)
         shelf.t = pymm.torch_tensor(np.arange(0,10))
         
         print(shelf.items)

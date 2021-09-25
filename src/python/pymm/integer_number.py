@@ -106,7 +106,7 @@ class shelved_integer_number(ShelvedCommon):
         memref.tx_commit()
 
         del memref # this will force release
-        del self._value_named_memory # this will force release
+        del self._metadata_named_memory # this will force release
         gc.collect()
 
         # swap names
@@ -114,7 +114,7 @@ class shelved_integer_number(ShelvedCommon):
 
         # erase old data
         memory.erase_named_memory(self._name + "-tmp")
-        
+
         memref = memory.open_named_memory(self._name)
         self._metadata_named_memory = memref
         self._value_named_memory = None

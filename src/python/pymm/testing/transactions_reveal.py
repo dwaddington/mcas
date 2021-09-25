@@ -14,7 +14,7 @@ def colored(r, g, b, text):
 def log(*args):
     print(colored(0,255,255,*args))
 
-shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0')
+shelf = pymm.shelf('myTransactionsShelf',pmem_path='/mnt/pmem0')
 
 class TestReveal(unittest.TestCase):
 
