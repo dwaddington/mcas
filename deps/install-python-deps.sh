@@ -7,6 +7,10 @@
 # Python3 should be installed
 #
 PIP="python3 -m pip"
+
+${PIP} install numpy --user -I
+
+if [[ -z "${TRAVIS_BUILD}" ]]; then
 ${PIP} install matplotlib --user -I
 ${PIP} install scikit-image --user -I
 ${PIP} install torch --user -I
@@ -15,7 +19,7 @@ ${PIP} install flatbuffers --user -I
 ${PIP} install parallel_sort --user -I
 ${PIP} install cython --user -I
 ${PIP} install chardet --user -I
-${PIP} install numpy --user -I
+fi
 
 #
 # To support transient memory mode, we use a custom version of numpy
