@@ -6,7 +6,7 @@
 #
 # Python3 should be installed
 #
-PIP=python3 -m pip
+PIP="python3 -m pip"
 ${PIP} install matplotlib --user -I
 ${PIP} install scikit-image --user -I
 ${PIP} install torch --user -I
@@ -25,6 +25,8 @@ ${PIP} install numpy --user -I
 # You will need to build this custom version and install as user-site local
 #
 # Modified NumPy source at https://github.com/dwaddington/numpy
+#
+# python3.9 setup.py install --user
 #
 # Alternatively here is the patch:
 #
