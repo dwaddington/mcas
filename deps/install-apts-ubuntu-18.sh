@@ -10,7 +10,7 @@ apt-get install -y --no-install-recommends build-essential cmake
 ./install-rust.sh
 
 apt-get install -y --no-install-recommends \
-        autoconf automake ca-certificates cmake gcc g++ git make python3 python3-numpy libtool-bin pkg-config \
+        autoconf automake ca-certificates cmake gcc g++ git make python3 libtool-bin pkg-config \
         libnuma-dev \
         libboost-system-dev libboost-iostreams-dev libboost-program-options-dev \
         libboost-filesystem-dev libboost-date-time-dev \

@@ -18,10 +18,10 @@ import numpy as np
 import copy
 import os
 
+from .metadata import *
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 dtypedescr = np.dtype
 wbinvd_threshold = 1073741824
@@ -61,8 +61,8 @@ class ndarray(Shadow):
         '''
         metadata = memory_resource.get_named_memory(name)
         if metadata is None:
-            return (False, None)
-        
+            raise RuntimeError('bad object name')
+
         if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
             return (False, None)
         else:
@@ -113,13 +113,15 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             else:
                 raise RuntimeError('unhandled condition in shelved_ndarray shape handling (shape={})'.format(shape))
 
-        # the meta data is always accessible by the key name
+        # the meta data is always accessible by the plain key name
+        # the value if not concated after meta data is in a separate key with -value suffix
         value_key = name + '-value'
         metadata_key = name
 
-        value_named_memory = memory_resource.open_named_memory(value_key)
+        metadata_memory = memory_resource.open_named_memory(metadata_key)
+        value_memory = memory_resource.open_named_memory(value_key)
 
-        if value_named_memory == None: # does not exist yet
+        if value_memory == None: # does not exist yet
             #
             # create a newly allocated named memory from MemoryResource
             #
@@ -128,29 +130,35 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                 alignment = 1
             else:
                 alignment = 8
-            value_named_memory = memory_resource.create_named_memory(value_key,
-                                                                     msize,
-                                                                     alignment,
-                                                                     zero) # zero memory
+            value_memory = memory_resource.create_named_memory(value_key,
+                                                               msize,
+                                                               alignment,
+                                                               zero) # zero memory
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
+            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_memory.buffer,
                                       strides=strides, order=order)
 
             # create and store metadata header
             metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str, type=type)
             memory_resource.put_named_memory(metadata_key, metadata)
-
+            
+            metadata_memory = memory_resource.open_named_memory(metadata_key)
         else:
-            # entity already exists, load metadata            
-            metadata = memory_resource.get_named_memory(metadata_key)
-            hdr = pymmcore.ndarray_read_header(memoryview(metadata),type=type)
-            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
+            # entity already exists, load metadata
+            assert metadata_memory != None
+            
+            hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=type)
+            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_memory.buffer,
                                       strides=hdr['strides'], order=order)
 
+        assert value_memory != None
+        assert metadata_memory != None
+            
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = value_named_memory
+        self._value_named_memory = value_memory
+        self._metadata_named_memory = metadata_memory
         self._metadata_key = metadata_key
         self._value_key = value_key
         self.name = name
@@ -330,6 +338,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self.info = getattr(obj, 'info', None)
         self._memory_resource = getattr(obj, '_memory_resource', None)
         self._value_named_memory = getattr(obj, '_value_named_memory', None)
+        self._metadata_named_memory = getattr(obj, '_metadata_named_memory', None)
         self._metadata_key = getattr(obj, '_metadata_key', None)
         self.name = getattr(obj, 'name', None)
 

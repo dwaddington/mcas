@@ -12,19 +12,12 @@
 #
 
 import pymmcore
-import flatbuffers
 import gc
 import chardet
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-import PyMM.Meta.DataSubType as DataSubType
-
-from flatbuffers import util
+from .metadata import *
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 # create alias for Python bytes type
 python_type_bytes = bytes
@@ -48,7 +41,7 @@ class bytes(Shadow):
                 self.encoding = None
                 return
             except:
-                raise RuntimeException("given bytes ctor parameters not handled")
+                raise RuntimeError("given bytes ctor parameters not handled")
             
         
     def make_instance(self, memory_resource: MemoryResource, name: str):
@@ -68,28 +61,20 @@ class bytes(Shadow):
         if buffer is None:
             return (False, None)
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
-            return (False, None)
+        # cast header structure on buffer
+        hdr = construct_header_from_buffer(buffer)
 
-        root = Header.Header()
-        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-        
-        if(hdr.Magic() != Constants.Constants().Magic):
-            return (False, None)
+        if (hdr.type == DataType_Bytes):
 
-        data_type = hdr.Type()
-
-        if data_type == DataType.DataType().Bytes:
-            data_subtype = hdr.Subtype()
-            if data_subtype == DataSubType.DataSubType().Ascii:
-                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='ascii'))
-            elif data_subtype == DataSubType.DataSubType().Utf8:
-                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='utf-8'))
-            elif data_subtype == DataSubType.DataSubType().Utf16:
-                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='utf-16'))
-            elif data_subtype == DataSubType.DataSubType().Latin1:
-                return (True, shelved_bytes(memory_resource, name, buffer[hdr_size + 4:], encoding='latin-1'))
+            data_subtype = hdr.subtype
+            if data_subtype == DataSubType_Ascii:
+                return (True, shelved_bytes(memory_resource, name, buffer[HeaderSize:], 'ascii'))
+            elif data_subtype == DataSubType_Utf8:
+                return (True, shelved_bytes(memory_resource, name, buffer[HeaderSize:], 'utf-8'))
+            elif data_subtype == DataSubType_Utf16:
+                return (True, shelved_bytes(memory_resource, name, buffer[HeaderSize:], 'utf-16'))
+            elif data_subtype == DataSubType_Latin1:
+                return (True, shelved_bytes(memory_resource, name, buffer[HeaderSize:], 'latin-1'))
 
         # not a bytes object
         return (False, None)
@@ -106,49 +91,40 @@ class shelved_bytes(ShelvedCommon):
     def __init__(self, memory_resource, name, bytes_value, encoding):
 
         if not isinstance(name, str):
-            raise RuntimeException("invalid name type")
+            raise RuntimeError("invalid name type")
 
         memref = memory_resource.open_named_memory(name)
 
         if memref == None:
+            
             # create new value
-            builder = flatbuffers.Builder(32)
-            # create header
-            Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddType(builder, DataType.DataType().Bytes)
-                                 
-            if encoding == 'ascii':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
-            elif encoding == 'utf-8':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
-            elif encoding == 'utf-16':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
-            elif encoding == 'latin-1':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
+            total_len = HeaderSize + len(bytes_value)
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
 
-            hdr = Header.HeaderEnd(builder)
-            builder.FinishSizePrefixed(hdr)
-            hdr_ba = builder.Output()
-
-            # allocate memory
-            hdr_len = len(hdr_ba)
-            value_len = len(bytes_value) + hdr_len
-
-            memref = memory_resource.create_named_memory(name, value_len, 1, False)
-            # copy into memory resource
             memref.tx_begin()
-            memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = bytes_value
+            hdr = construct_header_on_buffer(memref.buffer, DataType_Bytes)
+            
+            if encoding == 'ascii':
+                hdr.subtype = DataSubType_Ascii
+            elif encoding == 'utf-8':
+                hdr.subtype = DataSubType_Utf8
+            elif encoding == 'utf-16':
+                hdr.subtype = DataSubType_Utf16
+            elif encoding == 'latin-1':
+                hdr.subtype = DataSubType_Latin1
+            else:
+                hdr.subtype = DataSubType_Ascii
+            
+            # copy value into memory resource
+            memref.buffer[HeaderSize:] = bytes_value
             memref.tx_commit()
 
-            self.view = memoryview(memref.buffer[hdr_len:])
-        else:
-            self.view = memoryview(memref.buffer[32:])
+        self.view = memoryview(memref.buffer[HeaderSize:])
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self.encoding = encoding
         self._name = name
 
@@ -176,7 +152,7 @@ class shelved_bytes(ShelvedCommon):
         '''
         Flush cache and persistent all value memory
         '''
-        self._value_named_memory.persist()        
+        self._metadata_named_memory.persist()        
     
     def __getattr__(self, name):
         if name not in ("encoding"):
@@ -189,42 +165,32 @@ class shelved_bytes(ShelvedCommon):
         # build a new value with different name, then swap & delete
         new_bytes = python_type_bytes(self.view.tobytes()).__add__(value)
         memory = self._memory_resource
-        # create new value
-        builder = flatbuffers.Builder(32)
-        # create header
-        Header.HeaderStart(builder)
-        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddType(builder, DataType.DataType().Bytes)
+
+        total_len = HeaderSize + len(new_bytes)
+        memref = memory.create_named_memory(self._name + "-tmp", total_len, 8, False)
+
+        hdr = init_header_from_buffer(memref.buffer)
+        hdr.type = DataType_Bytes
         
         if self.encoding == 'ascii':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
+            hdr.subtype = DataSubType_Ascii
         elif self.encoding == 'utf-8':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
+            hdr.subtype = DataSubType_Utf8
         elif self.encoding == 'utf-16':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
+            hdr.subtype = DataSubType_Utf16
         elif self.encoding == 'latin-1':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
+            hdr.subtype = DataSubType_Latin1
         else:
-            raise RuntimeException('shelved_bytes does not recognize encoding {}'.format(encoding))
-            
-        hdr = Header.HeaderEnd(builder)
-        builder.FinishSizePrefixed(hdr)
-        hdr_ba = builder.Output()
-
-        # allocate memory
-        hdr_len = len(hdr_ba)
-        value_len = len(new_bytes) + hdr_len
-
-        memref = memory.create_named_memory(self._name + "-tmp", value_len, 1, False)
+            raise RuntimeError('shelved string does not recognize encoding {}'.format(self.encoding))
+    
         
         # copy into memory resource
-        #memref.tx_begin() # don't need transaction here?
-        memref.buffer[0:hdr_len] = hdr_ba
-        memref.buffer[hdr_len:] = python_type_bytes(new_bytes)
-        #memref.tx_commit()
+        memref.tx_begin() # don't need transaction here?
+        memref.buffer[HeaderSize:] = new_bytes
+        memref.tx_commit()
 
         del memref # this will force release
-        del self._value_named_memory # this will force release
+        del self._metadata_named_memory # this will force release
         gc.collect()
 
         # swap names
@@ -235,8 +201,9 @@ class shelved_bytes(ShelvedCommon):
 
         # open new data
         memref = memory.open_named_memory(self._name)
-        self._value_named_memory = memref
-        self.view = memoryview(memref.buffer[hdr_len:])
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
+        self.view = memoryview(memref.buffer[HeaderSize:])
         return self
 
     def __eq__(self, value): # == operator

@@ -12,19 +12,13 @@
 #
 
 import pymmcore
-import flatbuffers
 import struct
 import gc
 import numpy as np
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-
-from flatbuffers import util
+from .metadata import *
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 from .float_number import float_number
 from .check import methodcheck
 
@@ -59,19 +53,12 @@ class linked_list(Shadow):
         memory_resource = shelf.mr
         buffer = memory_resource.get_named_memory(name)
         if buffer is None:
-            return (False, None)
+            raise RuntimeError('bad object name')
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != Constants.Constants().HdrSize):
-            return (False, None)
+        # cast header structure on buffer
+        hdr = construct_header_from_buffer(buffer)
 
-        root = Header.Header()
-        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-
-        if(hdr.Magic() != Constants.Constants().Magic):
-            return (False, None)
-
-        if (hdr.Type() == DataType.DataType().LinkedList):
+        if (hdr.type == DataType_LinkedList):
             return (True, shelved_linked_list(shelf, name))
 
         # not a string
@@ -97,39 +84,23 @@ class shelved_linked_list(ShelvedCommon):
 
         if memref == None:
 
-            # create metadata
-            builder = flatbuffers.Builder(32)
-            Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddType(builder, DataType.DataType().LinkedList)
-            hdr = Header.HeaderEnd(builder)
-            builder.FinishSizePrefixed(hdr)
-            hdr_ba = builder.Output()
+            # create metadata (data is separate_
+            memref = memory_resource.create_named_memory(name, HeaderSize, 1, False)
 
-            # allocate named memory for metadata
-            hdr_len = len(hdr_ba)
-            memref = memory_resource.create_named_memory(name, hdr_len, 1, False)
             memref.tx_begin()
-            memref.buffer[0:hdr_len] = hdr_ba
+            hdr = construct_header_on_buffer(memref.buffer, DataType_LinkedList)            
             memref.tx_commit()
 
             self._metadata_named_memory = memref
 
             # initialize internal structure with allocated memory
-            self._value_named_memory = memory_resource.create_named_memory(name + '-value', MEMORY_INCREMENT_SIZE, 1, False)
+            self._value_named_memory = memory_resource.create_named_memory(name + '-value',
+                                                                           MEMORY_INCREMENT_SIZE, 64, False)
             self._internal = pymmcore.List(buffer=self._value_named_memory.buffer, rehydrate=False)
 
         else:
-
-            hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != Constants.Constants().HdrSize:
-                raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
-            
-            root = Header.Header()
-            hdr = root.GetRootAsHeader(memref.buffer[4:], 0) # size prefix is 4 bytes
-            
-            if(hdr.Magic() != Constants.Constants().Magic):
-                raise RuntimeError("bad magic number - corrupt data?")
+            # validates
+            construct_header_from_buffer(memref.buffer)
 
             self._metadata_named_memory = memref
             # rehydrate internal structure

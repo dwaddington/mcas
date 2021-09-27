@@ -12,18 +12,11 @@
 #
 
 import pymmcore
-import flatbuffers
 import gc
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-import PyMM.Meta.DataSubType as DataSubType
-
-from flatbuffers import util
+from .metadata import *
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 class string(Shadow):
     '''
@@ -45,30 +38,22 @@ class string(Shadow):
         '''                        
         buffer = memory_resource.get_named_memory(name)
         if buffer is None:
-            return (False, None)
+            raise RuntimeError('bad object name')
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != Constants.Constants().HdrSize):
-            return (False, None)
+        # cast header structure on buffer
+        hdr = construct_header_from_buffer(buffer)
 
-        root = Header.Header()
-        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-        
-        if(hdr.Magic() != Constants.Constants().Magic):
-            return (False, None)
+        if (hdr.type == DataType_String):
 
-        data_type = hdr.Type()
-
-        if data_type == DataType.DataType().String:
-            data_subtype = hdr.Subtype()
-            if data_subtype == DataSubType.DataSubType().Ascii:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'ascii'))
-            elif data_subtype == DataSubType.DataSubType().Utf8:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-8'))
-            elif data_subtype == DataSubType.DataSubType().Utf16:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'utf-16'))
-            elif data_subtype == DataSubType.DataSubType().Latin1:
-                return (True, shelved_string(memory_resource, name, buffer[hdr_size + 4:], 'latin-1'))
+            data_subtype = hdr.subtype
+            if data_subtype == DataSubType_Ascii:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'ascii'))
+            elif data_subtype == DataSubType_Utf8:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'utf-8'))
+            elif data_subtype == DataSubType_Utf16:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'utf-16'))
+            elif data_subtype == DataSubType_Latin1:
+                return (True, shelved_string(memory_resource, name, buffer[HeaderSize:], 'latin-1'))
 
         # not a string
         return (False, None)
@@ -82,51 +67,40 @@ class shelved_string(ShelvedCommon):
     def __init__(self, memory_resource, name, string_value, encoding):
 
         if not isinstance(name, str):
-            raise RuntimeException("invalid name type")
+            raise RuntimeError("invalid name type")
 
         memref = memory_resource.open_named_memory(name)
 
         if memref == None:
+
             # create new value
-            builder = flatbuffers.Builder(32)
-            # create header
-            Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddType(builder, DataType.DataType().String)
+            total_len = len(string_value) + HeaderSize
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
+
+            memref.tx_begin()
+            hdr = construct_header_on_buffer(memref.buffer, DataType_String)
             
             if encoding == 'ascii':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
+                hdr.subtype = DataSubType_Ascii
             elif encoding == 'utf-8':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
+                hdr.subtype = DataSubType_Utf8
             elif encoding == 'utf-16':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
+                hdr.subtype = DataSubType_Utf16
             elif encoding == 'latin-1':
-                Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
+                hdr.subtype = DataSubType_Latin1
             else:
-                raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
+                raise RuntimeError('shelved string does not recognize encoding {}'.format(encoding))
                     
-            hdr = Header.HeaderEnd(builder)
-            builder.FinishSizePrefixed(hdr)
-            hdr_ba = builder.Output()
-
-            # allocate memory
-            hdr_len = len(hdr_ba)
-            value_len = len(string_value) + hdr_len
-
-            memref = memory_resource.create_named_memory(name, value_len, 1, False)
-            # copy into memory resource
-            memref.tx_begin()
-            memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = bytes(string_value, encoding)
+            # copy data into memory resource            
+            memref.buffer[HeaderSize:] = bytes(string_value, encoding)
             memref.tx_commit()
 
-            self.view = memoryview(memref.buffer[hdr_len:])
-        else:
-            self.view = memoryview(memref.buffer[32:])
+        self.view = memoryview(memref.buffer[HeaderSize:])
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self.encoding = encoding
         self._name = name
 
@@ -167,43 +141,33 @@ class shelved_string(ShelvedCommon):
 
         # build a new value with different name, then swap & delete
         new_str = str(self.view,self.encoding).__add__(value)
+        
         memory = self._memory_resource
-        # create new value
-        builder = flatbuffers.Builder(32)
-        # create header
-        Header.HeaderStart(builder)
-        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddType(builder, DataType.DataType().String)
+        total_len = HeaderSize + len(new_str)
+        memref = memory.create_named_memory(self._name + "-tmp", total_len, 8, False)
+
+        hdr = init_header_from_buffer(memref.buffer)
+        hdr.type = DataType_String
         
         if self.encoding == 'ascii':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Ascii)
+            hdr.subtype = DataSubType_Ascii
         elif self.encoding == 'utf-8':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf8)
+            hdr.subtype = DataSubType_Utf8
         elif self.encoding == 'utf-16':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Utf16)
+            hdr.subtype = DataSubType_Utf16
         elif self.encoding == 'latin-1':
-            Header.HeaderAddSubtype(builder, DataSubType.DataSubType().Latin1)
+            hdr.subtype = DataSubType_Latin1
         else:
-            raise RuntimeException('shelved string does not recognize encoding {}'.format(encoding))
-            
-        hdr = Header.HeaderEnd(builder)
-        builder.FinishSizePrefixed(hdr)
-        hdr_ba = builder.Output()
-
-        # allocate memory
-        hdr_len = len(hdr_ba)
-        value_len = len(new_str) + hdr_len
-
-        memref = memory.create_named_memory(self._name + "-tmp", value_len, 1, False)
+            raise RuntimeError('shelved string does not recognize encoding {}'.format(self.encoding))
+    
         
         # copy into memory resource
-        #memref.tx_begin() # don't need transaction here?
-        memref.buffer[0:hdr_len] = hdr_ba
-        memref.buffer[hdr_len:] = bytes(new_str, self.encoding)
-        #memref.tx_commit()
+        memref.tx_begin() # don't need transaction here?
+        memref.buffer[HeaderSize:] = bytes(new_str, self.encoding)
+        memref.tx_commit()
 
         del memref # this will force release
-        del self._value_named_memory # this will force release
+        del self._metadata_named_memory # this will force release
         gc.collect()
 
         # swap names
@@ -214,8 +178,8 @@ class shelved_string(ShelvedCommon):
 
         # open new data
         memref = memory.open_named_memory(self._name)
-        self._value_named_memory = memref
-        self.view = memoryview(memref.buffer[hdr_len:])
+        self._metadata_named_memory = memref
+        self.view = memoryview(memref.buffer[HeaderSize:])
         return self
 
     def __eq__(self, value): # == operator

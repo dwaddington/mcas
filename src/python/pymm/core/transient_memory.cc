@@ -72,9 +72,14 @@ PyObject * pymmcore_disable_transient_memory(PyObject * self,
                                              PyObject * args,
                                              PyObject * kwds)
 {
-  PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &g_default_allocators);
-  delete g_provider;
-  g_provider = nullptr;
+  if(PY_MINOR_VERSION == 9) {
+    PWRN("Python3.9 does not yet support disabling transient memory");
+  }
+  else {
+    PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &g_default_allocators);
+    delete g_provider;
+    g_provider = nullptr;
+  }
   
   Py_RETURN_NONE;
 }

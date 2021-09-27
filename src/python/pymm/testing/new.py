@@ -18,34 +18,14 @@ shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 
 class TestNew(unittest.TestCase):
     
-    def test_bytes(self):
-        log("Testing: pymm.bytes shadow type")
-        shelf.x = pymm.bytes('hello world','utf-8')
-        print(shelf.x)
-        shelf.x += b'!  '
-        print(shelf.x)
-        log("Testing: pymm.bytes methods")
-        print(shelf.x.capitalize())
-        print(shelf.x.hex())
-        print(shelf.x.strip())
-        shelf.y = shelf.x.strip()
-        print(shelf.y.decode())
-        self.assertTrue(shelf.y.decode() == 'hello world!')
-        gc.collect()
-
-    def Xtest_bytes_recovery_A(self):
-        log("Testing: pymm.bytes (pre)recovery")
-        shelf = pymm.shelf('myShelfRec',size_mb=128,pmem_path='/mnt/pmem0',force_new=True)
-        shelf.x = pymm.bytes('hello world','utf-8')
-        shelf.s = "This is a string"
-        del shelf
-
-    def Xtest_bytes_recovery_B(self):
-        log("Testing: pymm.bytes recovery")
-        shelf = pymm.shelf('myShelfRec',pmem_path='/mnt/pmem0',force_new=False)
-        print(shelf.s)
-        print(shelf.x)
-
+    def test_a(self):
+        shelf.x = 'Hello world'
+        shelf.y = 1234
+        shelf.z = 1.34
+        shelf.inspect(True)
+        shelf.persist()
+        print("Persistent shelf variables!")
+        shelf.inspect(True)
 
 
 
