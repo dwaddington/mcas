@@ -52,7 +52,7 @@ include_directories(${PYTHON_INCLUDE_DIR})
 # uses local site install
 execute_process ( COMMAND ${PYTHON} -c "import numpy; print(numpy.__path__[0])" OUTPUT_VARIABLE NUMPY_SITE_PACKAGE OUTPUT_STRIP_TRAILING_WHITESPACE)
 message("-- Numpy     site : ${NUMPY_SITE_PACKAGE}")
-
+execute_process ( COMMAND find ${NUMPY_SITE_PACKAGE} -name arrayobject.h )
 include_directories(${NUMPY_SITE_PACKAGE}/core/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/python/mcas-python-api/src/)
   
