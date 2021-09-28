@@ -32,7 +32,7 @@ class ndarray(Shadow):
     '''
     ndarray that is stored in a memory resource
     '''
-    def __init__(self, shape, dtype=float, strides=None, order='C', zero=False):
+    def __init__(self, shape, dtype=np.float64, strides=None, order='C', zero=False):
 
         # todo check params
         # todo check and invalidate param 'buffer'
@@ -134,6 +134,8 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                                                                msize,
                                                                alignment,
                                                                zero) # zero memory
+            assert value_memory != None
+            
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
             self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_memory.buffer,

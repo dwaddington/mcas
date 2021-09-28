@@ -10,7 +10,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define PYMMCORE_API_VERSION "v0.1.30"
+#define PYMMCORE_API_VERSION "v0.1.31"
 #define STATUS_TEXT "(CC=env)"
 #define PAGE_SIZE 4096
 
@@ -70,7 +70,8 @@ PyDoc_STRVAR(pymcas_ndarray_rng_init_doc,
              "pymcas_ndarray_rng_init(seed) -> Set seed for random number generation");
 PyDoc_STRVAR(pymcas_ndarray_rng_set_doc,
              "pymcas_ndarray_rng_set(array|memoryview) -> Set random values in memory region");
-
+PyDoc_STRVAR(pymmcore_dlpack_construct_meta_doc,
+             "dlpack_construct_meta_doc(dtype, shape, strides) -> (internal) Generate dlpack header");
 
 static PyObject * pymmcore_version(PyObject * self,
                                    PyObject * args,
@@ -100,6 +101,9 @@ extern PyObject * pymmcore_disable_transient_memory(PyObject * self,
                                                     PyObject * args,
                                                     PyObject * kwargs);
 
+extern PyObject * pymmcore_dlpack_construct_meta(PyObject * self,
+                                                 PyObject * args,
+                                                 PyObject * kwargs);
 
 #ifdef BUILD_PYMM_VALGRIND
 static PyObject * pymmcore_valgrind_trigger(PyObject * self,
@@ -136,6 +140,8 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_rng_init, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_rng_init_doc },
    {"pymcas_ndarray_rng_set",
     (PyCFunction) pymcas_ndarray_rng_set, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_rng_set_doc },
+   {"dlpack_construct_meta",
+    (PyCFunction) pymmcore_dlpack_construct_meta, METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_construct_meta_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 

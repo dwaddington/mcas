@@ -347,6 +347,7 @@ class shelf():
         Helper function to return True if value is of a shadow type
         '''
         return (isinstance(value, pymm.ndarray) or
+                isinstance(value, pymm.dlpack_array) or
                 isinstance(value, pymm.torch_tensor) or
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.float_number) or

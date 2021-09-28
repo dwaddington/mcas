@@ -52,6 +52,7 @@ DataType_NumberInteger = int(4)
 DataType_Bytes         = int(5)
 DataType_NumPyArray    = int(10)
 DataType_TorchTensor   = int(11)
+DataType_DLPackArray   = int(12)
 DataType_LinkedList    = int(23)
 
 DataSubType_None   = int(0)

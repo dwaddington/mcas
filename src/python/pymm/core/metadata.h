@@ -24,6 +24,7 @@ extern "C" {
   static constexpr uint32_t DataType_Bytes         = 5;  
   static constexpr uint32_t DataType_NumPyArray    = 10;
   static constexpr uint32_t DataType_TorchTensor   = 11;
+  static constexpr uint32_t DataType_DLPackArray   = 12;
   static constexpr uint32_t DataType_LinkedList    = 23;
 
   static constexpr uint32_t DataSubType_None   = 0;
