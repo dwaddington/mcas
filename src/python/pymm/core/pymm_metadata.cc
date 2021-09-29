@@ -13,8 +13,6 @@
 #include <numpy/arrayobject.h>
 #pragma GCC diagnostic pop
 
-#include "meta_generated.h"
-
 PyObject * pymmcore_create_metadata(PyObject * self,
                                     PyObject * args,
                                     PyObject * kwargs)
