@@ -29,10 +29,10 @@ class TestBefore(unittest.TestCase):
             os.system("mkdir -p /mnt/pmem0/1")
             os.system("mkdir -p /mnt/pmem0/2")
 
-            shelf = pymm.shelf('myShelf', size_mb=1024, load_addr='0x700000000',
+            shelf = pymm.shelf('myShelf', size_mb=256, load_addr='0x700000000',
                                backend='hstore-cc', pmem_path='/mnt/pmem0/1', force_new=True)
 
-            shelf2 = pymm.shelf('myShelf-2', size_mb=1024, load_addr='0x800000000',
+            shelf2 = pymm.shelf('myShelf-2', size_mb=256, load_addr='0x800000000',
                                 backend='hstore-cc', pmem_path='/mnt/pmem0/2', force_new=True)
 
             log("Recovery: shelf init OK")

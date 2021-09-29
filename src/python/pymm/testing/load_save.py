@@ -21,7 +21,7 @@ force_new=True
 class TestLoadSave(unittest.TestCase):
     def setUp(self):
         global force_new
-        self.s = pymm.shelf('myShelf',size_mb=2048,backend="hstore-cc",force_new=force_new)
+        self.s = pymm.shelf('myShelf',size_mb=1024,backend="hstore-cc",force_new=force_new)
         force_new=False
 
     def tearDown(self):

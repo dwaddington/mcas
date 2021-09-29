@@ -14,14 +14,12 @@ def colored(r, g, b, text):
 def log(*args):
     print(colored(0,255,255,*args))
 
-global shelf
-force_new=True
-class TestLinkedList(unittest.TestCase):
+shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=True)
 
+class TestLinkedList(unittest.TestCase):
 
     def test_A_list_construction(self):
         global shelf
-        shelf = pymm.shelf('myShelf',size_mb=2048,pmem_path='/mnt/pmem0',backend="hstore-cc",force_new=force_new)
         log("Testing: pymm.linked_list construction")
         shelf.x = pymm.linked_list()
         print(shelf.x)
