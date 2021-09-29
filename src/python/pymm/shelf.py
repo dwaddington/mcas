@@ -124,6 +124,14 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
 
+                # type: pymm.dlpack_array
+                elif (stype == DataType_DLTensor):
+                    (existing, value) = pymm.dlpack_array.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue                    
+
                 # type: pymm.float_number
                 elif (stype == DataType_NumberFloat):
                     (existing, value) = pymm.float_number.existing_instance(self.mr, varname)
@@ -147,7 +155,6 @@ class shelf():
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
-
                     
                 print("Value '{}' is unknown type!".format(varname))
 

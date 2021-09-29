@@ -53,6 +53,9 @@ class dlpack_array(Shadow):
         '''
         Determine if an persistent named memory object corresponds to this type
         '''
+        print(memory_resource)
+        assert isinstance(memory_resource, MemoryResource)
+        
         metadata = memory_resource.get_named_memory(name)
         if metadata is None:
             raise RuntimeError('bad object name')
@@ -60,7 +63,7 @@ class dlpack_array(Shadow):
         # cast header structure on buffer
         hdr = construct_header_from_buffer(metadata)
 
-        if hdr.type == DataType_DLPackArray:
+        if hdr.type == DataType_DLTensor:
             return (True, shelved_dlpack_array(memory_resource, name, shape = None))
         else:
             return (False, None)
@@ -142,10 +145,13 @@ class shelved_dlpack_array(ShelvedCommon):
             pymmcore.dlpack_fix_pointers(metadata_memory.buffer, value_memory.buffer)
 
         else:
-            raise RuntimeError('not implemented')
             # entity already exists, load metadata
             assert metadata_memory != None
             assert value_memory != None
+
+            # if the load address is different the pointers need fixing; we would not need
+            # this if the same load address is always used
+            pymmcore.dlpack_fix_pointers(metadata_memory.buffer, value_memory.buffer)
             
             # hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=type)
             # self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_memory.buffer,
@@ -161,9 +167,8 @@ class shelved_dlpack_array(ShelvedCommon):
         self._capsule_ref_count = 0 # number of outstanding references through capsule exposure
         self.name = name
 
-    def ascapsule(self):
-        pass
-#        cap = pymmcore.dlpack_get_capsule(
+    def as_capsule(self):
+        return pymmcore.dlpack_get_capsule(self._metadata_named_memory.buffer)
 
 #        return self
 

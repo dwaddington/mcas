@@ -76,6 +76,8 @@ PyDoc_STRVAR(pymmcore_dlpack_fix_pointers_doc,
              "pymmcore_dlpack_fix_pointers_doc(metadata, valuedata) -> (internal) Fix dlpack header pointers");
 PyDoc_STRVAR(pymmcore_dlpack_as_str_doc,
              "pymmcore_dlpack_as_str() -> Return str representation");
+PyDoc_STRVAR(pymmcore_dlpack_get_capsule_doc,
+             "pymmcore_dlpack_get_capsule(metadata) -> Get PyCapsule representation");
 
 static PyObject * pymmcore_version(PyObject * self,
                                    PyObject * args,
@@ -116,6 +118,10 @@ extern PyObject * pymmcore_dlpack_fix_pointers(PyObject * self,
 extern PyObject * pymmcore_dlpack_as_str(PyObject * self,
                                          PyObject * args,
                                          PyObject * kwargs);
+
+extern PyObject * pymmcore_dlpack_get_capsule(PyObject * self,
+                                              PyObject * args,
+                                              PyObject * kwargs);
 
 
 #ifdef BUILD_PYMM_VALGRIND
@@ -159,6 +165,8 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymmcore_dlpack_fix_pointers, METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_fix_pointers_doc },
    {"dlpack_as_str",
     (PyCFunction) pymmcore_dlpack_as_str, METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_as_str_doc },
+   {"dlpack_get_capsule",
+    (PyCFunction) pymmcore_dlpack_get_capsule,  METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_get_capsule_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 

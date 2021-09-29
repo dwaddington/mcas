@@ -134,7 +134,6 @@ PyObject * pymmcore_dlpack_construct_meta(PyObject * self,
 
   /* convert from numpy type to dlpack type */
   DLDataType ddt;
-  ddt.lanes = 1; /* no vectorization */
   
   auto dtypedescr = reinterpret_cast<PyArray_Descr*>(dtypedescr_obj);
   switch(dtypedescr->kind) {
@@ -153,6 +152,7 @@ PyObject * pymmcore_dlpack_construct_meta(PyObject * self,
     PyErr_SetString(PyExc_RuntimeError,"unsupport type");
     return NULL;
   }
+  ddt.lanes = 1; /* no vectorization */
   ddt.bits = dtypedescr->elsize * 8;
 
   PLOG("dtypedescr.type_num = %d", dtypedescr->type_num);
@@ -379,4 +379,58 @@ PyObject * pymmcore_dlpack_as_str(PyObject * self,
   return PyUnicode_FromStringAndSize(ss.str().c_str(), ss.str().size());
 }
 
+static const char * kName = "dltensor";
 
+extern "C" void PyCapsule_Destructor_function(PyObject * capsule)
+{
+  auto hdr = reinterpret_cast<MetaHeader*>(PyCapsule_GetContext(capsule));
+
+  PLOG("dltensor refcnt=%u", hdr->refcnt);
+  hdr->refcnt --; /* decrmeent reference count */
+  PNOTICE("PyCapsule_Destructor_function !~!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+}
+
+PyObject * pymmcore_dlpack_get_capsule(PyObject * self,
+                                       PyObject * args,
+                                       PyObject * kwargs)
+{
+  static const char *kwlist[] = {"metadata",
+                                 NULL};
+
+  PyObject * metadata_obj = nullptr;
+
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwargs,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &metadata_obj)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  if (! PyMemoryView_Check(metadata_obj)) {
+      PyErr_SetString(PyExc_RuntimeError,"bad argument types");
+    return NULL;
+  }
+  
+  Py_buffer * metadata_buffer = PyMemoryView_GET_BUFFER(metadata_obj);
+
+  if (!metadata_buffer) {
+    PyErr_SetString(PyExc_RuntimeError,"couldn't get memoryview buffers");
+    return NULL;
+  }
+
+  if(! PyBuffer_IsContiguous(metadata_buffer,'C')) {
+    PyErr_SetString(PyExc_RuntimeError,"unexpected memoryview buffers");
+    return NULL;
+  }
+
+  auto hdr = reinterpret_cast<MetaHeader*>(metadata_buffer->buf);
+  auto dltensor = reinterpret_cast<DLTensor*>(&hdr[1]);
+
+  hdr->refcnt += 1; /* does not need flusing */
+
+  auto capsule = PyCapsule_New(reinterpret_cast<DLTensor*>(&hdr[1]), kName, &PyCapsule_Destructor_function);
+  PyCapsule_SetContext(capsule, reinterpret_cast<void*>(hdr));
+  return capsule;
+}
