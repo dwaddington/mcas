@@ -45,7 +45,7 @@ class MetaHeader(Structure):
     ]
 
 
-HeaderSize = 20
+HeaderSize = 24
 HeaderMagic = int(0xCAF0)
 
 DataType_Unknown       = int(0)
