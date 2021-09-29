@@ -90,7 +90,7 @@ class shelved_dlpack_array(ShelvedCommon):
     '''
     DLPack array that is stored in a memory resource
     '''
-    def __new__(subtype, memory_resource, name, shape, dtype=np.float64, strides=None, type=0, zero=False):
+    def __init__(self, memory_resource, name, shape, dtype=np.float64, strides=None, type=0, zero=False):
 
         #
         # determine size of memory needed
@@ -125,20 +125,21 @@ class shelved_dlpack_array(ShelvedCommon):
             else:
                 alignment = 8
 
-            # [ MetaHeader | int ndim | DLDataType dtype | int64_t shape[ndim] | int64_t strides[ndim] ]
+            # construct metadata in volatile memory
             #
             (hdr_bytes, data_size) = pymmcore.dlpack_construct_meta(dtypedescr=descr,
                                                                     shape=shape,
                                                                     strides=strides)
-
             memory_resource.put_named_memory(metadata_key, hdr_bytes)
             metadata_memory = memory_resource.open_named_memory(metadata_key)
             
             value_memory = memory_resource.create_named_memory(value_key,
                                                                data_size,
                                                                256, # as per DLpack spec
-                                                               zero) # zero memory
+                                                               zero) # zero memory        
             assert value_memory != None
+            # fix up the embedded pointers (using memoryviews)
+            pymmcore.dlpack_fix_pointers(metadata_memory.buffer, value_memory.buffer)
 
         else:
             raise RuntimeError('not implemented')
@@ -157,9 +158,14 @@ class shelved_dlpack_array(ShelvedCommon):
         self._metadata_named_memory = metadata_memory
         self._metadata_key = metadata_key
         self._value_key = value_key
+        self._capsule_ref_count = 0 # number of outstanding references through capsule exposure
         self.name = name
-        self._use_wbinvd = os.path.isfile('/proc/wbinvd')
-        return self
+
+    def ascapsule(self):
+        pass
+#        cap = pymmcore.dlpack_get_capsule(
+
+#        return self
 
     def __delete__(self, instance):
         raise RuntimeError('cannot delete item: use shelf erase')
@@ -180,10 +186,10 @@ class shelved_dlpack_array(ShelvedCommon):
             return super().__dict__[name]
 
     def asndarray(self):
-        return self.view(np.ndarray)
+        return None
 
     def __str__(self):
-        return str(self.asndarray())
+        return pymmcore.dlpack_as_str(self._metadata_named_memory.buffer)
     
     def __repr__(self):
         return repr(self.asndarray())

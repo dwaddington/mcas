@@ -320,21 +320,22 @@ class shelf():
             try:
                 hdr = construct_header_from_buffer(metadata_memory)
 
-                print('var {}: addr={} magic={} type={} subtype={} txbits={} ver={}'
+                print('var {}: addr={} magic={} type={} subtype={} txbits={} ver={} refcnt={}'
                       .format(varname,
                               self.__dict__[varname]._metadata_named_memory.addr(),
                               hex(hdr.magic),
                               hdr.type,
                               hdr.subtype,
                               hdr.txbits,
-                              hdr.version))
+                              hdr.version,
+                              hdr.refcnt))
 
                 if verbose:
                     print('var {}: {}'.format(varname, bytes(metadata_memory[:HeaderSize])))
                     
             except RuntimeError:
-                print('var {}: failed header check!!'.format(varname))
-                print('var {}: {}'.format(varname, bytes(metadata_memory[:HeaderSize])))
+                print('var {}: failed header check!! (buffer_len={})'.format(varname, len(metadata_memory)))
+                print('var {}: {}'.format(varname, bytes(metadata_memory)))
                 pass
 
             value_memory = self.__dict__[varname]._value_named_memory

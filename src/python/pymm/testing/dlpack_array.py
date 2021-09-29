@@ -22,8 +22,10 @@ class TestNdarray(unittest.TestCase):
     
     def test_dlpack_array(self):
         log("Testing: dlpack_array ...")
-        shelf.a = pymm.dlpack_array((5,2,4,),dtype=np.float64)
+        shelf.a = pymm.dlpack_array((5,),dtype=np.float64)
+        print(shelf.a.addr)
         print(shelf.a)
+        shelf.inspect()
 
 if __name__ == '__main__':
     unittest.main()

@@ -15,7 +15,6 @@ static constexpr size_t LARGE_ALLOCATION_THRESHOLD = KiB(64);
 #include "memory_providers.h"
 
 static Transient_memory_provider * g_provider = nullptr;
-static Mmap_memory_provider *      g_memmap_provider = nullptr;
 static PyMemAllocatorEx            g_default_allocators;
 
 

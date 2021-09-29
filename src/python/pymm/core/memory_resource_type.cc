@@ -315,10 +315,10 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
     return NULL;
   }
 
-  if (alignment > size) {
-    PyErr_SetString(PyExc_RuntimeError,"alignment greater than size");
-    return NULL;
-  }
+  // if (alignment > size) {
+  //   PyErr_SetString(PyExc_RuntimeError,"alignment greater than size");
+  //   return NULL;
+  // }
 
   if (strlen(name) < 1) {
     PyErr_SetString(PyExc_RuntimeError,"bad name argument");

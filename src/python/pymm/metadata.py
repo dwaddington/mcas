@@ -8,6 +8,7 @@ def construct_header(type=0, subtype=0, txbits=0, version=0):
     hdr.txbits = txbits
     hdr.version = version
     hdr.type = type
+    hdr.refcnt = 0
     return hdr
 
 def construct_header_on_buffer(buffer, type=0, subtype=0, txbits=0, version=0):
@@ -16,6 +17,7 @@ def construct_header_on_buffer(buffer, type=0, subtype=0, txbits=0, version=0):
     hdr.txbits = txbits
     hdr.version = version
     hdr.type = type
+    hdr.refcnt = 0
     return hdr
 
 
@@ -24,6 +26,7 @@ def init_header_from_buffer(buffer: memoryview):
     hdr.magic = HeaderMagic
     hdr.txbits = 0
     hdr.version = 0
+    hdr.refcnt = 0
     return hdr
 
 def construct_header_from_buffer(buffer: memoryview):
@@ -37,7 +40,8 @@ class MetaHeader(Structure):
                 ("txbits", c_uint32),
                 ("version", c_uint32),
                 ("type", c_uint32),
-                ("subtype", c_uint32)
+                ("subtype", c_uint32),
+                ("refcnt", c_uint32),
     ]
 
 
@@ -52,7 +56,7 @@ DataType_NumberInteger = int(4)
 DataType_Bytes         = int(5)
 DataType_NumPyArray    = int(10)
 DataType_TorchTensor   = int(11)
-DataType_DLPackArray   = int(12)
+DataType_DLTensor      = int(12)
 DataType_LinkedList    = int(23)
 
 DataSubType_None   = int(0)

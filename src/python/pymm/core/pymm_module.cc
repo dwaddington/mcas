@@ -72,6 +72,10 @@ PyDoc_STRVAR(pymcas_ndarray_rng_set_doc,
              "pymcas_ndarray_rng_set(array|memoryview) -> Set random values in memory region");
 PyDoc_STRVAR(pymmcore_dlpack_construct_meta_doc,
              "dlpack_construct_meta_doc(dtype, shape, strides) -> (internal) Generate dlpack header");
+PyDoc_STRVAR(pymmcore_dlpack_fix_pointers_doc,
+             "pymmcore_dlpack_fix_pointers_doc(metadata, valuedata) -> (internal) Fix dlpack header pointers");
+PyDoc_STRVAR(pymmcore_dlpack_as_str_doc,
+             "pymmcore_dlpack_as_str() -> Return str representation");
 
 static PyObject * pymmcore_version(PyObject * self,
                                    PyObject * args,
@@ -104,6 +108,15 @@ extern PyObject * pymmcore_disable_transient_memory(PyObject * self,
 extern PyObject * pymmcore_dlpack_construct_meta(PyObject * self,
                                                  PyObject * args,
                                                  PyObject * kwargs);
+
+extern PyObject * pymmcore_dlpack_fix_pointers(PyObject * self,
+                                               PyObject * args,
+                                               PyObject * kwargs);
+
+extern PyObject * pymmcore_dlpack_as_str(PyObject * self,
+                                         PyObject * args,
+                                         PyObject * kwargs);
+
 
 #ifdef BUILD_PYMM_VALGRIND
 static PyObject * pymmcore_valgrind_trigger(PyObject * self,
@@ -142,6 +155,10 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_rng_set, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_rng_set_doc },
    {"dlpack_construct_meta",
     (PyCFunction) pymmcore_dlpack_construct_meta, METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_construct_meta_doc },
+   {"dlpack_fix_pointers",
+    (PyCFunction) pymmcore_dlpack_fix_pointers, METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_fix_pointers_doc },
+   {"dlpack_as_str",
+    (PyCFunction) pymmcore_dlpack_as_str, METH_VARARGS | METH_KEYWORDS, pymmcore_dlpack_as_str_doc },
    {NULL, NULL, 0, NULL}        /* Sentinel */
   };
 
