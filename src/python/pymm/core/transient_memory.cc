@@ -110,13 +110,19 @@ PyObject * pymmcore_enable_transient_memory(PyObject * self,
 
   assert(p_backing_directory);
 
-  if(p_pmem_file == nullptr) {
-    /* single mmap'ed file tier */
-    g_provider = new Mmap_memory_provider(p_backing_directory);
+  try {
+    if(p_pmem_file == nullptr) {
+      /* single mmap'ed file tier */
+      g_provider = new Mmap_memory_provider(p_backing_directory);
+    }
+    else {
+      //    g_provider = new Pmem_memory_provider(p_pmem_file, p_pmem_file_size_gb);
+      g_provider = new Tiered_memory_provider(p_backing_directory, p_pmem_file, p_pmem_file_size_gb);
+    }
   }
-  else {
-    //    g_provider = new Pmem_memory_provider(p_pmem_file, p_pmem_file_size_gb);
-    g_provider = new Tiered_memory_provider(p_backing_directory, p_pmem_file, p_pmem_file_size_gb);
+  catch(...) {
+    PWRN("transient memory unable to initialize (resource creation failed)");
+    Py_RETURN_NONE;
   }
       
   
