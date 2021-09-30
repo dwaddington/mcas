@@ -16,13 +16,14 @@ import numpy as np
 
 from .pymmtest import *
 from .ndarray import ndarray
-#from .pickled import pickled
+from .dlpack_array import dlpack_array
 from .torch_tensor import torch_tensor
 from .string import string
 from .float_number import float_number
 from .integer_number import integer_number
 from .bytes import bytes
 from .linkedlist import linked_list
+
 
 from .shelf import shelf
 from .shelf import ShelvedCommon
