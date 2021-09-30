@@ -87,7 +87,7 @@ if (BUILD_PYTHON_SUPPORT)
       )
 
     # install as a site-package
-    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")
+    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user COMMAND_ERROR_IS_FATAL ANY)")
   endif()
 
   unset(BUILD_PYMM_NOPACKAGE)
