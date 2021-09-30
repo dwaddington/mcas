@@ -28,86 +28,83 @@ wbinvd_threshold = 1073741824
 
 # shadow type for ndarray
 #
-class ndarray(Shadow):
+class dlpack_array(Shadow):
     '''
     ndarray that is stored in a memory resource
     '''
-    def __init__(self, shape, dtype=np.float64, strides=None, order='C', zero=False):
-
-        # todo check params
-        # todo check and invalidate param 'buffer'
-        # save constructor parameters and type
+    def __init__(self, shape, dtype=np.float64, strides=None, zero=False):
         self.__p_shape = shape
         self.__p_dtype = dtype
         self.__p_strides = strides
-        self.__p_order = order
         self.__p_zero = zero
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
         Create a concrete instance from the shadow
         '''
-        return shelved_ndarray(memory_resource,
-                               name,
-                               shape = self.__p_shape,
-                               dtype = self.__p_dtype,
-                               strides = self.__p_strides,
-                               order = self.__p_order,
-                               zero = self.__p_zero)
+        return shelved_dlpack_array(memory_resource,
+                                    name,
+                                    shape = self.__p_shape,
+                                    dtype = self.__p_dtype,
+                                    strides = self.__p_strides,
+                                    zero = self.__p_zero)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
         Determine if an persistent named memory object corresponds to this type
         '''
+        print(memory_resource)
+        assert isinstance(memory_resource, MemoryResource)
+        
         metadata = memory_resource.get_named_memory(name)
         if metadata is None:
             raise RuntimeError('bad object name')
 
-        if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
-            return (False, None)
+        # cast header structure on buffer
+        hdr = construct_header_from_buffer(metadata)
+
+        if hdr.type == DataType_DLTensor:
+            return (True, shelved_dlpack_array(memory_resource, name, shape = None))
         else:
-            return (True, shelved_ndarray(memory_resource, name, shape = None))
+            return (False, None)
+            
 
     def __str__(self):
         print('shadow ndarray')
 
 
     def build_from_copy(memory_resource: MemoryResource, name: str, array):
-        new_array = shelved_ndarray(memory_resource,
-                                    name,
-                                    shape = array.shape,
-                                    dtype = array.dtype,
-                                    strides = array.strides)
+        raise RuntimeError('not implemented')
+        # new_array = shelved_dlpack_array(memory_resource,
+        #                                  name,
+        #                                  shape = array.shape,
+        #                                  dtype = array.dtype,
+        #                                  strides = array.strides)
 
-        # now copy the data
-        #new_array[:] = array
-        np.copyto(new_array, array)
-        return new_array
+        # # now copy the data
+        # #new_array[:] = array
+        # np.copyto(new_array, array)
+        # return new_array
 
 
-
-    
 # concrete subclass for ndarray
 #
-class shelved_ndarray(np.ndarray, ShelvedCommon):
-    '''ndarray that is stored in a memory resource'''
-    __array_priority__ = -100.0 # what does this do?
+class shelved_dlpack_array(ShelvedCommon):
+    '''
+    DLPack array that is stored in a memory resource
+    '''
+    def __init__(self, memory_resource, name, shape, dtype=np.float64, strides=None, type=0, zero=False):
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', type=0, zero=False):
         #
         # determine size of memory needed
         #
         descr = dtypedescr(dtype)
-        _dbytes = descr.itemsize
+        bytes_per_item = descr.itemsize
 
         if shape != None:
             size = np.intp(1)  # avoid default choice of np.int_, which might overflow
 
             if isinstance(shape, tuple) or isinstance(shape, list):
-#                if isinstance(shape, tuple):
-#                    if isinstance(shape[0], list):
-#                        shape = shape[0]
-
                 for k in shape:
                     size *= k
             else:
@@ -125,37 +122,41 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             #
             # create a newly allocated named memory from MemoryResource
             #
-            msize = int(size*_dbytes)
-            if msize < 8:
+            memory_size = int(size * bytes_per_item)
+            if memory_size < 8:
                 alignment = 1
             else:
                 alignment = 8
-            value_memory = memory_resource.create_named_memory(value_key,
-                                                               msize,
-                                                               alignment,
-                                                               zero) # zero memory
-            assert value_memory != None
-            
-            # construct array using supplied memory
-            #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_memory.buffer,
-                                      strides=strides, order=order)
 
-            # create and store metadata header
-            metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str, type=type)
-            memory_resource.put_named_memory(metadata_key, metadata)
-            
+            # construct metadata in volatile memory
+            #
+            (hdr_bytes, data_size) = pymmcore.dlpack_construct_meta(dtypedescr=descr,
+                                                                    shape=shape,
+                                                                    strides=strides)
+            memory_resource.put_named_memory(metadata_key, hdr_bytes)
             metadata_memory = memory_resource.open_named_memory(metadata_key)
+            
+            value_memory = memory_resource.create_named_memory(value_key,
+                                                               data_size,
+                                                               256, # as per DLpack spec
+                                                               zero) # zero memory        
+            assert value_memory != None
+            # fix up the embedded pointers (using memoryviews)
+            pymmcore.dlpack_fix_pointers(metadata_memory.buffer, value_memory.buffer)
+
         else:
             # entity already exists, load metadata
             assert metadata_memory != None
-            
-            hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=type)
-            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_memory.buffer,
-                                      strides=hdr['strides'], order=order)
+            assert value_memory != None
 
-        assert value_memory != None
-        assert metadata_memory != None
+            # if the load address is different the pointers need fixing; we would not need
+            # this if the same load address is always used
+            pymmcore.dlpack_fix_pointers(metadata_memory.buffer, value_memory.buffer)
+            
+            # hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=type)
+            # self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_memory.buffer,
+            #                           strides=hdr['strides'], order=order)
+
             
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
@@ -163,9 +164,13 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self._metadata_named_memory = metadata_memory
         self._metadata_key = metadata_key
         self._value_key = value_key
+        self._capsule_ref_count = 0 # number of outstanding references through capsule exposure
         self.name = name
-        self._use_wbinvd = os.path.isfile('/proc/wbinvd')
-        return self
+
+    def as_capsule(self):
+        return pymmcore.dlpack_get_capsule(self._metadata_named_memory.buffer)
+
+#        return self
 
     def __delete__(self, instance):
         raise RuntimeError('cannot delete item: use shelf erase')
@@ -186,10 +191,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             return super().__dict__[name]
 
     def asndarray(self):
-        return self.view(np.ndarray)
+        return None
 
     def __str__(self):
-        return str(self.asndarray())
+        return pymmcore.dlpack_as_str(self._metadata_named_memory.buffer)
     
     def __repr__(self):
         return repr(self.asndarray())
