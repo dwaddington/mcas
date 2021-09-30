@@ -132,8 +132,14 @@ class MemoryResource(pymmcore.MemoryResource):
     '''
     def __init__(self, name, size_mb, pmem_path, load_addr, backend=None, mm_plugin=None, force_new=False):
         self._named_memory = {}
+
+        if os.getenv('PYMM_DEBUG') != None:
+            debug_level = int(os.getenv('PYMM_DEBUG'))
+        else:
+            debug_level = 0
+
         super().__init__(pool_name=name, size_mb=size_mb, pmem_path=pmem_path,
-                         load_addr=load_addr, backend=backend, mm_plugin=mm_plugin, force_new=force_new)
+                         load_addr=load_addr, backend=backend, mm_plugin=mm_plugin, force_new=force_new, debug_level=debug_level)
         
         # todo check for outstanding transactions
         all_items = super()._MemoryResource_get_named_memory_list()

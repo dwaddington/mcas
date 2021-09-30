@@ -9,6 +9,7 @@
 #
 # python3 ~/mcas/src/python/pymm/testing/devdax.py
 #
+import os
 import unittest
 import pymm
 import numpy as np
@@ -49,4 +50,7 @@ class TestDevDaxSupport(unittest.TestCase):
 
         
 if __name__ == '__main__':
-    unittest.main()
+    if os.path.isdir('/dev/dax1.0'):
+        unittest.main()
+    else:
+        print('Omitting test; no /dev/dax1.0 detected')

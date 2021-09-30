@@ -49,6 +49,7 @@ class TestTensors(unittest.TestCase):
         self.s.x = T
         print(self.s.x)
         self.assertTrue(self.s.x.equal(T))
+        Q = torch.tensor([[1,2,3],[4,5,6]])
 
     def test_torch_ones(self):
         log("Testing: torch ones")

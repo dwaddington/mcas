@@ -124,6 +124,14 @@ class shelf():
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
 
+                # type: pymm.dlpack_array
+                elif (stype == DataType_DLTensor):
+                    (existing, value) = pymm.dlpack_array.existing_instance(self.mr, varname)
+                    if existing == True:
+                        self.__dict__[varname] = value
+                        print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
+                        continue                    
+
                 # type: pymm.float_number
                 elif (stype == DataType_NumberFloat):
                     (existing, value) = pymm.float_number.existing_instance(self.mr, varname)
@@ -147,7 +155,6 @@ class shelf():
                         self.__dict__[varname] = value
                         print("Value '{}' has been made available on shelf '{}'!".format(varname, name))
                         continue
-
                     
                 print("Value '{}' is unknown type!".format(varname))
 
@@ -320,21 +327,22 @@ class shelf():
             try:
                 hdr = construct_header_from_buffer(metadata_memory)
 
-                print('var {}: addr={} magic={} type={} subtype={} txbits={} ver={}'
+                print('var {}: addr={} magic={} type={} subtype={} txbits={} ver={} refcnt={}'
                       .format(varname,
                               self.__dict__[varname]._metadata_named_memory.addr(),
                               hex(hdr.magic),
                               hdr.type,
                               hdr.subtype,
                               hdr.txbits,
-                              hdr.version))
+                              hdr.version,
+                              hdr.refcnt))
 
                 if verbose:
                     print('var {}: {}'.format(varname, bytes(metadata_memory[:HeaderSize])))
                     
             except RuntimeError:
-                print('var {}: failed header check!!'.format(varname))
-                print('var {}: {}'.format(varname, bytes(metadata_memory[:HeaderSize])))
+                print('var {}: failed header check!! (buffer_len={})'.format(varname, len(metadata_memory)))
+                print('var {}: {}'.format(varname, bytes(metadata_memory)))
                 pass
 
             value_memory = self.__dict__[varname]._value_named_memory
@@ -347,6 +355,7 @@ class shelf():
         Helper function to return True if value is of a shadow type
         '''
         return (isinstance(value, pymm.ndarray) or
+                isinstance(value, pymm.dlpack_array) or
                 isinstance(value, pymm.torch_tensor) or
                 isinstance(value, pymm.string) or
                 isinstance(value, pymm.float_number) or

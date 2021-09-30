@@ -463,6 +463,12 @@ void * dax_manager::locate_free_address_range(std::size_t size_)
 			return i.lower();
 		}
 	}
+
+	for ( auto i : _address_fs_available )
+	{
+		PLOG("%s: free %p..%p", __func__, common::p_fmt(i.lower()), common::p_fmt(i.upper()));
+	}
+
 	throw std::runtime_error(__func__ + std::string(" out of address ranges"));
 }
 
@@ -509,12 +515,12 @@ auto dax_manager::create_region(
   }
   catch ( const General_exception &e )
   {
-    CPLOG(2,"%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
+    CPLOG(2,"%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx) %s", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available(), e.cause());
     return region_descriptor();
   }
   catch ( const std::exception &e )
   {
-    CPLOG(2,"%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx)", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available());
+    CPLOG(2,"%s: path %s id %.*s size req 0x%zx create failed (available 0x%zx) %s", __func__, arena->describe().data(), int(name_.size()), name_.begin(), size_, arena->get_max_available(), e.what());
     return region_descriptor();
   }
 }
