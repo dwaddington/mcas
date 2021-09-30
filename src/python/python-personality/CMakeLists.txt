@@ -49,12 +49,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # EASTL
 include_directories(${PYTHON_INCLUDE_DIR})
-
-# uses local site install
-execute_process ( COMMAND ${PYTHON} -c "import numpy; print(numpy.__path__[0])" OUTPUT_VARIABLE NUMPY_SITE_PACKAGE OUTPUT_STRIP_TRAILING_WHITESPACE)
-message("-- Numpy     site : ${NUMPY_SITE_PACKAGE}")
-
-include_directories(${NUMPY_SITE_PACKAGE}/core/include)
+include_directories(${PYTHON_SITE_PACKAGES}/numpy/core/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/python/mcas-python-api/src/)
   
 link_directories(${CMAKE_BINARY_DIR}/src/lib/flatbuffers/)
