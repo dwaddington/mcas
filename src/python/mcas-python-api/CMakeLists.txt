@@ -58,7 +58,7 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   add_custom_target(${PROJECT_NAME}-wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution
 
   # install as a site-package
-  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND_ERROR_IS_FATAL ANY)")
+  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} )")
   
   install(FILES mcas-shell DESTINATION ${CMAKE_INSTALL_PREFIX}/bin PERMISSIONS
     OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE OWNER_READ GROUP_READ WORLD_READ)
