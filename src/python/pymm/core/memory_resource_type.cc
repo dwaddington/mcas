@@ -16,8 +16,8 @@
 constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
 constexpr const char * DEFAULT_POOL_NAME = "default";
 constexpr const char * DEFAULT_BACKEND = "hstore-cc";
-constexpr uint64_t DEFAULT_LOAD_ADDR = 0x900000000;
-constexpr uint64_t DEFAULT_ADDR_CARVEOUT = 0x100000000;
+constexpr uint64_t DEFAULT_LOAD_ADDR = 0x900000000000;
+constexpr uint64_t DEFAULT_ADDR_CARVEOUT = 0x100000000000; /* 16TB */
 using namespace component;
 
 /* Python type */
