@@ -45,6 +45,7 @@ git submodule update --init --recursive
 ``` bash
 cd deps
 ./install-<Your-OS-Version>.sh
+./install-python-deps.sh
 cd ../
 ``` 
 
