@@ -78,11 +78,11 @@ class torch_tensor(Shadow):
     def build_from_copy(memory_resource: MemoryResource, name: str, tensor):
         new_tensor = shelved_torch_tensor(memory_resource,
                                           name,
-                                          shape = tensor.numpy(),
+                                          shape = tensor.detach().numpy(),
                                           dtype = tensor.dtype)
         
         # now copy the data
-        np.copyto(new_tensor._base_ndarray, tensor.to('cpu').numpy())
+        np.copyto(new_tensor._base_ndarray, tensor.to('cpu').detach().numpy())
 
 #        if tensor.dim() is 0:
 #            new_tensor.data = tensor.clone()
