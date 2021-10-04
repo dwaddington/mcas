@@ -35,7 +35,7 @@ class torch_tensor(Shadow):
     '''
     PyTorch tensor that is stored in a memory resource
     '''
-    def __init__(self, shape, dtype=float, strides=None, order='C'):
+    def __init__(self, shape, dtype=float, strides=None, order='C', requires_grad=False):
 
         print(colored(255,0,0, 'WARNING: torch_tensor is experimental and unstable!'))
 
@@ -46,6 +46,7 @@ class torch_tensor(Shadow):
         self.__p_dtype = dtype
         self.__p_strides = strides
         self.__p_order = order
+        self.__requires_grad = requires_grad
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
@@ -56,7 +57,8 @@ class torch_tensor(Shadow):
                                     shape = self.__p_shape,
                                     dtype = self.__p_dtype,
                                     strides = self.__p_strides,
-                                    order = self.__p_order)
+                                    order = self.__p_order,
+                                    requires_grad = self.__requires_grad)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -79,7 +81,8 @@ class torch_tensor(Shadow):
         new_tensor = shelved_torch_tensor(memory_resource,
                                           name,
                                           shape = tensor.detach().numpy(),
-                                          dtype = tensor.dtype)
+                                          dtype = tensor.dtype,
+                                          requires_grad = tensor.requires_grad)
         
         # now copy the data
         np.copyto(new_tensor._base_ndarray, tensor.to('cpu').detach().numpy())
@@ -99,7 +102,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''PyTorch tensor that is stored in a memory resource'''
     __array_priority__ = -100.0 # sets subclass as higher priority
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', requires_grad=False):
         #print('shelved_torch_tensor: shape={} dtype={}'.format(shape, dtype))
         torch_to_numpy_dtype_dict = {
             torch.bool  : bool,
@@ -165,7 +168,7 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         self._memory_resource = memory_resource
         self._metadata_key = metadata_key
         self.name_on_shelf = name
-        self.requires_grad = False # by default .grad is not there
+        self.requires_grad = requires_grad # by default .grad is not there
         self.retains_grad = False # by default .grad is not there 
         return self
 
