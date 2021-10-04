@@ -196,6 +196,12 @@ class shelf():
         # currently we allow reassignment of shelf variables
         # TODO: we might want to make a back up of it then later delete
         if name in self.__dict__:
+            # PyTorch: check for assignment of own's view
+            if isinstance(self.__dict__[name], torch.Tensor) and isinstance(value, torch.Tensor):
+                # check if this is just a view on the same object
+                if value.data_ptr() == self.__dict__[name].data_ptr():
+                    raise RuntimeError('cannot reassign self-referring view: use clone')
+
             gc.collect()
             self.erase(name)
             
