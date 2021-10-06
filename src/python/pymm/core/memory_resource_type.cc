@@ -513,10 +513,40 @@ static PyObject * MemoryResource_erase_named_memory(PyObject * self,
   }
 
   auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  status_t status;
+
+  void * ptr = nullptr;
+  IKVStore::key_t key_handle;
+  size_t size = 0;
+
+  /* before erasing we need to sanity check for on-going transactions etc. */
+  status = mr->_store->lock(mr->_pool,
+                            name,
+                            IKVStore::STORE_LOCK_WRITE,
+                            ptr,
+                            size, 0, key_handle);
+
+  if(status != S_OK || ptr == nullptr) {
+    PERR("status from store->lock before erase: %d", status);
+    PyErr_SetString(PyExc_RuntimeError,"pre-erase lock (metadata object) failed unexpectedly");
+    return NULL;
+  }
   
-  auto status = mr->_store->erase(mr->_pool, name);
+  auto hdr = reinterpret_cast<MetaHeader*>(ptr);
+  if(hdr->txbits > 0) {
+    mr->_store->unlock(mr->_pool, key_handle);
+    PERR("trying to erase variable that is part of a transaction (0x%x)", hdr->txbits);
+    PyErr_SetString(PyExc_RuntimeError,"attempt to erase variable which is marked as dirty or part of multivar tx");
+    return NULL;
+  }
+  mr->_store->unlock(mr->_pool, key_handle);
+  
+  /* now it is safe to erase the item */
+  status = mr->_store->erase(mr->_pool, name);
   if(status != S_OK) {
-    PyErr_SetString(PyExc_RuntimeError,"erase failed unexpectedly");
+    PERR("status from store->erase: %d", status);
+    PyErr_SetString(PyExc_RuntimeError,"erase (metadata object) failed unexpectedly");
     return NULL;
   }
 
@@ -654,11 +684,7 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
   Py_buffer * pybuffer = PyMemoryView_GET_BUFFER(mview);
 
   PLOG("persisting memory @%p", pybuffer->buf);
-  // /* update version in header */
-  // PyMM::Meta::Header* hdr = PyMM::Meta::GetMutableHeader(reinterpret_cast<char*>(pybuffer->buf) + 4);
-  // hdr->mutable_hdr()->mutate_version(hdr->hdr()->version() + 1);
-    
-  //  PNOTICE("persisting %p %lu", pybuffer->buf, pybuffer->len);
+
   pmem_persist(pybuffer->buf, pybuffer->len); /* part of libpmem */
   
   return PyLong_FromLong(0);
