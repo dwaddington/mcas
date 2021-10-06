@@ -14,6 +14,7 @@
 import pymmcore
 import os
 
+from .metadata import *
 from .check import methodcheck
 
 class TxHandler:
@@ -101,26 +102,48 @@ class MemoryReference():
         '''
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
-    def tx_begin(self):
+    def tx_begin(self, value_named_memory=None):
         '''
-        Add region of memory to transaction
+        Add region of memory to transaction.  This is called on metadata named memory,
+        and passed the value named memory if it exists (i.e. if it is not contiguous)
         '''
-        if self._use_sw_tx:
-            self.tx_handler.tx_begin()
+        # sanity check - but not fool proof!
+        hdr = construct_header_from_buffer(self.buffer)
 
-    def tx_commit(self):
+        metadata_set_dirty_tx_bit(hdr)
+        
+        if value_named_memory != None:
+            assert isinstance(value_named_memory, MemoryReference)
+            
+        if self._use_sw_tx: # optional undo logging hook
+            self.tx_handler.tx_begin(value_named_memory)
+
+    def tx_commit(self, value_named_memory=None):
         '''
-        Commit/flush changes and remove undo log
+        Commit transaction for variable
         '''        
-        if self._use_sw_tx:
-            self.persist()
-            self.tx_handler.tx_commit()
+        if self._use_sw_tx: # optional undo logging hook
+            self.tx_handler.tx_commit(value_named_memory)
+
+        hdr = construct_header_from_buffer(self.buffer)
+
+        if value_named_memory != None:
+            assert isinstance(value_named_memory, MemoryReference)
+            value_named_memory.persist()
+
+        metadata_clear_dirty_tx_bit(hdr)            
             
     def persist(self):
         '''
         Flush any cached memory (normally for persistence)
         '''
         self.mr._MemoryResource_persist_memory_view(self.buffer)
+
+    def increment_version(self):
+        '''
+        Increment version field
+        '''
+        pass  #self.mr._MemoryResource_release_named_memory
 
 
         

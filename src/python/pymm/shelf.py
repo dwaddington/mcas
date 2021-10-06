@@ -28,7 +28,6 @@ import torch
 from .metadata import *
 from .memoryresource import MemoryResource
 from .check import methodcheck
-from flatbuffers import util
 
 
 def colored(r, g, b, text):

@@ -211,6 +211,7 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   metadata.txbits = 0;
   metadata.version = 0;
   metadata.subtype = 0;
+  metadata.refcnt = 0;
   
   if(type == 0)
     metadata.type = DataType_NumPyArray;

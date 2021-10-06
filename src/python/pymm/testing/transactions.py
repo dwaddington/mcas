@@ -21,17 +21,17 @@ class TestTransactions(unittest.TestCase):
 
     def test_transactions(self):
         log("Testing: transaction on matrix fill ...")
-        shelf.s = 'This is a string!'
-        shelf.f = 1.123
-        shelf.i = 645338
-        shelf.b = b'Hello'
         shelf.n = pymm.ndarray((100,100),dtype=np.uint8)
-        shelf.w = np.ndarray((100,100),dtype=np.uint8)
-        shelf.w.fill(ord('a'))
-        #shelf.l = pymm.linked_list()
-        #shelf.l.append(1)
-        #shelf.l.append(2)
-        shelf.t = pymm.torch_tensor(np.arange(0,10))
+        shelf.n += 1
+        shelf.n += 1
+        # shelf.s = 'This is a string!'
+        # shelf.f = 1.123
+        # shelf.i = 645338
+        # shelf.b = b'Hello'
+
+        # shelf.w = np.ndarray((100,100),dtype=np.uint8)
+        # shelf.w.fill(ord('a'))
+        # shelf.t = pymm.torch_tensor(np.arange(0,10))
         
         print(shelf.items)
         shelf.inspect(verbose=False)
