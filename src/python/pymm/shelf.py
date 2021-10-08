@@ -28,8 +28,9 @@ import torch
 from .metadata import *
 from .memoryresource import MemoryResource
 from .check import methodcheck
-from flatbuffers import util
 
+# globals
+tx_vars = []
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -196,6 +197,12 @@ class shelf():
         # currently we allow reassignment of shelf variables
         # TODO: we might want to make a back up of it then later delete
         if name in self.__dict__:
+            # PyTorch: check for assignment of own's view
+            if isinstance(self.__dict__[name], torch.Tensor) and isinstance(value, torch.Tensor):
+                # check if this is just a view on the same object
+                if value.data_ptr() == self.__dict__[name].data_ptr():
+                    raise RuntimeError('cannot reassign self-referring view: use clone')
+
             gc.collect()
             self.erase(name)
             
@@ -364,70 +371,43 @@ class shelf():
         )
 
     def supported_types(self):
+        '''
+        Report types that are supported by the shelf
+        '''
         return ["pymm.ndarray", "pymm.torch_tensor", "pymm.string", "pymm.float_number", "pymm.integer_number",
                 "pymm.bytes"]
 
 
+    def tx_begin(self):
+        '''
+        Begin shelf-wide transaction. Currently new values created on the shelf are not included
+        as part of the transaction.
+        '''        
+        # iterate through shelf variables and set TXBIT_MULTIVAR
+        global tx_vars
+        for varname in self.get_item_names(all=False):
 
-# NUMPY
-#
-# Note: all invocations define a transaction boundary
-#-----------------------------------------------------
-# import numpy as np
-# import pyarrow as pa
-#
-# myShelf = pymm.shelf("/mnt/pmem0/data.pm")
-#
-# >> create an array in persistent memory
-#
-# myShelf.x = pymm.ndarray((9,9),dtype=np.uint8)
-#
-# >> create reference to array in persistent memoty
-#
-# X = myShelf.x
-#
-# >> in place modification (zero-copy)
-#
-# X.fill(8)
-# X[1,1] = 99
-#
-# >> copy to DRAM
-#
-# c = X.copy()
-#
-# >> replication in persistent memory
-#
-# myShelf.z = X   or myshelf.z = myshelf.x
-#
-# >> remove from persistent memory (requires no outstanding references)
-#
-# myShelf.erase('z')
+            # get header info
+            if self.__dict__[varname]._metadata_named_memory == None:
+                raise RuntimeError('var {} has no metadata'.format(varname))
+            
+            metadata_memory = self.__dict__[varname]._metadata_named_memory.buffer
 
+            hdr = construct_header_from_buffer(metadata_memory)
+            metadata_set_tx_bit(hdr, TXBIT_MULTIVAR)
+            tx_vars.append(varname)
+                    
+        return vars
 
-
-
-# APACHE ARROW
-#------------------------------------------------
-# import numpy as np
-# import pyarrow as pa
-#
-# myShelf = pymm.shelf("/mnt/pmem0/data.pm")
-#
-# >> create an array of strings builder
-#
-# myShelf.x = pymm.arrow.StringBuilder()
-#
-# X = myShelf.x
-#
-# X.append("hello")
-# X.append("world");
-#
-# X.finish();
-#
-# >> access immutable array (StringScalar type)
-#
-# print(X[0]) --> <pyarrow.StringScalar: 'hello'>
-#
-# >> create a schema ...
-#
+    def tx_end(self):
+        '''
+        Commit shelf-wide transaction.
+        '''
+        global tx_vars
+        for varname in tx_vars:
+            entry = self.__dict__[varname]
+            metadata = entry._metadata_named_memory
+            assert metadata != None
+            metadata.tx_multivar_commit(entry._value_named_memory)
+        tx_vars = []
 

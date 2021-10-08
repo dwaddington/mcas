@@ -14,7 +14,8 @@
 import pymmcore
 import os
 
-from .check import methodcheck
+from .metadata import *
+from .check import methodcheck, paramcheck
 
 class TxHandler:
     '''
@@ -101,27 +102,74 @@ class MemoryReference():
         '''
         return (hex(pymmcore.memoryview_addr(self.buffer)), len(self.buffer))
 
-    def tx_begin(self):
+    def tx_begin(self, value_named_memory=None):
         '''
-        Add region of memory to transaction
+        Add region of memory to transaction.  This is called on metadata named memory,
+        and passed the value named memory if it exists (i.e. if it is not contiguous)
         '''
-        if self._use_sw_tx:
-            self.tx_handler.tx_begin()
+        if value_named_memory != None:
+            assert isinstance(value_named_memory, MemoryReference)
 
-    def tx_commit(self):
+        # sanity check - but not fool proof!
+        hdr = construct_header_from_buffer(self.buffer)
+
+        if metadata_check_tx_bit(hdr, TXBIT_DIRTY):
+            return # nested, don't do anything
+            
+        metadata_set_dirty_tx_bit(hdr)
+            
+        if self._use_sw_tx: # optional undo logging hook
+            self.tx_handler.tx_begin(value_named_memory)
+
+    def tx_commit(self, value_named_memory=None):
         '''
-        Commit/flush changes and remove undo log
+        Commit transaction for variable
         '''        
-        if self._use_sw_tx:
-            self.persist()
-            self.tx_handler.tx_commit()
+        if self._use_sw_tx: # optional undo logging hook
+            self.tx_handler.tx_commit(value_named_memory)
+
+        hdr = construct_header_from_buffer(self.buffer)
+
+        # if we are in a multi-variable transaction, then delay commit
+        if metadata_check_tx_bit(hdr, TXBIT_MULTIVAR):
+            return
+
+        self.persist()
+        if value_named_memory != None:
+            assert isinstance(value_named_memory, MemoryReference)
+            value_named_memory.persist()
+
+        metadata_clear_dirty_tx_bit(hdr)
+
+        
+    def tx_multivar_commit(self, value_named_memory=None):
+        '''
+        Commit variable as part of multi-variable transaction
+        '''
+        hdr = construct_header_from_buffer(self.buffer)
+        hdr.version += 1
+        
+        # we might not have dirtied the memory
+        if not metadata_check_dirty_tx_bit(hdr):
+            metadata_clear_tx_bit(hdr, TXBIT_MULTIVAR | TXBIT_DIRTY)
+            return
+
+        # dirty bit is set
+        if self._use_sw_tx: # optional undo logging hook
+            self.tx_handler.tx_commit(value_named_memory)      
+
+        if value_named_memory != None:
+            assert isinstance(value_named_memory, MemoryReference)
+            value_named_memory.persist()
+
+        metadata_clear_tx_bit(hdr, TXBIT_MULTIVAR | TXBIT_DIRTY)
+        
             
     def persist(self):
         '''
         Flush any cached memory (normally for persistence)
         '''
         self.mr._MemoryResource_persist_memory_view(self.buffer)
-
 
         
 class MemoryResource(pymmcore.MemoryResource):

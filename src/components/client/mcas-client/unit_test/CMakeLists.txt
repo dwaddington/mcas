@@ -7,11 +7,7 @@ enable_language(CXX C ASM)
 
 add_definitions(-DCONFIG_DEBUG)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(GTEST_LIB gtest)
-else()
-  set(GTEST_LIB gtestd)
-endif()
+set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)

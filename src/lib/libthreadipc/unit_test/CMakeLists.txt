@@ -17,11 +17,7 @@ link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # ndctl
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(GTEST_LIB gtest)
-else()
-  set(GTEST_LIB gtestd)
-endif()
+set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
 add_executable(libthreadipc-test4 test4.cpp)
 target_compile_options(libthreadipc-test4 PUBLIC "$<$<CONFIG:Debug>:-O0>")

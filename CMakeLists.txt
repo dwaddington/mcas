@@ -70,7 +70,7 @@ set(ENV{MCAS_HOME} ${CMAKE_CURRENT_SOURCE_DIR})
 include(CheckIncludeFiles)
 find_package(PkgConfig)
 include(${CMAKE_CURRENT_SOURCE_DIR}/mk/common.cmake)
-project(comanche)
+project(mcas)
 
 # locate FindXXX.cmake
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mk)

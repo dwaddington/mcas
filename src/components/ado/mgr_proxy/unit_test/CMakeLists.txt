@@ -10,13 +10,9 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
-add_executable(ado-prox-test test.cpp)
+set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(GTEST_LIB gtest)
-else()
-  set(GTEST_LIB gtestd)
-endif()
+add_executable(ado-prox-test test.cpp)
 
 target_link_libraries(ado-prox-test boost_program_options
 	profiler boost_system boost_date_time boost_filesystem ${GTEST_LIB} pthread

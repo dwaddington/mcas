@@ -14,11 +14,7 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(GTEST_LIB gtest)
-else()
-  set(GTEST_LIB gtestd)
-endif()
+set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
 add_definitions(-DCONFIG_DEBUG)
 add_compile_options(-g -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)

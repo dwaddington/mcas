@@ -54,6 +54,8 @@ PyDoc_STRVAR(pymmcore_free_direct_memory_doc,
              "free_direct_memory(s) -> Free memory previously allocated with allocate_direct_memory (experimental)");
 PyDoc_STRVAR(pymmcore_memoryview_addr_doc,
              "memoryview_addr(m) -> Return address of memory (for debugging)");
+PyDoc_STRVAR(pymmcore_persist_doc,
+             "persist(memoryview) -> flush caches for data in memory view");
 
 #ifdef BUILD_PYMM_VALGRIND
 PyDoc_STRVAR(pymmcore_valgrind_trigger_doc,
@@ -95,9 +97,14 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
                                            PyObject * args,
                                            PyObject * kwargs);
 
+static PyObject * pymmcore_persist(PyObject * self,
+                                   PyObject * args,
+                                   PyObject * kwargs);
+
 extern PyObject * pymmcore_create_metadata(PyObject * self,
                                            PyObject * args,
                                            PyObject * kwargs);
+
 
 extern PyObject * pymmcore_enable_transient_memory(PyObject * self,
                                                    PyObject * args,
@@ -147,6 +154,8 @@ static PyMethodDef pymmcore_methods[] =
     (PyCFunction) pymcas_ndarray_header_size, METH_VARARGS | METH_KEYWORDS, pymcas_ndarray_header_size_doc },
    {"memoryview_addr",
     (PyCFunction) pymmcore_memoryview_addr, METH_VARARGS | METH_KEYWORDS, pymmcore_memoryview_addr_doc },
+   {"persist",
+    (PyCFunction) pymmcore_persist, METH_VARARGS | METH_KEYWORDS, pymmcore_persist_doc },
 #ifdef BUILD_PYMM_VALGRIND   
    {"valgrind_trigger",
     (PyCFunction) pymmcore_valgrind_trigger, METH_VARARGS | METH_KEYWORDS, pymmcore_valgrind_trigger_doc },
@@ -362,6 +371,40 @@ static PyObject * pymmcore_memoryview_addr(PyObject * self,
   
   return PyLong_FromUnsignedLong(reinterpret_cast<unsigned long>(buffer->buf));
 }
+
+static PyObject * pymmcore_persist(PyObject * self,
+                                   PyObject * args,
+                                   PyObject * kwds)
+{
+  static const char *kwlist[] = {"memoryview",
+                                 NULL};
+
+  PyObject * p_memoryview = nullptr;
+  
+  if (! PyArg_ParseTupleAndKeywords(args,
+                                    kwds,
+                                    "O",
+                                    const_cast<char**>(kwlist),
+                                    &p_memoryview)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  if (! PyMemoryView_Check(p_memoryview)) {
+    PyErr_SetString(PyExc_RuntimeError,"bad arguments");
+    return NULL;
+  }
+
+  Py_buffer * buffer = PyMemoryView_GET_BUFFER(p_memoryview);
+
+  if(globals::debug_level > 0)
+    PLOG("persisting (%p, %ld)", buffer->buf, buffer->len);
+  
+  ::pmem_persist(buffer->buf, buffer->len);
+  
+  Py_RETURN_NONE;
+}
+
 
 /* we always build these, so that if the Python code call
    pymm.pymmcore.valgrind_trigger it will just do nothing

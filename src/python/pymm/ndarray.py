@@ -204,12 +204,12 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     # each type will handle its own transaction methodology.  this
     # is because metadata may be dealt with differently
     #
-    def _value_only_transaction(self, F, *args):
+    def _wrap_transaction(self, F, *args):
         if self is None:
             return
-        self._value_named_memory.tx_begin()
+        self._metadata_named_memory.tx_begin(self._value_named_memory)
         result = F(*args)
-        self._value_named_memory.tx_commit()
+        self._metadata_named_memory.tx_commit(self._value_named_memory)
         return result
 
     # all methods that perform writes are implicitly used to define transaction
@@ -220,47 +220,47 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
     # in-place methods need to be transactional
     def fill(self, value):
-        return self._value_only_transaction(super().fill, value)
+        return self._wrap_transaction(super().fill, value)
 
     def byteswap(self, inplace):
         if inplace == True:
-            return self._value_only_transaction(super().byteswap, True)
+            return self._wrap_transaction(super().byteswap, True)
         else:
             return super().byteswap(False)
 
     # in-place arithmetic
     def __iadd__(self, value): # +=
-        return self._value_only_transaction(super().__iadd__, value)
+        return self._wrap_transaction(super().__iadd__, value)
 
     def __imul__(self, value): # *=
-        return self._value_only_transaction(super().__imul__, value)
+        return self._wrap_transaction(super().__imul__, value)
 
     def __isub__(self, value): # -=
-        return self._value_only_transaction(super().__isub__, value)
+        return self._wrap_transaction(super().__isub__, value)
 
     def __idiv__(self, value): # /=
-        return self._value_only_transaction(super().__idiv__, value)
+        return self._wrap_transaction(super().__idiv__, value)
 
     def __imod__(self, value): # %=
-        return self._value_only_transaction(super().__imod__, value)
+        return self._wrap_transaction(super().__imod__, value)
 
     def __ipow__(self, value): # **=
-        return self._value_only_transaction(super().__ipow__, value)
+        return self._wrap_transaction(super().__ipow__, value)
 
     def __ilshift__(self, value): # <<=
-        return self._value_only_transaction(super().__ilshift__, value)
+        return self._wrap_transaction(super().__ilshift__, value)
 
     def __irshift__(self, value): # >>=
-        return self._value_only_transaction(super().__irshift__, value)
+        return self._wrap_transaction(super().__irshift__, value)
 
     def __iand__(self, value): # &=
-        return self._value_only_transaction(super().__iand__, value)
+        return self._wrap_transaction(super().__iand__, value)
 
     def __ixor__(self, value): # ^=
-        return self._value_only_transaction(super().__ixor__, value)
+        return self._wrap_transaction(super().__ixor__, value)
 
     def __ior__(self, value): # |=
-        return self._value_only_transaction(super().__ior__, value)
+        return self._wrap_transaction(super().__ior__, value)
 
     
     # out-of-place we need to convert back to ndarray
@@ -317,10 +317,10 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     # set item, e.g. x[2] = 2
     # if we want transactionality on this we override it - but beware, it will cost!
 #    def __setitem__(self, position, x):
-#        return self._value_only_transaction(super().__setitem__, position, x)
+#        return self._wrap_transaction(super().__setitem__, position, x)
 
     def flip(self, m, axis=None):
-        return self._value_only_transaction(super().flip, m, axis)
+        return self._wrap_transaction(super().flip, m, axis)
 
 
     # operations that return new views on same data.  we want to change
