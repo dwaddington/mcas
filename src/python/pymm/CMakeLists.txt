@@ -86,8 +86,12 @@ if (BUILD_PYTHON_SUPPORT)
       DEPENDS ${PROJECT_NAME}-meta ${ALL_PACKAGE_SOURCE_FILES} ${SETUP_PY_DEPS}
       )
 
-    # install as a site-package
-    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user COMMAND_ERROR_IS_FATAL ANY)")
+    # install as a site-package. If CMake new enough, we can propagate a failure
+    if(${CMAKE_VERSION} VERSION_LESS "3.19.0")
+      install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user)")
+    else()
+      install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user COMMAND_ERROR_IS_FATAL ANY)")
+    endif()
   endif()
 
   unset(BUILD_PYMM_NOPACKAGE)
