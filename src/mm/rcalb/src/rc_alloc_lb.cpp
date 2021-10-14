@@ -23,6 +23,7 @@
 #include "slab.h"
 #include "region.h"
 
+static const unsigned trace = common::env_value<unsigned>("CCA_FINE_TRACE", 0);
 
 Rca_LB::Rca_LB(unsigned debug_level_) : _rmap(new Region_map(debug_level_)) {}
 
@@ -51,6 +52,10 @@ void *Rca_LB::alloc(size_t size, int numa_node, size_t alignment)
   void * result = _rmap->allocate(size, numa_node, alignment);
   if(result == nullptr) {
     SAFE_PRINT("Region allocator unable to allocate (size=%lu, alignment=%lu)", size, alignment);
+    if ( 1 <= trace )
+    {
+      debug_dump();
+    }
     throw std::bad_alloc();
   }
   //  PNOTICE("Rca_LB::alloc (%p,%lu)", result, size);
@@ -64,9 +69,21 @@ void Rca_LB::free(void *ptr, int numa_node, size_t size)
   _rmap->free(ptr, numa_node, size);
 }
 
-void Rca_LB::debug_dump(std::string *out_log)
+void Rca_LB::debug_dump(std::ostream &out_log)
 {
   _rmap->debug_dump(out_log);
 }
 
-
+void Rca_LB::debug_dump(std::string *out_log)
+{
+  if ( out_log )
+  {
+    std::ostringstream ss;
+    debug_dump(ss);
+    out_log->append(ss.str());
+  }
+  else
+  {
+    debug_dump(std::cerr);
+  }
+}

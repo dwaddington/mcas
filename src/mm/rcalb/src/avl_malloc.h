@@ -20,6 +20,7 @@
 
 #include "avl_tree.h"
 #include "slab.h"
+#include <common/env.h>
 #include <common/stack.h>
 #include <common/types.h>
 #include <common/utils.h>
@@ -29,6 +30,13 @@
 #include <cstdlib> // exit
 
 //#define DEBUG_AVL_ALLOCATOR
+
+/* rough intent of debug values:
+ * 1 : print exceptional cases only
+ * 2 : O(1) prints per alloc/free
+ * 3 : > O(1) prints per alloc free
+ */
+static const unsigned option_DEBUG = common::env_value<unsigned>("CCA_FINE_TRACE", 0);
 
 namespace core
 {
@@ -286,7 +294,6 @@ protected:
  */
 class AVL_range_allocator {
 private:
-  static constexpr unsigned option_DEBUG = 0;
 
   core::slab::CRuntime<Memory_region> __default_allocator;
 
@@ -336,14 +343,14 @@ public:
         /* the first entry will be the root (at least it should be!) */
         root = reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(reinterpret_cast<addr_t>(slab.get_first_element()));
 
-        if (option_DEBUG) PLOG("reconstructed root pointer: %p", common::p_fmt(root));
+        if (2 <= option_DEBUG) PLOG("reconstructed root pointer: %p", common::p_fmt(root));
       }
       else {
         /* create root pointer on slab */
         root =
           reinterpret_cast<packed_ptr<core::AVL_node<core::Memory_region>>*>(slab.alloc());
 
-        if (option_DEBUG) PLOG("new root pointer: %p", static_cast<void*>(root));
+        if (2 <= option_DEBUG) PLOG("new root pointer: %p", static_cast<void*>(root));
 
         *root = packed_ptr<core::AVL_node<core::Memory_region>>{};
       }
@@ -357,7 +364,7 @@ public:
         if (!p)
           throw Out_of_memory("AVL_range_allocator: failed to allocate from slab");
 
-        if (option_DEBUG)
+        if (2 <= option_DEBUG)
           PLOG("inserting root region (%lx-%lx)", start, start + size);
 
         try {
@@ -385,10 +392,11 @@ public:
    */
   virtual ~AVL_range_allocator() {
     /* delete node memory */
+    auto func = "~AVL_range_allocator";
     _tree->apply_topdown([=](void* p, size_t) {
                            Memory_region* mr = static_cast<Memory_region*>(p);
-                           if ( option_DEBUG > 2 )  {
-                             PLOG("%s: region %p, 0x%zx, %s", __func__, mr->paddr(),
+                           if ( 2 <= option_DEBUG )  {
+                             PLOG("%s: region %p, 0x%zx, %s", func, mr->paddr(),
                                   mr->size(), mr->is_free() ? "free" : "used");
                            }
                            _slab.free(mr);
@@ -461,14 +469,14 @@ public:
           throw Out_of_memory("AVL_range_allocator: failed to allocate %ld (no free region!)", size);
 
         assert(region->_free == true);
-        if (option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Region to split: %lx-%lx size=%lu (requested size=%lu, requested alignment = %lu, free=%d)",
                region->_addr, region->_addr + region->_size, region->_size, size, alignment, region->_free);
         }
 
         /* left split */
         size_t left_split_size = round_up(region->_addr, alignment) - region->_addr;
-        if (option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
         }
 
@@ -476,7 +484,7 @@ public:
         addr_t center_split_base = region->_addr + left_split_size;
         size_t center_split_size = size;
 
-        if (option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Center split: %lx-%lx size=%lu (remaining=%lu)",
                center_split_base, center_split_base + center_split_size,
                center_split_size, center_split_base % alignment);
@@ -496,7 +504,7 @@ public:
           new (p) Memory_region(center_split_base, center_split_size);
 
         if(right_split_size > 0) { /* perform RIGHT split */
-          if (option_DEBUG) {
+          if (3 <= option_DEBUG) {
             PLOG("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
           }
           assert(right_split_size > 0);
@@ -525,7 +533,7 @@ public:
 
         }
         else {
-          if(option_DEBUG) PLOG("No right split!");
+          if(2 <= option_DEBUG) PLOG("No right split!");
 
           assert(left_split_size > 0);
           auto adjacent_right = region->_next;
@@ -553,12 +561,11 @@ public:
     }
     catch ( const Exception &e )
       {
-        if ( option_DEBUG )
+        if ( 1 <= option_DEBUG )
           {
-            PINF("%s: size 0x%zx, alignment 0x%zx, %s", __func__, size, alignment, e.cause());
-            std::string s;
-            dump_info(&s);
-            std::cout << s << "\n";
+            PINF("%s: size 0x%zx, alignement 0x%zx, %s", __func__, size, alignment, e.cause());
+            dump_info(&std::cout);
+            std::cout << "\n";
           }
         throw;
       }
@@ -610,7 +617,7 @@ public:
       throw API_exception("alloc_at: cannot find containing region (addr=%lx, size=%ld)",
                           addr, size);
 
-    if (option_DEBUG)
+    if (2 <= option_DEBUG)
       PLOG("alloc_at (addr=0x%lx,size=%ld) found fitting region %lx-%lx:", addr,
            size, region->_addr, region->_addr + region->_size);
 
@@ -755,16 +762,27 @@ public:
    * Dump the tree for debugging purposes
    *
    */
-  void dump_info(std::string * out_str = nullptr) {
+  void dump_info(std::ostream *out = nullptr) {
     assert(_tree->root());
 
-    if(out_str) {
+    if(out) {
+      *out << "free [";
       apply([&](addr_t addr, size_t s, bool state)
             {
-              std::stringstream ss;
-              ss << "(" << std::hex << addr << "," << s << "," << state << ")";
-              out_str->append(ss.str());
+              if ( state )
+              {
+                *out << "(" << std::hex << addr << "," << s << ")";
+              }
             });
+      *out << "] used [";
+      apply([&](addr_t addr, size_t s, bool state)
+            {
+              if ( ! state )
+              {
+                *out << "(" << std::hex << addr << "," << s << ")";
+              }
+            });
+      *out << "]";
     }
     else {
       PINF("%s", "+ AVL_tree: ");
@@ -920,8 +938,8 @@ public:
    * Output debugging information
    *
    */
-  void dump_info(std::string * out_str = nullptr) {
-    _range_allocator.dump_info(out_str);
+  void dump_info(std::ostream * out_stream = nullptr) {
+    _range_allocator.dump_info(out_stream);
   }
 
   /**

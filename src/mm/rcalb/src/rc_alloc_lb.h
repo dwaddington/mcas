@@ -25,6 +25,7 @@
 #include <common/memory.h>
 #include <memory>
 #include <string>
+#include <iosfwd> /* ostream */
 
 class Region_map;
 
@@ -93,6 +94,7 @@ class Rca_LB : public common::Reconstituting_allocator {
    * console
    */
   void debug_dump(std::string *out_log = nullptr);
+  void debug_dump(std::ostream &out_log);
 
  private:
   std::unique_ptr<Region_map> _rmap;

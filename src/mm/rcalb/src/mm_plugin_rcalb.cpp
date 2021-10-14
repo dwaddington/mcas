@@ -100,6 +100,11 @@ PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size
   {
     return E_NO_MEM;
   }
+  catch ( const std::exception &e )
+  {
+    FLOG("UNEXPECTED exception type {}", type_of(e));
+    return E_NO_MEM;
+  }
   assert(*out_ptr);
   return S_OK;
 }

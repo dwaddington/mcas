@@ -225,29 +225,24 @@ public:
     return std::size_t(static_cast<char *>(_top) - static_cast<char *>(_base));
   }
 
-  void debug_dump(std::string *out_log = nullptr) {
-    std::stringstream ss;
+  void debug_dump(std::ostream &out_log) {
 
 #if SANITY_CHECK
     for (auto i : _used)
-      ss << "u(" << i << ")\n";
+      out_log << "u(" << i << ")\n";
 #endif
     for (auto i : _free_list)
-      ss << "f(" << i << ")\n";
+      out_log << "f(" << i << ")\n";
     /* dump the map, using reverse order in an attempt to match
      * the order in which elements will appear in the equivalent list.
      * Should this fail in the future (in the sense that the LB
-     * reconstitute test fails, dump a sorted copy of the _free_list,
+     * reconstitute test fails), dump a sorted copy of the _free_list,
      * and the free_set.
      */
     for (auto it = _free_set.rbegin(); it != _free_set.rend(); ++it) {
-      ss << "f(" << *it << ")\n";
+      out_log << "f(" << *it << ")\n";
     }
-    ss << "\n";
-    if (out_log)
-      out_log->append(ss.str());
-    else
-      std::cout << ss.str() << std::endl;
+    out_log << "\n";
   }
 
 private:
@@ -465,7 +460,7 @@ public:
     }
   }
 
-  void debug_dump(std::string *out_log = nullptr) {
+  void debug_dump(std::ostream &out_log) {
     for (unsigned numa_node = 0; numa_node < MAX_NUMA_ZONES; numa_node++) {
       for (unsigned i = 0; i < NUM_BUCKETS; i++) {
         /* search regions */
