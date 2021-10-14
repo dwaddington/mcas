@@ -1,9 +1,9 @@
 #ifndef _GET_CPU_MASK_FROM_STRING_
 #define _GET_CPU_MASK_FROM_STRING_
 
-#include "get_vector_from_string.h"
-
+#include <common/get_vector_from_string.h>
 #include <common/logging.h> /* PERR */
+#include <common/string_view.h>
 #include <common/cpu.h> /* cpu_mask_t */
 
 #include <sstream>
@@ -48,7 +48,7 @@ namespace
     }
   }
 
-  cpu_mask_t get_cpu_mask_from_string(std::string core_string)
+  cpu_mask_t get_cpu_mask_from_string(common::string_view core_string)
   {
     auto cores = get_vector_from_string<unsigned>(core_string);
     cpu_mask_t mask;
