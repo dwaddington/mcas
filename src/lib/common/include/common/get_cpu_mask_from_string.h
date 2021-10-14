@@ -11,7 +11,7 @@
 
 namespace common
 {
-  cpu_mask_t get_cpu_mask_from_string(std::string core_string);
+  cpu_mask_t get_cpu_mask_from_string(common::string_view core_string);
 }
 
 #endif

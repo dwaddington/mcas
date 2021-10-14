@@ -1,6 +1,7 @@
 #ifndef _GET_VECTOR_FROM_STRING_H
 #define _GET_VECTOR_FROM_STRING_H
 
+#include <common/string_view.h>
 #include <stdexcept> /* domain_error */
 #include <string>
 #include <sstream>
@@ -43,9 +44,10 @@ template <typename T>
 
 /* was get_cpu_vector_from_string, but now also used for devices */
 template <typename T>
-  std::vector<T> get_vector_from_string(const std::string &core_string)
+  std::vector<T> get_vector_from_string(common::string_view core_string)
   {
-    std::istringstream core_stream(core_string);
+    /* Extra copy until C++20, in which istringstream ctor accepts string && */
+    std::istringstream core_stream{std::string(core_string)};
     std::vector<T> cores;
 
     do {
@@ -60,7 +62,7 @@ template <typename T>
     if ( core_stream )
     {
       std::string s;
-      core_stream >> s; 
+      core_stream >> s;
       throw std::domain_error("Unrecognized trailing characters '" + s + "' in list");
     }
     return cores;

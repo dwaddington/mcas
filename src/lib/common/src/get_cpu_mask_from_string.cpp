@@ -49,7 +49,7 @@ static void _cpu_mask_add_core_wrapper(cpu_mask_t &mask,
 
 namespace common
 {
-  cpu_mask_t get_cpu_mask_from_string(std::string core_string)
+  cpu_mask_t get_cpu_mask_from_string(common::string_view core_string)
   {
     auto cores = get_vector_from_string<unsigned>(core_string);
     cpu_mask_t mask;
