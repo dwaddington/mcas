@@ -40,7 +40,7 @@
 
 //#define DEBUG_AVL_ALLOCATOR
 
-/* rough usage ov debug values:
+/* rough intent of debug values:
  * 1 : print exceptional cases only
  * 2 : O(1) prints per alloc/free
  * 3 : > O(1) prints per alloc free
@@ -481,7 +481,7 @@ public:
                                   size, get_free());
 
         assert(region->_free == true);
-        if ( 3 <= option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Region to split: %lx-%lx size=%lu (requested size=%lu, requested alignment = %lu, free=%d)",
                region->_addr, region->_addr + region->_size, region->_size, size, alignment, region->_free);
           
@@ -493,7 +493,7 @@ public:
 
         /* left split */
         size_t left_split_size = round_up(region->_addr, alignment) - region->_addr;
-        if ( 3 <= option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
         }
 
@@ -501,7 +501,7 @@ public:
         addr_t center_split_base = region->_addr + left_split_size;
         size_t center_split_size = size;
 
-        if ( 3 <= option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Center split: %lx-%lx size=%lu (remaining=%lu)",
                center_split_base, center_split_base + center_split_size,
                center_split_size, center_split_base % alignment);
@@ -512,7 +512,7 @@ public:
         addr_t right_split_base = center_split_base + center_split_size;
         size_t right_split_size = region->_size - left_split_size - center_split_size;
 
-        if ( 3 <= option_DEBUG) {
+        if (3 <= option_DEBUG) {
           PLOG("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
         }
         assert(right_split_size > 0);
