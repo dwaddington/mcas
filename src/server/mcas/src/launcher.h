@@ -28,93 +28,28 @@
 namespace mcas
 {
 class Shard_launcher {
+  using shard_vector = std::vector<std::unique_ptr<mcas::Shard>>;
  public:
-  Shard_launcher(Program_options &options) : _config_file(options.debug_level, options.config), _shards{}
-  {
-    for (unsigned i = 0; i < _config_file.shard_count(); i++) {
-      auto net = _config_file.get_shard_optional("net", i);
-      PMAJOR("launching shard: core(%d) port(%d) net(%s) (forced-exit=%s)", _config_file.get_shard_core(i),
-             _config_file.get_shard_port(i), net ? net->c_str() : "<none>", options.forced_exit ? "y" : "n");
+  Shard_launcher(Program_options &options);
+  Shard_launcher(bool debug_level_, common::string_view config_, bool forced_exit_, const char *profile_file_main_, bool triggered_profile_);
 
-      std::ostringstream ss{};
-      auto               dax_config = _config_file.get_shard_dax_config_raw(i);
-      if (dax_config) {
-        rapidjson::OStreamWrapper wrap(ss);
-        for (rapidjson::Value &s : dax_config->GetArray()) {
-          if (s.IsObject()) {
-            auto it = s.FindMember("addr");
-            if (it != s.MemberEnd() && it->value.IsString()) {
-              auto addr = std::stoull(it->value.GetString(), nullptr, 0);
-              it->value.SetUint64(addr);
-            }
-          }
-        }
+  ~Shard_launcher();
 
-        rapidjson::Writer<rapidjson::OStreamWrapper> writer(wrap);
-        dax_config->Accept(writer);
-        PLOG("DAX config %s", ss.str().c_str());
-      }
-      try {
-        _shards.push_back(std::make_unique<mcas::Shard>(
-            _config_file, i  // shard index
-            ,
-            ss.str(), options.debug_level, options.forced_exit,
-            options.profile_file_main.size() ? options.profile_file_main.c_str() : nullptr, options.triggered_profile));
-      }
-      catch (const std::exception &e) {
-        PLOG("shard %d failed to launch: %s", i, e.what());
-      }
-    }
-  }
+  bool threads_running();
 
-  ~Shard_launcher() { FLOGM(" ({})", common::p_fmt(this)); }
+  void signal_shards_to_exit();
 
-  bool threads_running()
-  {
-    for (auto &sp : _shards)
-      if (!sp->exiting()) return true;
+  void reap_completions();
 
-    return false;
-  }
-
-  void signal_shards_to_exit()
-  {
-    for (auto &sp : _shards) {
-      sp->signal_exit();
-    }
-  }
-
-  void wait_for_all()
-  {
-    pthread_setname_np(pthread_self(), "launcher");
-    for (auto &sp : _shards) {
-      try
-      {
-        sp->get_future();
-      }
-      catch ( const Exception &e )
-      {
-        FLOG("shard ({}): Exception {}", common::p_fmt(this), e.cause());
-      }
-      catch ( const std::exception &e )
-      {
-        FLOG("shard ({}) std::exception {}", common::p_fmt(this), e.what());
-      }
-    }
-  }
-
-  void send_cluster_event(const std::string& sender, const std::string& type, const std::string& content)
-  {
-    for (auto &sp : _shards) {
-      sp->send_cluster_event(sender, type, content);
-    }
-  }
+  void send_cluster_event(const std::string& sender, const std::string& type, const std::string& content);
 
  private:
+#if 0
   /* Probably no reason to make _config_file a member. Used only in the
    * constructor */
   Config_file                               _config_file;
-  std::vector<std::unique_ptr<mcas::Shard>> _shards;
+#endif
+  shard_vector _shards;
 };
 }  // namespace mcas
 

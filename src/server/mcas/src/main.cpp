@@ -221,6 +221,7 @@ int main(int argc, char *argv[])
     try
     {
       auto launcher = std::make_unique<mcas::Shard_launcher>(g_options);
+      pthread_setname_np(pthread_self(), "launcher");
 
       for ( auto sig : { SIGINT, SIGTERM } )
       {
@@ -235,7 +236,8 @@ int main(int argc, char *argv[])
       std::string msg_content;
       std::vector<std::string> values;
 
-      while (launcher->threads_running()) {
+      while (launcher->threads_running())
+      {
         if (zyre) {
           while (zyre->poll_recv(msg_sender_uuid, msg_type, msg_content, values)) {
 
@@ -261,17 +263,13 @@ int main(int argc, char *argv[])
 
         /* should be coordinated with zyre heartbeat */
         sleep(1);
+	launcher->reap_completions();
       }
 #endif
-      launcher->wait_for_all();
-    }
-    catch ( const Exception &e )
-    {
-      PLOG("%s: Exception %s", __func__, e.cause());
     }
     catch ( const std::exception &e )
     {
-      PLOG("%s: std::exception %s", __func__, e.what());
+      FLOG("exception {} {}", type_of(e), e.what());
     }
     catch ( ... )
     {

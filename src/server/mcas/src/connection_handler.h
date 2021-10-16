@@ -112,8 +112,9 @@ private:
   using Connection = component::IFabric_server;
   using Factory    = component::IFabric_server_factory;
 
-  Connection_state    _state       = Connection_state::INITIAL;
-  unsigned option_DEBUG = mcas::global::debug_level;
+  Connection_state _state;
+  unsigned         _handshakes;
+  unsigned         _resp_handshakes;
 
   /* list of pre-registered memory regions; normally one region */
   std::vector<component::IKVStore::memory_handle_t> _mr_vector;
@@ -165,16 +166,7 @@ private:
    */
   inline void set_state(Connection_state s)
   {
-    if (2 < option_DEBUG) {
-      const std::map<Connection_state, const char *> m{
-                                          {Connection_state::INITIAL, "INITIAL"},
-                                          {Connection_state::WAIT_HANDSHAKE, "WAIT_HANDSHAKE"},
-                                          {Connection_state::WAIT_TLS_HANDSHAKE, "WAIT_TLS_HANDSHAKE"},
-                                          {Connection_state::CLIENT_DISCONNECTED, "CLIENT_DISCONNECTED"},
-                                          {Connection_state::CLOSE_CONNECTION, "CLOSE_CONNECTION"},
-                                          {Connection_state::WAIT_NEW_MSG_RECV, "WAIT_NEW_MSG_RECV"}};
-      PLOG("state %s -> %s", m.find(_state)->second, m.find(s)->second);
-    }
+    CFLOGM(2, "state {} -> {}", _state, s);
     _state = s; /* we could add transition checking later */
   }
 
@@ -187,9 +179,7 @@ private:
   void send_callback2(buffer_t *iob) noexcept
   {
     assert(iob->value_adjunct);
-    if (2 < option_DEBUG) {
-      PLOG("Completed send2 (value_adjunct %p)", common::p_fmt(iob->value_adjunct));
-    }
+    CFLOGM(2, "Completed send2 (value_adjunct {})", iob->value_adjunct);
 /*
  * Requires that value_adjunct (the value in the second buffer of the pair) have a
  * reservation which can be undone by ACTION_RELEASE_VALUE_LOCK_SHARED, which is _i_kvstore->unlock()
@@ -260,8 +250,7 @@ public:
       //      void *deferred_unlock = nullptr;
       //???     std::swap(deferred_unlock, _deferred_unlock.front());
       auto deferred_unlock = _deferred_unlock.front();
-      if (option_DEBUG > 2)
-        PLOG("adding action for deferred unlocking value @ %p", deferred_unlock.parm);
+      CFLOG(2, "adding action for deferred unlocking value @ {}", deferred_unlock.parm);
       add_pending_action(deferred_unlock);
       _deferred_unlock.pop();
     }
@@ -313,7 +302,7 @@ public:
 
     action = _pending_actions.front();
 
-    if (option_DEBUG > 2) PLOG("Connection_handler: popped pending action (%d, %p)", int(action.op), action.parm);
+    CFLOGM(2, "Connection_handler: popped pending action ({}, {})", int(action.op), action.parm);
 
     _pending_actions.pop();
     return true;

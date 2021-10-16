@@ -14,6 +14,8 @@
 #ifndef __CONNECTION_STATE_H__
 #define __CONNECTION_STATE_H__
 
+#include <iosfwd>
+
 namespace mcas
 {
 
@@ -26,7 +28,8 @@ enum class Connection_state
    CLOSE_CONNECTION,
    CLIENT_DISCONNECTED,
   };
-
 }
+
+std::ostream &operator<<(std::ostream &, const mcas::Connection_state &);
 
 #endif

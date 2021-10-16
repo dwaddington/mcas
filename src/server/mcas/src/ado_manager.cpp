@@ -14,20 +14,41 @@
 #include <string>
 #include <typeinfo>
 
-using namespace std;
-using namespace threadipc;
-using namespace common;
-
+using Thread_ipc = threadipc::Thread_ipc;
 
 static const char *env_USE_DOCKER = ::getenv("USE_DOCKER");
 
-bool add_to_schedule(string &ret, unsigned int c)
+bool add_to_schedule(std::string &ret, unsigned int c)
 {
-  if (ret.find(to_string(c)) == string::npos) {
-    ret.append(to_string(c)).append(",");
+  if (ret.find(std::to_string(c)) == std::string::npos) {
+    ret.append(std::to_string(c)).append(",");
     return true;
   }
   return false;
+}
+
+ADO_manager::ADO_manager(Program_options &options)
+  : ADO_manager(options.debug_level, options.config)
+{
+}
+
+ADO_manager::ADO_manager(bool debug_level, common::string_view config)
+  : log_source(0U),
+    _config(debug_level, config),
+    _sla{nullptr},
+    _ados{},
+    _ado_cpu_pool{},
+    _manager_cpu_pool{},
+    _m_running{},
+    _cv_running{},
+    _running{false},
+    _m_exit{},
+    _exit{false},
+    _thread(std::async(std::launch::async, &ADO_manager::init, this))
+{
+  std::unique_lock<std::mutex> g{_m_running};
+  _cv_running.wait(g, [this] () { return is_running(); });
+  _sla = NULL;
 }
 
 void ADO_manager::init()
@@ -40,7 +61,7 @@ void ADO_manager::init()
   // setup ado cpu pool
   auto ado_cores = _config.get_ado_cores();
   if (ado_cores.empty()) {
-    for (unsigned i = 0; i < thread::hardware_concurrency(); i++) _ado_cpu_pool.insert(i);
+    for (unsigned i = 0; i < std::thread::hardware_concurrency(); i++) _ado_cpu_pool.insert(i);
     for (unsigned i = 0; i < _config.shard_count(); i++) _ado_cpu_pool.erase(_config.get_shard_core(i));
   }
   else {
@@ -69,14 +90,20 @@ void ADO_manager::init()
 
   CPLOG(2, "CPU MASK: ADO MANAGER process configured with cpu mask: [%s]", mask.string_form().c_str());
 
-  _running = true;
+  {
+    std::unique_lock<std::mutex> g(_m_running);
+    _running = true;
+    _cv_running.notify_all();
+  }
   // main loop (send and receive from the queue)
   main_loop();
 }
 
 void ADO_manager::main_loop()
 {
+  std::unique_lock<std::mutex> g{_m_exit};
   while (!_exit) {
+    g.unlock();
 
     CPLOG(3, "%lu ADO manager thread", rdtsc());
 
@@ -91,14 +118,14 @@ void ADO_manager::main_loop()
       catch(std::exception& e) {
         break; /* timeout is used to get out of this on exit */
       }
-      
+
       assert(msg);
-      
+
       switch (msg->op) {
-      case Operation::schedule:
+      case threadipc::Operation::schedule:
         schedule(msg->shard_core, msg->cores, msg->core_number, msg->numa_zone);
         break;
-      case Operation::register_ado:
+      case threadipc::Operation::register_ado:
         register_ado(msg->shard_core, msg->cores, msg->ado_id);
         break;
       default:
@@ -108,28 +135,28 @@ void ADO_manager::main_loop()
     while(msg);
 
     resource_check();
+    g.lock();
   }
 }
 
-void ADO_manager::register_ado(unsigned int shard, string &cpus, string &id)
+void ADO_manager::register_ado(unsigned int shard, common::string_view cpus, common::string_view id)
 {
-  struct ado ado {shard, cpus, id };
-  _ados.push_back(ado);
+  _ados.emplace_back(shard, std::string(cpus), std::string(id));
 }
 
-void ADO_manager::kill_ado(const struct ado &ado)
+ado::~ado()
 {
-  Thread_ipc::instance()->send_kill_to_ado(ado.shard_id);
+  Thread_ipc::instance()->send_kill_to_ado(shard_id);
 }
 
-void ADO_manager::schedule(unsigned int shard, string cpus, float cpu_num, numa_node_t numa_zone)
+void ADO_manager::schedule(unsigned int shard, common::string_view cpus, float cpu_num, numa_node_t numa_zone)
 {
-  string ret;
+  std::string ret;
   if (cpu_num == -1) {
     auto cores = get_vector_from_string<unsigned>(cpus);
     // just assign core
     for (auto &c : cores) {
-      ret.append(to_string(c)).append(",");
+      ret.append(std::to_string(c)).append(",");
       _ado_cpu_pool.erase(c);
     }
   }
@@ -154,26 +181,24 @@ void ADO_manager::schedule(unsigned int shard, string cpus, float cpu_num, numa_
 
 }
 
-void ADO_manager::exit()
+ADO_manager::~ADO_manager()
 {
-  _exit = true;
-  
-  /* send exit message to each ADO processes */
-  for (auto &ado : _ados) {
-    kill_ado(ado);
+  {
+    std::unique_lock<std::mutex> g(_m_exit);
+    _exit = true;
   }
 
-  threadipc::Thread_ipc::instance()->cleanup();
+  /* send exit message to each ADO processes */
+  _ados.clear();
+
+  Thread_ipc::instance()->cleanup();
 
   try {
     _thread.get(); /* wait for thread to exit */
   }
-  catch ( const Exception &e ) {
-    FERRM("ended with Exception: {}", e.cause());
-  }
   catch ( const std::exception &e )  {
-    FERRM("ended with std::exception: {}", e.what());
+    FERRM("ended with exception: {} {}", type_of(e), e.what());
   }
-  
+
   CPLOG(1, "Ado_manager: threads joined");
 }

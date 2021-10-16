@@ -159,13 +159,27 @@ class Shard : public Shard_transport, private common::log_source {
   Shard(const Shard &) = delete;
   Shard &operator=(const Shard &) = delete;
 
-  ~Shard() {}
+  ~Shard()
+  {
+    try
+    {
+      _thread.get();
+    }
+    catch ( const std::exception &e )
+    {
+      FLOGM("std::exception {} {}", type_of(e), e.what());
+    }
+  }
 
-  inline void get_future() { return _thread.get(); }
-  inline bool exiting() const { return _thread_exit; }
+  inline bool exiting()
+  {
+    std::lock_guard<std::mutex> g{_m_thread_exit};
+    return _thread_exit;
+  }
 
   inline void signal_exit() /*< signal main loop to exit */
   {
+    std::lock_guard<std::mutex> g{_m_thread_exit};
     _thread_exit = true;
   }
 
@@ -419,11 +433,11 @@ class Shard : public Shard_transport, private common::log_source {
     inline void free_wr(work_request_t *wr) { _free.push_back(wr); }
 
   } _wr_allocator;
-
+#if 0 /* unused */
   using ado_pool_map_t =
       std::unordered_map<component::IKVStore::pool_t,
                          std::pair<component::IADO_proxy *, Connection_handler *>>;
-
+#endif
   using work_request_key_t = uint64_t;
 
   static inline work_request_t *request_key_to_record(work_request_key_t key)
@@ -437,6 +451,7 @@ class Shard : public Shard_transport, private common::log_source {
   const std::string                                 _net_addr;
   const unsigned int                                _port;
   std::unique_ptr<index_map_t>                      _index_map; /* depends on _i_kvstore therefore should be cleaned up first */
+  std::mutex                                        _m_thread_exit;
   bool                                              _thread_exit;
   bool                                              _forced_exit;
   unsigned                                          _core;
@@ -445,7 +460,12 @@ class Shard : public Shard_transport, private common::log_source {
   component::Itf_ref<component::IADO_manager_proxy> _i_ado_mgr;    /*< null indicate non-ADO mode */
   Ado_pool_map                                      _ado_pool_map; /*< maps open pool handles to ADO proxy */
   Ado_map                                           _ado_map;      /*< managing the pool name to ADO proxy */
-  std::vector<Connection_handler *>                 _handlers;
+  /* 
+   * The sanity (avoidance of assert, at least) of libfabric relies on closure
+   * of connections, which requires that the shard not leak open connections.
+   * Use RAII for Connection handler.
+   */
+  std::vector<std::unique_ptr<Connection_handler>>  _handlers;
   locked_value_map_t                                _locked_values_shared;
   locked_value_map_t                                _locked_values_exclusive;
   std::map<const void*, std::string>                _target_keyname_map;

@@ -96,6 +96,7 @@ class Ado_pool_map
 
   void add(const component::IKVStore::pool_t pool, component::IADO_proxy *ado, Connection_handler *handler)
   {
+    /* Note: if the reference count is non-zero, handler is ignored. Why? */
     if (1 < _debug_level)
       PLOG("Ado_pool_map: adding mapping (%lx->%p,%p)", pool, common::p_fmt(ado),
            common::p_fmt(handler));

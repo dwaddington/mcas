@@ -94,7 +94,7 @@ static constexpr const char * Ado_signal_POST_GET = "post-get";
 class Config_file : private common::log_source
 {
 public:
-  Config_file(unsigned debug_level_, const std::string &config_spec);
+  Config_file(unsigned debug_level_, common::string_view config_spec);
 
   Config_file(unsigned debug_level_, rapidjson::Document &&doc);
 

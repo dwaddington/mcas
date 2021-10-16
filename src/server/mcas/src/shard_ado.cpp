@@ -531,11 +531,8 @@ void Shard::process_ado_request(Connection_handler* handler,
        extend this to asynchronous semantics for longer ADO
        operations */
   }
-  catch (const Exception& e) {
-    PLOG("%s: Exception %s enter", __func__, e.cause());
-  }
   catch (const std::exception& e) {
-    PLOG("%s: exception %s", __func__, e.what());
+    FLOGM("exception {} {}", __func__, type_of(e), e.what());
   }
 }
 
@@ -686,10 +683,11 @@ void Shard::signal_ado(const char * tag,
 
 void Shard::close_all_ado()
 {
-  PLOG("Shard: signalling ADOs to shutdown");
-  for (auto iter = _ado_map.begin(); iter != _ado_map.end(); iter++) {
-    component::IADO_proxy* ado = iter->second;
+  FLOGM("{}", "signalling ADOs to shutdown");
+  for (auto &a : _ado_map) {
+    component::IADO_proxy* ado = a.second;
     ado->shutdown();
+    /* leaves dangling pointer in _ado_map */
     delete ado;
   }
 }
@@ -705,7 +703,7 @@ void Shard::process_messages_from_ado()
   /* iterate ADO process proxies */
   auto iter = _ado_pool_map.begin();
   while (iter != _ado_pool_map.end()) {
-    gsl::not_null<IADO_proxy*> ado     = std::get<0>(iter->second);
+    gsl::not_null<IADO_proxy*> ado    = std::get<0>(iter->second);
     Connection_handler* handler_outer = std::get<1>(iter->second);
     iter++; /* OK to do this now */
 

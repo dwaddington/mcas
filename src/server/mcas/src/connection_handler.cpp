@@ -47,6 +47,9 @@ Connection_handler::Connection_handler(unsigned debug_level_,
   : Connection_base(debug_level_, factory, std::move(preconnection), buffer_count_),
     Region_manager(debug_level_, transport()),
     Connection_TLS_session(debug_level_, this),
+    _state(Connection_state::INITIAL),
+    _handshakes(0),
+    _resp_handshakes(0),
     _mr_vector{},
     _tick_count(0),
     _auth_id(0),
@@ -129,13 +132,13 @@ auto Connection_handler::tick() -> tick_type
         case MSG_TYPE::NO_MSG:
         case MSG_TYPE::PING:
           post_recv_buffer(allocate_recv());
-          if (option_DEBUG > 2) PMAJOR("%s", common_to_string(*msg).c_str());
+          CFLOGM(2, "{}", common_to_string(*msg));
           _pending_msgs.push(iob);
           break;
 
         case MSG_TYPE::CLOSE_SESSION:
           post_recv_buffer(allocate_recv()); /* Is this (and the subsequent free_recv_buffer) necessary? */
-          if (option_DEBUG > 2) PMAJOR("%s", common_to_string(*msg).c_str());
+          CFLOGM(2, "{}", common_to_string(*msg));
           free_recv_buffer();
 	  FLOGM("{}", "CLOSE_SESSION message");
           response = tick_type::TICK_RESPONSE_CLOSE;
@@ -147,8 +150,7 @@ auto Connection_handler::tick() -> tick_type
 
         ++_stats.recv_msg_count;
 
-        if (option_DEBUG > 2)
-          PMAJOR("Shard %p State: WAIT_MSG_RECV complete (%lu ticks)", common::p_fmt(this), _tick_count);
+        CFLOGM(2, "Shard {} State: WAIT_MSG_RECV complete ({} ticks)", this, _tick_count);
       }
     else {
       ++_stats.wait_msg_recv_misses;
@@ -157,10 +159,8 @@ auto Connection_handler::tick() -> tick_type
     break;
 
   case Connection_state::INITIAL: {
-    static int handshakes = 0;
-    handshakes++;
-    if (option_DEBUG > 2)
-      PMAJOR("Shard %p State: POST_HANDSHAKE (%lu ticks, %d handshakes)", common::p_fmt(this), _tick_count, handshakes);
+    ++_handshakes;
+    CFLOGM(2, "Shard {} State: POST_HANDSHAKE ({} ticks, {} handshakes)", this, _tick_count, _handshakes);
 
     /* fabric connection has allocated the first receive buffer */
 
@@ -195,13 +195,11 @@ auto Connection_handler::tick() -> tick_type
   }
 
   case Connection_state::WAIT_HANDSHAKE:
-    static int resp_handshakes = 0;
     if (check_for_posted_recv_complete()) {
-      resp_handshakes ++;
+      ++_resp_handshakes;
 
-      if (option_DEBUG > 2)
-        PLOG("Shard %p State: WAIT_HANDSHAKE complete (tick count %lu, resp_handshakes %d)",
-             common::p_fmt(this), _tick_count, resp_handshakes);
+      CFLOGM(2, "Shard {} State: WAIT_HANDSHAKE complete (tick count {}, resp_handshakes {})",
+             this, _tick_count, _resp_handshakes);
 
       const auto iob = posted_recv();
       assert(iob);

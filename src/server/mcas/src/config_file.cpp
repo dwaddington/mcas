@@ -636,13 +636,13 @@ rapidjson::Document validate(unsigned debug_level_, rapidjson::Document &&doc)
   return std::move(doc);
 }
 
-rapidjson::Document string_to_doc(unsigned debug_level_, const std::string &config)
+rapidjson::Document string_to_doc(unsigned debug_level_, common::string_view config)
 {
-  if (0 < debug_level_) PLOG("config: (%s)", config.c_str());
+  if (0 < debug_level_) FLOG("config: ({})", config);
 
   try {
     rapidjson::Document doc;
-    doc.Parse(config.c_str());
+    doc.Parse(std::string(config).c_str());
     return validate(debug_level_, std::move(doc));
   }
   catch (...) {
@@ -650,15 +650,16 @@ rapidjson::Document string_to_doc(unsigned debug_level_, const std::string &conf
   }
 }
 
-rapidjson::Document filename_to_doc(unsigned debug_level_, const std::string &filename)
+rapidjson::Document filename_to_doc(unsigned debug_level_, common::string_view filename_)
 {
-  if (0 < debug_level_) PLOG("config_file: (%s)", filename.c_str());
+  if (0 < debug_level_) FLOG("config_file: ({})", filename_);
 
   using namespace rapidjson;
 
   /* use file stream instead of istreamwrapper because of older Ubuntu 16.04
    */
-  FILE *fp = ::fopen(filename.c_str(), "rb");
+  std::string filename(filename_);
+  FILE *fp = ::fopen(std::string(filename).c_str(), "rb");
   if (fp == nullptr)
     throw Config_exception("fopen failed to open configuration file (%s)", ::strerror(errno));
 
@@ -689,8 +690,8 @@ void throw_parse_exception(rapidjson::ParseErrorCode code, const char *msg, size
   throw ParseException(code, msg, offset);
 }
 
-Config_file::Config_file(unsigned debug_level_, const std::string& config_spec)
-  : Config_file(debug_level_, (config_spec[0] == '{' ? string_to_doc : filename_to_doc)(debug_level_, config_spec))
+Config_file::Config_file(unsigned debug_level_, common::string_view config_spec)
+  : Config_file(debug_level_, (0 < config_spec.size() && config_spec[0] == '{' ? string_to_doc : filename_to_doc)(debug_level_, config_spec))
 {
 }
 

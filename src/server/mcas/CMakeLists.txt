@@ -35,8 +35,8 @@ configure_file(src/env.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/env.h)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
-add_executable(mcas src/main.cpp src/shard.cpp src/shard_ado.cpp
-src/connection_handler.cpp src/ado_manager.cpp src/security.cpp
+add_executable(mcas src/main.cpp src/launcher.cpp src/shard.cpp src/shard_ado.cpp
+src/connection_handler.cpp src/connection_state.cpp src/ado_manager.cpp src/security.cpp
 src/fabric_connection_base.cpp src/fabric_transport.cpp
 src/config_file.cpp src/tls_session.cpp) #  src/cw_common.cpp src/cw_fabric_test.cpp
 

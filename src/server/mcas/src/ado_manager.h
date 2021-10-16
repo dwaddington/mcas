@@ -3,11 +3,13 @@
 #define __ADO_MANAGER_H__
 
 #include <common/logging.h> /* log_source */
+#include <common/string_view.h>
 #include <common/types.h>
-#include <threadipc/queue.h>
+#include <threadipc/queue.h> /* Threadipc */
 
 #include <set>
 #include <future>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -21,6 +23,12 @@ struct ado {
   std::string  cpus;
   // can be container id
   std::string id;
+  ado(unsigned int shard_id_, common::string_view cpus_, common::string_view id_)
+    : shard_id(shard_id_)
+    , cpus(cpus_)
+    , id(id_)
+  {}
+  ~ado();
 };
 
 struct compare {
@@ -37,44 +45,36 @@ private:
   mcas::Config_file         _config;
 
 public:
-  ADO_manager(Program_options &options)
-    : log_source(0U),
-      _config(options.debug_level, options.config),
-      _ados{},
-      _ado_cpu_pool{},
-      _manager_cpu_pool{},
-      _thread(std::async(std::launch::async, &ADO_manager::init, this))
-  {
-    while (!_running) usleep(1000);
-    _sla = NULL;
-  }
+  ADO_manager(Program_options &options);
+  ADO_manager(bool debug_level, common::string_view config);
   ADO_manager(const ADO_manager &) = delete;
   ADO_manager &operator=(const ADO_manager &) = delete;
-  ~ADO_manager() { exit(); }
+  ~ADO_manager();
   void setSLA();
 
 private:
-  SLA *                   _sla = NULL;
+  SLA *                   _sla;
   std::vector<struct ado> _ados;
   // std::set<std::pair<unsigned int, unsigned int>, compare> _ado_cpu_pool;
   std::set<unsigned int> _ado_cpu_pool;
   std::set<unsigned int> _manager_cpu_pool;
-  bool                   _running = false;
-  bool                   _exit    = false;
+  std::mutex             _m_running;
+  std::condition_variable _cv_running;
+  bool                   _running;
+  std::mutex             _m_exit;
+  bool                   _exit;
   std::future<void>      _thread;
 
   void init();
   void main_loop();
-
-  void exit();
-
+  bool is_running() const { return _running; }
   void resource_check()
   {
     // TODO
   }
-  void        register_ado(unsigned int, std::string &, std::string &);
+  void        register_ado(unsigned int, common::string_view, common::string_view);
   void        kill_ado(const struct ado &ado);
-  void        schedule(unsigned int shard_core, std::string cpus, float cpu_num, numa_node_t numa_zone);
+  void        schedule(unsigned int shard_core, common::string_view cpus, float cpu_num, numa_node_t numa_zone);
   std::string reschedule(const struct ado &ado)
   {
     // TODO
