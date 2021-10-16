@@ -151,11 +151,6 @@ using m = std::map<std::string, p>;
     return 0;
   }
 }
-catch ( const Exception &e )
-{
-  PERR("Exception %s", e.cause());
-  return 1;
-}
 catch ( const std::exception &e )
 {
   PERR("exception %s", e.what());
