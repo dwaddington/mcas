@@ -175,7 +175,7 @@ TEST_F(KVStore_test, RemoveOldPool)
     {
       _kvstore->delete_pool(pool_name());
     }
-    catch ( Exception & )
+    catch ( const std::exception & )
     {
     }
   }
@@ -236,7 +236,7 @@ TEST_F(KVStore_test, BasicGet1)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINFM("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(single_value.size(), value_len);
     EXPECT_EQ(0, memcmp(single_value.data(), value, single_value.size()));
     _kvstore->free_memory(value);
@@ -415,7 +415,7 @@ TEST_F(KVStore_test, BasicGet2)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(single_value.size(), value_len);
     EXPECT_EQ(0, memcmp(single_value.data(), value, single_value.size()));
     _kvstore->free_memory(value);
@@ -436,7 +436,7 @@ TEST_F(KVStore_test, BasicReplaceSameSize)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(0, memcmp(single_value_updated_same_size.data(), value, single_value_updated_same_size.size()));
     _kvstore->free_memory(value);
   }
@@ -454,7 +454,7 @@ TEST_F(KVStore_test, BasicReplaceDifferentSize)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(0, memcmp(single_value_updated_different_size.data(), value, single_value_updated_different_size.size()));
     _kvstore->free_memory(value);
   }
@@ -605,7 +605,7 @@ TEST_F(KVStore_test, BasicGet3)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     _kvstore->free_memory(value);
   }
 }
@@ -639,7 +639,7 @@ TEST_F(KVStore_test, BasicGetAttribute)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
       _kvstore->free_memory(value);
     }
   }
@@ -902,7 +902,7 @@ TEST_F(KVStore_test, Size2c)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("line %d Value=(%.*s) %zu", __LINE__, static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("line {} Value=({}) {}", __LINE__, common::string_view(static_cast<char *>(value), value_len), value_len);
       _kvstore->free_memory(value);
     }
   }
@@ -930,7 +930,7 @@ TEST_F(KVStore_test, BasicUpdate)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("line %d Value=(%.*s) %zu", __LINE__, static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("line {} Value=({}) {}", __LINE__, common::string_view(static_cast<char *>(value), value_len), value_len);
       _kvstore->free_memory(value);
     }
   }
@@ -956,7 +956,7 @@ TEST_F(KVStore_test, BasicUpdate)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
       EXPECT_EQ(single_value_updated_different_size.size(), value_len);
       EXPECT_EQ(0, memcmp(single_value_updated3.data(), value, single_value_updated3.size()));
       _kvstore->free_memory(value);

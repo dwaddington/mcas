@@ -148,7 +148,7 @@ auto hstore::create_pool(common::string_view name_,
 	) -> pool_t
 try
 {
-  CPLOG(1, PREFIX "pool_name=%.*s size %zu", LOCATION, int(name_.size()), name_.data(), size_);
+  CFLOGM(1, "pool_name{} size {}", name_, size_);
   try
   {
 		/*
@@ -251,7 +251,7 @@ status_t hstore::close_pool(const pool_t p)
   try
   {
     auto pool = move_pool(p);
-    CPLOG(1, PREFIX "closed pool (%" PRIxIKVSTORE_POOL_T ")", LOCATION, p);
+    CFLOGM(1, "closed pool ({:x})", p);
     _pool_manager->pool_close_check(path);
   }
   catch ( const std::runtime_error &e )  {
@@ -283,7 +283,7 @@ status_t hstore::delete_pool(const common::string_view name_)
     return E_INVAL;
   }
 
-  CPLOG(1, PREFIX "pool deleted: %.*s", LOCATION, int(name_.size()), name_.data());
+  CFLOGM(1, "pool deleted: {}", name_);
   return S_OK;
 }
 
@@ -334,13 +334,11 @@ auto hstore::put(const pool_t pool,
                  flags_t flags) -> status_t
 {
   TM_ROOT()
-  CPLOG(
+  CFLOGM(
     1
-    , PREFIX "(key=%.*s) (value=%.*s)"
-    , LOCATION
-    , int(key.size()), common::pointer_cast<char>(key.data())
-    , int(value.size())
-    , common::pointer_cast<char>(value.data())
+    , "(key={}) (value{})"
+    , std::string_view(common::pointer_cast<char>(key.data()), key.size())
+    , std::string_view(common::pointer_cast<char>(value.data()), value.size())
   );
 
   /* Strangely, zero is not allowed as a value length */

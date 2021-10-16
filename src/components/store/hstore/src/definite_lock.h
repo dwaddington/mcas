@@ -89,9 +89,6 @@ template <typename Table, typename Allocator>
 					d.unlock_exclusive();
 				}
 			}
-			catch ( const Exception & )
-			{
-			}
 			catch ( const std::exception & )
 			{
 			}

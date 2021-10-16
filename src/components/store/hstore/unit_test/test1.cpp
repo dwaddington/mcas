@@ -179,7 +179,7 @@ TEST_F(KVStore_test, RemoveOldPool)
     {
       _kvstore->delete_pool(pool_name());
     }
-    catch ( Exception & )
+    catch ( const std::exception & )
     {
     }
   }
@@ -291,7 +291,7 @@ TEST_F(KVStore_test, BasicGet1)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(single_value.size(), value_len);
     EXPECT_EQ(0, memcmp(single_value.data(), value, single_value.size()));
     _kvstore->free_memory(value);
@@ -481,7 +481,7 @@ TEST_F(KVStore_test, BasicGet2)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(single_value.size(), value_len);
     EXPECT_EQ(0, memcmp(single_value.data(), value, single_value.size()));
     _kvstore->free_memory(value);
@@ -503,7 +503,7 @@ TEST_F(KVStore_test, BasicReplaceSameSize)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(0, memcmp(single_value_updated_same_size.data(), value, single_value_updated_same_size.size()));
     _kvstore->free_memory(value);
   }
@@ -522,7 +522,7 @@ TEST_F(KVStore_test, BasicReplaceDifferentSize)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     EXPECT_EQ(0, memcmp(single_value_updated_different_size.data(), value, single_value_updated_different_size.size()));
     _kvstore->free_memory(value);
   }
@@ -691,7 +691,7 @@ TEST_F(KVStore_test, BasicGet3)
   EXPECT_EQ(S_OK, r);
   if ( S_OK == r )
   {
-    PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+    FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
     _kvstore->free_memory(value);
   }
 }
@@ -727,7 +727,7 @@ TEST_F(KVStore_test, BasicGetAttribute)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
       _kvstore->free_memory(value);
     }
   }
@@ -986,7 +986,7 @@ TEST_F(KVStore_test, Size2c)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("line %d Value=(%.*s) %zu", __LINE__, static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
       _kvstore->free_memory(value);
     }
   }
@@ -1013,7 +1013,7 @@ TEST_F(KVStore_test, BasicUpdate)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("line %d Value=(%.*s) %zu", __LINE__, static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("line {} Value=({}) {}", __LINE__, common::string_view(static_cast<char *>(value), value_len), value_len);
       _kvstore->free_memory(value);
     }
   }
@@ -1039,7 +1039,7 @@ TEST_F(KVStore_test, BasicUpdate)
     EXPECT_EQ(S_OK, r);
     if ( S_OK == r )
     {
-      PINF("Value=(%.*s) %zu", static_cast<int>(value_len), static_cast<char *>(value), value_len);
+      FINF("Value=({}) {}", common::string_view(static_cast<char *>(value), value_len), value_len);
       EXPECT_EQ(single_value_updated_different_size.size(), value_len);
       EXPECT_EQ(0, memcmp(single_value_updated3.data(), value, single_value_updated3.size()));
       _kvstore->free_memory(value);
@@ -1281,7 +1281,7 @@ TEST_F(KVStore_test, Timestamps)
 			) -> bool
 			{
 				++key_count;
-				PLOG("Timestamped record: %.*s @ %lu", int(key_len), static_cast<const char *>(key), timestamp.raw());
+				FLOG("Timestamped record: {} @ {}", common::string_view(static_cast<const char *>(key), key_len), timestamp.raw());
 				return true;
 			}
 			, 0
@@ -1307,8 +1307,9 @@ TEST_F(KVStore_test, Timestamps)
 			) -> bool
 			{
 				++key_count;
-				PLOG("After %u Timestamped record: %.*s @ %s", wait
-					, int(key_len), static_cast<const char *>(key), common::to_string(timestamp).c_str()
+				FLOG("After {} Timestamped record: {} @ {}", wait
+					, common::string_view(static_cast<const char *>(key), key_len)
+                    , common::to_string(timestamp)
 				);
 				return true;
 			}
@@ -1349,8 +1350,8 @@ TEST_F(KVStore_test, Timestamps)
 			) -> bool
 			{
 				++key_count;
-				PLOG("Before swaps record: %.*s @ %s"
-					, int(key_len), static_cast<const char *>(key), common::to_string(timestamp).c_str()
+				FLOG("Before swaps record: {} @ {}"
+					, common::string_view(static_cast<const char *>(key), key_len), common::to_string(timestamp)
 				);
 				return true;
 			}
@@ -1372,8 +1373,8 @@ TEST_F(KVStore_test, Timestamps)
 			) -> bool
 			{
 				++key_count;
-				PLOG("During swaps record: %.*s @ %s"
-					, int(key_len), static_cast<const char *>(key), common::to_string(timestamp).c_str()
+				FLOG("During swaps record: {} @ {}"
+					, common::string_view(static_cast<const char *>(key), key_len), common::to_string(timestamp)
 				);
 				return true;
 			}
@@ -1395,8 +1396,8 @@ TEST_F(KVStore_test, Timestamps)
 			) -> bool
 			{
 				++key_count;
-				PLOG("After swaps record: %.*s @ %s"
-					, int(key_len), static_cast<const char *>(key), common::to_string(timestamp).c_str()
+				FLOG("After swaps record: {} @ {}"
+					, common::string_view(static_cast<const char *>(key), key_len), common::to_string(timestamp)
 				);
 				return true;
 			}
@@ -1439,9 +1440,9 @@ TEST_F(KVStore_test, Iterator)
       , const size_t value_len
     ) -> int
     {
-      PINF("key:(%p %.*s) value(%.*s)"
-        , key, int(key_len), static_cast<const char *>(key), int(value_len),
-        static_cast<const char *>(value)
+      FINF("key:({}) value({})"
+        , common::string_view(static_cast<const char *>(key), key_len)
+        , common::string_view(static_cast<const char *>(value), value_len)
       );
       return 0;
     }
@@ -1455,9 +1456,9 @@ TEST_F(KVStore_test, Iterator)
 
   auto iter = _kvstore->open_pool_iterator(pool);
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, 0, ref, time_match, true)) == S_OK) {
-    PLOG("iterator: key(%.*s) value(%.*s) %lu",
-         int(ref.key_len), static_cast<const char *>(ref.key),
-         int(ref.value_len), static_cast<const char *>(ref.value),
+    FLOG("iterator: key({}) value({}) %lu",
+         common::string_view(static_cast<const char *>(ref.key), ref.key_len),
+         common::string_view(static_cast<const char *>(ref.value), ref.value_len),
          ref.timestamp.seconds());
   }
   _kvstore->close_pool_iterator(pool, iter);
@@ -1466,9 +1467,9 @@ TEST_F(KVStore_test, Iterator)
   iter = _kvstore->open_pool_iterator(pool);
   ASSERT_LT(0, now.seconds());
   while((rc = _kvstore->deref_pool_iterator(pool, iter, 0, now, ref, time_match, true)) == S_OK) {
-    PLOG("(time-constrained) iterator: key(%.*s) value(%.*s) %lu (match=%s)",
-         int(ref.key_len), static_cast<const char *>(ref.key),
-         int(ref.value_len), static_cast<const char *>(ref.value),
+    FLOG("(time-constrained) iterator: key({}) value({}) {} (match={})",
+         common::string_view(static_cast<const char *>(ref.key), ref.key_len),
+         common::string_view(static_cast<const char *>(ref.value), ref.value_len),
          ref.timestamp.seconds(),
          time_match ? "y":"n");
   }
@@ -1482,9 +1483,9 @@ TEST_F(KVStore_test, Iterator)
   iter = _kvstore->open_pool_iterator(pool);
   while ( (rc = _kvstore->deref_pool_iterator(pool, iter, 0, 0, ref, time_match, true)) == S_OK )
   {
-    PLOG("iterator: key(%.*s) value(%.*s) %lu",
-         int(ref.key_len), static_cast<const char *>(ref.key),
-         int(ref.value_len), static_cast<const char *>(ref.value),
+    FLOG("iterator: key({}) value({}) {}",
+         common::string_view(static_cast<const char *>(ref.key), ref.key_len),
+         common::string_view(static_cast<const char *>(ref.value), ref.value_len),
          ref.timestamp.seconds());
     ++i;
     if ( i == 5 ) {
@@ -1524,8 +1525,8 @@ TEST_F(KVStore_test, KeySwap)
   ::iovec new_right{}; /* ERROR: uninitialized in map_store test */
   _kvstore->get(pool, right_key, new_right.iov_base, new_right.iov_len);
 
-  PLOG("left: %.*s", int(new_left.iov_len), static_cast<const char *>(new_left.iov_base));
-  PLOG("right: %.*s", int(new_right.iov_len), static_cast<const char *>(new_right.iov_base));
+  FLOG("left: {}", common::string_view(static_cast<const char *>(new_left.iov_base), new_left.iov_len));
+  FLOG("right: {}", common::string_view(static_cast<const char *>(new_right.iov_base), new_right.iov_len));
   ASSERT_EQ(0, strncmp(static_cast<const char *>(new_left.iov_base), right_value.c_str(), new_left.iov_len));
   ASSERT_EQ(0, strncmp(static_cast<const char *>(new_right.iov_base), left_value.c_str(), new_right.iov_len));
   _kvstore->free_memory(new_left.iov_base);

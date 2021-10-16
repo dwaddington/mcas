@@ -239,7 +239,7 @@ TEST_F(KVStore_test, RemoveOldPool)
       {
         _kvstore->delete_pool(pool_name(i));
       }
-      catch ( Exception & )
+      catch ( const std::exception & )
       {
       }
     }
