@@ -420,27 +420,27 @@ static inline auto vg_thread_id()
 # if defined DRD_GET_VALGRIND_THREADID
 /* valgrind thread id, C++ thread id */
 #  define ELOG_PFX_FMT "<{} {:x}> "
-#  define ELOG_PFX_ARGS vg_thread_id(), std::this_thread::get_id(),
+#  define ELOG_PFX_ARGS vg_thread_id(), std::this_thread::get_id()
 # else
 /* C++ thread id */
 #  define ELOG_PFX_FMT "<{:x}> "
-#  define ELOG_PFX_ARGS std::this_thread::get_id(),
+#  define ELOG_PFX_ARGS std::this_thread::get_id()
 # endif
 #else
 /* no thread id */
-# define ELOG_PFX_FMT ""
-# define ELOG_PFX_ARGS
+# define ELOG_PFX_FMT "{}"
+# define ELOG_PFX_ARGS ""
 #endif
 /* function name */
 #define FLOG_FMT ELOG_PFX_FMT "{} "
-#define FLOG_ARGS ELOG_PFX_ARGS __func__
+#define FLOG_ARGS ELOG_PFX_ARGS, __func__
 #define FDBG(fmt, ...) EPRINT(PDBG, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
 #define FLOG(fmt, ...) EPRINT(PLOG, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
 #define FINF(fmt, ...) EPRINT(PINF, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
 #define FWRN(fmt, ...) EPRINT(PWRN, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
 #define FERR(fmt, ...) EPRINT(PERR, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
 /* ELOG macro: less than FLOG macro. Does not include the function name. */
-#define ELOG(fmt, ...) EPRINT(PLOG, ELOG_PFX_FMT fmt, ELOG_PFX_ARGS ##__VA_ARGS__)
+#define ELOG(fmt, ...) EPRINT(PLOG, ELOG_PFX_FMT fmt, ELOG_PFX_ARGS, ##__VA_ARGS__)
 #define CELOG(level, fmt, ...)
 /* conditional (by debug_level()) messages */
 #define ECOND(level, mac, fmt, ...) ( (level) < this->debug_level() && (mac(fmt, ##__VA_ARGS__), true) )
@@ -452,7 +452,7 @@ static inline auto vg_thread_id()
  */
 /* object address, class name, function name */
 #define FLOGM_FMT ELOG_PFX_FMT "({}) {}::{} "
-#define FLOGM_ARGS ELOG_PFX_ARGS this, type_of(*this), __func__
+#define FLOGM_ARGS ELOG_PFX_ARGS, this, type_of(*this), __func__
 #define FDBGM(fmt, ...) EPRINT(PDBG, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
 #define FLOGM(fmt, ...) EPRINT(PLOG, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
 #define FINFM(fmt, ...) EPRINT(PINF, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
