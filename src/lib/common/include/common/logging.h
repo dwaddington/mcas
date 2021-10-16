@@ -395,21 +395,15 @@ namespace
 		}
 }
 
+using pr_fn = void (*)(const char * format, ...);
+
 /* Simple support for logging similar to std::format */
 template <typename ... Args>
-	void FLOG(common::string_view fmt, Args && ... args)
+	void EPRINT(pr_fn pr, common::string_view fmt, Args && ... args)
 	{
 		std::ostringstream os;
 		faccrete(os, fmt, std::forward<Args>(args) ...);
-		PLOG("%s", os.str().c_str());
-	}
-
-template <typename ... Args>
-	void FERR(common::string_view fmt, Args && ... args)
-	{
-		std::ostringstream os;
-		faccrete(os, fmt, std::forward<Args>(args) ...);
-		PERR("%s", os.str().c_str());
+		pr("%s", os.str().c_str());
 	}
 
 #if defined DRD_GET_VALGRIND_THREADID
@@ -423,28 +417,49 @@ static inline auto vg_thread_id()
 #endif
 
 #if LOG_PRINT_TIMESTAMP
-#if defined DRD_GET_VALGRIND_THREADID
-#define ELOG_PFX_FMT "<{} {:x}> "
-#define ELOG_PFX_ARGS vg_thread_id(), std::this_thread::get_id(),
+# if defined DRD_GET_VALGRIND_THREADID
+/* valgrind thread id, C++ thread id */
+#  define ELOG_PFX_FMT "<{} {:x}> "
+#  define ELOG_PFX_ARGS vg_thread_id(), std::this_thread::get_id(),
+# else
+/* C++ thread id */
+#  define ELOG_PFX_FMT "<{:x}> "
+#  define ELOG_PFX_ARGS std::this_thread::get_id(),
+# endif
 #else
-#define ELOG_PFX_FMT "<{:x}> "
-#define ELOG_PFX_ARGS std::this_thread::get_id(),
+/* no thread id */
+# define ELOG_PFX_FMT ""
+# define ELOG_PFX_ARGS
 #endif
-#else
-#define ELOG_PFX_FMT "{}",
-#define ELOG_PFX_ARGS "",
-#endif
-#define FLOG(fmt, ...) (FLOG)(ELOG_PFX_FMT "{} " fmt, ELOG_PFX_ARGS __func__, __VA_ARGS__)
-/* ELOG macro: less than FLOG macro. Do not include the function name */
-#define ELOG(fmt, ...) (FLOG)(ELOG_PFX_FMT fmt, ELOG_PFX_ARGS __VA_ARGS__)
-#define FERR(fmt, ...) (FERR)("{} " fmt, __func__, __VA_ARGS__)
-#define CFLOG(level, ...) ( (level) < this->debug_level() && (FLOG(__VA_ARGS__), true) )
-/* [C]FLOG preceded by class name. Code which sees the error "'this' is unavailable" should use [C]FLOG instead. */
-#define FLOGM_FMT "({}) {}::{} "
-#define FLOGM_ARGS this, type_of(*this), __func__
-#define FLOGM(fmt, ...) (FLOG)(ELOG_PFX_FMT FLOGM_FMT fmt, ELOG_PFX_ARGS FLOGM_ARGS, __VA_ARGS__)
-#define FERRM(fmt, ...) FERR("{}::{} " fmt, type_of(*this), __func__, __VA_ARGS__)
-#define CFLOGM(level, fmt, ...) CFLOG((level), "LEVEL {} " ELOG_PFX_FMT FLOGM_FMT fmt, (level), ELOG_PFX_ARGS FLOGM_ARGS, __VA_ARGS__)
+/* function name */
+#define FLOG_FMT ELOG_PFX_FMT "{} "
+#define FLOG_ARGS ELOG_PFX_ARGS __func__
+#define FDBG(fmt, ...) EPRINT(PDBG, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
+#define FLOG(fmt, ...) EPRINT(PLOG, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
+#define FINF(fmt, ...) EPRINT(PINF, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
+#define FWRN(fmt, ...) EPRINT(PWRN, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
+#define FERR(fmt, ...) EPRINT(PERR, FLOG_FMT fmt, FLOG_ARGS, ##__VA_ARGS__)
+/* ELOG macro: less than FLOG macro. Does not include the function name. */
+#define ELOG(fmt, ...) EPRINT(PLOG, ELOG_PFX_FMT fmt, ELOG_PFX_ARGS ##__VA_ARGS__)
+#define CELOG(level, fmt, ...)
+/* conditional (by debug_level()) messages */
+#define ECOND(level, mac, fmt, ...) ( (level) < this->debug_level() && (mac(fmt, ##__VA_ARGS__), true) )
+#define CFLOG(level, fmt, ...) ECOND((level), FLOG, fmt, ##__VA_ARGS__)
+#define CFWRN(level, fmt, ...) ECOND((level), FWRN, fmt, ##__VA_ARGS__)
+/*
+ * Messages with a class name. Code in which 'this' is unavailable (non-member
+ * functions, static member functions) should use [C]FLOG instead.
+ */
+/* object address, class name, function name */
+#define FLOGM_FMT ELOG_PFX_FMT "({}) {}::{} "
+#define FLOGM_ARGS ELOG_PFX_ARGS this, type_of(*this), __func__
+#define FDBGM(fmt, ...) EPRINT(PDBG, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
+#define FLOGM(fmt, ...) EPRINT(PLOG, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
+#define FINFM(fmt, ...) EPRINT(PINF, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
+#define FWRNM(fmt, ...) EPRINT(PWRN, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
+#define FERRM(fmt, ...) EPRINT(PERR, FLOGM_FMT fmt, FLOGM_ARGS, ##__VA_ARGS__)
+#define CFLOGM(level, fmt, ...) ECOND((level), FLOGM, fmt, ##__VA_ARGS__)
+#define CFWRNM(level, fmt, ...) ECOND((level), FWRNM, fmt, ##__VA_ARGS__)
 #endif
 
 // clang-format on
