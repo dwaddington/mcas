@@ -17,7 +17,7 @@ private:
 	unsigned _line;
 	void write(common::string_view id_) const
 	{
-		FLOG("FABRIC {} {} {}:{}", id_, _func, _file, _line);
+		ELOG("{} {} {}:{}", id_, _func, _file, _line);
 	}
 public:
 	enter_exit_trace(common::string_view func_, common::string_view file_, unsigned line_)
@@ -25,15 +25,19 @@ public:
 		, _file(file_)
 		, _line(line_)
 	{
-		write("begin");
+		write(">");
 	}
 	~enter_exit_trace()
 	{
-		write("end");
+		write("<");
 	}
 };
 
 #define ENTER_EXIT_TRACE_N /* suppressed because too frequest */
 #define ENTER_EXIT_TRACE0 /* suppressed because duplicative */
+#if 0
 #define ENTER_EXIT_TRACE1 enter_exit_trace x0(__func__, __FILE__, __LINE__);
+#else
+#define ENTER_EXIT_TRACE1 /* suppressed because not currently needed */
+#endif
 #endif
