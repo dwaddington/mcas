@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2020] [IBM Corporation]
+  Copyright [2017-2021] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -10,6 +10,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
+
+#include "map_store.h"
+
 #include <api/kvstore_itf.h>
 #include <city.h>
 #include <common/exceptions.h>
@@ -21,6 +24,7 @@
 #include <common/memory.h>
 #include <common/str_utils.h>
 #include <fcntl.h>
+#include <gsl/pointers>
 #include <nupm/region_descriptor.h>
 #include <stdio.h>
 #include <time.h>
@@ -34,8 +38,6 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <chrono>  // seconds
-#include <thread> // sleep_for
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
@@ -46,7 +48,6 @@
 #define MIN_POOL (1ULL << DM_REGION_LOG_GRAIN_SIZE)
 
 #include "mm_plugin_itf.h"
-#include "map_store.h"
 
 using namespace component;
 using namespace common;
@@ -105,19 +106,19 @@ int init_map_lock_mask()
 const int effective_map_locked = init_map_lock_mask();
 }
 
-/** 
+/**
  * Pool instance class
- * 
+ *
  */
 class Pool_instance {
 
 private:
-  
+
   unsigned debug_level() const { return _debug_level; }
 
   void * allocate_region_memory(size_t size, const string_view pool_name);
   void free_region_memory(void *addr, const size_t size);
-  
+
   static const Pool_instance *checked_pool(const Pool_instance * pool)
   {
     if ( pool == nullptr )
@@ -165,22 +166,22 @@ public:
   {
     /* use a pointer so we can make sure it gets stored before memory is freed */
     _map = new map_t({(_mm_plugin.add_managed_region(_regions[0].iov_base, _nsize), aam_t(_mm_plugin))});
-    CPLOG(1, PREFIX "new pool instance");
+    CFLOGM(1, "new pool instance");
   }
 
   ~Pool_instance()
   {
     if(_ref_count == 0) {
-      CPLOG(1, PREFIX "freeing regions for pool (%s)", _name.c_str());
+      CFLOGM(1, "freeing regions for pool ({})", _name);
 
       /* destroy map before we release memory */
       delete _map;
-      
+
       /* release memory */
       for(auto r : _regions) {
         free_region_memory(r.iov_base, r.iov_len);
       }
-      CPLOG(2, PREFIX "all regions freed");
+      CFLOGM(2, "all regions freed");
       _regions.clear();
 
       syncfs(_fdout);
@@ -197,15 +198,15 @@ public:
     std::lock_guard<std::mutex> g(_ref_mutex);
     assert(_ref_count > 0);
     return --_ref_count;
-  }      
+  }
 
   const std::string& name() const { return _name; }
-  
+
 private:
-  
+
   unsigned                   _debug_level;
   std::mutex                 _ref_mutex;
-  unsigned                   _ref_count = 0; 
+  unsigned                   _ref_count = 0;
   size_t                     _nsize; /*< order important */
   std::string                _name; /*< pool name */
   std::vector<::iovec>       _regions; /*< regions supporting pool */
@@ -299,18 +300,16 @@ public:
 };
 
 struct Pool_session {
-  Pool_session(Pool_instance *ph) : pool(ph) {
-    auto n = pool->add_ref();
-    FLOG("thread {:x} session {} add pool {}, was {} refs", std::this_thread::get_id(), this, pool, n);
+  Pool_session(gsl::not_null<Pool_instance *> ph) : pool(ph) {
+    pool->add_ref();
   }
 
   ~Pool_session() {
-    auto n = pool->release_ref();
-    FLOG("thread {:x} session {} releases pool {}, now {} refs", std::this_thread::get_id(), this, pool, n);
+    pool->release_ref();
   }
-  
+
   bool check() const { return canary == 0x45450101; }
-  Pool_instance * pool;
+  gsl::not_null<Pool_instance *> pool;
   const unsigned canary = 0x45450101;
 };
 
@@ -318,27 +317,39 @@ struct tls_cache_t {
   Pool_session *session;
 };
 
-std::mutex                                       _pool_sessions_lock;
-std::set<Pool_session *>                         _pool_sessions;
+std::mutex _pool_sessions_lock; /* guards both _pool_sessions and _pools */
+/* ERROR?: should Pool_sessions really shared across Map_store instances? */
 using pools_type = std::unordered_map<std::string, std::unique_ptr<Pool_instance>>;
 pools_type _pools; /*< existing pools */
+std::set<std::unique_ptr<Pool_session>> _pool_sessions;
+
 static __thread tls_cache_t tls_cache = {nullptr};
 
 using Std_lock_guard = std::lock_guard<std::mutex>;
 
+std::set<std::unique_ptr<Pool_session>>::iterator find_session(Pool_session *session)
+{
+  return
+    std::find_if(
+      _pool_sessions.begin(), _pool_sessions.end()
+      , [session] (const std::unique_ptr<Pool_session> &i) { return i.get() == session; }
+    );
+}
+
 Pool_session *get_session(const IKVStore::pool_t pid)
 {
   auto session = reinterpret_cast<Pool_session *>(pid);
+  assert(session);
 
   if (session != tls_cache.session) {
     Std_lock_guard g(_pool_sessions_lock);
 
-    if (_pool_sessions.count(session) == 0) return nullptr;
+    auto it = find_session(session);
+    if (it == _pool_sessions.end()) return nullptr;
 
     tls_cache.session = session;
   }
 
-  assert(session);
   return session;
 }
 
@@ -388,7 +399,7 @@ status_t Pool_instance::put(string_view_key key,
       auto p_to_free = p._ptr;
       auto len_to_free = p._length;
 
-      CPLOG(3, PREFIX "allocating %lu bytes alignment %lu", value_len, choose_alignment(value_len));
+      CFLOGM(3, "allocating {} bytes alignment {}", value_len, choose_alignment(value_len));
 
       if(_mm_plugin.aligned_allocate(value_len, choose_alignment(value_len),&p._ptr) != S_OK)
         throw General_exception("plugin aligned_allocate failed");
@@ -412,7 +423,7 @@ status_t Pool_instance::put(string_view_key key,
   }
   else { /* key does not already exist */
 
-    CPLOG(3, PREFIX "allocating %lu bytes alignment %lu", value_len, choose_alignment(value_len));
+    CFLOGM(3, "allocating {} bytes alignment {}", value_len, choose_alignment(value_len));
 
     void * buffer = nullptr;
     if(_mm_plugin.aligned_allocate(value_len, choose_alignment(value_len), &buffer) != S_OK)
@@ -433,7 +444,8 @@ status_t Pool_instance::get(const string_view_key key,
                             void *&out_value,
                             size_t &out_value_len)
 {
-  CPLOG(1, PREFIX "get(%.*s,%p,%lu)", int(key.size()), common::pointer_cast<char>(key.data()), out_value, out_value_len);
+  common::string_view key_svc(common::pointer_cast<char>(key.data()), key.size());
+  CFLOGM(1, "get({},{},{})", key_svc, out_value, out_value_len);
 
 #ifndef SINGLE_THREADED
   RWLock_guard guard(map_lock);
@@ -453,8 +465,8 @@ status_t Pool_instance::get(const string_view_key key,
     PWRN("Map_store: malloc failed");
     return IKVStore::E_TOO_LARGE;
   }
-  
-  memcpy(out_value, i->second._ptr, i->second._length);  
+
+  memcpy(out_value, i->second._ptr, i->second._length);
   return S_OK;
 }
 
@@ -462,7 +474,8 @@ status_t Pool_instance::get_direct(const string_view_key key,
                                    void *out_value,
                                    size_t &out_value_len)
 {
-  CPLOG(1, "Map_store GET: key=(%.*s) ", int(key.size()), common::pointer_cast<char>(key.data()));
+  common::string_view key_svc(common::pointer_cast<char>(key.data()), key.size());
+  CFLOGM(1, " key=({}) ", key_svc);
 
   if (out_value == nullptr || out_value_len == 0)
     throw API_exception("invalid parameter");
@@ -587,10 +600,11 @@ status_t Pool_instance::lock(const string_view_key key,
   std::lock_guard g{_mm_plugin_mutex}; /* aac, and later _mm_plugin.aligned_allocate, aal */
   string_t k(key.data(), key.size(), aac);
   bool created = false;
+  common::string_view key_svc(common::pointer_cast<char>(key.data()), key.size());
 
   auto i = _map->find(k);
 
-  CPLOG(1, PREFIX "lock looking for key:(%.*s)", int(key.size()), common::pointer_cast<char>(key.data()));
+  CFLOGM(1, "lock looking for key:({})", key_svc);
 
   if (i == _map->end()) { /* create value */
 
@@ -599,17 +613,16 @@ status_t Pool_instance::lock(const string_view_key key,
     /* lock API has semantics of create on demand */
     if (inout_value_len == 0) {
       out_key = IKVStore::KEY_NONE;
-      CPLOG(1, PREFIX "could not on-demand allocate without length:(%.*s) %lu",
-            int(key.size()), common::pointer_cast<char>(key.data()), inout_value_len);
+      CFLOGM(1, "could not on-demand allocate without length:({}) {}", key_svc, inout_value_len);
       return IKVStore::E_KEY_NOT_FOUND;
     }
 
 
-    CPLOG(1, PREFIX "lock is on-demand allocating:(%.*s) %lu", int(key.size()), common::pointer_cast<char>(key.data()), inout_value_len);
+    CFLOGM(1, "is on-demand allocating:({}) {}", key_svc, inout_value_len);
 
     if(alignment == 0)
       alignment = choose_alignment(inout_value_len);
-    
+
     if(_mm_plugin.aligned_allocate(inout_value_len, alignment, &buffer) != S_OK)
       throw General_exception("memory plugin alloc failed");
 
@@ -618,22 +631,21 @@ status_t Pool_instance::lock(const string_view_key key,
                               inout_value_len);
     created = true;
 
-    CPLOG(1, PREFIX "creating on demand key=(%.*s) len=%lu",
-          int(key.size()), common::pointer_cast<char>(key.data()),
-          inout_value_len);
+    CFLOGM(1, "creating on demand key=({}) len={}",
+          key_svc, inout_value_len);
 
     common::RWLock * p = new (aal.allocate(1)) common::RWLock();
 
-    CPLOG(2, PREFIX "created RWLock at %p", reinterpret_cast<void*>(p));
+    CFLOGM(2, "created RWLock at {}", p);
     _map->emplace(k, Value_type{buffer, inout_value_len, p});
   }
 
-  CPLOG(1, PREFIX "lock call has got key");
+  CFLOGM(1, "lock call has got key");
 
   if (type == IKVStore::STORE_LOCK_READ) {
     if((*_map)[k]._value_lock->read_trylock() != 0) {
       if(debug_level())
-        PWRN(PREFIX "key (%.*s) unable to take read lock", int(key.size()), common::pointer_cast<char>(key.data()));
+        FWRNM("key ({}) unable to take read lock", key_svc);
 
       out_key = IKVStore::KEY_NONE;
       return E_LOCKED;
@@ -645,7 +657,7 @@ status_t Pool_instance::lock(const string_view_key key,
 
     if((*_map)[k]._value_lock->write_trylock() != 0) {
       if(debug_level())
-        PWRN("Map_store: key (%.*s) unable to take write lock", int(key.size()), common::pointer_cast<char>(key.data()));
+        FWRNM("Map_store: key ({}) unable to take write lock", key_svc);
 
       out_key = IKVStore::KEY_NONE;
       return E_LOCKED;
@@ -694,12 +706,13 @@ status_t Pool_instance::unlock(IKVStore::key_t key_handle)
     return E_INVAL;
   }
 
-  CPLOG(2, PREFIX "unlocked key (handle=%p)", reinterpret_cast<void*>(key_handle));
+  CFLOGM(2, "unlocked key (handle={})", key_handle);
   return S_OK;
 }
 
 status_t Pool_instance::erase(const string_view_key key)
 {
+  const common::string_view key_svc(common::pointer_cast<char>(key.data()), key.size());
 #ifndef SINGLE_THREADED
   RWLock_guard guard(map_lock, RWLock_guard::WRITE);
 #endif
@@ -711,7 +724,7 @@ status_t Pool_instance::erase(const string_view_key key)
 
   if ( i->second._value_lock->write_trylock() != 0 ) { /* check pair is not locked */
     if(debug_level())
-      PWRN("Map_store: key (%.*s) unable to take write lock", int(key.size()), common::pointer_cast<char>(key.data()));
+      FWRNM("key ({}) unable to take write lock", key_svc);
 
     return E_LOCKED;
   }
@@ -793,9 +806,10 @@ status_t Pool_instance::resize_value(const string_view_key key,
                                      const size_t new_size,
                                      const size_t alignment)
 {
+  const common::string_view key_svc(common::pointer_cast<char>(key.data()), key.size());
 
-  CPLOG(1, PREFIX "resize_value (key=%.*s, new_size=%lu, align=%lu",
-        int(key.size()), common::pointer_cast<char>(key.data()), new_size, alignment);
+  CFLOGM(1, "resize_value (key={}, new_size={}, align={}",
+        key_svc, new_size, alignment);
 
   if (new_size == 0) return E_INVAL;
 
@@ -808,7 +822,7 @@ status_t Pool_instance::resize_value(const string_view_key key,
 
   if (i == _map->end()) return IKVStore::E_KEY_NOT_FOUND;
   if (i->second._length == new_size) {
-    CPLOG(2, PREFIX "resize_value request for same size!");
+    CFLOGM(2, "resize_value request for same size!");
     return E_INVAL;
   }
 
@@ -833,11 +847,11 @@ status_t Pool_instance::resize_value(const string_view_key key,
                     nullptr);
 
   if (out_key_handle == IKVStore::KEY_NONE) {
-    CPLOG(2, PREFIX "bad lock result");
+    CFLOGM(2, "bad lock result");
     return E_INVAL;
   }
 
-  CPLOG(2, PREFIX "resize_value locked key-value pair");
+  CFLOGM(2, "resize_value locked key-value pair");
 
   size_t size_to_copy = std::min<size_t>(new_size, boost::numeric_cast<size_t>(i->second._length));
 
@@ -853,7 +867,7 @@ status_t Pool_instance::resize_value(const string_view_key key,
   if(unlock(out_key_handle) != S_OK)
     throw General_exception("unlock in resize failed");
 
-  CPLOG(2, PREFIX "resize_value re-unlocked key-value pair");
+  CFLOGM(2, "resize_value re-unlocked key-value pair");
   return s;
 }
 
@@ -918,7 +932,7 @@ status_t Pool_instance::allocate_pool_memory(const size_t size,
                                     alignment : choose_alignment(size), &out_addr) != S_OK)
       throw General_exception("memory plugin aligned_allocate failed");
 
-    CPLOG(1, PREFIX "allocated pool memory (%p %lu)", out_addr, size);
+    CFLOGM(1, "allocated pool memory ({} {})", out_addr, size);
   }
   catch(...) {
     PWRN("Map_store: unable to allocate (%lu) bytes aligned by %lu", size, choose_alignment(size));
@@ -991,7 +1005,7 @@ void * Pool_instance::allocate_region_memory(size_t size, const string_view pool
 
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   assert(size % PAGE_SIZE == 0);
-  
+
   if(backing_store_dir) {
     struct stat st;
     if(stat(backing_store_dir,&st) == 0) {
@@ -1010,7 +1024,7 @@ void * Pool_instance::allocate_region_memory(size_t size, const string_view pool
                      _fdout, /* file */
                      0 /* offset */);
             if(p)
-              PINF("[Mapstore] using mmap'ed backing file (%s) (%lu MiB)", filename.c_str(), REDUCE_MB(size));
+              FINF("using mmap'ed backing file ({}) ({} MiB)", filename, REDUCE_MB(size));
           }
         }
       }
@@ -1033,17 +1047,17 @@ void * Pool_instance::allocate_region_memory(size_t size, const string_view pool
       throw General_exception("%s", msg.str().c_str());
     }
   }
-  
+
   //  if(madvise(p, size, MADV_DONTFORK) != 0)
   //    throw General_exception("madvise 'don't fork' failed unexpectedly (%p %lu)", p, size);
 
-  CPLOG(1, PREFIX "allocated_region_memory (%p,%lu)", p, size);
+  CFLOGM(1, "allocated_region_memory ({},{})", p, size);
   return p;
 }
 
 void Pool_instance::free_region_memory(void *addr, const size_t size)
 {
-  CPLOG(1, PREFIX "freeing region memory (%p %lu)", addr, size);
+  CFLOGM(1, "freeing region memory ({},{})", addr, size);
   if(::munmap(addr, size))
     throw Logic_exception("munmap of region memory failed");
 }
@@ -1059,17 +1073,10 @@ Map_store::Map_store(const unsigned debug_level,
   : _debug_level(debug_level),
     _mm_plugin_path(mm_plugin_path)
 {
-  CPLOG(1, PREFIX "mm_plugin_path (%.*s)", int(mm_plugin_path.size()), mm_plugin_path.data());
+  CFLOGM(1, "mm_plugin_path ({})", mm_plugin_path);
 }
 
 Map_store::~Map_store() {
-  Std_lock_guard g(_pool_sessions_lock);
-
-  for(auto& s : _pool_sessions)
-  {
-    delete s;
-  }
-  CPLOG(1, "~Map_store");
 }
 
 IKVStore::pool_t Map_store::create_pool(const common::string_view name_,
@@ -1084,38 +1091,30 @@ IKVStore::pool_t Map_store::create_pool(const common::string_view name_,
 
   const std::string name(name_);
 
-  Pool_session * session;
-  {
-    Std_lock_guard g(_pool_sessions_lock);
+  Std_lock_guard g(_pool_sessions_lock);
 
-    auto iter = _pools.find(name);
+  auto iter = _pools.find(name);
 
-    if (flags & IKVStore::FLAGS_CREATE_ONLY) {
-      if (iter != _pools.end()) {
-        return POOL_ERROR;
-      }
+  if (flags & IKVStore::FLAGS_CREATE_ONLY) {
+    if (iter != _pools.end()) {
+      return POOL_ERROR;
     }
-
-    Pool_instance * handle;
-    if(iter != _pools.end()) {
-      handle = iter->second.get();
-      CPLOG(1, PREFIX "using existing pool instance");
-    }
-    else {
-      handle = _pools.insert(pools_type::value_type(name, std::make_unique<Pool_instance>(debug_level(), _mm_plugin_path, name, nsize, flags))).first->second.get();
-      CPLOG(1, PREFIX "creating new pool instance");
-    }
-
-    session = new Pool_session{handle};
-
-    CPLOG(1, PREFIX "adding new session (%p)", common::p_fmt(session));
-
-    _pool_sessions.insert(session); /* create a session too */
   }
 
-  CPLOG(1, PREFIX "created pool OK: %.*s", int(name.size()), name.data());
+  Pool_instance * handle;
+  if(iter != _pools.end()) {
+    handle = iter->second.get();
+    CFLOGM(1, "using existing pool instance");
+  }
+  else {
+    handle = _pools.insert(pools_type::value_type(name, std::make_unique<Pool_instance>(debug_level(), _mm_plugin_path, name, nsize, flags))).first->second.get();
+    CFLOGM(1, "creating new pool instance");
+  }
+  auto session = _pool_sessions.emplace(new Pool_session{handle}).first->get(); /* create a session too */
+  CFLOGM(1, "adding new session ({})", session);
 
-  assert(session);
+  CFLOGM(1, "created pool OK: {}", name);
+
   return reinterpret_cast<IKVStore::pool_t>(session);
 }
 
@@ -1137,34 +1136,33 @@ IKVStore::pool_t Map_store::open_pool(string_view name,
 
   if (ph == nullptr)
     return component::IKVStore::POOL_ERROR;
+  auto session = _pool_sessions.emplace(new Pool_session(ph)).first->get();
+  CFLOGM(1, "opened pool({})", session);
 
-  auto new_session = new Pool_session(ph);
-  CPLOG(1, PREFIX "opened pool(%p)", common::p_fmt(new_session));
-  _pool_sessions.insert(new_session);
-
-  return reinterpret_cast<IKVStore::pool_t>(new_session);
+  return reinterpret_cast<IKVStore::pool_t>(session);
 }
 
 status_t Map_store::close_pool(const pool_t pid)
 {
-  CPLOG(1, PREFIX "close_pool (%p)", reinterpret_cast<const void *>(pid));
+  auto session = reinterpret_cast<Pool_session *>(pid);
+  CFLOGM(1, "close_pool ({})", session);
 
-  auto session = get_session(pid);
-  if (debug_level() && !session) PWRN(PREFIX "close pool on invalid handle");
-  if (!session) return IKVStore::E_POOL_NOT_FOUND;
+  Std_lock_guard g(_pool_sessions_lock);
+  auto it = find_session(session);
+  if ( debug_level() && it == _pool_sessions.end() ) FWRNM("close pool on invalid handle");
+  if ( it == _pool_sessions.end() ) return IKVStore::E_POOL_NOT_FOUND;
 
   tls_cache.session = nullptr;
-  Std_lock_guard g(_pool_sessions_lock);
-  delete session;
-  _pool_sessions.erase(session);
-  CPLOG(1, PREFIX "closed pool (%lx)", pid);
-  CPLOG(1, PREFIX "erased sescsion %p", common::p_fmt(session));
+
+  _pool_sessions.erase(it);
+  CFLOGM(1, "closed pool ({})", pid);
+  CFLOGM(1, "erased session {}", session);
 
   return S_OK;
 }
 
 status_t Map_store::delete_pool(const common::string_view poolname_)
-{ 
+{
   Std_lock_guard g(_pool_sessions_lock);
 
   const std::string poolname(poolname_);
@@ -1179,15 +1177,15 @@ status_t Map_store::delete_pool(const common::string_view poolname_)
   }
 
   if (ph == nullptr) {
-    CPWRN(1, PREFIX "delete_pool (%s) pool not found", poolname.c_str());
+    CFWRNM(1, "({}) pool not found", poolname);
     return E_POOL_NOT_FOUND;
   }
 
   for (auto &s : _pool_sessions) {
     if (s->pool->name() == poolname) {
-      PWRN(PREFIX "delete_pool (%s) pool delete failed because pool still "
-           "open (%p)",
-           poolname.c_str(), common::p_fmt(s));
+      FWRNM("({}) pool delete failed because pool still "
+           "open ({})",
+           poolname, common::p_fmt(s.get()));
       return E_ALREADY_OPEN;
     }
   }
@@ -1198,7 +1196,7 @@ status_t Map_store::delete_pool(const common::string_view poolname_)
 
   _pools.erase(poolname);
   delete ph;
-  
+
   return S_OK;
 }
 
@@ -1294,13 +1292,14 @@ status_t Map_store::lock(const pool_t pid,
   auto session = get_session(pid);
   if (!session) {
     out_key = IKVStore::KEY_NONE;
-    PWRN(PREFIX "lock invalid pool id (%lx)", pid);
+    FWRNM("invalid pool id ({})", pid);
     return E_FAIL; /* same as hstore, but should be E_INVAL; */
   }
 
   auto rc = session->pool->lock(key, type, out_value, inout_value_len, alignment, out_key, out_key_ptr);
 
-  CPLOG(1, PREFIX "lock(%.*s, %p) rc=%d", int(key.size()), common::pointer_cast<char>(key.data()), reinterpret_cast<void*>(out_key), rc);
+  const common::string_view key_svc(common::pointer_cast<char>(key.data()), key.size());
+  CFLOGM(1, "lock({}, {}) rc={}", key_svc, out_key, rc);
 
   return rc;
 }
@@ -1312,7 +1311,7 @@ status_t Map_store::unlock(const pool_t pid,
   auto session = get_session(pid);
   if (!session) return IKVStore::E_POOL_NOT_FOUND;
 
-  CPLOG(1, PREFIX "unlock (key-handle=%p)", reinterpret_cast<void*>(key_handle));
+  CFLOGM(1, "(key-handle={})", key_handle);
 
   session->pool->unlock(key_handle);
   return S_OK;
@@ -1475,6 +1474,57 @@ extern "C" void *factory_createInstance(component::uuid_t component_id) {
   else {
     return NULL;
   }
+}
+
+Map_store_factory::~Map_store_factory() {
+}
+  
+void *Map_store_factory::query_interface(component::uuid_t &itf_uuid)
+{
+  if (itf_uuid == component::IKVStore_factory::iid()) {
+    return static_cast<component::IKVStore_factory *>(this);
+  }
+  else return NULL;  // we don't support this interface
+}
+
+void Map_store_factory::unload() { delete this; }
+
+component::IKVStore *Map_store_factory::create(unsigned debug_level,
+                                    const IKVStore_factory::map_create &mc)
+{
+  auto owner_it = mc.find(+component::IKVStore_factory::k_owner);
+  auto name_it = mc.find(+component::IKVStore_factory::k_name);
+  auto mm_plugin_path_it = mc.find(+component::IKVStore_factory::k_mm_plugin_path);
+
+  std::string checked_mm_plugin_path;
+  if(mm_plugin_path_it == mc.end()) {
+    checked_mm_plugin_path = DEFAULT_MM_PLUGIN_PATH;
+  }
+  else {
+    std::string path = mm_plugin_path_it->second;
+
+    if(access(path.c_str(), F_OK) != 0) {
+      path = DEFAULT_MM_PLUGIN_LOCATION + path;
+      if(access(path.c_str(), F_OK) != 0) {
+        PERR("inaccessible plugin path (%s) and (%s)", mm_plugin_path_it->second.c_str(), path.c_str());
+        throw General_exception("unable to open mm_plugin");
+      }
+      checked_mm_plugin_path = path;
+    }
+    else {
+      checked_mm_plugin_path = path;
+    }
+  }
+  
+  component::IKVStore *obj =
+    static_cast<component::IKVStore *>
+    (new Map_store(debug_level,
+                   checked_mm_plugin_path,
+                   owner_it == mc.end() ? "owner" : owner_it->second,
+                   name_it == mc.end() ? "name" : name_it->second));
+  assert(obj);
+  obj->add_ref();
+  return obj;
 }
 
 #pragma GCC diagnostic pop
