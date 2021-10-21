@@ -370,10 +370,137 @@ void Shard::service_cluster_signals()
 #define LIVENESS_DURATION 10000
 #define LIVENESS_SHARDS 18
 
+auto Shard::service_handler(gsl::not_null<Connection_handler *> handler, common::profiler &pr_) -> handler_service_state
+{
+  handler_service_state t { false, false };
+  /* issue tick, unless we are stalling */
+  auto tick_response = handler->tick();
+
+  if(tick_response == mcas::Connection_handler::tick_type::TICK_RESPONSE_WAIT_SECURITY) {
+    /* first tick, complete initialization */
+    handler->configure_security(_security.ipaddr(),
+                                _security.port(),
+                                _security.cert_path(),
+                                _security.key_path());
+  }
+  /* Close session, this will occur if the client shuts down (cleanly or
+   * not). Also close sessions in response to SIGINT */
+  else if ((tick_response == mcas::Connection_handler::tick_type::TICK_RESPONSE_CLOSE) ||
+           (signals::sigint > 0)) {
+    t.progress = true;
+    /* close all open pools belonging to session  */
+    CPLOG(1, "Shard: forcing pool closures");
+
+    /* iterate open pool handles, close them and associated ADO processes
+     */
+    auto& pool_set = handler->pool_manager().open_pool_set();
+
+    for (auto &p : pool_set) {
+      auto pool_id = p.first;
+
+      /* close ADO process on pool close */
+      if (ado_enabled()) {
+        {
+          /* decrement reference to ADO proxy, clean up
+             when zero */
+          auto ado_itf = get_ado_interface(pool_id);
+
+          CPLOG(2, "Shard: check for ADO close ref count=%u", ado_itf->ref_count());
+
+          if (ado_itf->ref_count() == 1) {
+            ado_itf->shutdown();
+            _ado_map.remove(ado_itf);
+
+            if (_i_kvstore->close_pool(pool_id) != S_OK)
+              throw Logic_exception("failed to close pool");
+          }
+
+          ado_itf->release_ref();
+        }
+
+        _ado_pool_map.release(pool_id);
+      }
+
+      CPLOG(2, "Shard: closed pool handle %lx for connection close request", pool_id);
+    }
+
+    CFLOGM(1,"Shard: closing connection {}", handler.get());
+    t.done = true;
+  } // TICK_RESPONSE_CLOSE
+
+  /* process ALL deferred actions */
+  Connection_handler::action_t action;
+  int get_pending_iter = 0;
+  while (handler->get_pending_action(action)) {
+    t.progress = true;
+    (void)get_pending_iter;
+    assert(get_pending_iter++ < 1000);
+
+    switch (action.op) {
+    case Connection_handler::action_type::ACTION_RELEASE_VALUE_LOCK_SHARED:
+      CPLOG(2, "releasing shared value lock (%p)", action.parm);
+      release_locked_value_shared(handler.get(), action.parm);
+      break;
+    default:
+      throw Logic_exception("unexpected action type %d", int(action.op));
+    }
+  }
+
+  /* A process which cannot handle the top queue message due to
+   * lack of resource may throw resource_unavailable, which will
+   * leave the protocol::Message on the queue for later
+   * handling.
+   */
+  try {
+
+    /* collect ONE available messages ; don't collect them ALL, they just keep coming! */
+    if (const protocol::Message *p_msg = handler->peek_pending_msg()) {
+
+      t.progress = true;
+      assert(p_msg);
+      /* "split" accepts responsibility for the *preceding* code. Not exactly intuitive. */
+      using namespace mcas::protocol;
+      switch (p_msg->type_id()) {
+      case MSG_TYPE::IO_REQUEST:
+        process_message_IO_request(handler.get(), static_cast<const protocol::Message_IO_request *>(p_msg));
+        break;
+      case MSG_TYPE::ADO_REQUEST:
+        process_ado_request(handler.get(), static_cast<const protocol::Message_ado_request *>(p_msg));
+        break;
+      case MSG_TYPE::PUT_ADO_REQUEST:
+        process_put_ado_request(handler.get(), static_cast<const protocol::Message_put_ado_request *>(p_msg));
+        break;
+      case MSG_TYPE::POOL_REQUEST:
+        process_message_pool_request(handler.get(), static_cast<const protocol::Message_pool_request *>(p_msg));
+        break;
+      case MSG_TYPE::INFO_REQUEST:
+        process_info_request(handler.get(), static_cast<const protocol::Message_INFO_request *>(p_msg), pr_);
+        break;
+      case MSG_TYPE::NO_MSG:
+        process_no_request(handler.get(), static_cast<const protocol::Message_none *>(p_msg));
+        break;
+      case MSG_TYPE::PING:
+        process_ping_request(handler.get(), static_cast<const protocol::Message_ping *>(p_msg));
+        break;
+      default:
+        /* ERROR: should probably affect only this handler, not all */
+        throw General_exception("unrecognizable message type");
+      }
+      handler->free_buffer(handler->pop_pending_msg());
+    }
+  }
+  catch (const resource_unavailable &e) {
+    PWRN("%s: short of buffers in 'handler' processing: %s", __func__, e.what());
+  }
+  catch (const std::exception &e) {
+    PWRN("%s: exception in 'handler' processing: %s", __func__, e.what());
+    throw;
+  }
+  return t;
+}
+
 void Shard::main_loop(common::profiler &pr_)
 {
-  using namespace mcas::protocol;
-
   std::ostringstream ss;
   ss << "shard-" << _core;
   pthread_setname_np(pthread_self(), ss.str().c_str());
@@ -383,8 +510,6 @@ void Shard::main_loop(common::profiler &pr_)
   static constexpr uint64_t CHECK_CLUSTER_SIGNAL_INTERVAL = 10000;
   static constexpr uint64_t OUTPUT_DEBUG_INTERVAL         = 10000000;
   static constexpr unsigned SESSIONS_EMPTY_USLEEP         = 50000;
-
-  Connection_handler::action_t action;
 
 #ifdef DEBUG_LIVENESS
   static std::mutex score_board_lock;
@@ -467,126 +592,13 @@ void Shard::main_loop(common::profiler &pr_)
 
         /* iterate connection handlers (each connection is a client session) */
         for (const auto &handler : _handlers) {
-
-          /* issue tick, unless we are stalling */
-          auto tick_response = handler->tick();
-
-          if(tick_response == mcas::Connection_handler::tick_type::TICK_RESPONSE_WAIT_SECURITY) {
-            /* first tick, complete initialization */
-            handler->configure_security(_security.ipaddr(),
-                                        _security.port(),
-                                        _security.cert_path(),
-                                        _security.key_path());
+          handler_service_state t = service_handler(handler.get(), pr_);
+          if ( t.progress )
+          {
           }
-          /* Close session, this will occur if the client shuts down (cleanly or
-           * not). Also close sessions in response to SIGINT */
-          else if ((tick_response == mcas::Connection_handler::tick_type::TICK_RESPONSE_CLOSE) ||
-                   (signals::sigint > 0)) {
-            idle = 0;
-            /* close all open pools belonging to session  */
-            CPLOG(1, "Shard: forcing pool closures");
-
-            /* iterate open pool handles, close them and associated ADO processes
-             */
-            auto& pool_set = handler->pool_manager().open_pool_set();
-
-            for (auto &p : pool_set) {
-              auto pool_id = p.first;
-
-              /* close ADO process on pool close */
-              if (ado_enabled()) {
-                {
-                  /* decrement reference to ADO proxy, clean up
-                     when zero */
-                  auto ado_itf = get_ado_interface(pool_id);
-
-                  CPLOG(2, "Shard: check for ADO close ref count=%u", ado_itf->ref_count());
-
-                  if (ado_itf->ref_count() == 1) {
-                    ado_itf->shutdown();
-                    _ado_map.remove(ado_itf);
-
-                    if (_i_kvstore->close_pool(pool_id) != S_OK)
-                      throw Logic_exception("failed to close pool");
-                  }
-
-                  ado_itf->release_ref();
-                }
-
-                _ado_pool_map.release(pool_id);
-              }
-
-              CPLOG(2, "Shard: closed pool handle %lx for connection close request", pool_id);
-            }
-
-            CFLOGM(1,"Shard: closing connection {}", handler.get());
-            pending_close.push_back(handler.get());
-          } // TICK_RESPONSE_CLOSE
-
-          /* process ALL deferred actions */
-          int get_pending_iter = 0;
-          while (handler->get_pending_action(action)) {
-            idle = 0;
-            (void)get_pending_iter;
-            assert(get_pending_iter++ < 1000);
-
-            switch (action.op) {
-            case Connection_handler::action_type::ACTION_RELEASE_VALUE_LOCK_SHARED:
-              CPLOG(2, "releasing shared value lock (%p)", action.parm);
-	  			release_locked_value_shared(handler.get(), action.parm);
-              break;
-            default:
-              throw Logic_exception("unexpected action type %d", int(action.op));
-            }
-          }
-
-          /* A process which cannot handle the top queue message due to
-           * lack of resource may throw resource_unavailable, which will
-           * leave the protocol::Message on the queue for later
-           * handling.
-           */
-          try {
-
-            /* collect ONE available messages ; don't collect them ALL, they just keep coming! */
-            if (const protocol::Message *p_msg = handler->peek_pending_msg()) {
-
-              idle = 0;
-              assert(p_msg);
-              /* "split" accepts responsibility for the *preceding* code. Not exactly intuitive. */
-              switch (p_msg->type_id()) {
-              case MSG_TYPE::IO_REQUEST:
-                process_message_IO_request(handler.get(), static_cast<const protocol::Message_IO_request *>(p_msg));
-                break;
-              case MSG_TYPE::ADO_REQUEST:
-                process_ado_request(handler.get(), static_cast<const protocol::Message_ado_request *>(p_msg));
-                break;
-              case MSG_TYPE::PUT_ADO_REQUEST:
-                process_put_ado_request(handler.get(), static_cast<const protocol::Message_put_ado_request *>(p_msg));
-                break;
-              case MSG_TYPE::POOL_REQUEST:
-                process_message_pool_request(handler.get(), static_cast<const protocol::Message_pool_request *>(p_msg));
-                break;
-              case MSG_TYPE::INFO_REQUEST:
-                process_info_request(handler.get(), static_cast<const protocol::Message_INFO_request *>(p_msg), pr_);
-                break;
-              case MSG_TYPE::NO_MSG:
-                process_no_request(handler.get(), static_cast<const protocol::Message_none *>(p_msg));
-                break;
-              case MSG_TYPE::PING:
-                process_ping_request(handler.get(), static_cast<const protocol::Message_ping *>(p_msg));
-                break;
-              default:
-                throw General_exception("unrecognizable message type");
-              }
-              handler->free_buffer(handler->pop_pending_msg());
-            }
-          }
-          catch (const resource_unavailable &e) {
-            PWRN("%s: short of buffers in 'handler' processing: %s", __func__, e.what());
-          }
-          catch (const std::exception &e) {
-            PWRN("%s: exception in 'handler' processing: %s", __func__, e.what());
-            throw;
+          if ( t.done )
+          {
+             pending_close.push_back(handler.get());
           }
         }  // iteration of handlers
 
@@ -611,33 +623,33 @@ void Shard::main_loop(common::profiler &pr_)
         /* handle pending close sessions */
         assert(pending_close.size() < 1000);
 
-        /* process closures */
-        {
-          for (auto h : pending_close) {
-            _handlers.erase(std::remove_if(_handlers.begin(), _handlers.end(), [h] (const std::unique_ptr<Connection_handler> &c) { return c.get() == h; }), _handlers.end());
-            CPLOG(2, "Shard: deleting handler (%p)", common::p_fmt(h));
-#if 0
-            assert(h);
-            /* valgrind used to flag the deletion of an fabric_endpoint object which has vft reference on another thread
-             * Fixed with a "remove" method which deregisters the fabric_endpoint from event processing before deleting it */
-            delete h;
-#endif
-            CPLOG(2, "Shard: #remaining handlers (%lu)", _handlers.size());
+        /* process closures: erase all handlers found in pending_close array */
+        _handlers.erase(
+          std::remove_if(
+            _handlers.begin(), _handlers.end()
+            , [&pending_close] (const std::unique_ptr<Connection_handler> &c)
+              {
+                return std::find(pending_close.begin(), pending_close.end(), c.get()) != pending_close.end();
+              }
+          )
+          , _handlers.end()
+        );
 
-            if (_handlers.empty() && _forced_exit) {
-              CPLOG(1, "Shard: forcing exit..");
-              signal_exit();
-            }
-          }
+        if ( pending_close.size() != 0 )
+        {
+          CPLOG(2, "Shard: #remaining handlers (%lu)", _handlers.size());
+        }
+        if (_handlers.empty() && _forced_exit)
+        {
+          CPLOG(1, "Shard: forcing exit..");
+          signal_exit();
         }
       }
     }
     g0.lock();
   }
 
-  {
-    close_all_ado();
-  }
+  close_all_ado();
 
   CPLOG(1, "Shard: shard (%p) exited", common::p_fmt(this));
 }
@@ -1013,36 +1025,6 @@ void Shard::release_locked_value_exclusive(
 	handler_->release_locked_value(target);
   }
 }
-
-#if 0 /* moved to Connection_handler */
-void Shard::add_space_shared(const range<std::uint64_t> &range_, memory_registered<Connection_base> &&mr_)
-{
-  auto i = _spaces_shared
-    .emplace(std::piecewise_construct, std::forward_as_tuple(range_), std::forward_as_tuple(std::move(mr_)))
-    .first;
-
-  ++i->second.count;
-
-  CPLOG(2, "%s: [0x%" PRIx64 "..0x%" PRIx64 ") count %u", __func__, range_.first, range_.second, i->second.count);
-}
-
-void Shard::release_space_shared(const range<std::uint64_t> &range_)
-{
-  auto i = _spaces_shared.find(range_); /* search by max offset */
-  if (i == _spaces_shared.end()) {
-    throw Logic_exception("%s: bad target; space never located? (%" PRIx64 ":%" PRIx64 ")", __func__, range_.first,
-                          range_.second);
-  }
-
-  CPLOG(2, "%s: [0x%" PRIx64 "..0x%" PRIx64 ") count %u", __func__, range_.first, range_.second, i->second.count);
-
-  --i->second.count;
-
-  if (i->second.count == 0) {
-    _spaces_shared.erase(i);
-  }
-}
-#endif
 
 /* note, target address is used because it is unique for the shard */
 void Shard::add_pending_rename(const pool_t pool_id, const void *target, const std::string &from, const std::string &to)
@@ -2204,9 +2186,6 @@ void Shard::process_tasks(unsigned &idle)
 
       if (s == S_OK) {
         response->set_value(response_iob->length(), t->get_result(), t->get_result_length(), t->matched_position());
-#if 0
-        response->offset = t->matched_position();
-#endif
         response->set_status(S_OK);
         response_iob->set_length(response->message_size());
       }

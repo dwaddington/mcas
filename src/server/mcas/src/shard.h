@@ -139,9 +139,6 @@ class Shard : public Shard_transport, private common::log_source {
   using buffer_t            = Shard_transport::buffer_t;
   using index_map_t         = std::unordered_map<pool_t, component::Itf_ref<component::IKVIndex>>;
   using locked_value_map_t  = std::unordered_map<const void* , lock_info_t>;
-#if 0
-  using spaces_shared_map_t = std::map<range<std::uint64_t>, space_lock_info_t>;
-#endif
   using rename_map_t        = std::unordered_map<const void* , rename_info_t>;
   using task_list_t         = std::list<Shard_task* >;
 
@@ -224,10 +221,7 @@ class Shard : public Shard_transport, private common::log_source {
 		Connection_handler *handler
 		, const void *target
 	);
-#if 0
-  void add_space_shared(const range<std::uint64_t> &range, memory_registered<Connection_base> &&mr);
-  void release_space_shared(const range<std::uint64_t> &range);
-#endif
+
   void add_pending_rename(const pool_t pool_id, const void *target, const std::string &from, const std::string &to);
   void release_pending_rename(const void *target);
 
@@ -252,6 +246,12 @@ class Shard : public Shard_transport, private common::log_source {
   void check_for_new_connections();
 
   void main_loop(common::profiler &);
+  struct handler_service_state
+  {
+    bool progress;
+    bool done;
+  };
+  handler_service_state service_handler(gsl::not_null<Connection_handler *> handler, common::profiler &pr);
 
   /* message processing functions */
   void process_message_pool_request(Connection_handler *handler, const protocol::Message_pool_request *msg);
@@ -469,9 +469,6 @@ class Shard : public Shard_transport, private common::log_source {
   locked_value_map_t                                _locked_values_shared;
   locked_value_map_t                                _locked_values_exclusive;
   std::map<const void*, std::string>                _target_keyname_map;
-#if 0
-  spaces_shared_map_t                               _spaces_shared;
-#endif
   rename_map_t                                      _pending_renames;
   task_list_t                                       _tasks; /*< list of deferred tasks */
   std::set<work_request_key_t>                      _outstanding_work;
