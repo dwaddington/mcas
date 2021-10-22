@@ -12,7 +12,7 @@ std::unique_ptr<Thread_ipc> Thread_ipc::_ipc = nullptr;
     is private and is only called by this instance function.
 */
 
-Thread_ipc::Thread_ipc(make_key) :
+Thread_ipc::Thread_ipc() :
   _queue_to_ado_sem(),
   _queue_to_ado(),
   _queue_to_mgr_sem(),
@@ -26,7 +26,7 @@ Thread_ipc *Thread_ipc::instance()
   if (!_ipc) {  // Only allow one instance of class to be generated.
     /* Thread_ipc alignment, once handled here, is now handled by Thread_ipc
      * class */
-    _ipc = std::make_unique<Thread_ipc>(make_key{});
+    _ipc.reset(new Thread_ipc());
   }
   return _ipc.get();
 }
