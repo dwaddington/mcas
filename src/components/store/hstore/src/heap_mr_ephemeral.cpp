@@ -18,7 +18,8 @@
 #include "mm_plugin_itf.h"
 #include <common/errors.h> /* S_OK, E_INVAL */
 #include <memory> /* make_unique */
-#include <shared_mutex> /* shared_lock, unique_lock */
+#include <mutex> /* unique_lock */
+#include <shared_mutex> /* shared_lock */
 
 constexpr unsigned heap_mr_ephemeral::log_min_alignment;
 constexpr unsigned heap_mr_ephemeral::hist_report_upper_bound;
