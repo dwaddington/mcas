@@ -4,6 +4,7 @@
 #include <common/types.h>
 #include <common/semaphore.h>
 #include <stdlib.h> /* aligned_alloc */
+#include <memory>
 #include <mutex>
 
 #pragma GCC diagnostic push
@@ -41,6 +42,7 @@ class Thread_ipc {
 
   using queue_type = tbb::concurrent_queue<Message*>;  //common::Spsc_lfq_sleeping<message *>;
 
+  struct make_key{};
 
  public:
   static Thread_ipc *instance();
@@ -61,16 +63,15 @@ class Thread_ipc {
   void *operator new(std::size_t sz) { return aligned_alloc(alignof(Thread_ipc), sz); }
 #endif
 
- private:
-  Thread_ipc();
-
+  Thread_ipc(make_key);
+private:
   common::Semaphore  _queue_to_ado_sem;
   queue_type         _queue_to_ado;
   common::Semaphore  _queue_to_mgr_sem;
   queue_type         _queue_to_mgr;
 
   static std::mutex  _ipc_mutex;
-  static Thread_ipc *_ipc;
+  static std::unique_ptr<Thread_ipc> _ipc;
 };
 }  // namespace threadipc
 
