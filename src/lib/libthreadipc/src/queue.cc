@@ -5,7 +5,7 @@ namespace threadipc
 {
 // Global static pointer used to ensure a single instance of the class.
 std::mutex  Thread_ipc::_ipc_mutex;
-Thread_ipc *Thread_ipc::_ipc = nullptr;
+std::unique_ptr<Thread_ipc> Thread_ipc::_ipc = nullptr;
 
 /** This function is called to create an instance of the class.
     Calling the constructor publicly is not allowed. The constructor
@@ -26,9 +26,9 @@ Thread_ipc *Thread_ipc::instance()
   if (!_ipc) {  // Only allow one instance of class to be generated.
     /* Thread_ipc alignment, once handled here, is now handled by Thread_ipc
      * class */
-    _ipc = new Thread_ipc();
+    _ipc.reset(new Thread_ipc());
   }
-  return _ipc;
+  return _ipc.get();
 }
 
 void Thread_ipc::schedule_to_mgr(unsigned int shard_core, std::string &cores, float core_number, numa_node_t numa_zone)

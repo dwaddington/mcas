@@ -4,6 +4,7 @@
 #include <common/types.h>
 #include <common/semaphore.h>
 #include <stdlib.h> /* aligned_alloc */
+#include <memory>
 #include <mutex>
 
 #pragma GCC diagnostic push
@@ -41,7 +42,6 @@ class Thread_ipc {
 
   using queue_type = tbb::concurrent_queue<Message*>;  //common::Spsc_lfq_sleeping<message *>;
 
-
  public:
   static Thread_ipc *instance();
   Thread_ipc(Thread_ipc const &) = delete;  // copy constructor deleted
@@ -59,18 +59,19 @@ class Thread_ipc {
   /* pre-C++17, provide help to align instance of Thread_ipc */
 #if __cplusplus < 201703L
   void *operator new(std::size_t sz) { return aligned_alloc(alignof(Thread_ipc), sz); }
+  /* overloaded operator new must have a paired operator delete */
+  void operator delete(void *p, std::size_t) { ::free(p); }
 #endif
 
- private:
+private:
   Thread_ipc();
-
   common::Semaphore  _queue_to_ado_sem;
   queue_type         _queue_to_ado;
   common::Semaphore  _queue_to_mgr_sem;
   queue_type         _queue_to_mgr;
 
   static std::mutex  _ipc_mutex;
-  static Thread_ipc *_ipc;
+  static std::unique_ptr<Thread_ipc> _ipc;
 };
 }  // namespace threadipc
 

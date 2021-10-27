@@ -14,6 +14,7 @@
 #ifndef MCAS_COMMON_PERF_ENV_H
 #define MCAS_COMMON_PERF_ENV_H
 
+#include <limits>
 #include <string>
 #include <type_traits>
 

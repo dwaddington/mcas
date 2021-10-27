@@ -15,7 +15,8 @@
 
 #include "hstore_config.h"
 
-#include <shared_mutex>
+#include <mutex> /* unique_lock */
+#include <shared_mutex> /* shared_lock */
 
 constexpr unsigned heap_rc_ephemeral::log_min_alignment;
 constexpr unsigned heap_rc_ephemeral::hist_report_upper_bound;
