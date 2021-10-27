@@ -18,7 +18,7 @@
 #include "fabric_enter_exit_trace.h"
 
 #include "rdma-fi_cm.h" /* fi_shutdown */
-#include <common/logging.h> /* PLOG */
+#include <common/logging.h> /* FLOG */
 
 fabric_connection::fabric_connection(
 	component::IFabric_endpoint_unconnected_client *aep_
@@ -48,7 +48,7 @@ fabric_connection::~fabric_connection()
   }
   catch ( const std::exception &e )
   {
-    PLOG("connection shutdown error %s", e.what());
+    FLOGM("connection shutdown error {}", e.what());
   }
 }
 

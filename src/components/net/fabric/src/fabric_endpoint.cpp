@@ -36,7 +36,7 @@
 #include "system_fail.h"
 
 #include <common/env.h> /* env_value */
-#include <common/logging.h> /* PLOG */
+#include <common/logging.h> /* FLOG */
 #include <common/to_string.h>
 
 #include <rdma/fi_errno.h> /* fi_strerror */
@@ -728,7 +728,7 @@ try
   {
     os << std::setfill('0') << std::setw(2) << std::hex << *i;
   }
-  PLOG("%s", os.str().c_str());
+  FLOGM("{}", os.str());
 
   std::uint32_t event = FI_NOTIFY;
   _event_pipe.write(&event, sizeof event);
@@ -907,7 +907,7 @@ ru_flt_counter::~ru_flt_counter()
 {
   if ( _report )
   {
-    PLOG("fault count %li", ru_flt() - _ru_flt_start);
+    FLOG("fault count {}", ru_flt() - _ru_flt_start);
   }
 }
 
@@ -1143,7 +1143,7 @@ gsl::not_null<fid_mr *> fabric_endpoint::make_fid_mr_reg_ptr(
     if ( _paging_test )
     {
       auto rc = ::madvise(const_cast<common::byte *>(::data(buf)), ::size(buf), MADV_DONTNEED);
-      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", ::base(buf), ::size(buf), rc ? " refused" : " accepted");
+      FLOGM("Paging test madvise({}, 0x{:x}, MADV_DONTNEED) {}", ::base(buf), ::size(buf), rc ? " refused" : " accepted");
     }
   }
   catch ( const fabric_runtime_error &e )

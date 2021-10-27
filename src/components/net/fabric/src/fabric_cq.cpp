@@ -97,7 +97,7 @@ namespace
                   << " err_data_size " << err.err_data_size
                   << " (text) " << pe << "/" << pe_buffer
         << std::endl;
-  PLOG("%s", os.str().c_str());
+  FLOGM("{}", os.str());
   return err;
 }
 

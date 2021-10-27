@@ -81,7 +81,7 @@ namespace
 {
 	gsl::not_null<component::IFabric_endpoint_unconnected_server *> get_ep(gsl::not_null<component::IFabric_server_factory *> f_)
 	{
-		PLOG("cw server_connection::%s", __func__);
+		FLOG("");
 		component::IFabric_endpoint_unconnected_server *ep = nullptr;
 		while ( ! ( ep = f_->get_new_endpoint_unconnected() ) ) {}
 		return gsl::not_null<component::IFabric_endpoint_unconnected_server *>(ep);
@@ -93,7 +93,7 @@ server_connection::server_connection(component::IFabric_server_factory &f_)
 	, _ep(get_ep(_f))
 	, _cnxn(_f->open_connection(_ep.get()))
 {
-	PLOG("%s %p", __func__, static_cast<void *>(this));
+	FLOG("");
 }
 
 server_connection::~server_connection()
@@ -109,7 +109,7 @@ server_connection::~server_connection()
 			FLOGM("exception: {}", e.what());
 		}
 	}
-	PLOG("%s %p", __func__, static_cast<void *>(this));
+	FLOG("");
 }
 
 /*
@@ -229,11 +229,11 @@ namespace
 			auto e = errno;
 			if ( e == 0 )
 			{
-				PLOG("USE_ODP=%d (%s on-demand paging)", int(odp), odp ? "using" : "not using");
+				FLOG("USE_ODP={} ({} on-demand paging)", odp, odp ? "using" : "not using");
 			}
 			else
 			{
-				PLOG("USE_ODP specification %s failed to parse: %s", p, ::strerror(e));
+				FLOG("USE_ODP specification {} failed to parse: {}", p, ::strerror(e));
 			}
 		}
 		return odp;

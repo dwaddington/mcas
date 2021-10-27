@@ -37,7 +37,7 @@ server_connection::server_connection(component::IFabric_server_factory &f_)
   , _ep(get_ep(_f))
   , _cnxn(_f->open_connection(_ep.get()))
 {
-	PLOG("%s %p", __func__, static_cast<void *>(this));
+	FLOGM("");
 }
 
 server_connection::~server_connection()
@@ -53,5 +53,5 @@ server_connection::~server_connection()
       FLOGM("exception {} {}", e.what(), eyecatcher);
     }
   }
-	PLOG("%s %p", __func__, static_cast<void *>(this));
+	FLOG("");
 }
