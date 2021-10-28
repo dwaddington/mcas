@@ -36,24 +36,24 @@
 
 #include <common/common.h>
 #include <common/exceptions.h>
+#include <gsl/pointers>
 #include <stdlib.h>
 
 namespace common
 {
-template <typename T, size_t STACK_SIZE = 10000000>
+template <typename T, size_t Capacity = 10000000>
 class Fixed_stack {
  private:
-  T *_base;
+  gsl::not_null<T *> _base;
   T *_top;
   T *_max;
 
  public:
   Fixed_stack()
-    : _base(static_cast<T *>(::malloc(sizeof(T) * STACK_SIZE)))
+    : _base(static_cast<T *>(::malloc(sizeof(T) * Capacity)))
     , _top(_base)
-    , _max(_base + STACK_SIZE)
+    , _max(_base.get() + Capacity)
   {
-    assert(_base);
   }
 
   Fixed_stack(const Fixed_stack &) = delete;
@@ -61,9 +61,10 @@ class Fixed_stack {
 
   ~Fixed_stack() { ::free(_base); }
 
+  static constexpr size_t capacity() { return Capacity; }
+
   void push(T &val) {
     if (_top == _max) {
-      for (unsigned i = 0; i < 20; i++, _top--) PLOG("entry: %p", common::p_fmt(*_top));
 
       throw General_exception("stack overflow!");
     }
