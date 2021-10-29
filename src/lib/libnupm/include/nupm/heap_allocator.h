@@ -18,6 +18,8 @@
 #error This is a C++ header
 #endif
 
+#define SLAB_PLOG PLOG
+#define SLAB_PERR PERR
 #include "slab.h"
 #include "avl_malloc.h"
 #include <memory>

@@ -11,6 +11,8 @@
    limitations under the License.
 */
 
+#define LAZY_REGION_PLOG PLOG
+#define LAZY_REGION_PERR PERR
 #include "lazy_region.h"
 
 #if (__SIZEOF_POINTER__ == 8)

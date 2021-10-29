@@ -19,14 +19,16 @@
  *
  */
 
-#ifndef __RC_ALLOC_LB__
-#define __RC_ALLOC_LB__
+#ifndef __NUPM_RC_ALLOC_LB_BASE_H_
+#define __NUPM_RC_ALLOC_LB_BASE_H_
 
 #include <common/memory.h>
 #include <memory>
 #include <string>
 #include <iosfwd> /* ostream */
 
+namespace nupm
+{
 class Region_map;
 
 /**
@@ -100,18 +102,6 @@ class Rca_LB : public common::Reconstituting_allocator {
   std::unique_ptr<Region_map> _rmap;
 };
 
+}  // namespace nupm
 
-
-// template <>
-// 	struct mr_traits<nupm::Rca_LB>
-// 	{
-// 		static auto allocate(nupm::Rca_LB *pmr, unsigned numa_node, std::size_t bytes, std::size_t alignment)
-// 		{
-// 			return pmr->alloc(bytes, int(numa_node), alignment);
-// 		}
-// 		static auto deallocate(nupm::Rca_LB *pmr, unsigned numa_node, void *p, std::size_t bytes, std::size_t)
-// 		{
-// 			return pmr->free(p, int(numa_node), bytes);
-// 		}
-// 	};
 #endif

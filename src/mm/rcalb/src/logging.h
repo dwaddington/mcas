@@ -1,57 +1,49 @@
-#include <common/logging.h>
+#include <common/logging.h> /* NORMAL_CYAN, BRIGHT_RED, BRIGHT_CYAN, RESET */
+
+#include <stdarg.h>
+#include <stdarg.h>
 
 #define PREFIX "MM-PLUGIN-RCALB:"
 
+void pp_inner(const char *prefix, const char *format, va_list args)
+{
 #ifdef DEBUG
+  char formatb[m_max_buffer];
+  char buffer[m_max_buffer];
+  vsnprintf(formatb, m_max_buffer, format, args);
+# if 0
+  snprintf(buffer, m_max_buffer, "%s%s%s\n", prefix, buffer, RESET);
+  write(1, buffer, strlen(buffer));
+# else
+  printf(buffer, "%s%s%s\n", prefix, buffer, RESET);
+# endif
+#else
+  (void)prefix;
+  (void)format;
+  (void)args;
+#endif
+}
+
 void PPLOG(const char * format, ...)
 {
-  static const size_t m_max_buffer = 512;
   va_list args;
   va_start(args, format);
-  char buffer[m_max_buffer];
-  char formatb[m_max_buffer];
-  sprintf(formatb, "%s%s%s%s\n", NORMAL_CYAN, PREFIX, format, RESET);
-  vsnprintf(buffer, m_max_buffer, formatb, args);
+  pp_inner(NORMAL_CYAN PREFIX, format, args);
   va_end(args);
-  //  write(1, buffer, strlen(buffer));
-  printf("%s",buffer);
 }
-#else
-inline void PPLOG(const char * format, ...) {}
-#endif
 
-#ifdef DEBUG
 void PPERR(const char * format, ...)
 {
-  static const size_t m_max_buffer = 512;
   va_list args;
   va_start(args, format);
-  char buffer[m_max_buffer];
-  char formatb[m_max_buffer];
-  sprintf(formatb, "%s%s%s%s\n", BRIGHT_RED, "error:", format, RESET);
-  vsnprintf(buffer, m_max_buffer, formatb, args);
+  pp_inner(BRIGHT_RED "error:", format, args);
   va_end(args);
-  //  write(1, buffer, strlen(buffer));
-  printf("%s",buffer);
 }
-#else
-inline void PPERR(const char * format, ...) {}
-#endif
 
-#ifdef DEBUG
 void PPNOTICE(const char * format, ...)
 {
-  static const size_t m_max_buffer = 512;
   va_list args;
   va_start(args, format);
-  char buffer[m_max_buffer];
-  char formatb[m_max_buffer];
-  sprintf(formatb, "%s%s%s%s\n", BRIGHT_CYAN, PREFIX, format, RESET);
-  vsnprintf(buffer, m_max_buffer, formatb, args);
+  pp_inner(BRIGHT_CYAN PREFIX, format, args);
   va_end(args);
-  //  write(1, buffer, strlen(buffer));
-  printf("%s",buffer);
 }
-#else
-inline void PPNOTICE(const char * format, ...) {}
-#endif

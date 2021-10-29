@@ -10,7 +10,7 @@
 //#define DEBUG /* enable log output */
 
 #include "../../mm_plugin_itf.h"
-#include "rc_alloc_lb.h"
+#include <nupm/rc_alloc_lb_base.h>
 #include "logging.h"
 
 
@@ -19,7 +19,7 @@ namespace global
 static unsigned debug_level = 3;
 }
 
-using Heap = Rca_LB;
+using Heap = nupm::Rca_LB;
 
 PUBLIC status_t mm_plugin_init()
 {

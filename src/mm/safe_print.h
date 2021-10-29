@@ -1,19 +1,22 @@
 #ifndef __SAFE_PRINT_H__
 #define __SAFE_PRINT_H__
 
-#include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
+#include <common/logging.h> /* NORMAL_CYAN, RESET */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include <stdarg.h> /* va_{list,start,end} */
+#include <string.h> /* sprintf, vsnprintf */
+#include <unistd.h> /* write */
+
+#if defined __cplusplus
+extern "C" {
+#endif
 
 void SAFE_PRINT(const char * format, ...) __attribute__((format(printf, 1, 2)));
 
-#ifdef DEBUG
 inline void SAFE_PRINT(const char * format, ...)
 {
-  static const size_t m_max_buffer = 512;
+#if defined DEBUG || LOGGING_ENABLE
+  enum { m_max_buffer = 512 };
   va_list args;
   va_start(args, format);
   char buffer[m_max_buffer];
@@ -22,12 +25,13 @@ inline void SAFE_PRINT(const char * format, ...)
   vsnprintf(buffer, m_max_buffer, formatb, args);
   va_end(args);
   write(1, buffer, strlen(buffer));
-}
 #else
-inline void SAFE_PRINT(const char * format, ...)
-{
+  (void)format;
+#endif
+}
+
+#if defined __cplusplus
 }
 #endif
 
-#pragma GCC diagnostic pop
 #endif

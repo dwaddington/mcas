@@ -12,18 +12,24 @@
 */
 
 #include <common/exceptions.h>
-#include <common/logging.h>
 #include <common/utils.h>
 #include <numa.h>
 #include <stdexcept>
 
+#define ENABLE_LOGGING 1
 #include "safe_print.h"
-#include "rc_alloc_lb.h"
-#include "avl_malloc.h"
-#include "slab.h"
-#include "region.h"
+#include <nupm/rc_alloc_lb_base.h>
+#define SLAB_PLOG SAFE_PRINT
+#define SLAB_PERR SAFE_PRINT
+#include <nupm/avl_malloc_base.h>
+#include <nupm/slab.h>
+#define REGION_LOG SAFE_PRINT
+#define REGION_CLOG(x, ...) SAFE_PRINT(__VA_ARGS__)
+#include <nupm/region.h>
 
 static const unsigned trace = common::env_value<unsigned>("CCA_FINE_TRACE", 0);
+
+using Rca_LB = nupm::Rca_LB;
 
 Rca_LB::Rca_LB(unsigned debug_level_) : _rmap(new Region_map(debug_level_)) {}
 

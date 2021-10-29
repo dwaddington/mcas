@@ -17,6 +17,7 @@
 #include <common/logging.h>
 #include <common/rand.h>
 #include "avl_malloc.h"
+#define SLAB_PLOG PLOG
 #include "slab.h"
 #include <boost/numeric/conversion/cast.hpp>
 #include <limits.h>

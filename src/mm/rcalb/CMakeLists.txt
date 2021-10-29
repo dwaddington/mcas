@@ -6,9 +6,12 @@ project(mm-plugin-rcalb C CXX)
 
 add_definitions(-DCONFIG_DEBUG)
 add_compile_options("-fvisibility=hidden")
+add_compile_options("$<$<CONFIG:Release>:-DNDEBUG>")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/mm)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/libnupm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libmm/src)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
   

@@ -11,5 +11,6 @@
    limitations under the License.
 */
 
-
+#define REGION_CLOG CPLOG
+#define REGION_LOG PLOG
 #include "region.h"

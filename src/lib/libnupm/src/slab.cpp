@@ -11,4 +11,6 @@
    limitations under the License.
 */
 
+#define SLAB_PLOG PLOG
+#define SLAB_PERR PERR
 #include "slab.h"

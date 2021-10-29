@@ -15,6 +15,8 @@
 
 #include "avl_malloc.h"
 #include "slab.h"
+#define REGION_CLOG CPLOG
+#define REGION_LOG PLOG
 #include "region.h"
 #include <common/env.h>
 #include <common/exceptions.h>

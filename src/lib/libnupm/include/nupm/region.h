@@ -38,11 +38,6 @@
 #include <memory>
 #include <set>
 #include <sstream> /* stringstream */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <tbb/cache_aligned_allocator.h>
-#include <tbb/scalable_allocator.h>
-#pragma GCC diagnostic pop
 
 #define SANITY_CHECK 0
 namespace nupm {
@@ -55,9 +50,9 @@ class Region : private common::log_source {
   Region(const Region &) = delete;
   Region &operator=(const Region &) = delete;
 
-  using list_t = std::forward_list<void *, tbb::scalable_allocator<void *>>;
+  using list_t = std::forward_list<void *>;
   using set_t =
-      std::set<void *, std::less<void *>, tbb::scalable_allocator<void *>>;
+      std::set<void *, std::less<void *>>;
 
   void mark_used(void *p) {
 #if SANITY_CHECK
@@ -92,8 +87,10 @@ public:
         _reclaim_when_empty(false),
         _use_count(0)
   {
-    CPLOG(1,"new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
+#if 0
+    REGION_CLOG(1,"new region: region_base=%p region_size=%lu objsize=%lu capacity=%lu",
           region_ptr, region_size, object_size, _capacity);
+#endif
 
     if (region_size % object_size)
       throw std::invalid_argument(
@@ -281,6 +278,7 @@ public:
 
   ~Region_map()
    {
+#ifdef DEBUG_REGION_STATE
      auto node_ix = 0;
      for ( const auto &node_buckets : _buckets )
      {
@@ -289,16 +287,17 @@ public:
        {
          if ( ! bucket_list.empty() )
          {
-           CPLOG(1, "%s: node %d size %d", __func__, node_ix, 1 << list_ix);
+           REGION_CLOG(1, "%s: node %d size %d", __func__, node_ix, 1 << list_ix);
            for ( const auto &bucket : bucket_list )
            {
-             CPLOG(1, "%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
+             REGION_CLOG(1, "%s: %p %zu / %zu", __func__, bucket->base(), bucket->use_count(), bucket->capacity());
            }
          }
          ++list_ix;
        }
        ++node_ix;
      }
+#endif
    }
 
   void add_arena(void *arena_base, size_t arena_length, int numa_node) {
@@ -338,7 +337,7 @@ public:
 
     /* debugging */
     if (debug_level() > 2) {
-      if (size <= nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
+      if (size <= Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
         assert(reinterpret_cast<addr_t>(p) % _mapper.rounded_up_object_size(size) == 0); /* small objects should be size-aligned */
       }
     }
@@ -405,7 +404,7 @@ public:
     /* debugging/ */
     if (debug_level() > 2) {
       if (size <=
-          nupm::Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
+          Large_and_small_bucket_mapper::L0_MAX_SMALL_OBJECT_SIZE) {
         /* small objects should be aligned with bucket object size */
         assert(reinterpret_cast<addr_t>(ptr) % _mapper.rounded_up_object_size(size) == 0);
       }
@@ -428,7 +427,7 @@ public:
       auto region_base = _mapper.base(ptr, size);
 
       if (debug_level() > 2) {
-        PLOG("derived (ptr=%p size=%lu) region_base=%p region_size=%lu\n", ptr,
+        REGION_LOG("derived (ptr=%p size=%lu) region_base=%p region_size=%lu\n", ptr,
              size, region_base, region_size);
       }
 
@@ -451,9 +450,9 @@ public:
     }
     catch ( const Logic_exception & ) {
       //      region->debug_dump();
-      PLOG("rounded up object size: %lu",
+      REGION_LOG("rounded up object size: %lu",
            _mapper.rounded_up_object_size(size));
-      PLOG("region object size: %lu", region->object_size());
+      REGION_LOG("region object size: %lu", region->object_size());
       throw Logic_exception(
           "inject allocation found/created region, but allocate_at failed (%p,%lu)",
           ptr, size);
@@ -540,7 +539,7 @@ private:
 
 private:
   Bucket_mapper _mapper;
-  nupm::Rca_AVL _arena_allocator;
+  Rca_AVL _arena_allocator;
   std::array<
     std::array<
       std::list<std::unique_ptr<Region>>

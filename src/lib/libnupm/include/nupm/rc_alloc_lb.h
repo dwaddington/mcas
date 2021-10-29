@@ -1,5 +1,5 @@
 /*
-   Copyright [2017-2019] [IBM Corporation]
+   Copyright [2017-2021] [IBM Corporation]
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -23,87 +23,7 @@
 #define __NUPM_RC_ALLOC_LB__
 
 #include "mr_traits.h"
-#include <common/memory.h>
-#include <memory>
-#include <string>
-#include <iosfwd> /* ostream */
-
-namespace nupm
-{
-class Region_map;
-
-/**
- * Reconstituting allocator.  Metadata is held in DRAM (C runtime allocator).
- * NOTE: This class is NOT thread safe.
- *
- */
-class Rca_LB : public common::Reconstituting_allocator {
- public:
-  /**
-   * Constructor
-   *
-   */
-  Rca_LB(unsigned debug_level);
-
-  /**
-   * Destructor
-   *
-   */
-  ~Rca_LB();
-
-  /**
-   * Add region of memory to be managed
-   *
-   * @param region_base Base of region
-   * @param region_length Size of region in bytes
-   * @param numa_node NUMA node
-   */
-  void add_managed_region(void * region_base,
-                          size_t region_length,
-                          int    numa_node);
-
-  /**
-   * Allocate region of memory
-   *
-   * @param size Size of memory in bytes
-   * @param numa_node NUMA node
-   * @param alignment Required alignment
-   *
-   * @return Pointer to newly allocated region
-   */
-  void *alloc(size_t size, int numa_node, size_t alignment = 0) override;
-
-  /**
-   * Free previously allocated region of memory
-   *
-   * @param ptr Point to region
-   * @param numa_node NUMA node
-   */
-  void free(void *ptr, int numa_node, size_t size = 0) override;
-
-  /**
-   * Reconstitute a previous allocation.  Mark memory as allocated.
-   *
-   * @param p Address of region
-   * @param size Size of region in bytes
-   * @param numa_node NUMA node
-   */
-  void inject_allocation(void *p, size_t size, int numa_node) override;
-
-  /**
-   * Dump debugging information
-   *
-   * @param out_log Optional string to copy to, otherwise output is set to
-   * console
-   */
-  void debug_dump(std::string *out_log = nullptr);
-  void debug_dump(std::ostream &out_log);
-
- private:
-  std::unique_ptr<Region_map> _rmap;
-};
-
-}  // namespace nupm
+#include "rc_alloc_lb_base.h"
 
 template <>
 	struct mr_traits<nupm::Rca_LB>

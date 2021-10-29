@@ -17,10 +17,13 @@
 #include <numa.h>
 #include <stdexcept>
 
+#define ENABLE_LOGGING 1
 #include "safe_print.h"
-#include "rc_alloc_avl.h"
-#include "avl_malloc.h"
-#include "slab.h"
+#include <nupm/rc_alloc_avl.h>
+#define SLAB_PLOG SAFE_PRINT
+#define SLAB_PERR SAFE_PRINT
+#include <nupm/avl_malloc_base.h>
+#include <nupm/slab.h>
 
 namespace rca
 {
@@ -32,6 +35,7 @@ __attribute__((constructor)) static void init_Rca()
   rca::max_numa_node = 8; // numa_max_node();
 }
 
+namespace nupm {
 class Rca_AVL_internal : private common::log_source {
 
  public:
@@ -112,6 +116,9 @@ class Rca_AVL_internal : private common::log_source {
   core::slab::CRuntime<core::Memory_region> _slab; /* use C runtime for slab? */
   std::vector<std::unique_ptr<core::AVL_range_allocator>> _allocators;
 };
+}
+
+using Rca_AVL = nupm::Rca_AVL;
 
 Rca_AVL::Rca_AVL() : _rca(new Rca_AVL_internal()) {}
 

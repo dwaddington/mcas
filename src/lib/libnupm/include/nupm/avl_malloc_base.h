@@ -11,8 +11,8 @@
   limitations under the License.
 */
 
-#ifndef __AVL_MALLOC_H__
-#define __AVL_MALLOC_H__
+#ifndef __AVL_MALLOC_BASE_H__
+#define __AVL_MALLOC_BASE_H__
 
 #if !defined(__cplusplus)
 #error("C++ header only")
@@ -28,6 +28,10 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib> // exit
+
+#ifndef STACK_SIZE_FIND_REGION
+#define STACK_SIZE_FIND_REGION (common::Fixed_stack<Memory_region *>::capacity())
+#endif
 
 //#define DEBUG_AVL_ALLOCATOR
 
@@ -109,7 +113,7 @@ public:
    *
    * @return Start address
    */
-  addr_t addr() { return _addr; }
+  addr_t addr() const { return _addr; }
 
   /**
    * Get start pointer of the region
@@ -117,7 +121,7 @@ public:
    *
    * @return Start address
    */
-  void* paddr() { return reinterpret_cast<void*>(_addr); }
+  void* paddr() const { return reinterpret_cast<void*>(_addr); }
 
 
   /**
@@ -144,7 +148,8 @@ private:
    *
    * @return
    */
-  bool higher(AVL_node<Memory_region>* n) {
+  /* Note: should probably be const, but its base function is not */
+  bool higher(AVL_node<Memory_region>* n) override {
     return (_addr > (static_cast<Memory_region*>(n))->_addr);
   }
 
@@ -154,7 +159,7 @@ private:
    *
    * @return
    */
-  Memory_region* left() {
+  Memory_region* left() const {
     return static_cast<Memory_region*>(&*subtree[core::LEFT]);
   }
 
@@ -164,7 +169,7 @@ private:
    *
    * @return
    */
-  Memory_region* right() {
+  Memory_region* right() const {
     return static_cast<Memory_region*>(&*subtree[core::RIGHT]);
   }
 
@@ -177,7 +182,7 @@ protected:
    *
    * @return
    */
-  Memory_region* find_region(Memory_region* node, addr_t addr) {
+  Memory_region* find_region(Memory_region* node, addr_t addr) const {
     if (node == nullptr) return nullptr;
 
     std::vector<Memory_region*> stack;
@@ -198,7 +203,7 @@ protected:
         if (r) stack.push_back(r);
       }
     }
-    
+
     return nullptr;
   }
 
@@ -215,11 +220,11 @@ protected:
    */
   Memory_region* find_free_region(Memory_region* node,
                                   size_t size,
-                                  size_t alignment = 0)
+                                  size_t alignment = 0) const
   {
     if (node == nullptr) return nullptr;
 
-    common::Fixed_stack<Memory_region*> stack;
+    common::Fixed_stack<Memory_region*, STACK_SIZE_FIND_REGION> stack;
     stack.push(node);
 
     while (!stack.empty()) {
@@ -258,8 +263,8 @@ protected:
    *
    * @return nullptr if not found, otherwise containing region
    */
-  Memory_region* find_containing_region(Memory_region* node, addr_t addr) {
-    
+  Memory_region* find_containing_region(Memory_region* node, addr_t addr) const {
+
     if (node == nullptr) return nullptr;
 
     common::Fixed_stack<Memory_region*> stack;  // good for debugging
@@ -282,6 +287,14 @@ protected:
     }
 
     return nullptr; /* not found */
+  }
+
+  void insert_after(Memory_region* old)
+  {
+    _prev = old;
+    _next = old->_next;
+    old->_next = this;
+    if ( _next ) { _next->_prev = this; }
   }
 
 } __attribute__((packed));
@@ -378,9 +391,9 @@ public:
       }
     }
 
-  addr_t base() {
+  addr_t base() const {
     /* update base */
-    Memory_region* leftmost = leftmost_region();
+    const Memory_region* leftmost = leftmost_region();
     assert(leftmost);
     return leftmost->addr();
   }
@@ -392,8 +405,7 @@ public:
    */
   virtual ~AVL_range_allocator() {
     /* delete node memory */
-    auto func = "~AVL_range_allocator";
-    _tree->apply_topdown([=](void* p, size_t) {
+    _tree->apply_topdown([this,func=__func__](void* p, size_t) {
                            Memory_region* mr = static_cast<Memory_region*>(p);
                            if ( 2 <= option_DEBUG )  {
                              PLOG("%s: region %p, 0x%zx, %s", func, mr->paddr(),
@@ -403,6 +415,25 @@ public:
                          });
     _slab.free(_tree->root());
     delete _tree;
+  }
+
+  /**
+   * Sanity check for doubly-linked region list
+   *
+   * Invoke with assert(list_is_consistent()) to suppress code generation when -DNDEBUG
+   *
+   *
+   * @return true
+   */
+  bool list_is_consistent() const
+  {
+    auto region = leftmost_region();
+    assert(region->_prev == nullptr);
+    for ( ; region->_next; region = region->_next )
+    {
+      assert(region->_next->_prev == region);
+    }
+    return true;
   }
 
   /**
@@ -426,7 +457,8 @@ public:
       Memory_region* aligned_region = root->find_free_region(root, size, alignment);
 
       if (aligned_region) {
-        
+
+        assert(list_is_consistent());
         assert(aligned_region->_size >= size);
         assert(check_aligned(aligned_region->_addr, alignment));
 
@@ -435,31 +467,25 @@ public:
           aligned_region->_free = false;
         }
         else {
-          /* alignment is OK but its not an exact fit, so we'll create a remaining region on the right  */          
+          /* alignment is OK but its not an exact fit, so we'll create a remaining region on the right  */
           size_t right_remaining_size = aligned_region->_size - size;
           Memory_region* right_remaining = new (_slab.alloc()) Memory_region(aligned_region->_addr + size, right_remaining_size);
-
-          auto r_adjacent = aligned_region->_next;
 
           // aligned_region->_addr remains same
           aligned_region->_size = size;
           aligned_region->_free = false;
-          aligned_region->_next = right_remaining;
-          // aligned_region->_prev remains same
-          
-          right_remaining->_prev = aligned_region;
-          right_remaining->_next = r_adjacent;
-          if(r_adjacent)
-            r_adjacent->_prev = right_remaining;
-          right_remaining->_size = right_remaining_size;
+
+          right_remaining->insert_after(aligned_region);
           right_remaining->_free = true;
           _tree->insert_node(right_remaining);
         }
 
+        assert(list_is_consistent());
         return aligned_region;
       }
       else {
-        
+
+        assert(list_is_consistent());
         /* OK, maybe there still is space, but alignment isn't there.  Now we need
            to three-way split a large enough block */
         assert(alignment > 0);
@@ -475,7 +501,7 @@ public:
         }
 
         /* left split */
-        size_t left_split_size = round_up(region->_addr, alignment) - region->_addr;
+        const size_t left_split_size = round_up(region->_addr, alignment) - region->_addr;
         if (3 <= option_DEBUG) {
           PLOG("Left split:   %lx-%lx size=%lu", region->_addr, region->_addr+left_split_size, left_split_size);
         }
@@ -507,14 +533,13 @@ public:
           if (3 <= option_DEBUG) {
             PLOG("Right split:  %lx-%lx size=%lu", right_split_base, right_split_base + right_split_size, right_split_size);
           }
-          assert(right_split_size > 0);
           assert(left_split_size > 0);
           assert(center_split_size > 0);
-          
+
           void* q = _slab.alloc();
           if (!q)
             throw Out_of_memory("AVL_range_allocator: failed to allocate %ld", size);
-          
+
           Memory_region* right_node = new (q) Memory_region(right_split_base, right_split_size);
 
           auto adjacent_right = region->_next;
@@ -547,11 +572,12 @@ public:
 
           _tree->insert_node(aligned_region);
         }
-        
+
         if(alignment > 0) {
           assert(check_aligned(aligned_region->_addr, alignment));
         }
 
+        assert(list_is_consistent());
       }
 
 #ifdef DEBUG_AVL_ALLOCATOR
@@ -577,7 +603,7 @@ public:
    *
    * @return Leftmost memory region
    */
-  Memory_region* leftmost_region() {
+  Memory_region* leftmost_region() const {
     assert(_tree);
     Memory_region* r = static_cast<Memory_region*>(&**(_tree->root()));
     if (r == nullptr)
@@ -593,7 +619,7 @@ public:
    *
    * @return Rightmost memory region (give top end of region)
    */
-  Memory_region* rightmost_region() {
+  Memory_region* rightmost_region() const {
     Memory_region* r = static_cast<Memory_region*>(&**(_tree->root()));
     while (r->right()) r = r->right();
     return r;
@@ -613,6 +639,7 @@ public:
     Memory_region* root = static_cast<Memory_region*>(&**(_tree->root()));
     Memory_region* region = root->find_containing_region(root, addr);
 
+    assert(list_is_consistent());
     if (region == nullptr)
       throw API_exception("alloc_at: cannot find containing region (addr=%lx, size=%ld)",
                           addr, size);
@@ -640,10 +667,7 @@ public:
       middle = new (_slab.alloc()) Memory_region(addr, region->_size - left_size);
 
       region->_size = left_size;  // make the containing region left chunk
-      middle->_next = region->_next;
-      middle->_prev = region;
-      region->_next = middle;
-      // region previous stays the same
+      middle->insert_after(region);
       _tree->insert_node(middle);
 
     }
@@ -663,14 +687,12 @@ public:
 
       Memory_region* right = new (p) Memory_region(middle->_addr + size, right_size);
 
-      right->_size = right_size;
-      right->_next = middle->_next;
-      right->_prev = middle;
-      middle->_next = right;
       middle->_size = size;  // shrink middle chunk
+      right->insert_after(middle);
       _tree->insert_node(right);
     }
 
+    assert(list_is_consistent());
     return middle;
   }
 
@@ -724,9 +746,10 @@ public:
       return size_t(-1);
     }
 
-    size_t return_count = region->_size;
+    const size_t return_count = region->_size;
     region->_free = true;
 
+    assert(list_is_consistent());
     // right coalesce
     {
       Memory_region* right = region->_next;
@@ -755,6 +778,7 @@ public:
       }
     }
 
+    assert(list_is_consistent());
     return return_count;
   }
 
@@ -762,7 +786,7 @@ public:
    * Dump the tree for debugging purposes
    *
    */
-  void dump_info(std::ostream *out = nullptr) {
+  void dump_info(std::ostream *out = nullptr) const {
     assert(_tree->root());
 
     if(out) {
@@ -803,6 +827,17 @@ public:
                          });
   }
 
+  /**
+   * Apply function to each region
+   *
+   * @param functor
+   */
+  void apply(std::function<void(addr_t, size_t, bool)> functor) const {
+    _tree->apply_topdown([functor](void* p, size_t) {
+                           const Memory_region* mr = static_cast<Memory_region*>(p);
+                           functor(mr->addr(), mr->size(), mr->is_free());
+                         });
+  }
 
   /**
    * Get total number of free bytes
@@ -968,8 +1003,8 @@ public:
    *
    * @return Upper limit in bytes
    */
-  size_t used_zone_limit() {
-    Memory_region* r = _range_allocator.rightmost_region();
+  size_t used_zone_limit() const {
+    const Memory_region* r = _range_allocator.rightmost_region();
 
     if (r->is_free())
       return r->addr() - _range_allocator.base();
@@ -1062,5 +1097,4 @@ private:
 };
 }  // namespace core
 
-
-#endif  //__AVL_MALLOC_H__
+#endif  //__AVL_MALLOC_BASE_H__
