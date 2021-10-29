@@ -96,29 +96,29 @@ namespace common
 
 #endif
 
-#define NORMAL_CYAN "\033[36m"
-#define NORMAL_MAGENTA "\033[35m"
-#define NORMAL_BLUE "\033[34m"
-#define NORMAL_YELLOW "\033[33m"
-#define NORMAL_GREEN "\033[32m"
 #define NORMAL_RED "\033[31m"
+#define NORMAL_GREEN "\033[32m"
+#define NORMAL_YELLOW "\033[33m"
+#define NORMAL_BLUE "\033[34m"
+#define NORMAL_MAGENTA "\033[35m"
+#define NORMAL_CYAN "\033[36m"
 
 #define BRIGHT "\033[1m"
 #define NORMAL_XDK "\033[0m"
 #define RESET "\033[0m"
 
-#define BRIGHT_CYAN "\033[1m\033[36m"
-#define BRIGHT_MAGENTA "\033[1m\033[35m"
-#define BRIGHT_BLUE "\033[1m\033[34m"
-#define BRIGHT_YELLOW "\033[1m\033[33m"
-#define BRIGHT_GREEN "\033[1m\033[32m"
-#define BRIGHT_RED "\033[1m\033[31m"
+#define BRIGHT_CYAN BRIGHT NORMAL_CYAN
+#define BRIGHT_MAGENTA BRIGHT NORMAL_MAGENTA
+#define BRIGHT_BLUE BRIGHT NORMAL_BLUE
+#define BRIGHT_YELLOW BRIGHT NORMAL_YELLOW
+#define BRIGHT_GREEN BRIGHT NORMAL_GREEN
+#define BRIGHT_RED BRIGHT NORMAL_RED
 
 #define WHITE_ON_RED "\033[41m"
 #define WHITE_ON_GREEN "\033[42m"
 #define WHITE_ON_YELLOW "\033[43m"
 #define WHITE_ON_BLUE "\033[44m"
-#define WHITE_ON_MAGENTA "\033[44m"
+#define WHITE_ON_MAGENTA "\033[45m"
 
 #define ESC_LOG NORMAL_GREEN
 #define ESC_DBG NORMAL_YELLOW
@@ -127,173 +127,108 @@ namespace common
 #define ESC_ERR BRIGHT_RED
 #define ESC_END "\033[0m"
 
-void pr_info(const char * format, ...) __attribute__((format(printf, 1, 2)));
-
 #define PR_MAX_BUFFER 2048
 
-inline void pr_info(const char * format, ...)
+inline void pr_inner(const char *format, const char *intro, va_list args)
 {
 #ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
   char buffer[PR_MAX_BUFFER];
   vsnprintf(buffer, PR_MAX_BUFFER, format, args);
-  va_end(args);
-  fprintf(stderr, "%s[LOG]:" LOG_TS_FMT " %s %s\n", ESC_LOG, LOG_TS_ARG buffer, ESC_END);
+  fprintf(stderr, "%s:" LOG_TS_FMT " %s %s\n", intro, LOG_TS_ARG buffer, ESC_END);
 #else
   (void)format;
+  (void)intro;
+  (void)args;
 #endif
 }
 
+/* Somehow, pr_info and PLOG ended up identical */
+void pr_info(const char * format, ...) __attribute__((format(printf, 1, 2)));
+inline void pr_info(const char * format, ...)
+{
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_LOG "[LOG]", args);
+  va_end(args);
+}
+
+/* Somehow, pr_error and PERR ended up identical */
 void pr_error(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void pr_error(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_ERR "[LOG]", args);
   va_end(args);
-  fprintf(stderr, "%s[LOG]:" LOG_TS_FMT " %s %s\n", ESC_ERR, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PLOG(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PLOG(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_LOG "[LOG]", args);
   va_end(args);
-  fprintf(stderr, "%s[LOG]:" LOG_TS_FMT " %s %s\n", ESC_LOG, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PDBG(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PDBG(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_DBG "[DBG]", args);
   va_end(args);
-  fprintf(stderr, "%s[DBG]:" LOG_TS_FMT " %s %s\n", ESC_DBG, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PINF(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PINF(const char * format, ...)
 {
+  va_list args; va_start(args, format);
 #ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
   char buffer[PR_MAX_BUFFER];
   vsnprintf(buffer, PR_MAX_BUFFER, format, args);
-  va_end(args);
   fprintf(stderr, "%s %s %s\n", ESC_INF, buffer, ESC_END);
 #else
   (void)format;
+  (void)args;
 #endif
+  va_end(args);
 }
 
 void PWRN(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PWRN(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_WRN "[WRN]", args);
   va_end(args);
-  fprintf(stderr, "%s[WRN]:" LOG_TS_FMT " %s %s\n", ESC_WRN, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PERR(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PERR(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_ERR "Error", args);
   va_end(args);
-  fprintf(stderr, "%sError:" LOG_TS_FMT " %s %s\n", ESC_ERR, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PEXCEP(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PEXCEP(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, ESC_ERR "Exception", args);
   va_end(args);
-  fprintf(stderr, "%sException:" LOG_TS_FMT " %s %s\n", ESC_ERR, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PNOTICE(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PNOTICE(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, BRIGHT_RED "NOTICE", args);
   va_end(args);
-  fprintf(stderr, "%sNOTICE:" LOG_TS_FMT " %s %s\n", BRIGHT_RED, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
 }
 
 void PMAJOR(const char * format, ...) __attribute__((format(printf, 1, 2)));
 inline void PMAJOR(const char * format, ...)
 {
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
+  va_list args; va_start(args, format);
+  pr_inner(format, NORMAL_BLUE "[+]", args);
   va_end(args);
-  fprintf(stderr, "%s[+]" LOG_TS_FMT " %s %s\n", NORMAL_BLUE, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void)format;
-#endif
-}
-
-void PLOG2(const char *color, const char * format, ...) __attribute__((format(printf, 2, 3)));
-inline void PLOG2(const char * color, const char * format, ...)
-{
-#ifdef CONFIG_DEBUG
-  va_list args;
-  va_start(args, format);
-  char buffer[PR_MAX_BUFFER];
-  vsnprintf(buffer, PR_MAX_BUFFER, format, args);
-  va_end(args);
-  fprintf(stderr, "%s[+]" LOG_TS_FMT " %s %s\n", color, LOG_TS_ARG buffer, ESC_END);
-#else
-  (void) format;
-  (void) color;
-#endif
 }
 
 /* one-line conditional PLOG */
