@@ -11,7 +11,6 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libccpm/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libmm/src)
-#include_directories(${CMAKE_SOURCE_DIR}/src/mm/ccpm/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
 
 #link_directories(${CMAKE_CURRENT_BINARY_DIR}/jemalloc-source/build/lib)
