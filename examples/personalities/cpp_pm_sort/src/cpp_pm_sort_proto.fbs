@@ -1,0 +1,37 @@
+// Description: PM sorting ADO protocol
+// Authors      : Omri Arad, Yoav Ben Shimon, Ron Zadicario
+// Authors email: omriarad3@gmail.com, yoavbenshimon@gmail.com, ronzadi@gmail.com
+// License      : Apache License, Version 2.0
+
+namespace cpp_pm_sort_protocol;
+
+table Ack
+{
+	status : int;
+}
+
+table SortRequest {
+	type: int;
+}
+
+table InitRequest{
+	first_time : int;
+}
+
+table VerifyRequest {}
+
+union Element
+{
+	SortRequest,
+	InitRequest,
+	VerifyRequest,
+	Ack,
+}
+
+table Message
+{
+	transaction_id : uint64;
+	element : Element;
+}
+
+root_type Message;

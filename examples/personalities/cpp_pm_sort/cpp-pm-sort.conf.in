@@ -1,0 +1,17 @@
+{
+    "shards" :
+    [
+        {
+            "core" : 0,
+            "port" : 11911,
+            "net"  : "lo",
+            "addr" : "127.0.0.1",
+            "default_backend" : "hstore",
+            "ado_plugins" : ["${CMAKE_CURRENT_BINARY_DIR}/libpersonality-cpp-pm-sort.so"],
+            "dax_config" : [{ "path": "/dev/dax1.0", "addr": "0x9000000000" }],
+            "ado_cores" : "2"
+        }
+    ],
+    "ado_path" : "${CMAKE_INSTALL_PREFIX}/bin/ado",
+    "net_providers" : "sockets"
+}
