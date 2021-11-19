@@ -965,7 +965,14 @@ status_t Pool_instance::deref_pool_iterator(IKVStore::pool_iterator_t iter,
   ref.timestamp = r->second._tsc.to_epoch();
 
   /* leave condition in timestamp cycles for better accuracy */
-  time_match = (r->second._tsc >= begin_tsc) && (end_tsc == 0 || r->second._tsc <= end_tsc);
+  try {
+    time_match = (r->second._tsc >= begin_tsc) && (end_tsc == 0 || r->second._tsc <= end_tsc);
+  }
+  catch(...) {
+    PWRN("bad time parameter");
+    return E_INVAL;
+  }
+    
 
   if(increment) {
     try {
