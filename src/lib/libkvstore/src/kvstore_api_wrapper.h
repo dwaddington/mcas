@@ -363,6 +363,39 @@ extern "C"
                        const pool_t pool);
 
 
+  /** 
+   * kvstore_allocate_pool_memory: allocate un-named memory from the pool
+   * 
+   * @param store_handle Store instance handle
+   * @param pool Pool handle
+   * @param size Size to allocate in bytes
+   * @param alignment Alignment in bytes
+   * @param out_ptr [out] Pointer to newly allocated memory
+   * 
+   * @return S_OK or error code
+   */
+  status_t kvstore_allocate_pool_memory(const kvstore_t store_handle,
+                                        const pool_t pool,
+                                        const size_t size,
+                                        const size_t alignment,
+                                        void ** out_ptr);
+
+  /** 
+   * kvstore_free_pool_memory: free un-named memory back to pool
+   * 
+   * @param store_handle Store instance handle
+   * @param pool Pool handle
+   * @param ptr Pointer to region to free
+   * @param size Size of region (0 if not known)
+   * 
+   * @return S_OK or error code
+   */
+  status_t kvstore_free_pool_memory(const kvstore_t store_handle,
+                                    const pool_t pool,
+                                    const void * ptr,
+                                    const size_t size);
+
+
                     
 #ifdef __cplusplus
 }
