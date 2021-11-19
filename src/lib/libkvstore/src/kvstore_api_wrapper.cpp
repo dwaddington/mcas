@@ -15,8 +15,9 @@
 
 /* don't want to include the header */
 typedef int       status_t;
-typedef void *    kvstore_t; 
-typedef uint32_t  pool_flags_t;
+typedef void *    kvstore_t;
+typedef void *    lock_token_t;
+typedef uint32_t  kvstore_flags_t;
 typedef uint64_t  pool_t;
 typedef uint64_t  addr_t;
 
@@ -80,7 +81,7 @@ extern "C" status_t kvstore_close(kvstore_t handle)
 extern "C" status_t kvstore_create_pool(const kvstore_t store_handle,
                                         const char * pool_name,
                                         const size_t size,
-                                        const pool_flags_t flags,
+                                        const kvstore_flags_t flags,
                                         pool_t * out_pool_handle)
 {
   auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
@@ -97,7 +98,7 @@ extern "C" status_t kvstore_create_pool(const kvstore_t store_handle,
 extern "C" status_t kvstore_create_pool_ex(const kvstore_t store_handle,
                                            const char * pool_name,
                                            const size_t size,
-                                           const pool_flags_t flags,
+                                           const kvstore_flags_t flags,
                                            const size_t expected_object_count,
                                            const addr_t base_addr,
                                            pool_t * out_pool_handle)
@@ -117,7 +118,7 @@ extern "C" status_t kvstore_create_pool_ex(const kvstore_t store_handle,
 
 extern "C" status_t kvstore_open_pool_ex(const kvstore_t store_handle,
                                          const char * pool_name,
-                                         const pool_flags_t flags,
+                                         const kvstore_flags_t flags,
                                          const addr_t base_addr,
                                          pool_t * out_pool_handle)
 {
@@ -135,7 +136,7 @@ extern "C" status_t kvstore_open_pool_ex(const kvstore_t store_handle,
 
 extern "C" status_t kvstore_open_pool(const kvstore_t store_handle,
                                       const char * pool_name,
-                                      const pool_flags_t flags,
+                                      const kvstore_flags_t flags,
                                       pool_t * out_pool_handle)
 {
   return kvstore_open_pool_ex(store_handle,
@@ -182,6 +183,102 @@ extern "C" status_t kvstore_get_pool_names(const kvstore_t store_handle,
   }
   return S_OK;
 }
+
+
+extern "C" status_t kvstore_grow_pool(const kvstore_t store_handle,
+                                      const pool_t pool_handle,
+                                      const size_t increment_size,
+                                      size_t * reconfigured_size)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  return kvstore->grow_pool(pool_handle, increment_size, *reconfigured_size);
+}
+
+extern "C" status_t kvstore_put(const kvstore_t store_handle,
+                                const pool_t pool_handle,
+                                const char * key,
+                                const void * value,
+                                const size_t value_len,
+                                const kvstore_flags_t flags)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  return kvstore->put(pool_handle, key, value, value_len, flags);
+}
+
+extern "C" status_t kvstore_get(const kvstore_t store_handle,
+                                const pool_t pool_handle,
+                                const char * key,
+                                void ** value,
+                                size_t * value_len)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  void * p;
+  size_t len_p;
+  auto status = kvstore->get(pool_handle, key, p, len_p);
+  if(status == S_OK) {
+    *value = p;
+    *value_len = len_p;
+  }
+  return status;
+}
+
+extern "C" status_t kvstore_swap_keys(const kvstore_t store_handle,
+                                      const pool_t pool_handle,
+                                      const char * key0,
+                                      const char * key1)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  return kvstore->swap_keys(pool_handle, key0, key1);
+}
+
+extern "C" status_t kvstore_lock_existing(const kvstore_t store_handle,
+                                          const pool_t pool_handle,
+                                          const char * key,
+                                          const int lock_type,
+                                          void ** out_value_ptr,
+                                          size_t * out_value_len,
+                                          lock_token_t * out_lock_token)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+
+  void * value_ptr = nullptr;
+  size_t value_len = 0;
+
+  IKVStore::key_t lock_handle;
+
+  KVStore::lock_type_t lt = IKVStore::STORE_LOCK_NONE;
+  if(lock_type == 1) lt = IKVStore::STORE_LOCK_READ;
+  else if(lock_type == 2) lt = IKVStore::STORE_LOCK_WRITE;
+
+  auto status = kvstore->lock(pool_handle,
+                              key,
+                              lt,
+                              value_ptr,
+                              value_len,
+                              0, // alignment not specified for existing
+                              lock_handle);
+  if(status == S_OK ) {
+    *out_value_ptr = value_ptr;
+    *out_value_len = value_len;
+    *out_lock_token = reinterpret_cast<lock_token_t>(lock_handle);
+  }
+  return status;
+}
+
+  
+extern "C" status_t kvstore_unlock(const kvstore_t store_handle,
+                                   const pool_t pool_handle,
+                                   const lock_token_t lock_token,
+                                   const int flush)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  auto lock_token_c = reinterpret_cast<KVStore::key_t>(lock_token);
+  if(flush > 0)
+    return kvstore->unlock(pool_handle, lock_token_c, KVStore::UNLOCK_FLAGS_FLUSH);
+  else
+    return kvstore->unlock(pool_handle, lock_token_c);
+}
+
 
   
 
