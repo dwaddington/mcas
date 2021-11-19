@@ -362,6 +362,8 @@ status_t Pool_instance::put(const std::string &key,
     return E_INVAL;
   }
 
+  CPLOG(2, PREFIX "put(%s) %.*s", key.c_str(), boost::numeric_cast<int>(value_len), reinterpret_cast<const char *>(value));
+
 #ifndef SINGLE_THREADED
   RWLock_guard guard(map_lock, RWLock_guard::WRITE);
 #endif
@@ -425,6 +427,7 @@ status_t Pool_instance::put(const std::string &key,
 
     void * buffer = nullptr;
     if(_mm_plugin.aligned_allocate(value_len, choose_alignment(value_len), &buffer) != S_OK)
+
       throw General_exception("memory plugin aligned_allocate failed");
 
     memcpy(buffer, value, value_len);
@@ -597,8 +600,6 @@ status_t Pool_instance::lock(const std::string &key,
 
   if (i == _map->end()) { /* create value */
 
-    write_touch();
-
     /* lock API has semantics of create on demand */
     if (inout_value_len == 0) {
       out_key = IKVStore::KEY_NONE;
@@ -607,6 +608,7 @@ status_t Pool_instance::lock(const std::string &key,
       return IKVStore::E_KEY_NOT_FOUND;
     }
 
+    write_touch();
 
     CPLOG(1, PREFIX "lock is on-demand allocating:(%s) %lu", key.c_str(), inout_value_len);
 

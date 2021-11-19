@@ -91,13 +91,13 @@ protected:
   };
 
   using flags_t = std::uint32_t ;
-  static constexpr flags_t FLAGS_NONE      = 0x0;
-  static constexpr flags_t FLAGS_READ_ONLY = 0x1; /* lock read-only */
-  static constexpr flags_t FLAGS_SET_SIZE    = 0x2;
-  static constexpr flags_t FLAGS_CREATE_ONLY = 0x4;  /* only succeed if no existing k-v pair exist */
-  static constexpr flags_t FLAGS_DONT_STOMP  = 0x8;  /* do not overwrite existing k-v pair */
-  static constexpr flags_t FLAGS_NO_RESIZE   = 0x10; /* if size < existing size, do not resize */
-  static constexpr flags_t FLAGS_MAX_VALUE   = 0x10;
+  static constexpr flags_t FLAGS_NONE          = 0x0;
+  static constexpr flags_t FLAGS_READ_ONLY     = 0x1; /* lock read-only */
+  static constexpr flags_t FLAGS_SET_SIZE      = 0x2;
+  static constexpr flags_t FLAGS_CREATE_ONLY   = 0x4;  /* only succeed if no existing k-v pair exist */
+  static constexpr flags_t FLAGS_DONT_STOMP    = 0x8;  /* do not overwrite existing k-v pair */
+  static constexpr flags_t FLAGS_NO_RESIZE     = 0x10; /* if size < existing size, do not resize */
+  static constexpr flags_t FLAGS_MAX_VALUE     = 0x10;
 
   using unlock_flags_t = std::uint32_t;
   static constexpr unlock_flags_t UNLOCK_FLAGS_NONE = 0x0;
