@@ -348,3 +348,27 @@ extern "C" size_t kvstore_count(const kvstore_t store_handle,
   auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
   return kvstore->count(pool);
 }
+
+extern "C" status_t kvstore_allocate_pool_memory(const kvstore_t store_handle,
+                                                 const pool_t pool,
+                                                 const size_t size,
+                                                 const size_t alignment,
+                                                 void ** out_ptr)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  void * ptr = nullptr;
+  auto s = kvstore->allocate_pool_memory(pool, size, alignment, ptr);
+  if(s == S_OK) {
+    *out_ptr = ptr;
+  }
+  return s;
+}
+
+extern "C" status_t kvstore_free_pool_memory(const kvstore_t store_handle,
+                                             const pool_t pool,
+                                             const void * ptr,
+                                             const size_t size)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  return kvstore->free_pool_memory(pool, ptr, size);
+}

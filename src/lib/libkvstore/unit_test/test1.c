@@ -160,6 +160,18 @@ int main() //int argc, char* argv[])
       assert(kvstore_unlock(store, pool, tok) == 0);
     }
 
+    /* allocate and deallocate un-named memory */
+    {
+      void * p = NULL;
+      assert(kvstore_allocate_pool_memory(store, pool, 1024, 0xFF, &p) == 0);
+      assert(p);
+      assert((((addr_t)p) & 0xFF) == 0); // check alignment
+      memset(p, 0, 1024);
+      assert(kvstore_free_pool_memory(store, pool, p, 1024) == 0);
+    }
+      
+
+    /* clean up */
     assert(kvstore_close_pool(store, pool) == 0);
     assert(kvstore_close_pool(store, pool2) == 0);
     assert(kvstore_delete_pool(store, "myPool") == 0);
