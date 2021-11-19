@@ -30,8 +30,9 @@ extern "C"
 
   /* type definitions */
   typedef int       status_t;
-  typedef void *    kvstore_t; 
-  typedef uint32_t  pool_flags_t;
+  typedef void *    kvstore_t;
+  typedef void *    lock_token_t;
+  typedef uint32_t  kvstore_flags_t;
   typedef uint64_t  pool_t;
   typedef uint64_t  addr_t;
 
@@ -48,13 +49,13 @@ extern "C"
 
 
   /* see kvstore_itf.h */
-  static const pool_flags_t FLAGS_NONE        = 0x0;
-  static const pool_flags_t FLAGS_READ_ONLY   = 0x1; /* lock read-only */
-  static const pool_flags_t FLAGS_SET_SIZE    = 0x2;
-  static const pool_flags_t FLAGS_CREATE_ONLY = 0x4;  /* only succeed if no existing k-v pair exist */
-  static const pool_flags_t FLAGS_DONT_STOMP  = 0x8;  /* do not overwrite existing k-v pair */
-  static const pool_flags_t FLAGS_NO_RESIZE   = 0x10; /* if size < existing size, do not resize */
-  static const pool_flags_t FLAGS_MAX_VALUE   = 0x10;
+  static const kvstore_flags_t FLAGS_NONE        = 0x0;
+  static const kvstore_flags_t FLAGS_READ_ONLY   = 0x1; /* lock read-only */
+  static const kvstore_flags_t FLAGS_SET_SIZE    = 0x2;
+  static const kvstore_flags_t FLAGS_CREATE_ONLY = 0x4;  /* only succeed if no existing k-v pair exist */
+  static const kvstore_flags_t FLAGS_DONT_STOMP  = 0x8;  /* do not overwrite existing k-v pair */
+  static const kvstore_flags_t FLAGS_NO_RESIZE   = 0x10; /* if size < existing size, do not resize */
+  static const kvstore_flags_t FLAGS_MAX_VALUE   = 0x10;
 
 
   /* kvstore_create
@@ -84,25 +85,25 @@ extern "C"
   status_t kvstore_create_pool(const kvstore_t store_handle,
                                const char * pool_name,
                                const size_t size,
-                               const pool_flags_t flags,
+                               const kvstore_flags_t flags,
                                pool_t * out_pool_handle);
 
   status_t kvstore_create_pool_ex(const kvstore_t store_handle,
                                   const char * pool_name,
                                   const size_t size,
-                                  const pool_flags_t flags,
+                                  const kvstore_flags_t flags,
                                   const size_t expected_object_count,
                                   const addr_t base_addr,
                                   pool_t * out_pool_handle);
 
   status_t kvstore_open_pool(const kvstore_t store_handle,
                              const char * pool_name,
-                             const pool_flags_t flags,
+                             const kvstore_flags_t flags,
                              pool_t * out_pool_handle);
   
   status_t kvstore_open_pool_ex(const kvstore_t store_handle,
                                 const char * pool_name,
-                                const pool_flags_t flags,
+                                const kvstore_flags_t flags,
                                 const addr_t base_addr,
                                 pool_t * out_pool_handle);
 
@@ -112,10 +113,54 @@ extern "C"
   status_t kvstore_delete_pool(const kvstore_t store_handle,
                                const char * pool_name);
 
-  
+
+  /* - memory release with free */
   status_t kvstore_get_pool_names(const kvstore_t store_handle,
                                   char *** out_names,
                                   size_t * out_names_count);
+
+  status_t kvstore_grow_pool(const kvstore_t store_handle,
+                             const pool_t pool_handle,
+                             const size_t increment_size,
+                             size_t * reconfigured_size);
+
+  status_t kvstore_put(const kvstore_t store_handle,
+                       const pool_t pool_handle,
+                       const char * key,
+                       const void * value,
+                       const size_t value_len,
+                       const kvstore_flags_t flags);
+
+  /* - memory release with free */
+  status_t kvstore_get(const kvstore_t store_handle,
+                       const pool_t pool_handle,
+                       const char * key,
+                       void ** value,
+                       size_t * value_len);
+
+  status_t kvstore_swap_keys(const kvstore_t store_handle,
+                             const pool_t pool_handle,
+                             const char * key0,
+                             const char * key1);
+
+  enum {
+        KVSTORE_LOCK_NONE = 0,
+        KVSTORE_LOCK_READ = 1,
+        KVSTORE_LOCK_WRITE = 2,
+  };
+  
+  status_t kvstore_lock_existing(const kvstore_t store_handle,
+                                 const pool_t pool_handle,
+                                 const char * key,
+                                 const int lock_type,
+                                 void ** out_value_ptr,
+                                 size_t * out_value_len,
+                                 lock_token_t * out_lock_token);
+  
+  status_t kvstore_unlock(const kvstore_t store_handle,
+                          const pool_t pool_handle,
+                          const lock_token_t lock_token);
+
   
   
   //typedef void * kvstore_t; /*< handle to IKVStore-compatible component instance */
@@ -128,7 +173,7 @@ extern "C"
   //   void * response_data;
   // } mcas_async_handle_t; /*< handle for asynchronous operations */
   
-  // typedef uint32_t      mcas_flags_t;
+  // typedef uint32_t      mcas_kvstore_flags_t;
   // typedef uint64_t      offset_t;
   // typedef unsigned char byte;
 
@@ -146,36 +191,36 @@ extern "C"
   //   uint64_t handle;
   // } mcas_pool_t;
   
-  // typedef uint32_t      mcas_ado_flags_t;
+  // typedef uint32_t      mcas_ado_kvstore_flags_t;
   // typedef uint64_t      addr_t;
 
   // /* see kvstore_itf.h */
-  // static const mcas_flags_t FLAGS_NONE      = 0x0;
-  // static const mcas_flags_t FLAGS_READ_ONLY = 0x1; /* lock read-only */
-  // static const mcas_flags_t FLAGS_SET_SIZE    = 0x2;
-  // static const mcas_flags_t FLAGS_CREATE_ONLY = 0x4;  /* only succeed if no existing k-v pair exist */
-  // static const mcas_flags_t FLAGS_DONT_STOMP  = 0x8;  /* do not overwrite existing k-v pair */
-  // static const mcas_flags_t FLAGS_NO_RESIZE   = 0x10; /* if size < existing size, do not resize */
-  // static const mcas_flags_t FLAGS_MAX_VALUE   = 0x10;
+  // static const mcas_kvstore_flags_t FLAGS_NONE      = 0x0;
+  // static const mcas_kvstore_flags_t FLAGS_READ_ONLY = 0x1; /* lock read-only */
+  // static const mcas_kvstore_flags_t FLAGS_SET_SIZE    = 0x2;
+  // static const mcas_kvstore_flags_t FLAGS_CREATE_ONLY = 0x4;  /* only succeed if no existing k-v pair exist */
+  // static const mcas_kvstore_flags_t FLAGS_DONT_STOMP  = 0x8;  /* do not overwrite existing k-v pair */
+  // static const mcas_kvstore_flags_t FLAGS_NO_RESIZE   = 0x10; /* if size < existing size, do not resize */
+  // static const mcas_kvstore_flags_t FLAGS_MAX_VALUE   = 0x10;
 
   // static const mcas_memory_handle_t MEMORY_HANDLE_NONE = 0;
   
   // /* see mcas_itf.h */
-  // static const mcas_ado_flags_t ADO_FLAG_NONE = 0;
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_NONE = 0;
   // /*< operation is asynchronous */
-  // static const mcas_ado_flags_t ADO_FLAG_ASYNC = (1 << 0);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_ASYNC = (1 << 0);
   // /*< create KV pair if needed */
-  // static const mcas_ado_flags_t ADO_FLAG_CREATE_ON_DEMAND = (1 << 1);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_CREATE_ON_DEMAND = (1 << 1);
   // /*< create only - allocate key,value but don't call ADO */
-  // static const mcas_ado_flags_t ADO_FLAG_CREATE_ONLY = (1 << 2);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_CREATE_ONLY = (1 << 2);
   // /*< do not overwrite value if it already exists */
-  // static const mcas_ado_flags_t ADO_FLAG_NO_OVERWRITE = (1 << 3);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_NO_OVERWRITE = (1 << 3);
   // /*< create value but do not attach to key, unless key does not exist */
-  // static const mcas_ado_flags_t ADO_FLAG_DETACHED = (1 << 4);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_DETACHED = (1 << 4);
   // /*< only take read lock */
-  // static const mcas_ado_flags_t ADO_FLAG_READ_ONLY = (1 << 5);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_READ_ONLY = (1 << 5);
   // /*< zero any newly allocated value memory */
-  // static const mcas_ado_flags_t ADO_FLAG_ZERO_NEW_VALUE = (1 << 6);
+  // static const mcas_ado_kvstore_flags_t ADO_FLAG_ZERO_NEW_VALUE = (1 << 6);
 
   // typedef enum {
   //               ATTR_VALUE_LEN                = 1, /* length of a value associated with key */
@@ -263,7 +308,7 @@ extern "C"
   // status_t mcas_create_pool_ex(const mcas_session_t session,
   //                              const char * pool_name,
   //                              const size_t size,
-  //                              const mcas_flags_t flags,
+  //                              const mcas_kvstore_flags_t flags,
   //                              const uint64_t expected_obj_count,
   //                              const addr_t base_addr,
   //                              mcas_pool_t * out_pool_handle);
@@ -271,7 +316,7 @@ extern "C"
   // status_t mcas_create_pool(const mcas_session_t session,
   //                           const char * pool_name,
   //                           const size_t size,
-  //                           const mcas_flags_t flags,
+  //                           const mcas_kvstore_flags_t flags,
   //                           mcas_pool_t * out_pool_handle);
 
   // /** 
@@ -286,13 +331,13 @@ extern "C"
   //  */
   // status_t mcas_open_pool_ex(const mcas_session_t session,
   //                            const char * pool_name,
-  //                            const mcas_flags_t flags,
+  //                            const mcas_kvstore_flags_t flags,
   //                            const addr_t base_addr,
   //                            mcas_pool_t * out_pool_handle);
 
   // status_t mcas_open_pool(const mcas_session_t session,
   //                         const char * pool_name,
-  //                         const mcas_flags_t flags,
+  //                         const mcas_kvstore_flags_t flags,
   //                         mcas_pool_t * out_pool_handle);
   
 
@@ -733,7 +778,7 @@ extern "C"
   //                          const char * key,
   //                          const void * request,
   //                          const size_t request_len,
-  //                          const mcas_ado_flags_t flags,
+  //                          const mcas_ado_kvstore_flags_t flags,
   //                          const size_t value_size,
   //                          mcas_response_array_t * out_response_vector,
   //                          size_t * out_response_vector_count);
@@ -755,7 +800,7 @@ extern "C"
   //                                const char * key,
   //                                const void * request,
   //                                const size_t request_len,
-  //                                const mcas_ado_flags_t flags,
+  //                                const mcas_ado_kvstore_flags_t flags,
   //                                const size_t value_size,
   //                                mcas_async_handle_t * handle);
 
@@ -799,7 +844,7 @@ extern "C"
   //                              const void * value,
   //                              const size_t value_len,
   //                              const size_t root_len,
-  //                              const mcas_ado_flags_t flags,
+  //                              const mcas_ado_kvstore_flags_t flags,
   //                              mcas_response_array_t * out_response_vector,
   //                              size_t * out_response_vector_count);
 
@@ -825,7 +870,7 @@ extern "C"
   //                                    const void * value,
   //                                    const size_t value_len,
   //                                    const size_t root_len,
-  //                                    const mcas_ado_flags_t flags,
+  //                                    const mcas_ado_kvstore_flags_t flags,
   //                                    mcas_async_handle_t * handle);
   
   // /** 
