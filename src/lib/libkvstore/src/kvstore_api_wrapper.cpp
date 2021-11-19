@@ -17,6 +17,7 @@
 typedef int       status_t;
 typedef void *    kvstore_t;
 typedef void *    lock_token_t;
+typedef void *    pool_iterator_t;
 typedef uint32_t  kvstore_flags_t;
 typedef uint64_t  pool_t;
 typedef uint64_t  addr_t;
@@ -24,9 +25,14 @@ typedef uint64_t  addr_t;
 using namespace component;
 using namespace rapidjson;
 
-namespace globals
-{
-}
+struct pool_reference_t {
+  const void*     key;
+  size_t          key_len;
+  const void*     value;
+  size_t          value_len;
+  struct timespec timestamp; /* zero if not supported */
+  int             time_match;
+};
 
 extern "C" status_t kvstore_open(const unsigned debug_level,
                                  const char * json_config,
@@ -371,4 +377,55 @@ extern "C" status_t kvstore_free_pool_memory(const kvstore_t store_handle,
 {
   auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
   return kvstore->free_pool_memory(pool, ptr, size);
+}
+
+extern "C" status_t kvstore_iterator_open(const kvstore_t store_handle,
+                                          const pool_t pool,
+                                          pool_iterator_t * out_iterator_handle)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  assert(out_iterator_handle);
+  *out_iterator_handle = kvstore->open_pool_iterator(pool);
+  return S_OK;
+}
+
+extern "C" status_t kvstore_iterator_next(const kvstore_t store_handle,
+                                          const pool_t pool,
+                                          pool_iterator_t iterator_handle,
+                                          const struct timespec t_begin,
+                                          const struct timespec t_end,
+                                          struct pool_reference_t * out_reference)
+{
+  assert(out_reference);
+  
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  IKVStore::pool_reference_t ref;
+  bool time_match = 0;
+  auto status = kvstore->deref_pool_iterator(pool,
+                                             reinterpret_cast<IKVStore::pool_iterator_t>(iterator_handle),
+                                             t_begin,
+                                             t_end,
+                                             ref,
+                                             time_match,
+                                             true);
+
+  if(status == S_OK) {
+    out_reference->key = ref.key;
+    out_reference->key_len = ref.key_len;
+    out_reference->value = ref.value;
+    out_reference->value_len = ref.value_len;
+    out_reference->timestamp = ref.timestamp;
+    out_reference->time_match = time_match;
+  }
+  
+  return status;
+}
+
+extern "C" status_t kvstore_iterator_close(const kvstore_t store_handle,
+                                           const pool_t pool,
+                                           pool_iterator_t iterator_handle)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
+  assert(iterator_handle);
+  return kvstore->close_pool_iterator(pool,  reinterpret_cast<IKVStore::pool_iterator_t>(iterator_handle));
 }

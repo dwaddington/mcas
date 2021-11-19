@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
+#include <time.h>
 #include <bits/types/struct_iovec.h>
 
 #ifdef __cplusplus
@@ -32,9 +33,27 @@ extern "C"
   typedef int       status_t;
   typedef void *    kvstore_t;
   typedef void *    lock_token_t;
+  typedef void *    pool_iterator_t;
   typedef uint32_t  kvstore_flags_t;
   typedef uint64_t  pool_t;
   typedef uint64_t  addr_t;
+
+  /* structures */
+  struct pool_reference_t {
+    const void*     key;
+    size_t          key_len;
+    const void*     value;
+    size_t          value_len;
+    struct timespec timestamp; /* zero if not supported */
+    int             time_match;
+  };
+
+  /* enums */
+  enum {
+        KVSTORE_LOCK_NONE = 0,
+        KVSTORE_LOCK_READ = 1,
+        KVSTORE_LOCK_WRITE = 2,
+  };
 
   /* error definitions */
   static const status_t S_OK = 0;
@@ -42,12 +61,15 @@ extern "C"
   static const status_t S_OK_MORE = 2;
   static const status_t E_FAIL = -1;
   static const status_t E_INVAL = -2;
+  static const status_t E_OUT_OF_BOUNDS = -16;
+  static const status_t E_ITERATOR_DISTURBED = -34;
   static const status_t E_KEY_EXISTS  = -51;
   static const status_t E_KEY_NOT_FOUND = -52;
   static const status_t E_BAD_POOL_NAME = -53;
   static const status_t E_BAD_ALIGNMENT = -54;
   static const status_t E_TOO_LARGE   = -55;
   static const status_t E_ALREADY_OPEN  = -56;
+
 
 
   /* see kvstore_itf.h */
@@ -252,12 +274,6 @@ extern "C"
                              const char * key0,
                              const char * key1);
 
-  enum {
-        KVSTORE_LOCK_NONE = 0,
-        KVSTORE_LOCK_READ = 1,
-        KVSTORE_LOCK_WRITE = 2,
-  };
-
 
   /** 
    * kvstore_lock_existing: lock memory for existing key-value pair
@@ -395,6 +411,53 @@ extern "C"
                                     const void * ptr,
                                     const size_t size);
 
+
+  /** 
+   * kvstore_iterator_open: open iterator on key-value pairs
+   * 
+   * @param store_handle Store instance handle
+   * @param pool Pool handle
+   * @param out_iterator_handle [out] Iterator handle
+   * 
+   * @return S_OK or error code
+   */
+  status_t kvstore_iterator_open(const kvstore_t store_handle,
+                                 const pool_t pool,
+                                 pool_iterator_t * out_iterator_handle);
+
+  /** 
+   * kvstore_iterator_next: get next element (order not guaranteed)
+   * 
+   * @param store_handle Store instance handle
+   * @param pool Pool handle
+   * @param iterator_handle Iterator handle
+   * @param t_begin Time must be after or equal. If set to zero, no constraint.
+   * @param t_end Time must be before or equal. If set to zero, no constraint.
+   * @param out_reference Reference to key-value pair
+   * 
+   * @return S_OK on success and valid reference, E_INVAL (bad iterator),
+   *   E_OUT_OF_BOUNDS (when attempting to dereference out of bounds)
+   *   E_ITERATOR_DISTURBED (when writes have been made since last iteration)
+   */
+  status_t kvstore_iterator_next(const kvstore_t store_handle,
+                                 const pool_t pool,
+                                 pool_iterator_t iterator_handle,
+                                 const struct timespec t_begin,
+                                 const struct timespec t_end,
+                                 struct pool_reference_t * out_reference);
+
+  /** 
+   * kvstore_iterator_close: close iterator
+   * 
+   * @param store_handle Store instance handle
+   * @param pool Pool handle
+   * @param iterator_handle Iterator handle
+   * 
+   * @return S_OK or error code
+   */
+  status_t kvstore_iterator_close(const kvstore_t store_handle,
+                                  const pool_t pool,
+                                  pool_iterator_t iterator_handle);
 
                     
 #ifdef __cplusplus
