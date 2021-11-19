@@ -91,6 +91,27 @@ int main() //int argc, char* argv[])
       free(value_ptr);
     }
 
+    /* iterate over them */
+    {
+      pool_iterator_t iter;
+      assert(kvstore_iterator_open(store, pool, &iter) == 0);
+      struct pool_reference_t ref;
+      struct timespec ts_zero = {0,0};
+
+      unsigned count = 0;
+      while(kvstore_iterator_next(store, pool, iter, ts_zero, ts_zero, &ref) == S_OK) {
+        printf("Got pair: %s %s ts=%ld:%lu match=%s\n",
+               (const char*) ref.key, (const char *) ref.value,
+               ref.timestamp.tv_sec,
+               ref.timestamp.tv_nsec, ref.time_match > 0 ? "yes" : "no");
+        count++;
+      }
+      printf("Total count:%u\n", count);
+      assert(count == 10);
+      
+      assert(kvstore_iterator_close(store, pool, iter) == 0);
+    }
+
     /* perform growth */
     {
       size_t new_size = 0;

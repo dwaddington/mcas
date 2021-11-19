@@ -788,7 +788,7 @@ protected:
    * @param increment Move iterator forward one position
    *
    * @return S_OK on success and valid reference, E_INVAL (bad iterator),
-   *   E_OUT_OF_BOUNDS (when attempting to dereference out of bounds
+   *   E_OUT_OF_BOUNDS (when attempting to dereference out of bounds)
    *   E_ITERATOR_DISTURBED (when writes have been made since last iteration)
    */
   virtual status_t deref_pool_iterator(const pool_t       pool,
