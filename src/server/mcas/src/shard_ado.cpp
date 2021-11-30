@@ -99,9 +99,9 @@ status_t Shard::conditional_bootstrap_ado_process(gsl::not_null<component::IKVSt
       }
 
       /* add parameter passing ipaddr */
-      std::string net_addr = _net_addr;
       args.push_back("--param");
-      args.push_back("'{net:" + net_addr + "," + std::to_string(_port) + "}'");
+      using namespace std::string_literals;
+      args.push_back("'{net:"s + _net_addr + "," + std::to_string(_port) + "}'");
 
       PMAJOR("Shard: Launching with ADO path: (%s)", _ado_path.c_str());
 

@@ -17,6 +17,7 @@
 
 #include <api/kvstore_itf.h>
 #include <common/logging.h> /* log_source */
+#include <common/string_view.h>
 #include <common/to_string.h>
 
 #include <gsl/pointers>
@@ -34,8 +35,8 @@ namespace mcas
 
 #ifdef FEATURE_POOL_ACL
 /* attributes of metadata pools */
-static constexpr const char * METADATA_POOL_PREFIX = "__metadata_";
-static constexpr size_t METADATA_POOL_PREFIX_LEN = 10;
+static constexpr common::string_view METADATA_POOL_PREFIX = "__metadata_";
+static constexpr size_t METADATA_POOL_PREFIX_LEN = METADATA_POOL_PREFIX.size();
 static constexpr size_t METADATA_POOL_INITIAL_SIZE = 4096*2;
 static constexpr size_t METADATA_POOL_EXPECTED_OBJECTS = 100;
 #endif
@@ -74,11 +75,11 @@ private:
    *
    * @return true of pool is open
    */
-  bool check_for_open_pool(const std::string& pool_name, pool_t& out_pool) const
+  bool check_for_open_pool(common::string_view pool_name_, pool_t& out_pool) const
   {
-    auto i = _map_n2p.find(pool_name);
+    auto i = _map_n2p.find(pool_name_);
     if (i == _map_n2p.end()) {
-      CPLOG(1, "check_for_open_pool (%s) false", pool_name.c_str());
+      CFLOG(1, "check_for_open_pool ({}) false", pool_name_);
       out_pool = 0;
       return false;
     }
@@ -86,11 +87,11 @@ private:
     auto j = _open_pools.find(i->second);
     if (j != _open_pools.end()) {
       out_pool = i->second;
-      CPLOG(1, "check_for_open_pool (%s) true", pool_name.c_str());
+      CFLOG(1, "check_for_open_pool ({}) true", pool_name_);
       return true;
     }
     out_pool = 0;
-    CPLOG(1, "check_for_open_pool (%s) false", pool_name.c_str());
+    CFLOG(1, "check_for_open_pool ({}) false", pool_name_);
     return false;
   }
 
@@ -104,8 +105,8 @@ private:
    * 
    * @return 
    */
-  std::string derive_metadata_pool_name(const std::string& pool_name) {
-    std::string mpn = METADATA_POOL_PREFIX + pool_name;
+  std::string derive_metadata_pool_name(common::string_view pool_name) {
+    std::string mpn = std::string(METADATA_POOL_PREFIX) + std::string(pool_name);
     return mpn;
   }
 #endif
@@ -121,10 +122,13 @@ public:
    * @return Pool handle
    */
   pool_t open_and_register_pool(gsl::not_null<component::IKVStore *> kvstore,
-                                const std::string&    pool_name)
+                                const common::string_view pool_name)
   {
 #ifdef FEATURE_POOL_ACL
     /* refuse to open pools that have metadata pool prefix */
+    /* Note that string::compare evaluates to non-zero (true) iff the strings
+     * *don't* match. Is this what was intended here?
+     */
     if(pool_name.compare(0, METADATA_POOL_PREFIX_LEN, METADATA_POOL_PREFIX)) {
       PWRN("Pool_manager: opening metadata pool directly disallowed");
       return component::IKVStore::POOL_ERROR;
@@ -147,8 +151,8 @@ public:
     }
 
     _open_pools[pool]   = 1;
-    _map_n2p[pool_name] = pool;
-    _map_p2n[pool]      = pool_name;
+    _map_n2p[std::string(pool_name)] = pool;
+    _map_p2n[pool]      = std::string(pool_name);
     _pool_info[pool]    = {
 #ifdef FEATURE_POOL_ACL                           
                            metadata_pool,
@@ -175,7 +179,7 @@ public:
    * @return Pool handle
    */
   pool_t create_and_register_pool(gsl::not_null<component::IKVStore *> kvstore,
-                                  const std::string&    pool_name,
+                                  common::string_view   pool_name,
                                   const size_t          pool_size,
                                   const uint64_t        expected_object_count,
                                   const unsigned int    flags)
@@ -220,8 +224,8 @@ public:
     }
     
     _open_pools[pool]   = 1;
-    _map_n2p[pool_name] = pool;
-    _map_p2n[pool]      = pool_name;
+    _map_n2p[std::string(pool_name)] = pool;
+    _map_p2n[pool]      = std::string(pool_name);
     _pool_info[pool]    = {
 #ifdef FEATURE_POOL_ACL                           
                            metadata_pool,
@@ -377,7 +381,7 @@ public:
     unsigned int flags;
   };
 
-  std::map<std::string, pool_t> _map_n2p;
+  std::map<std::string, pool_t, std::less<>> _map_n2p;
   std::map<pool_t, std::string> _map_p2n;
   std::map<pool_t, unsigned>    _open_pools;
   std::map<pool_t, pool_info_t> _pool_info;
