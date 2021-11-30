@@ -18,6 +18,7 @@
 #include <common/exceptions.h>
 #include <common/cycles.h>
 #include <common/env.h>
+#include <common/less_getter.h>
 #include <common/rwlock.h>
 #include <common/to_string.h>
 #include <common/utils.h>
@@ -39,16 +40,16 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
-
-
 #define DEFAULT_ALIGNMENT 8
 #define SINGLE_THREADED
 #define MIN_POOL (1ULL << DM_REGION_LOG_GRAIN_SIZE)
 
 #include "mm_plugin_itf.h"
 
+/*
+ * Outside of "factory", there are two uses of new/delete: RWLock and Iteratora.
+ * These exist because they
+ */
 using namespace component;
 using namespace common;
 
@@ -106,6 +107,97 @@ int init_map_lock_mask()
 const int effective_map_locked = init_map_lock_mask();
 }
 
+struct region_memory
+  : private ::iovec
+{
+private:
+  int _debug_level;
+public:
+  region_memory(unsigned debug_level_, void *p, std::size_t size)
+    : ::iovec{p, size}
+    , _debug_level(debug_level_)
+  {}
+  unsigned debug_level() const { return _debug_level; }
+  virtual ~region_memory() {}
+  using ::iovec::iov_base;
+  using ::iovec::iov_len;
+};
+
+struct region_memory_mmap
+  : public region_memory
+{
+  region_memory_mmap(unsigned debug_level_, void *p, std::size_t size)
+    : region_memory(debug_level_, p, size)
+  {}
+  ~region_memory_mmap() override
+  {
+    CFLOGM(1, "freeing region memory ({},{})", iov_base, iov_len);
+    if(::munmap(iov_base, iov_len))
+    {
+      FLOGM("munmap of region memory {}.{} failed", iov_base, iov_len);
+    }
+  }
+};
+
+struct region_memory_numa
+  : public region_memory
+{
+  region_memory_numa(unsigned debug_level_, void *p, std::size_t size)
+    : region_memory(debug_level_, p, size)
+  {}
+  ~region_memory_numa() override
+  {
+    CFLOGM(1, "freeing region memory ({},{})", iov_base, iov_len);
+    numa_free(iov_base, iov_len);
+  }
+};
+
+namespace
+{
+  int open_region_file(const string_view pool_name)
+  {
+    char * backing_store_dir = ::getenv("MAPSTORE_BACKING_STORE_DIR");
+    if ( backing_store_dir )
+    {
+      /* create file */
+      struct stat st;
+      if (::stat(backing_store_dir,&st) == 0) {
+        if (st.st_mode & (S_IFDIR != 0)) {
+          using namespace std::string_literals;
+          std::string filename = backing_store_dir + "/mapstore_backing_"s + std::string(pool_name) + ".dat";
+
+          ::mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+          FINF("backing file ({}))", filename);
+          return ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, mode);
+        }
+      }
+    }
+    return -1;
+  }
+}
+
+/* allow find of unique_ptr by ptr value in a set or map */
+template<typename T>
+	struct compare_unique_ptr
+	{
+		using is_transparent = void;
+
+		bool operator()(const std::unique_ptr<T> &a, const std::unique_ptr<T> &b) const
+		{
+			return a.get() < b.get();
+		}
+
+		bool operator()(const T *a, const std::unique_ptr<T> &b) const
+		{
+			return a < b.get();
+		}
+
+		bool operator()(const std::unique_ptr<T> &a, const T *b) const
+		{
+			return a.get() < b;
+		}
+	};
+
 /**
  * Pool instance class
  *
@@ -116,8 +208,7 @@ private:
 
   unsigned debug_level() const { return _debug_level; }
 
-  void * allocate_region_memory(size_t size, const string_view pool_name);
-  void free_region_memory(void *addr, const size_t size);
+  std::unique_ptr<region_memory> allocate_region_memory(size_t size);
 
   static const Pool_instance *checked_pool(const Pool_instance * pool)
   {
@@ -153,70 +244,60 @@ public:
                 const common::string_view mm_plugin_path,
                 const common::string_view name_,
                 size_t nsize,
+                int numa_node_,
                 unsigned flags_)
     : _debug_level(debug_level),
-      _nsize(nsize < MIN_POOL ? MIN_POOL : nsize),
+      _ref_mutex{},
+      _nsize(0),
+      _numa_node(numa_node_),
       _name(name_),
-      _regions{{allocate_region_memory(round_up_page(_nsize), name_), round_up_page(_nsize)}},
+      _fdout(open_region_file(_name)),
+      _regions{},
+      _mm_plugin_mutex{},
       _mm_plugin(mm_plugin_path), /* plugin path for heap allocator */
       _map_lock{},
+      _map(std::make_unique<map_t>(aam_t(_mm_plugin))),
       _flags{flags_},
       _iterators{},
       _writes{}
   {
-    /* use a pointer so we can make sure it gets stored before memory is freed */
-    _map = new map_t({(_mm_plugin.add_managed_region(_regions[0].iov_base, _nsize), aam_t(_mm_plugin))});
+    grow_pool(nsize < MIN_POOL ? MIN_POOL : nsize, _nsize);
     CFLOGM(1, "new pool instance");
   }
+  Pool_instance(const Pool_instance &) = delete;
+  Pool_instance &operator=(const Pool_instance &) = delete;
 
   ~Pool_instance()
   {
-    if(_ref_count == 0) {
-      CFLOGM(1, "freeing regions for pool ({})", _name);
+    CFLOGM(1, "freeing regions for pool ({})", _name);
 
-      /* destroy map before we release memory */
-      delete _map;
-
-      /* release memory */
-      for(auto r : _regions) {
-        free_region_memory(r.iov_base, r.iov_len);
-      }
-      CFLOGM(2, "all regions freed");
-      _regions.clear();
-
+    if ( 0 <= _fdout )
+    {
       syncfs(_fdout);
       close(_fdout);
     }
   }
-
-  unsigned add_ref() {
-    std::lock_guard<std::mutex> g(_ref_mutex);
-    return _ref_count++;
-  }
-
-  unsigned release_ref() {
-    std::lock_guard<std::mutex> g(_ref_mutex);
-    assert(_ref_count > 0);
-    return --_ref_count;
-  }
-
   const std::string& name() const { return _name; }
 
 private:
 
   unsigned                   _debug_level;
   std::mutex                 _ref_mutex;
-  unsigned                   _ref_count = 0;
   size_t                     _nsize; /*< order important */
+  int                        _numa_node;
   std::string                _name; /*< pool name */
-  std::vector<::iovec>       _regions; /*< regions supporting pool */
+  int                        _fdout;
+  std::vector<std::unique_ptr<region_memory>> _regions; /*< regions supporting pool */
   std::mutex                 _mm_plugin_mutex;
   MM_plugin_wrapper          _mm_plugin;
-  map_t *                    _map; /*< hash table based map */
+  /* use a pointer so we can make sure it gets stored before memory is freed */
   common::RWLock             _map_lock; /*< read write lock */
+  std::unique_ptr<map_t>     _map; /*< hash table based map */
   unsigned int               _flags;
-  std::set<Iterator*>        _iterators;
-  int                        _fdout;
+  /* Note: Using Iterator * as a comparable is a slight cheat, because pointers
+   * from separate allocations are, strictly speaking, not comparable.
+   */
+  std::set<std::unique_ptr<Iterator>, less_getter<std::unique_ptr<Iterator>>> _iterators;
   /*
     We use this counter to see if new writes have come in
     during an iteration.  This is essentially an optmistic
@@ -300,16 +381,14 @@ public:
 };
 
 struct Pool_session {
-  Pool_session(gsl::not_null<Pool_instance *> ph) : pool(ph) {
-    pool->add_ref();
+  Pool_session(gsl::not_null<std::shared_ptr<Pool_instance>> ph) : pool(ph) {
   }
 
   ~Pool_session() {
-    pool->release_ref();
   }
 
   bool check() const { return canary == 0x45450101; }
-  gsl::not_null<Pool_instance *> pool;
+  gsl::not_null<std::shared_ptr<Pool_instance>> pool;
   const unsigned canary = 0x45450101;
 };
 
@@ -319,7 +398,7 @@ struct tls_cache_t {
 
 std::mutex _pool_sessions_lock; /* guards both _pool_sessions and _pools */
 /* ERROR?: should Pool_sessions really shared across Map_store instances? */
-using pools_type = std::unordered_map<std::string, std::unique_ptr<Pool_instance>>;
+using pools_type = std::map<std::string, std::shared_ptr<Pool_instance>, std::less<>>;
 pools_type _pools; /*< existing pools */
 std::set<std::unique_ptr<Pool_session>> _pool_sessions;
 
@@ -876,9 +955,9 @@ status_t Pool_instance::get_pool_regions(nupm::region_descriptor::address_map_t 
   if (_regions.empty())
     return E_INVAL;
 
-  for (auto region : _regions)
+  for (const auto &region : _regions)
     out_regions.push_back(nupm::region_descriptor::address_map_t::value_type
-                          (common::make_byte_span(region.iov_base, region.iov_len)));
+                          (common::make_byte_span(region->iov_base, region->iov_len)));
   return S_OK;
 }
 
@@ -889,13 +968,12 @@ status_t Pool_instance::grow_pool(const size_t increment_size,
     return E_INVAL;
 
   size_t rounded_increment_size = round_up_page(increment_size);
-  reconfigured_size = _nsize + rounded_increment_size;
 
-  void *new_region = allocate_region_memory(rounded_increment_size, _name);
+  auto new_region = allocate_region_memory(rounded_increment_size);
   std::lock_guard g{_mm_plugin_mutex};
-  _mm_plugin.add_managed_region(new_region, rounded_increment_size);
-  _regions.push_back({new_region, rounded_increment_size});
-  _nsize = reconfigured_size;
+  _mm_plugin.add_managed_region(new_region->iov_base, new_region->iov_len);
+  _regions.push_back(std::move(new_region));
+  reconfigured_size = _nsize;
   return S_OK;
 }
 
@@ -945,9 +1023,8 @@ status_t Pool_instance::allocate_pool_memory(const size_t size,
 
 IKVStore::pool_iterator_t Pool_instance::open_pool_iterator()
 {
-  auto i = new Iterator(this);
-  _iterators.insert(i);
-  return reinterpret_cast<IKVStore::pool_iterator_t>(i);
+  auto it = _iterators.insert(std::make_unique<Iterator>(this));
+  return reinterpret_cast<IKVStore::pool_iterator_t>(it.first->get());
 }
 
 status_t Pool_instance::deref_pool_iterator(IKVStore::pool_iterator_t iter,
@@ -957,7 +1034,7 @@ status_t Pool_instance::deref_pool_iterator(IKVStore::pool_iterator_t iter,
                                             bool& time_match,
                                             bool increment)
 {
-  auto i = reinterpret_cast<Iterator*>(iter);
+  const auto i = reinterpret_cast<Iterator*>(iter);
   if(_iterators.count(i) != 1) return E_INVAL;
   if(i->is_end()) return E_OUT_OF_BOUNDS;
   if(!i->check_mark(_writes)) return E_ITERATOR_DISTURBED;
@@ -990,88 +1067,93 @@ status_t Pool_instance::deref_pool_iterator(IKVStore::pool_iterator_t iter,
 
 status_t Pool_instance::close_pool_iterator(IKVStore::pool_iterator_t iter)
 {
-  auto i = reinterpret_cast<Iterator*>(iter);
-  if(iter == nullptr || _iterators.erase(i) != 1) return E_INVAL;
-  delete i;
+  const auto it = _iterators.find(reinterpret_cast<Iterator *>(iter));
+  if (it == _iterators.end()) return E_INVAL;
+  _iterators.erase(it);
   return S_OK;
 }
 
-void * Pool_instance::allocate_region_memory(size_t size, const string_view pool_name)
+std::unique_ptr<region_memory> Pool_instance::allocate_region_memory(size_t size)
 {
+  std::unique_ptr<region_memory> rm;
   assert(size > 0);
 
-  void * p = nullptr;
-  char * backing_store_dir = ::getenv("MAPSTORE_BACKING_STORE_DIR");
-
-  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   assert(size % PAGE_SIZE == 0);
 
-  if(backing_store_dir) {
-    struct stat st;
-    if(stat(backing_store_dir,&st) == 0) {
-      if(st.st_mode & (S_IFDIR != 0)) {
-        std::string filename = backing_store_dir;
-        filename += "/mapstore_backing_" + std::string(pool_name) + ".dat";
-
-        if ((_fdout = open (filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, mode)) >= 0) {
-
-          /* create space in file */
-          if(ftruncate(_fdout, size) == 0) {
-            p = mmap(reinterpret_cast<void*>(0xff00000000), /* help debugging */
-                     size,
-                     PROT_READ | PROT_WRITE,
-                     MAP_SHARED, /* paging means no MAP_LOCKED */
-                     _fdout, /* file */
-                     0 /* offset */);
-            if(p)
-              FINF("using mmap'ed backing file ({}) ({} MiB)", filename, REDUCE_MB(size));
-          }
-        }
-      }
+  auto prot = PROT_READ | PROT_WRITE;
+  auto flags = MAP_SHARED;
+  /* create space in file */
+  if ( 0 <= _fdout && ftruncate(_fdout, _nsize + size) == 0 )
+  {
+    auto p = mmap(reinterpret_cast<char *>(0xff00000000) + _nsize, /* help debugging */
+             size,
+             prot,
+             flags, /* paging means no MAP_LOCKED */
+             _fdout, /* file */
+             _nsize /* offset */);
+    if (p != MAP_FAILED)
+    {
+      FINF("using backing file for {} MiB", REDUCE_MB(size));
+      rm = std::make_unique<region_memory_mmap>(debug_level(), p, size);
     }
   }
 
-  if(p == nullptr) {
-    p = mmap(reinterpret_cast<void*>(0x800000000), /* help debugging */
+  if (! rm) {
+    if ( _numa_node == -1 )
+    {
+    auto addr = reinterpret_cast<char *>(0x800000000) + _nsize; /* help debugging */
+    /* memory to be freed with munmap */
+      auto p = ::mmap(addr,
              size,
-             PROT_READ | PROT_WRITE,
-             MAP_ANONYMOUS | MAP_SHARED | effective_map_locked,
-             0, /* file */
+             prot,
+             flags | MAP_ANONYMOUS | effective_map_locked,
+             -1, /* file */
              0 /* offset */);
 
-    if ( p == MAP_FAILED ) {
-      auto e = errno;
-      std::ostringstream msg;
-      msg << __FILE__ << " allocate_region_memory mmap failed on DRAM for region allocation"
-          << " size=" << std::dec << size << " :" << strerror(e);
-      throw General_exception("%s", msg.str().c_str());
+      if ( p == MAP_FAILED ) {
+        auto e = errno;
+        std::ostringstream msg;
+        msg << __FILE__ << " allocate_region_memory mmap failed on DRAM for region allocation"
+            << " size=" << std::dec << size << " :" << strerror(e);
+        throw General_exception("%s", msg.str().c_str());
+      }
+      rm = std::make_unique<region_memory_mmap>(debug_level(), p, size);
+    }
+    else
+    {
+      auto p = numa_alloc_onnode(size, _numa_node);
+      rm = std::make_unique<region_memory_numa>(debug_level(), p, size);
     }
   }
 
-  //  if(madvise(p, size, MADV_DONTFORK) != 0)
-  //    throw General_exception("madvise 'don't fork' failed unexpectedly (%p %lu)", p, size);
+#if 0
+  if(madvise(p, size, MADV_DONTFORK) != 0)
+    throw General_exception("madvise 'don't fork' failed unexpectedly (%p %lu)", p, size);
+#endif
 
-  CFLOGM(1, "allocated_region_memory ({},{})", p, size);
-  return p;
+  CFLOGM(1, "allocated_region_memory ({},{})", rm->iov_base, size);
+  _nsize += size;
+  return rm;
 }
-
-void Pool_instance::free_region_memory(void *addr, const size_t size)
-{
-  CFLOGM(1, "freeing region memory ({},{})", addr, size);
-  if(::munmap(addr, size))
-    throw Logic_exception("munmap of region memory failed");
-}
-
-
 
 /** Main class */
 
 Map_store::Map_store(const unsigned debug_level,
                      const common::string_view mm_plugin_path,
+                     const common::string_view owner,
+                     const common::string_view name)
+  : Map_store(debug_level, mm_plugin_path, owner, name, -1)
+{
+}
+
+Map_store::Map_store(const unsigned debug_level,
+                     const common::string_view mm_plugin_path,
                      const common::string_view /* owner */,
-                     const common::string_view /* name */)
+                     const common::string_view /* name */,
+                     const int numa_node_)
   : _debug_level(debug_level),
-    _mm_plugin_path(mm_plugin_path)
+    _mm_plugin_path(mm_plugin_path),
+    _numa_node(numa_node_)
 {
   CFLOGM(1, "mm_plugin_path ({})", mm_plugin_path);
 }
@@ -1089,11 +1171,9 @@ IKVStore::pool_t Map_store::create_pool(const common::string_view name_,
   if (flags & IKVStore::FLAGS_READ_ONLY)
     throw API_exception("read only create_pool not supported on map-store component");
 
-  const std::string name(name_);
-
   Std_lock_guard g(_pool_sessions_lock);
 
-  auto iter = _pools.find(name);
+  auto iter = _pools.find(name_);
 
   if (flags & IKVStore::FLAGS_CREATE_ONLY) {
     if (iter != _pools.end()) {
@@ -1101,19 +1181,20 @@ IKVStore::pool_t Map_store::create_pool(const common::string_view name_,
     }
   }
 
-  Pool_instance * handle;
+  std::shared_ptr<Pool_instance> handle;
+
   if(iter != _pools.end()) {
-    handle = iter->second.get();
+    handle = iter->second;
     CFLOGM(1, "using existing pool instance");
   }
   else {
-    handle = _pools.insert(pools_type::value_type(name, std::make_unique<Pool_instance>(debug_level(), _mm_plugin_path, name, nsize, flags))).first->second.get();
+    handle = _pools.insert(pools_type::value_type(name_, std::make_shared<Pool_instance>(debug_level(), _mm_plugin_path, name_, nsize, _numa_node, flags))).first->second;
     CFLOGM(1, "creating new pool instance");
   }
-  auto session = _pool_sessions.emplace(new Pool_session{handle}).first->get(); /* create a session too */
+  auto session = _pool_sessions.emplace(std::make_unique<Pool_session>(handle)).first->get(); /* create a session too */
   CFLOGM(1, "adding new session ({})", session);
 
-  CFLOGM(1, "created pool OK: {}", name);
+  CFLOGM(1, "created pool OK: {}", name_);
 
   return reinterpret_cast<IKVStore::pool_t>(session);
 }
@@ -1122,21 +1203,14 @@ IKVStore::pool_t Map_store::open_pool(string_view name,
                                       const flags_t /*flags*/,
                                       component::IKVStore::Addr /* base_addr_unused */)
 {
-  const string_view key = name;
-
-  Pool_instance *ph = nullptr;
+  std::shared_ptr<Pool_instance> ph;
   Std_lock_guard g(_pool_sessions_lock);
   /* see if a pool exists that matches the key */
-  for (auto &h : _pools) {
-    if (h.first == key) {
-      ph = h.second.get();
-      break;
-    }
-  }
+  auto it = _pools.find(name);
 
-  if (ph == nullptr)
+  if (it == _pools.end())
     return component::IKVStore::POOL_ERROR;
-  auto session = _pool_sessions.emplace(new Pool_session(ph)).first->get();
+  auto session = _pool_sessions.emplace(std::make_unique<Pool_session>(it->second)).first->get();
   CFLOGM(1, "opened pool({})", session);
 
   return reinterpret_cast<IKVStore::pool_t>(session);
@@ -1164,38 +1238,23 @@ status_t Map_store::close_pool(const pool_t pid)
 status_t Map_store::delete_pool(const common::string_view poolname_)
 {
   Std_lock_guard g(_pool_sessions_lock);
-
-  const std::string poolname(poolname_);
-  // return S_OK;
-  Pool_instance *ph = nullptr;
   /* see if a pool exists that matches the poolname */
-  for (auto &h : _pools) {
-    if (h.first == poolname) {
-      ph = h.second.get();
-      break;
-    }
-  }
+  auto it = _pools.find(poolname_);
 
-  if (ph == nullptr) {
-    CFWRNM(1, "({}) pool not found", poolname);
+  if (it == _pools.end()) {
+    CFWRNM(1, "({}) pool not found", poolname_);
     return E_POOL_NOT_FOUND;
   }
 
   for (auto &s : _pool_sessions) {
-    if (s->pool->name() == poolname) {
-      FWRNM("({}) pool delete failed because pool still "
-           "open ({})",
-           poolname, common::p_fmt(s.get()));
+    if (s->pool->name() == poolname_) {
+      FWRNM("({}) pool delete failed because pool still open ({})",
+           poolname_, common::p_fmt(s.get()));
       return E_ALREADY_OPEN;
     }
   }
 
-  /* delete pool too */
-  if (_pools.find(poolname) == _pools.end())
-    throw Logic_exception("unable to delete pool session");
-
-  _pools.erase(poolname);
-  delete ph;
+  _pools.erase(it);
 
   return S_OK;
 }
@@ -1478,7 +1537,7 @@ extern "C" void *factory_createInstance(component::uuid_t component_id) {
 
 Map_store_factory::~Map_store_factory() {
 }
-  
+
 void *Map_store_factory::query_interface(component::uuid_t &itf_uuid)
 {
   if (itf_uuid == component::IKVStore_factory::iid()) {
@@ -1515,7 +1574,7 @@ component::IKVStore *Map_store_factory::create(unsigned debug_level,
       checked_mm_plugin_path = path;
     }
   }
-  
+
   component::IKVStore *obj =
     static_cast<component::IKVStore *>
     (new Map_store(debug_level,
@@ -1526,5 +1585,3 @@ component::IKVStore *Map_store_factory::create(unsigned debug_level,
   obj->add_ref();
   return obj;
 }
-
-#pragma GCC diagnostic pop

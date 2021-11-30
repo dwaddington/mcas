@@ -33,8 +33,9 @@ namespace nupm
 
 class Map_store : public component::IKVStore /* generic Key-Value store interface */
 {
-  unsigned          _debug_level;
-  const std::string _mm_plugin_path;
+  unsigned    _debug_level;
+  std::string _mm_plugin_path;
+  int         _numa_node;
 public:
   
   unsigned debug_level() { return _debug_level; }
@@ -49,6 +50,11 @@ public:
             const common::string_view mm_plugin_path,
             const common::string_view owner,
             const common::string_view name);
+  Map_store(const unsigned debug_level,
+            const common::string_view mm_plugin_path,
+            const common::string_view owner,
+            const common::string_view name,
+            int numa_node);
 
   /**
    * Destructor
