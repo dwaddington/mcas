@@ -4,6 +4,8 @@
 #define RAPIDJSON_HAS_STDSTRING 1
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 #include <common/logging.h>
 #include <common/errors.h>
@@ -34,6 +36,8 @@ struct pool_reference_t {
   int             time_match;
 };
 
+static unsigned log_level = 3;
+
 extern "C" status_t kvstore_open(const unsigned debug_level,
                                  const char * json_config,
                                  kvstore_t * out_handle)
@@ -56,6 +60,43 @@ extern "C" status_t kvstore_open(const unsigned debug_level,
   }
   std::string type = document["store_type"].GetString();
 
+  IKVStore_factory::map_create params;
+  if(document.HasMember("mm_plugin_path")) {
+    if(log_level > 1)
+      PLOG("mm_plugin_path:%s", document["mm_plugin_path"].GetString());
+    params["mm_plugin_path"] = document["mm_plugin_path"].GetString();
+  }
+
+  if(document.HasMember("dax_config")) {
+    assert(document["dax_config"].IsArray());
+
+    std::stringstream ss;
+    ss << "[";
+
+    bool first=true;
+    for (auto& v : document["dax_config"].GetArray()) {
+      if(first)
+        first=false;
+      else
+        ss << ",";
+      
+      PLOG("%s",v["addr"].GetString());
+      PLOG("%s",v["path"].GetString());
+      ss << "{\"path\":\"" << v["path"].GetString() << "\",\"addr\":" << std::stol(v["addr"].GetString(),nullptr,16) << "}";
+    }
+    ss << "]";
+
+    /* unparse back to string */
+    // StringBuffer buffer;
+    // Writer<StringBuffer> writer(buffer);
+    // document["dax_config"].Accept(writer);
+    params["dax_config"] = ss.str();
+    
+    if(log_level > 1)
+      PLOG("dax_config:%s", ss.str().c_str());
+  }
+
+
   if(type == "mapstore") {
     std::string libname = "libcomponent-";
     libname += type;
@@ -63,8 +104,15 @@ extern "C" status_t kvstore_open(const unsigned debug_level,
     IBase * comp = load_component(libname, mapstore_factory);
     if(!comp) return E_FAIL;
     auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
-
-    auto kvstore = fact->create(debug_level, {});
+    auto kvstore = fact->create(debug_level, params);
+    *const_cast<kvstore_t*>(out_handle) = kvstore;
+  }
+  else if(type == "hstore" || type == "hstore-cc" || type == "hstore-mm") {
+    std::string libname = "libcomponent-" + type + ".so";
+    IBase * comp = load_component(libname, hstore_factory);
+    if(!comp) return E_FAIL;
+    auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
+    auto kvstore = fact->create(debug_level, params);
     *const_cast<kvstore_t*>(out_handle) = kvstore;
   }
   else {
@@ -427,5 +475,6 @@ extern "C" status_t kvstore_iterator_close(const kvstore_t store_handle,
 {
   auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
   assert(iterator_handle);
-  return kvstore->close_pool_iterator(pool,  reinterpret_cast<IKVStore::pool_iterator_t>(iterator_handle));
+  return kvstore->close_pool_iterator(pool,
+                                      reinterpret_cast<IKVStore::pool_iterator_t>(iterator_handle));
 }

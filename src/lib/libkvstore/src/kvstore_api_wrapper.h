@@ -45,7 +45,7 @@ extern "C"
     const void*     value;
     size_t          value_len;
     struct timespec timestamp; /* zero if not supported */
-    int             time_match;
+    int             time_match; /* if within designated time bounds */
   };
 
   /* enums */

@@ -22,6 +22,13 @@
 #define GB(X) ((1ULL << 30) * X)
 #define TB(X) ((1ULL << 40) * X)
 
+#define DAX_CONFIG "[{ \"path\": \"/mnt/pmem0\", \"addr\": \"0x900000000\" }]"
+//#define DAX_CONFIG "[{ \"path\": \"/dev/dax0.0\", \"addr\": \"0x900000000\" }]"
+
+/** 
+ * Use this with testing ADO
+ * 
+ */
 int main() //int argc, char* argv[])
 {
   kvstore_t store;
@@ -33,7 +40,13 @@ int main() //int argc, char* argv[])
   }
   
   char json_spec[4096];
-  sprintf(json_spec, "{ \"store_type\":\"mapstore\", \"mm_plugin_path\" : \"%s\" }", getenv("MM_PLUGIN_PATH"));
+  sprintf(json_spec,
+          "{ \"store_type\":\"hstore\", \"mm_plugin_path\" : \"%s\", \"dax_config\" : %s }",
+          getenv("MM_PLUGIN_PATH"),
+          DAX_CONFIG
+          );
+
+  printf("%s\n",json_spec);
 
   assert(kvstore_open(debug_level, json_spec, &store) == 0);
 
@@ -90,8 +103,9 @@ int main() //int argc, char* argv[])
       size_t value_len = 0;
       sprintf(key, "key-%u", i);
       assert(kvstore_get(store, pool, key, &value_ptr, &value_len) == 0);
-      printf("key:(%s) value:(%s:%lu)\n",
-             key, (char*)value_ptr, value_len);
+      assert(value_ptr);
+      printf("key:(%s) value:(%.*s:%lu)\n",
+             key, (int) value_len, (char*)value_ptr, value_len);
       free(value_ptr);
     }
 
