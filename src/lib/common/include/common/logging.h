@@ -80,7 +80,6 @@ namespace common
   private:
 	unsigned _debug_level;
   public:
-    ~log_source() {}
     explicit log_source(const unsigned debug_level_)
       : _debug_level(debug_level_)
     {}

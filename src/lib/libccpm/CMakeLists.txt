@@ -5,7 +5,10 @@ project(ccpm CXX C)
 set(CMAKE_CXX_STANDARD 17)
 include(${CMAKE_SOURCE_DIR}/mk/avoid_boost_type_to_string_bug.cmake)
 
-add_compile_options(-g -pedantic -Wall -Werror -Wextra -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings -Wformat=2)
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy-dtor COMPILER_SUPPORTS_DEPRECATED_COPY_DTOR)
+
+add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wformat=2 -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings $<$<BOOL:${COMPILER_SUPPORTS_DEPRECATED_COPY_DTOR}>:-Wdeprecated-copy-dtor>)
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 include(../../../mk/clang-dev-tools.cmake)

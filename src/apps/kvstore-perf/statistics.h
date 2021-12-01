@@ -153,6 +153,8 @@ public:
     }
 
 	~BinStatistics();
+    BinStatistics(const BinStatistics &) = default;
+    BinStatistics &operator=(const BinStatistics &) = default;
 
   public:
 

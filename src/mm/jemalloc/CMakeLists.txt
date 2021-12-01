@@ -6,8 +6,12 @@ set(SOURCES src/mm_plugin_jemalloc.cpp)
 
 add_subdirectory(jemalloc-source)
 
-add_compile_options(-DCONFIG_DEBUG -pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings)
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy-dtor COMPILER_SUPPORTS_DEPRECATED_COPY_DTOR)
 
+add_compile_options(-pedantic -Wall -Wextra -Werror -Wcast-align -Wcast-qual -Wconversion -Weffc++ -Wformat=2 -Wold-style-cast -Wredundant-decls -Wshadow -Wtype-limits -Wunused-parameter -Wwrite-strings $<$<BOOL:${COMPILER_SUPPORTS_DEPRECATED_COPY_DTOR}>:-Wdeprecated-copy-dtor>)
+
+add_definitions(-DCONFIG_DEBUG)
 include_directories(${CMAKE_BINARY_DIR}/src/mm/jemalloc-dist/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/jemalloc-source/build/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
