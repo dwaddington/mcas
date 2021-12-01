@@ -33,7 +33,6 @@
 #include "../../mm_plugin_itf.h"
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-value"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 #define CAST_HEAP(X) (reinterpret_cast<Heap*>(X))
@@ -53,7 +52,15 @@ Heap * g_heap_map[MAX_HEAPS] = {0};
 class Heap
 {
 public:
-  Heap(unsigned arena_id) : _arena_id(arena_id)
+  Heap(unsigned arena_id) : _managed_size(0), _x_flags(0), _arena_id(arena_id), _ofs{}
+#ifdef USE_AVL
+    /* use an AVL tree to manage the extents */
+    , _avl_allocator{}
+#else
+    , _log_base{}
+    , _log_end{}
+    , _log_ptr{}
+#endif
   {
   }
 
@@ -81,7 +88,10 @@ public:
     /* once-only hook in extent allocators */
     if(needs_hooking) {
       hook_extents(_arena_id);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
       _x_flags = MALLOCX_ARENA(_arena_id) | MALLOCX_TCACHE_NONE;
+#pragma GCC diagnostic pop
     }     
   }    
 
@@ -119,8 +129,8 @@ public:
   }
   
 private:
-  size_t   _managed_size = 0;
-  unsigned _x_flags = 0;
+  size_t   _managed_size;
+  unsigned _x_flags;
   unsigned _arena_id;
   std::ofstream _ofs;
 
@@ -280,7 +290,7 @@ PUBLIC status_t mm_plugin_init()
   {
     bool off = 0;
     size_t off_size = sizeof(off);
-    if(jel_mallctl("thread.tcache.enabled",(void*)&off,&off_size,NULL,0)) {
+    if(jel_mallctl("thread.tcache.enabled",static_cast<void*>(&off),&off_size,NULL,0)) {
       PPERR("error: disabling tcache");
       return E_FAIL;      
     }
@@ -313,10 +323,13 @@ static void hook_extents(unsigned arena_id)
   new_hooks = &custom_extent_hooks;
   new_size = sizeof(extent_hooks_t *);
     
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
   if(jel_mallctlbymib(hooks_mib, hooks_miblen, (void *)&old_hooks, &old_size, (void *)&new_hooks, new_size)) {
     PERR("new hook attach failed");
     return;
   }    
+#pragma GCC diagnostic pop
 }
 
 
@@ -384,7 +397,10 @@ PUBLIC status_t mm_plugin_aligned_allocate(mm_plugin_heap_t heap, size_t n, size
 #endif
   
   assert(is_power_of_two(alignment));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
   void * ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags() | MALLOCX_ALIGN(alignment));
+#pragma GCC diagnostic pop
   if(ptr == nullptr) PPERR("out of memory");
   assert(ptr);
   assert(check_aligned(ptr, alignment));
@@ -430,7 +446,11 @@ PUBLIC status_t mm_plugin_callocate(mm_plugin_heap_t heap, size_t n, void ** out
 #ifdef DEBUG_ALLOCS
   PPLOG("%s (%lu) x_flags=%x",__func__, n, CAST_HEAP(heap)->x_flags());
 #endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
   void * ptr = jel_mallocx(n, CAST_HEAP(heap)->x_flags() | MALLOCX_ZERO);
+#pragma GCC diagnostic pop
+
   if(ptr == nullptr) {
     PPERR("callocate: out of memory");
     return E_NO_MEM;
