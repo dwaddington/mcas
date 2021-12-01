@@ -68,7 +68,7 @@ namespace
 
 #define LOG_TS_FMT " %f"
 #define LOG_TS_ARG log_ts(),
-#else
+#else /* ! ( LOG_PRINT_TIMESTAMP && defined CONFIG_DEBUG ) */
 #define LOG_TS_FMT ""
 #define LOG_TS_ARG
 #endif
@@ -94,6 +94,9 @@ namespace common
   template <typename T> const void *p_fmt(const T t) { return static_cast<const void *>(t); }
 }
 
+#else /* ! defined __cplusplus */
+#include <stdarg.h> /* va_list, va_start, va_end */
+#include <stdio.h> /* vsnprint, fprintf */
 #endif
 
 #define NORMAL_RED "\033[31m"
