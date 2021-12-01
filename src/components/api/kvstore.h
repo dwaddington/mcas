@@ -748,7 +748,7 @@ public:
    * @param type STORE_LOCK_READ | STORE_LOCK_WRITE
    * @param out_value [out] Pointer to data
    * @param inout_value_len [in-out] Size of data in bytes
-   * @param alignment [in] Alignment in bytes.
+   * @param alignment [in] Alignment of new value space in bytes.
    * @param out_key [out]  Handle to key for unlock
    * @param out_key_ptr [out]  Optional request for key-string pointer (set to
    * nullptr if not required)
