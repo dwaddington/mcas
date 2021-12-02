@@ -925,6 +925,12 @@ status_t Pool_instance::allocate_pool_memory(const size_t size,
     return E_INVAL;
   }
 
+  if ( (alignment & (alignment-1)) != 0 )
+  {
+    PWRN("Map_store: invalid %s alignment 0x%zx (neither 0 nor a power of 2)", __func__, alignment);
+    return IKVStore::E_BAD_ALIGNMENT;
+  }
+
   try {
     /* we can't fully support alignment choice */
     out_addr = 0;
