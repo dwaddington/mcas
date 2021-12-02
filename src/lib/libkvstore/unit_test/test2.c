@@ -101,7 +101,7 @@ int main() //int argc, char* argv[])
       char key[32];
       sprintf(key, "key-%u", i);
       printf("getting .. (%s)\n", key);
-      void * value_ptr = NULL;;
+      void * value_ptr = NULL;
       size_t value_len = 0;
       status_t s = kvstore_get(store, pool, key, &value_ptr, &value_len);
       if(s!=S_OK) {
@@ -109,7 +109,6 @@ int main() //int argc, char* argv[])
         return 0;
       }
       
-      sprintf(key, "key-%u", i);
       assert(value_ptr);
       printf("key:(%s) value:(%.*s:%lu)\n",
              key, (int) value_len, (char*)value_ptr, value_len);
