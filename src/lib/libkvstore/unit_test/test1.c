@@ -92,7 +92,7 @@ int main() //int argc, char* argv[])
       assert(kvstore_get(store, pool, key, &value_ptr, &value_len) == 0);
       printf("key:(%s) value:(%s:%lu)\n",
              key, (char*)value_ptr, value_len);
-      free(value_ptr);
+      kvstore_free_memory(store, value_ptr);
     }
 
     /* iterate over them */

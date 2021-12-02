@@ -478,3 +478,10 @@ extern "C" status_t kvstore_iterator_close(const kvstore_t store_handle,
   return kvstore->close_pool_iterator(pool,
                                       reinterpret_cast<IKVStore::pool_iterator_t>(iterator_handle));
 }
+
+extern "C" status_t kvstore_free_memory(const kvstore_t store_handle,
+                                        void * ptr)
+{
+  auto kvstore = reinterpret_cast<IKVStore *>(store_handle);  
+  return kvstore->free_memory(ptr);
+}

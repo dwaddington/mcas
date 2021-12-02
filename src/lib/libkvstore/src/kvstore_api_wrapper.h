@@ -459,7 +459,18 @@ extern "C"
                                   const pool_t pool,
                                   pool_iterator_t iterator_handle);
 
-                    
+
+  /** 
+   * kvstore_free_memory: free memory from get call value etc.
+   * 
+   * @param store_handle Store instance handle
+   * @param ptr Pointer to memory to free
+   * 
+   * @return S_OK or error code
+   */
+  status_t kvstore_free_memory(const kvstore_t store_handle,
+                               void * ptr);
+  
 #ifdef __cplusplus
 }
 #endif

@@ -53,7 +53,7 @@ int main() //int argc, char* argv[])
   /* create pool, add some pairs, close, delete */
   {
     pool_t pool;
-    assert(kvstore_create_pool(store, "myPool", MB(4), 0, &pool) == 0);
+    assert(kvstore_create_pool(store, "myPool", MB(8), 0, &pool) == 0);
     
     for(unsigned i=0;i<10;i++) {
       char key[32];
@@ -93,20 +93,27 @@ int main() //int argc, char* argv[])
       char value[32];
       sprintf(key, "key-%u", i);
       sprintf(value, "value-of-%u", i);
-      assert(kvstore_put(store, pool, key, value, strlen(value), 0) == 0);
+      assert(kvstore_put(store, pool, key, value, strlen(value), 0) == S_OK);
     }
     
     /* get them back */
     for(unsigned i=0;i<10;i++) {
       char key[32];
+      sprintf(key, "key-%u", i);
+      printf("getting .. (%s)\n", key);
       void * value_ptr = NULL;;
       size_t value_len = 0;
+      status_t s = kvstore_get(store, pool, key, &value_ptr, &value_len);
+      if(s!=S_OK) {
+        printf("error result: %d\n", s);
+        return 0;
+      }
+      
       sprintf(key, "key-%u", i);
-      assert(kvstore_get(store, pool, key, &value_ptr, &value_len) == 0);
       assert(value_ptr);
       printf("key:(%s) value:(%.*s:%lu)\n",
              key, (int) value_len, (char*)value_ptr, value_len);
-      free(value_ptr);
+      kvstore_free_memory(store, value_ptr);
     }
 
     /* iterate over them */
