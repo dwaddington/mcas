@@ -48,6 +48,9 @@ int main() //int argc, char* argv[])
 
   printf("%s\n",json_spec);
 
+#ifdef NDEBUG
+#error NDEBUG defined; assert arg will be ignored
+#endif
   assert(kvstore_open(debug_level, json_spec, &store) == 0);
 
   printf("store handle:%p\n", store);
@@ -136,7 +139,7 @@ int main() //int argc, char* argv[])
     {
       size_t new_size = 0;
       CHECK_OK(kvstore_close_pool(store, pool));
-      assert(kvstore_grow_pool(store, pool, MB(2), &new_size) == -53); /* can't use closed pool */
+      assert(kvstore_grow_pool(store, pool, MB(2), &new_size) == E_BAD_POOL_NAME); /* can't use closed pool */
       CHECK_OK(kvstore_open_pool(store, "myPool", 0, &pool));
       CHECK_OK(kvstore_grow_pool(store, pool, MB(2), &new_size));
       assert(new_size >= (MB(4)  + MB(2)));
@@ -206,9 +209,11 @@ int main() //int argc, char* argv[])
     /* allocate and deallocate un-named memory */
     {
       void * p = NULL;
-      CHECK_OK(kvstore_allocate_pool_memory(store, pool, 1024, 0xFF, &p));
+      assert(kvstore_allocate_pool_memory(store, pool, 1024, 0xff, &p) == E_BAD_ALIGNMENT);
+      const unsigned align = 0x100;
+      CHECK_OK(kvstore_allocate_pool_memory(store, pool, 1024, align, &p));
       assert(p);
-      assert((((addr_t)p) & 0xFF) == 0); // check alignment
+      assert((((addr_t)p) % align) == 0); // check alignment
       memset(p, 0, 1024);
       CHECK_OK(kvstore_free_pool_memory(store, pool, p, 1024));
     }
@@ -218,7 +223,7 @@ int main() //int argc, char* argv[])
     CHECK_OK(kvstore_close_pool(store, pool));
     CHECK_OK(kvstore_close_pool(store, pool2));
     CHECK_OK(kvstore_delete_pool(store, "myPool"));
-    assert(kvstore_delete_pool(store, "badPoolName") == -53);
+    assert(kvstore_delete_pool(store, "badPoolName") == E_BAD_POOL_NAME);
     CHECK_OK(kvstore_close(store));
   }
   
