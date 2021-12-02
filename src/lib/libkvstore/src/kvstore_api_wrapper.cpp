@@ -271,14 +271,7 @@ extern "C" status_t kvstore_get(const kvstore_t store_handle,
                                 size_t * value_len)
 {
   auto kvstore = reinterpret_cast<IKVStore *>(store_handle);
-  void * p;
-  size_t len_p;
-  auto status = kvstore->get(pool_handle, key, p, len_p);
-  if(status == S_OK) {
-    *value = p;
-    *value_len = len_p;
-  }
-  return status;
+  return kvstore->get(pool_handle, key, *value, *value_len);
 }
 
 

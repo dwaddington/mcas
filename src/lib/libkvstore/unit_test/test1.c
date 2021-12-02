@@ -22,6 +22,10 @@
 #define GB(X) ((1ULL << 30) * X)
 #define TB(X) ((1ULL << 40) * X)
 
+#define CHECK_OK(X) \
+  { status_t s = X;                                              \
+    if(s != S_OK) { printf("error: %d line:%d\n", s, __LINE__); }}
+
 int main() //int argc, char* argv[])
 {
   kvstore_t store;
@@ -37,29 +41,32 @@ int main() //int argc, char* argv[])
 
   assert(kvstore_open(debug_level, json_spec, &store) == 0);
 
+  printf("store handle:%p\n", store);
+  assert(store);
+
   /* create pool, add some pairs, close, delete */
   {
     pool_t pool;
-    assert(kvstore_create_pool(store, "myPool", MB(4), 0, &pool) == 0);
+    CHECK_OK(kvstore_create_pool(store, "myPool", MB(4), 0, &pool));
     
     for(unsigned i=0;i<10;i++) {
       char key[32];
       char value[32];
       sprintf(key, "key-%u", i);
       sprintf(value, "value-of-%u", i);
-      assert(kvstore_put(store, pool, key, value, strlen(value), 0) == 0);
+      CHECK_OK(kvstore_put(store, pool, key, value, strlen(value), 0));
     }
 
-    assert(kvstore_close_pool(store, pool) == 0);
-    assert(kvstore_delete_pool(store, "myPool") == 0);
+    CHECK_OK(kvstore_close_pool(store, pool));
+    CHECK_OK(kvstore_delete_pool(store, "myPool"));
   }
 
   /* create multiple pools and add pairs */
   {
     pool_t pool, pool2, pool3;
-    assert(kvstore_create_pool(store, "myPool", MB(4), 0, &pool) == 0);
-    assert(kvstore_create_pool(store, "myPool2", MB(4), 0, &pool2) == 0);
-    assert(kvstore_create_pool(store, "myPoolThatIsSmall", KB(4), 0, &pool3) == 0);
+    CHECK_OK(kvstore_create_pool(store, "myPool", MB(4), 0, &pool));
+    CHECK_OK(kvstore_create_pool(store, "myPool2", MB(4), 0, &pool2));
+    CHECK_OK(kvstore_create_pool(store, "myPoolThatIsSmall", KB(4), 0, &pool3));
 
     {
       char ** names;
@@ -80,7 +87,7 @@ int main() //int argc, char* argv[])
       char value[32];
       sprintf(key, "key-%u", i);
       sprintf(value, "value-of-%u", i);
-      assert(kvstore_put(store, pool, key, value, strlen(value), 0) == 0);
+      CHECK_OK(kvstore_put(store, pool, key, value, strlen(value), 0));
     }
     
     /* get them back */
@@ -89,16 +96,16 @@ int main() //int argc, char* argv[])
       void * value_ptr = NULL;;
       size_t value_len = 0;
       sprintf(key, "key-%u", i);
-      assert(kvstore_get(store, pool, key, &value_ptr, &value_len) == 0);
-      printf("key:(%s) value:(%s:%lu)\n",
-             key, (char*)value_ptr, value_len);
+      CHECK_OK(kvstore_get(store, pool, key, &value_ptr, &value_len));
+      printf("key:(%s) value:(%.*s:%lu)\n",
+             key, (int) value_len, (char*)value_ptr, value_len);
       kvstore_free_memory(store, value_ptr);
     }
 
     /* iterate over them */
     {
       pool_iterator_t iter;
-      assert(kvstore_iterator_open(store, pool, &iter) == 0);
+      CHECK_OK(kvstore_iterator_open(store, pool, &iter));
       struct pool_reference_t ref;
       struct timespec ts_zero = {0,0};
 
@@ -113,16 +120,16 @@ int main() //int argc, char* argv[])
       printf("Total count:%u\n", count);
       assert(count == 10);
       
-      assert(kvstore_iterator_close(store, pool, iter) == 0);
+      CHECK_OK(kvstore_iterator_close(store, pool, iter));
     }
 
     /* perform growth */
     {
       size_t new_size = 0;
-      assert(kvstore_close_pool(store, pool) == 0);
+      CHECK_OK(kvstore_close_pool(store, pool));
       assert(kvstore_grow_pool(store, pool, MB(2), &new_size) == -53); /* can't use closed pool */
-      assert(kvstore_open_pool(store, "myPool", 0, &pool) == 0);
-      assert(kvstore_grow_pool(store, pool, MB(2), &new_size) == 0);
+      CHECK_OK(kvstore_open_pool(store, "myPool", 0, &pool));
+      CHECK_OK(kvstore_grow_pool(store, pool, MB(2), &new_size));
       assert(new_size >= (MB(4)  + MB(2)));
     }
 
@@ -130,23 +137,25 @@ int main() //int argc, char* argv[])
     {
       char value[32];
       sprintf(value, "hello world!");
-      assert(kvstore_put(store, pool, "myResizeKey", value, strlen(value), 0) == 0);
-      {
-        void * value_ptr = NULL;
-        size_t value_len = 0;
-        assert(kvstore_get(store, pool, "myResizeKey", &value_ptr, &value_len) == 0);
-        printf("%.*s\n", (int) value_len, (char*) value_ptr);
-        assert(strncmp(value_ptr, "hello world!",strlen("hello world!")) == 0); 
-      }
-      /* now resize */
-      assert(kvstore_resize_value(store, pool, "myResizeKey", 5, 0) == 0);
+      
+      CHECK_OK(kvstore_put(store, pool, "myResizeKey", value, strlen(value), 0));
 
       {
         void * value_ptr = NULL;
         size_t value_len = 0;
-        assert(kvstore_get(store, pool, "myResizeKey", &value_ptr, &value_len) == 0);
+        CHECK_OK(kvstore_get(store, pool, "myResizeKey", &value_ptr, &value_len));
         printf("%.*s\n", (int) value_len, (char*) value_ptr);
-        assert(strncmp(value_ptr, "hello", 5) == 0);
+        CHECK_OK(strncmp(value_ptr, "hello world!",strlen("hello world!"))); 
+      }
+      /* now resize */
+      CHECK_OK(kvstore_resize_value(store, pool, "myResizeKey", 5, 0));
+
+      {
+        void * value_ptr = NULL;
+        size_t value_len = 0;
+        CHECK_OK(kvstore_get(store, pool, "myResizeKey", &value_ptr, &value_len));
+        printf("%.*s\n", (int) value_len, (char*) value_ptr);
+        CHECK_OK(strncmp(value_ptr, "hello", 5));
       }
     }
 
@@ -156,7 +165,7 @@ int main() //int argc, char* argv[])
       size_t value_len = 0;
 
       assert(kvstore_erase(store, pool, "madeUpKey") == E_KEY_NOT_FOUND);
-      assert(kvstore_erase(store, pool, "myResizeKey") == S_OK);
+      CHECK_OK(kvstore_erase(store, pool, "myResizeKey") == S_OK);
       assert(kvstore_get(store, pool, "myResizeKey", &value_ptr, &value_len) == E_KEY_NOT_FOUND);
     }
 
@@ -165,9 +174,9 @@ int main() //int argc, char* argv[])
       void * p;
       size_t p_len;
       lock_token_t tok;
-      assert(kvstore_lock_existing(store, pool, "key-2", KVSTORE_LOCK_WRITE, &p, &p_len, &tok) == 0);
+      CHECK_OK(kvstore_lock_existing(store, pool, "key-2", KVSTORE_LOCK_WRITE, &p, &p_len, &tok));
       printf("Locked:key-2 (%s)\n", (char*) p);
-      assert(kvstore_unlock(store, pool, tok) == 0);
+      CHECK_OK(kvstore_unlock(store, pool, tok));
     }
 
     /* lock with implicit create */
@@ -182,26 +191,26 @@ int main() //int argc, char* argv[])
                                              &p, &p_len, &tok) == S_OK_CREATED);
       printf("Locked:key-new (%p)(%ld) token=%p\n", (char*) p, p_len, tok);
       assert(tok != NULL);
-      assert(kvstore_unlock(store, pool, tok) == 0);
+      CHECK_OK(kvstore_unlock(store, pool, tok));
     }
 
     /* allocate and deallocate un-named memory */
     {
       void * p = NULL;
-      assert(kvstore_allocate_pool_memory(store, pool, 1024, 0xFF, &p) == 0);
+      CHECK_OK(kvstore_allocate_pool_memory(store, pool, 1024, 0xFF, &p));
       assert(p);
       assert((((addr_t)p) & 0xFF) == 0); // check alignment
       memset(p, 0, 1024);
-      assert(kvstore_free_pool_memory(store, pool, p, 1024) == 0);
+      CHECK_OK(kvstore_free_pool_memory(store, pool, p, 1024));
     }
       
 
     /* clean up */
-    assert(kvstore_close_pool(store, pool) == 0);
-    assert(kvstore_close_pool(store, pool2) == 0);
-    assert(kvstore_delete_pool(store, "myPool") == 0);
+    CHECK_OK(kvstore_close_pool(store, pool));
+    CHECK_OK(kvstore_close_pool(store, pool2));
+    CHECK_OK(kvstore_delete_pool(store, "myPool"));
     assert(kvstore_delete_pool(store, "badPoolName") == -53);
-    assert(kvstore_close(store) == 0);
+    CHECK_OK(kvstore_close(store));
   }
   
   printf("OK!!!\n");

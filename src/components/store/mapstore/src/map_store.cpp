@@ -455,10 +455,20 @@ status_t Pool_instance::get(const std::string &key,
 
   if (i == _map->end()) return IKVStore::E_KEY_NOT_FOUND;
 
+  /* if out_value is provided as non-NULL, and its large enough
+     then use it. If it is not large enough, then send back 
+     the size needed.
+  */
+  auto buffer_len = i->second._length;
   out_value_len = i->second._length;
-
-  /* result memory allocated with ::malloc */
-  out_value = malloc(out_value_len);
+  
+  if(out_value) {
+    if(buffer_len < i->second._length) return E_INSUFFICIENT_BUFFER;
+  }
+  else {
+    /* result memory allocated with ::malloc */
+    out_value = malloc(out_value_len);
+  }
 
   if ( out_value == nullptr )  {
     PWRN("Map_store: malloc failed");
