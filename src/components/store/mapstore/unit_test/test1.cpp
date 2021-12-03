@@ -22,6 +22,7 @@
 #include <common/str_utils.h>
 #include <api/components.h>
 #include <api/kvstore_itf.h>
+#include <cstdlib> /* getenv */
 
 #define ASSERT_OK(X) ASSERT_TRUE(S_OK == X)
 
@@ -34,6 +35,7 @@ namespace {
 // The fixture for testing class Foo.
 class KVStore_test : public ::testing::Test {
 
+  static bool numa_notified;
  protected:
 
   // If the constructor and destructor are not enough for setting up
@@ -50,7 +52,20 @@ class KVStore_test : public ::testing::Test {
       ASSERT_TRUE(comp);
       auto fact = make_itf_ref(static_cast<IKVStore_factory *>(comp->query_interface(IKVStore_factory::iid())));
 
-      _kvstore = fact->create(0, {});
+      const char *const numa_node = ::getenv("NUMA_NODE");
+      if ( numa_node )
+      {
+        _kvstore = fact->create(0, {{+component::IKVStore_factory::k_numa_node_mask, numa_node}});
+      }
+      else
+      {
+        if ( ! numa_notified )
+        {
+          std::cerr << "Using mmap memory. Run with NUMA_NODE=<numa_mask_spec> to allocate from a numa node\n";
+          numa_notified = true;
+        }
+        _kvstore = fact->create(0, {});
+      }
     }
   }
 
@@ -63,6 +78,7 @@ class KVStore_test : public ::testing::Test {
   static component::IKVStore * _kvstore;
 };
 
+bool KVStore_test::numa_notified = false;
 component::IKVStore * KVStore_test::_kvstore;
 
 

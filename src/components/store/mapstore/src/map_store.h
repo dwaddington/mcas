@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2020] [IBM Corporation]
+  Copyright [2017-2021] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -24,7 +24,9 @@
 #include <api/kvstore_itf.h>
 #include "map_store_env.h"
 
+#include "numa_node_mask.h"
 #include <common/string_view.h>
+#include <string>
 
 namespace nupm
 {
@@ -35,7 +37,7 @@ class Map_store : public component::IKVStore /* generic Key-Value store interfac
 {
   unsigned    _debug_level;
   std::string _mm_plugin_path;
-  int         _numa_node;
+  numa_node_mask _numa_node_mask;
 public:
   
   unsigned debug_level() { return _debug_level; }
@@ -54,7 +56,7 @@ public:
             const common::string_view mm_plugin_path,
             const common::string_view owner,
             const common::string_view name,
-            int numa_node);
+            common::string_view numa_node_mask);
 
   /**
    * Destructor
@@ -191,25 +193,6 @@ public:
 
   virtual status_t close_pool_iterator(const pool_t pool,
                                        pool_iterator_t iter) override;
-};
-
-class Map_store_factory : public component::IKVStore_factory {
-public:
-  /**
-   * Component/interface management
-   *
-   */
-  DECLARE_VERSION(1.0f);
-  DECLARE_COMPONENT_UUID(0xfac20985, 0x1253, 0x404d, 0x94d7, 0x77, 0x92, 0x75, 0x21, 0xa1, 0x21);
-
-  virtual ~Map_store_factory();
-  
-  void *query_interface(component::uuid_t &itf_uuid) override;
-
-  void unload() override;
-
-  component::IKVStore *create(unsigned debug_level,
-                                      const IKVStore_factory::map_create &mc) override;
 };
 
 #endif
