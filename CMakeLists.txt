@@ -19,6 +19,7 @@ option(BUILD_MPI_APPS "build mcas-mpi-bench and any other MPI dependent applicat
 # features
 option(FEATURE_TIMESTAMPS "feature: enable timestamps in hstore map" ON)
 option(FEATURE_POOL_ACL "feature: enable pool access control" OFF)
+option(FEATURE_HSTORE_USES_PMEM_PERSIST "feature: hstore uses special pmem_persist copy functions" ON)
 
 # debug options
 option(TEST_HSTORE_PERISHABLE "hstore perishable testing enabled" OFF)
@@ -84,6 +85,14 @@ if(FEATURE_TIMESTAMPS)
   add_definitions(-DENABLE_TIMESTAMPS=1)
 else()
   add_definitions(-DENABLE_TIMESTAMPS=0)
+endif()
+
+# MCAS_HSTORE_USE_PMEM_PERSIST indicates that hstore is to use PMEM persist
+# functions for memcpy/memmove/memset, rather than the standard functions.
+if(FEATURE_HSTORE_USES_PMEM_PERSIST)
+  add_definitions(-DMCAS_HSTORE_USE_PMEM_PERSIST=1)
+else()
+  add_definitions(-DMCAS_HSTORE_USE_PMEM_PERSIST=0)
 endif()
 
 set(ENV{MCAS_HOME} ${CMAKE_CURRENT_SOURCE_DIR})

@@ -29,6 +29,7 @@
 #include <common/errors.h>
 #include <common/exceptions.h>
 #include <common/perf/tm.h>
+#include <common/to_string.h>
 #include <common/utils.h>
 
 #include <city.h>

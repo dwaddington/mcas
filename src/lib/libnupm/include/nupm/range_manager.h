@@ -28,7 +28,7 @@ namespace nupm
 	struct range_manager
 	{
 		/*
-		 * Until we get past bosot 1.65, this interface has to work across
+		 * Until we get past boost 1.65, this interface has to work across
 		 * C++14 and C++17. common::byte, which is gsl::byte, has different
 		 * types in the two g++ compilers.
 		 */

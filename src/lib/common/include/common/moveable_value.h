@@ -46,7 +46,7 @@ namespace common
         return *this;
       }
 
-      T release(int)
+      T release()
       {
         T t(Traits::none);
         using std::swap;

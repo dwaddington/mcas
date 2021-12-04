@@ -221,12 +221,12 @@ template <typename Table>
 			::pmem_memcpy_persist(dst_, src_, sizeof *dst_);
 			(void)why_;
 #else
-	#pragma GCC diagnostic push
-	#if 9 <= __GNUC__
-	#pragma GCC diagnostic ignored "-Wclass-memaccess"
-	#endif
+#	pragma GCC diagnostic push
+#	if 8 <= __GNUC__
+#	pragma GCC diagnostic ignored "-Wclass-memaccess"
+#	endif
 			std::memcpy(dst_, src_, sizeof *dst_);
-	#pragma GCC diagnostic pop
+#	pragma GCC diagnostic pop
 			this->persist(dst_, sizeof *dst_, why_);
 #endif
 		}
@@ -397,7 +397,12 @@ template <typename Table>
 #if MCAS_HSTORE_USE_PMEM_PERSIST
 		::pmem_memcpy_persist(&_persisted->_swap.temp[0], &d0, _persisted->_swap.temp.size());
 #else
+#pragma GCC diagnostic push
+#	if 8 <= __GNUC__
+#	pragma GCC diagnostic ignored "-Wclass-memaccess"
+#	endif
 		std::memcpy(&_persisted->_swap.temp[0], &d0, _persisted->_swap.temp.size());
+#pragma GCC diagnostic pop
 		this->persist(&_persisted->_swap, sizeof _persisted->_swap);
 #endif
 

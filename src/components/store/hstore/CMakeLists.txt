@@ -17,7 +17,6 @@ add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
 # MCAS_HSTORE_USE_PMEM_PERSIST indicates that hstore is to use use PMEM persist
 # functions for memcpy/memmove/memset, rather than std::memmcpy, std::copy,
 # std::fill etc, followed by a persist call.
-add_definitions(-DMCAS_HSTORE_USE_PMEM_PERSIST=1)
 
 set(SOURCES_HEADER_CHECK
 	src/allocator_cc.cpp

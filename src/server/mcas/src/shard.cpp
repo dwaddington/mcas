@@ -94,7 +94,7 @@ struct locked_key
   }
   component::IKVStore::key_t release()
   {
-    _store.release(111);
+    _store.release();
     return _lock_handle;
   }
 };

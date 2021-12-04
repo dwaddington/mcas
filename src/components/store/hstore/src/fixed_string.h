@@ -18,6 +18,9 @@
 #include "lock_state.h"
 #include <common/pointer_cast.h>
 #include <common/perf/tm.h>
+#ifndef MCAS_HSTORE_USE_PMEM_PERSIST
+#error MCAS_HSTORE_USE_PMEM_PERSIST undefined
+#endif
 #if MCAS_HSTORE_USE_PMEM_PERSIST
 #include <libpmem.h>
 #endif
@@ -25,6 +28,7 @@
 #include <cassert>
 #include <cstddef> /* size_t */
 #include <stdexcept> /* domain_error */
+#include <type_traits> /* remove_reference */
 
 namespace
 {
@@ -55,7 +59,8 @@ namespace
 			::pmem_memset_persist(&*dst_, 0, n_ * sizeof *dst_);
 			return dst_ + n_;
 #else
-			return std::fill_n( dst_, n_, 0);
+			using fill_type = typename std::remove_reference<decltype(*dst_)>::type;
+			return std::fill_n(dst_, n_, fill_type{});
 			/* persist call is owed */
 #endif
 		}
@@ -68,7 +73,7 @@ namespace
 			::pmem_memcpy_persist(&*dst_, &*source_.begin(), source_.size() * sizeof(C));
 			return dst_ + source_.size();
 #else
-			return std::copy(source_.begin(), source.end(), dst_);
+			return std::copy(source_.begin(), source_.end(), dst_);
 			/* persist call is owed */
 #endif
 		}

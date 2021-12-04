@@ -24,7 +24,10 @@
 #include <api/fabric_itf.h>
 #include <api/kvstore_itf.h>
 #include <api/registrar_memory_direct.h> /* Opaque_memory_region */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
 #include <rdma/fabric.h> /* fi_context2 */
+#pragma GCC diagnostic pop
 #include <sys/mman.h>
 
 #include "free_deleter.h"
