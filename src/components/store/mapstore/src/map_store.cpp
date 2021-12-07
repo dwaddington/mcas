@@ -362,6 +362,8 @@ status_t Pool_instance::put(const std::string &key,
     return E_INVAL;
   }
 
+  CPLOG(2, PREFIX "put(%s) %.*s", key.c_str(), boost::numeric_cast<int>(value_len), reinterpret_cast<const char *>(value));
+
 #ifndef SINGLE_THREADED
   RWLock_guard guard(map_lock, RWLock_guard::WRITE);
 #endif
@@ -425,6 +427,7 @@ status_t Pool_instance::put(const std::string &key,
 
     void * buffer = nullptr;
     if(_mm_plugin.aligned_allocate(value_len, choose_alignment(value_len), &buffer) != S_OK)
+
       throw General_exception("memory plugin aligned_allocate failed");
 
     memcpy(buffer, value, value_len);
@@ -452,10 +455,20 @@ status_t Pool_instance::get(const std::string &key,
 
   if (i == _map->end()) return IKVStore::E_KEY_NOT_FOUND;
 
+  /* if out_value is provided as non-NULL, and its large enough
+     then use it. If it is not large enough, then send back 
+     the size needed.
+  */
+  auto buffer_len = i->second._length;
   out_value_len = i->second._length;
-
-  /* result memory allocated with ::malloc */
-  out_value = malloc(out_value_len);
+  
+  if(out_value) {
+    if(buffer_len < i->second._length) return E_INSUFFICIENT_BUFFER;
+  }
+  else {
+    /* result memory allocated with ::malloc */
+    out_value = malloc(out_value_len);
+  }
 
   if ( out_value == nullptr )  {
     PWRN("Map_store: malloc failed");
@@ -597,8 +610,6 @@ status_t Pool_instance::lock(const std::string &key,
 
   if (i == _map->end()) { /* create value */
 
-    write_touch();
-
     /* lock API has semantics of create on demand */
     if (inout_value_len == 0) {
       out_key = IKVStore::KEY_NONE;
@@ -607,6 +618,7 @@ status_t Pool_instance::lock(const std::string &key,
       return IKVStore::E_KEY_NOT_FOUND;
     }
 
+    write_touch();
 
     CPLOG(1, PREFIX "lock is on-demand allocating:(%s) %lu", key.c_str(), inout_value_len);
 
@@ -913,6 +925,12 @@ status_t Pool_instance::allocate_pool_memory(const size_t size,
     return E_INVAL;
   }
 
+  if ( (alignment & (alignment-1)) != 0 )
+  {
+    PWRN("Map_store: invalid %s alignment 0x%zx (neither 0 nor a power of 2)", __func__, alignment);
+    return IKVStore::E_BAD_ALIGNMENT;
+  }
+
   try {
     /* we can't fully support alignment choice */
     out_addr = 0;
@@ -963,7 +981,14 @@ status_t Pool_instance::deref_pool_iterator(IKVStore::pool_iterator_t iter,
   ref.timestamp = r->second._tsc.to_epoch();
 
   /* leave condition in timestamp cycles for better accuracy */
-  time_match = (r->second._tsc >= begin_tsc) && (end_tsc == 0 || r->second._tsc <= end_tsc);
+  try {
+    time_match = (r->second._tsc >= begin_tsc) && (end_tsc == 0 || r->second._tsc <= end_tsc);
+  }
+  catch(...) {
+    PWRN("bad time parameter");
+    return E_INVAL;
+  }
+    
 
   if(increment) {
     try {
@@ -1159,7 +1184,7 @@ status_t Map_store::close_pool(const pool_t pid)
   delete session;
   _pool_sessions.erase(session);
   CPLOG(1, PREFIX "closed pool (%lx)", pid);
-  CPLOG(1, PREFIX "erased sescsion %p", common::p_fmt(session));
+  CPLOG(2, PREFIX "erased session %p", common::p_fmt(session));
 
   return S_OK;
 }

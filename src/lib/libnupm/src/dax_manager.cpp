@@ -388,6 +388,7 @@ void nupm::dax_manager::remove(const string_view & id_)
 	else
 	{
 		CPLOG(2, "%s: _mapped_spaces does not contain %.*s", __func__, int(id_.size()), id_.begin());
+		throw std::runtime_error("no region " + std::string(id_));
 	}
 }
 
