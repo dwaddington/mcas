@@ -26,8 +26,8 @@
 #include "cpp_rangeindex_types.h"
 #include <btree_multimap.h>
 #include <blindi_btree_hybrid_nodes_multimap.h>
+#include <HOTSingleThreaded.hpp>
 #include <iostream>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 //#define DEBUG_PLUGIN 
