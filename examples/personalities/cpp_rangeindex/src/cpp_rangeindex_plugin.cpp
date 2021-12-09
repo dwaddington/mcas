@@ -207,15 +207,11 @@ public:
         auto it = tree.lower_bound(key);
 
 	for (int i=0; i < 1000; i++) {
-//	std::cout << " it.currslot " << it.currslot << std::endl;
 		if (it.currslot == ENDSLOT) {
 //			std::cout << " Range tree.end END= " << ENDSLOT << std::endl;
 			break;
 		}
 		ValueType v1 = it->second; 
-//		std::cout << "value_range[0] = "<<  v1->val[0] << std::endl;
-//		std::cout << "value_range[1] = "<<  v1->val[1] << std::endl;
-//		std::cout << " it->second " << it->second << std::endl;
 		value_list.push_back(it->second);
 		it++;
 	}
@@ -371,7 +367,7 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
   /*----------------------*/
   auto put_request = msg->command_as_PutRequest();
   if(put_request) {
-    auto str = put_request->word()->c_str();
+    auto str = put_request->row()->c_str();
 
   const char *p;  
 
@@ -437,8 +433,8 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
   /*---------------------------------------*/  
   auto get_symbol_request = msg->command_as_GetSymbol();
   if(get_symbol_request) {
-    auto req_str = get_symbol_request->word()->c_str();
-//    auto& req_word = *(get_symbol_request->word());
+    auto req_str = get_symbol_request->row()->c_str();
+//    auto& req_row = *(get_symbol_request->row());
 #ifdef DEBUG_PLUGIN
     std::cout << "req_str " << req_str << std::endl;
     std::cout << "devide fields " << std::endl;

@@ -4,7 +4,7 @@ namespace rangeindex_ADO_protocol;
 
 table PutRequest
 {
-  word : string;
+  row : string;
 }
 
 table BuildIndex
@@ -13,7 +13,7 @@ table BuildIndex
 
 table GetSymbol
 {
-  word : string;
+  row : string;
 }
 
 table GetString

@@ -41,11 +41,11 @@ public:
     if(rc != S_OK) std::logic_error("init invoke_ado failed");
   }
 
-  void add_word(const std::string& word) {
-    assert(word.empty() == false);
+  void add_row(const std::string& row) {
+    assert(row.empty() == false);
     FlatBufferBuilder fbb;
-    auto flat_word = fbb.CreateString(word);
-    auto cmd = CreatePutRequest(fbb, flat_word);
+    auto flat_row = fbb.CreateString(row);
+    auto cmd = CreatePutRequest(fbb, flat_row);
     auto msg = CreateMessage(fbb, Command_PutRequest, cmd.Union());
     fbb.Finish(msg);
     
@@ -58,7 +58,7 @@ public:
                                     0,
                                     response);
     if(rc != S_OK)
-      throw General_exception("add_word failed");
+      throw General_exception("add_row failed");
   }
 
   void build_index() {
@@ -82,7 +82,7 @@ public:
 
   std::string get_string(uint64_t bol) {
     FlatBufferBuilder fbb;
-    //    auto flat_bol = fbb.CreateString(word);
+    //    auto flat_bol = fbb.CreateString(row);
     auto cmd = CreateGetString(fbb, bol);
     auto msg = CreateMessage(fbb, Command_GetString, cmd.Union());
     fbb.Finish(msg);
@@ -103,10 +103,10 @@ public:
   }
 
 
-  uint64_t get_symbol(const std::string& word) {
+  uint64_t get_symbol(const std::string& row) {
     FlatBufferBuilder fbb;
-    auto flat_word = fbb.CreateString(word);
-    auto cmd = CreateGetSymbol(fbb, flat_word);
+    auto flat_row = fbb.CreateString(row);
+    auto cmd = CreateGetSymbol(fbb, flat_row);
     auto msg = CreateMessage(fbb, Command_GetSymbol, cmd.Union());
     fbb.Finish(msg);
     
