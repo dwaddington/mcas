@@ -32,6 +32,9 @@
 #include <boost/lexical_cast.hpp>
 //#define DEBUG_PLUGIN 
 
+//#define ELASTIC 
+#define HOT 
+
 
 using namespace rangeindex_ADO_protocol;
 using namespace ccpm;
@@ -39,7 +42,10 @@ using namespace stx;
 using namespace std;
 using namespace boost;
 
+#define RANGE_NUM 1000
+
 #define END 16000
+
 
 char *str1 = "string Literal";
 ///////////////////////////////////////////////////////
@@ -65,6 +71,8 @@ public:
     virtual bool Insert(const KeyType& key, const ValueType& value) = 0;
     virtual void GetValue(const KeyType &key,
                           std::vector<ValueType> &value_list)  = 0;
+
+    virtual int  GetExact(const KeyType &key) = 0;
 
     virtual void PrintTreeStats()  = 0;
 
@@ -127,6 +135,14 @@ public:
         if (it != tree.end())
             value_list.push_back(it->second);
     }
+
+   int GetExact(const KeyType &key) {
+        auto it = tree.find(key);
+        if (it != tree.end())
+            return 1;
+	return 0;
+   }
+   
 
      void GetRange(const KeyType &key,
                   std::vector<ValueType> &value_list) {
@@ -201,6 +217,21 @@ public:
 
     }
 
+
+    int GetExact(const KeyType &key) {
+
+        auto it = tree.lower_bound(key);
+#ifdef DEBUG_PLUGIN
+	std::cout << " it.currslot " << it.currslot << std::endl;
+#endif
+        if (it.currslot != END) {
+		return 1;
+	}
+	return 0;
+    }
+
+
+
     void GetRange(const KeyType &key,
                   std::vector<ValueType> &value_list) {
 
@@ -224,6 +255,7 @@ public:
         auto it = tree.lower_bound(key);
 	uint64_t cnt = 0;
         KeyType *curr_ts;
+/*	
 #ifdef DEBUG_PLUGIN
 	std::cout << " current timestamp " << std::endl;
 #endif	
@@ -264,10 +296,11 @@ public:
 
 	}
 	return cnt;
-
+*/
     }
 
 };
+
 
 /////////////
 
@@ -279,16 +312,30 @@ typedef UUID  KeyType;
 typedef UUID*  ValueType;  
 typedef uint64_t  KeyType2;  
 typedef uint64_t*  ValueType2;  
-//Index<KeyType, ValueType> *idx = new BTreeType<KeyType, ValueType, INNER_NUM, LEAF_NUM>;
-Index<KeyType, ValueType> *idx1 = new BlindiBTreeHybridNodes<KeyType, ValueType, SeqTreeBlindiNode, INNER_NUM, LEAF_NUM>("SeqTreeBlindi");
-//Index<KeyType2, ValueType2> *idx2 = new BlindiBTreeHybridNodes<KeyType2, ValueType2, SeqTreeBlindiNode, INNER_NUM, LEAF_NUM>("SeqTreeBlindi");
+//Index<KeyType, ValueType> *idx = new BTreeType<KeyType, ValueType, INNER_NUM, LEAF_NUM>; // BTREE
+Index<KeyType, ValueType> *idx1 = new BlindiBTreeHybridNodes<KeyType, ValueType, SeqTreeBlindiNode, INNER_NUM, LEAF_NUM>("SeqTreeBlindi"); // ELASTIC 
+//Index<KeyType2, ValueType2> *idx2 = new BlindiBTreeHybridNodes<KeyType2, ValueType2, SeqTreeBlindiNode, INNER_NUM, LEAF_NUM>("SeqTreeBlindi"); // ELASTIC HOT
+
+/////////////////////////// 
+// HOT
+
+template <typename Val> struct KeyExtractor {
+
+	inline KeyType operator()(Val const &ptr) const {
+		KeyType *key = (KeyType *)ptr;
+		return *key;
+	}
+};
+
+hot::singlethreaded::HOTSingleThreaded<ValueType, KeyExtractor> hot1;
 
 
-
+//
+//////////////////////////////
 typedef  struct {
-	uint64_t obj;
+	UUID  obj_time;
+	uint64_t op;
 	uint64_t  size;
-	UUID  op_time;
 } item;
 
 item table[48000000]; 
@@ -367,6 +414,7 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
   /*----------------------*/
   auto put_request = msg->command_as_PutRequest();
   if(put_request) {
+if(1) {	  
     auto str = put_request->row()->c_str();
 
   const char *p;  
@@ -396,24 +444,36 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
    std::cout << "num2 " << num2 << "  felids2 " << fields[2].c_str() << std::endl; 
    std::cout << "num3 " << num3 << std::endl; 
 #endif
-   ///   table[row_nu] = {num0, num1, num2, num3};
-   table[row_nu] = {num2, num3};
-   table[row_nu].op_time.val[0] = num0;
-   table[row_nu].op_time.val[1] = num1;
-   idx1->Insert(table[row_nu].op_time, &table[row_nu].op_time);
+
+   UUID obj_time = {num0, num2};
+   table[row_nu] = {obj_time, num1, num3};
+   
+#ifdef ELASTIC 
+   idx1->Insert(table[row_nu].obj_time, &table[row_nu].obj_time);
+#endif   
+#ifdef HOT
+   hot1.insert(&(table[row_nu].obj_time)); 
+#endif
+
 
 #ifdef DEBUG_PLUGIN
-   PLOG("fields[0] = %s", fields[0].c_str());
-   PLOG("fields[1] = %s", fields[1].c_str());
-   PLOG("fields[2] = %s", fields[2].c_str());
-   PLOG("fields[3] = %s", fields[3].c_str());
+   PLOG("fields[0] = %s", fields[0].c_str()); // time
+   PLOG("fields[1] = %s", fields[1].c_str()); // op
+   PLOG("fields[2] = %s", fields[2].c_str()); // obj
+   PLOG("fields[3] = %s", fields[3].c_str()); // size
+#ifdef ELASTIC   
    std::vector<ValueType> v {};
-   idx1->GetValue(table[row_nu].op_time, v);
+   idx1->GetValue(table[row_nu].obj_time, v);
    std::cout << "end row_nu " << row_nu << std::endl;
-   std::cout << "valuei_ptr = " << v[0] << std::endl;
-   std::cout << "value[0] = " << v[0]->val[0] << std::endl;
-   std::cout << "value[1] = " << v[0]->val[1] << std::endl;
+   std::cout << "value = " << v[0] << std::endl;
+#endif 
+#ifdef HOT
+   auto res = hot1.lookup(table[row_nu].obj_time);
+#endif   
+   ValueType key = (ValueType) res.mValue;
+   printf ("HOT ptr %ld key%ld\n", key, key->val);
 #endif
+}
 
    row_nu++;
    return S_OK;
@@ -423,8 +483,16 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
   /* build index request handling */
   /*------------------------------*/
   if(msg->command_as_BuildIndex()) {
-	 std::cout << "sizeof(table) " << sizeof(table)/1024/1024.0 <<" [MB]" << std::endl;
+	  
+#ifdef ELASTIC
+	 std::cout << "sizeof(table) " << sizeof(table)/1024.0/1024.0 <<" [MB]" << std::endl;
 	 idx1->PrintTreeStats();
+#endif
+#ifdef HOT
+	 std::pair<size_t, std::map<std::string, double>> hot_stats;
+	 hot_stats = hot1.getStatistics(); 
+	 std::cout <<"hot total size " << hot_stats.first/1024.0/1024.0  << " [MB] " << std::endl;
+#endif	 
          return S_OK;
   }
 
@@ -432,8 +500,10 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
   /* requesting for given string    */
   /*---------------------------------------*/  
   auto get_symbol_request = msg->command_as_GetSymbol();
-  if(get_symbol_request) {
-    auto req_str = get_symbol_request->row()->c_str();
+  uint64_t cnter = 0;
+  if(get_symbol_request) {// seatch query
+if(1){ 
+     	auto req_str = get_symbol_request->row()->c_str();
 //    auto& req_row = *(get_symbol_request->row());
 #ifdef DEBUG_PLUGIN
     std::cout << "req_str " << req_str << std::endl;
@@ -441,24 +511,60 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
 #endif
     std::vector<string> fields;
     boost::split( fields, req_str, is_any_of(" ") );
-    const char *c = fields[0].c_str();
-    uint64_t opcode = char8B_to_uint64(c);
-    uint64_t stime = lexical_cast<uint64_t>(fields[1]);
-    uint64_t jump = lexical_cast<uint64_t>(fields[2]);
+   std::stringstream ss;
+   uint64_t obj;
+   ss << std::hex << fields[0];
+   ss >> obj;
+   uint64_t stime = lexical_cast<uint64_t>(fields[1]);
+   uint64_t isrange = lexical_cast<uint64_t>(fields[2]);
+
+   KeyType req;
+   req.val[1]  =  obj;
+   req.val[0] = stime;
+
+   if (isrange == 0) {
 #ifdef DEBUG_PLUGIN
-    std::cout << " after split " << opcode << " " << stime << " " << jump << std::endl;
+	   std::cout << " after split " << obj  << " " << stime << " " << jump << std::endl;
 #endif
-    std::vector<ValueType> v2 {};
-    KeyType req;
-    req.val[0]  = stime;
-    req.val[1] =  opcode;
-    uint64_t cnter = 0;
-//    cnter = idx1->GetRangeTime(req, v2, jump);
-    idx1->GetRange(req, v2);
-//    idx1->GetValue(req, v2);
+#ifdef ELASTIC    
+	   //    cnter = idx1->GetRangeTime(req, v2, jump);
+	   cnter = idx1->GetExact(req);
+    
+#endif
+#ifdef HOT    
+	   auto res = hot1.lookup(req);
+
+	   if (res.mIsValid) {
+		   //	   ValueType key = (ValueType) res.mValue;
+		   //	   printf ("ptr %ld key[0] %ld, key[1] %ld\n", key, key->val[0], key->val[1]);
+		   cnter = 1;
+	   }
+#endif   
+
 #ifdef DEBUG_PLUGIN
-    std::cout << " the COUNTER symbol in this range is "<< cnter << std::endl;
+	   std::cout << " the COUNTER symbol in this range is "<< res0 << std::endl;
 #endif
+   }
+   else { // range query
+#ifdef HOT
+	   /// NOT handle arrive to the end of the index 	 
+	   hot::singlethreaded::HOTSingleThreaded<ValueType, KeyExtractor>::const_iterator res = hot1.lower_bound(req);
+	   ValueType key = (ValueType) *res;
+//	   printf ("res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", res,  &key->val[0], key->val[0], key->val[1]);
+	   for (int i =0; i < RANGE_NUM ; i++) {
+	   	++res;
+		key = (ValueType) *res;
+		if(key == 0) {
+			printf ("key ++ %lu and  i=%lu\n", key , i);
+			continue;
+		}
+//	   printf ("i %lu res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", i, res, &key->val[0],  key->val[0], key->val[1]);
+		   cnter += key->val[0];
+	   }
+#endif   
+
+   }
+  } 
     auto result = new uint64_t;
     *result = reinterpret_cast<uint64_t>(cnter);
     response_buffers.emplace_back(result, sizeof(uint64_t), response_buffer_t::alloc_type_malloc{});
@@ -476,7 +582,6 @@ status_t ADO_rangeindex_plugin::do_work(const uint64_t work_request_id,
   PERR("unhandled command");
   return E_INVAL;
 }
-
 status_t ADO_rangeindex_plugin::shutdown() {
   /* here you would put graceful shutdown code if any */
   return S_OK;
@@ -495,5 +600,4 @@ extern "C" void *factory_createInstance(component::uuid_t interface_iid) {
 }
 
 #undef RESET_STATE
-
 

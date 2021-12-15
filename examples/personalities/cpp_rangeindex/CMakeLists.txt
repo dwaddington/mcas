@@ -32,7 +32,7 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include) # EASTL
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # flatbuffers
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} ${FLAG_DUMP_CLASS} -DCONFIG_DEBUG)
-add_compile_options(-g -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings)
+add_compile_options(-g -march=native -Wall -Wextra -Wcast-align -Wcast-qual -Wconversion -Wredundant-decls -Wshadow -Wtype-limits -Wno-unused-parameter -Wwrite-strings)
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated/cpp_rangeindex_proto.h

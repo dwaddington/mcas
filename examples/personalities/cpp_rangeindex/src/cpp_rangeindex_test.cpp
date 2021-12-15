@@ -16,7 +16,13 @@
 #include <ccpm/immutable_list.h>
 #include "cpp_rangeindex_client.h"
 #include <chrono>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 #define DEBUG_TEST
+#define SEARCH_PRS 10 
+#define SEARCH_MAX 10000000 
+
+using namespace boost;
 
 struct Options
 {
@@ -27,6 +33,12 @@ struct Options
   std::string data;
   unsigned port;
 } g_options;
+
+std::string search_array[SEARCH_MAX] ;
+std::string range_array[SEARCH_MAX] ;
+size_t search_cnt = 0;
+size_t range_cnt = 0;
+
 
 
 component::IMCAS * init(const std::string& server_hostname,  int port)
@@ -125,129 +137,94 @@ int main(int argc, char * argv[])
 
     std::string line;
     while(getline(ifs, line)) {
-      if (count%1000000== 0) {
-	      std::cout << "insert counti " << count  << std::endl;
-      }     
-      table.add_word(line);
+      if ((count%1000000==0) & (count>0)) {
+	      std::cout << "insert count " << count  << std::endl;
+    }    
+       
+      table.add_row(line);
+
+      if (count%(SEARCH_PRS/2) == 0){
+      // save the line for search 
+	      if (count%SEARCH_PRS == 0) {
+		     search_array[search_cnt] = line;
+		     search_cnt++; 
+	      }
+	      else {
+      // save the line for range 
+		     range_array[range_cnt] = line; 
+		     range_cnt++; 
+	      }
+      }
+      
+
+
       count++;
       //      if(count == 100) break;
     }
   }
   catch(...) {
-    PERR("Reading word file failed");
+    PERR("Reading row file failed");
   }
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   uint64_t insert_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
   std::cout << "Insert " << count << " took: "  << insert_time_ms << " [ms]" << " -> Inserts per sec " << count/insert_time_ms*1000 << std::endl;
-  PMAJOR("Loaded %u words", count);
+  PMAJOR("Loaded %u rows", count);
  
   table.build_index();
+  
 
-  uint64_t start_time = 5100* 1000; // 
-  uint64_t jump_time = 1000;// jump every X millisec
-  uint64_t end_time = 11740*1000; // 
+  //// SEARCH  
   begin = std::chrono::steady_clock::now();
-
-  uint64_t cnt = 0;
-  uint64_t curr_start_time = start_time;
-    
-  srand(1);
-
-
-  while (cnt<1000000) {
-	  curr_start_time = start_time;
-	  int rand_num = rand()%432000;
-	  curr_start_time = rand_num*100 + 5100*1000;
-	  if (rand_num >  66400) {
-		  curr_start_time += 10180 * 1000;
-	  }
-//	  std::cout << " search curr_start_time " << curr_start_time <<  " curr_start_time + jump_time " << curr_start_time + jump_time  << "  cnt " << cnt << std::endl;
-	  std::string send_symbol = "REST.HEAD.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-	  uint64_t num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  send_symbol = "REST.PUT.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-	  num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  send_symbol = "REST.GET.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-	  num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  curr_start_time = curr_start_time + jump_time/10;
-          cnt++; 
+  size_t cnt = 0;
+  size_t res = 0;
+  std::string is_range = "0";
+  for (size_t i=0; i <  search_cnt; i++) {
+	  cnt++;
+	  std::vector<std::string> fields;
+	  boost::split( fields, search_array[i], is_any_of(" ") );
+	  std::string send_symbol = fields[2] +  " " + fields[0] + " " + is_range;
+	  size_t num_res = table.get_symbol(send_symbol);
+	  res += num_res;
 
   }
-/*
-  start_time = 21920* 1000; // 
-  jump_time = 1000;// jump every X millisec
-  end_time = 34000*1000; // 
-  begin = std::chrono::steady_clock::now();
-
-  curr_start_time = start_time;
-  while (curr_start_time < end_time) { 
-//	  std::cout << " search curr_start_time " << curr_start_time << " start_time " << start_time <<  " end_time "  << (curr_start_time+jump_time) <<  " jump_time " << jump_time <<  "  cnt " << cnt << std::endl;
-	  std::string send_symbol = "REST.HEAD.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-//	  std::cout << send_symbol << std::endl;
-	  uint64_t num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  send_symbol = "REST.PUT.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-//	  std::cout << send_symbol << std::endl;
-	  num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  send_symbol = "REST.GET.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-//	  std::cout << send_symbol << std::endl;
-	  num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  curr_start_time = curr_start_time + jump_time/10;
-          cnt++; 
-
-  }
-
-
-  start_time = 34000* 1000; // 
-  jump_time = 1000;// jump every X millisec
-  end_time = 58480*1000; // 
-  begin = std::chrono::steady_clock::now();
-
-  curr_start_time = start_time;
-  while (curr_start_time < end_time) { 
-//	  std::cout << " search curr_start_time " << curr_start_time << " start_time " << start_time <<  " end_time "  << end_time <<  " jump_time " << jump_time <<  "  cnt " << cnt << std::endl;
-	  std::string send_symbol = "REST.HEAD.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-//	  std::cout << send_symbol << std::endl;
-	  uint64_t num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  send_symbol = "REST.PUT.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-//	  std::cout << send_symbol << std::endl;
-	  num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  send_symbol = "REST.GET.OBJECT " + boost::lexical_cast<std::string>(curr_start_time) + " " + boost::lexical_cast<std::string> (curr_start_time+jump_time);
-//	  std::cout << send_symbol << std::endl;
-	  num_res = table.get_symbol(send_symbol);
-//	  std::cout << "The number of elements in the range are: " << num_res << std::endl;
-
-	  curr_start_time = curr_start_time + jump_time/10;
-          cnt++; 
-
-  }
-*/
   end = std::chrono::steady_clock::now();
   std::cout << "finish search "<< std::endl;
   uint64_t search_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
-  std::cout << "finish calculate time "<< std::endl;
-
-  std::cout << "search " << cnt << "*3=" << cnt*3 << std::endl;
-  std::cout  << " took: "  << search_time_ms << " [ms]" << std::endl;
+  std::cout << "search " << cnt << "= exact " << res << std::endl;
+  std::cout  << "Search " << cnt << " items took: "  << search_time_ms << " [ms]" << std::endl;
   if (search_time_ms > 0) {
-	  std::cout  << " -> Searches per sec " << cnt*3*1000/search_time_ms << std::endl;
+	  std::cout  << " -> Searches per sec " << cnt*1000/search_time_ms << std::endl;
   }
+
+
+/// SCAN
+  cnt = 0;
+  res = 0;
+  is_range = "1";
+  begin = std::chrono::steady_clock::now();
+  for (size_t i=0; i <  range_cnt; i++) {
+	  cnt++;
+	  std::vector<std::string> fields;
+	  boost::split( fields, range_array[i], is_any_of(" ") );
+	  std::string send_symbol = fields[2] +  " " + fields[0] + " " + is_range;
+	  size_t num_res = table.get_symbol(send_symbol);
+	  res += num_res;
+
+  }
+  end = std::chrono::steady_clock::now();
+  std::cout << "finish SCAN "<< std::endl;
+  uint64_t scan_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+  std::cout << "sum " <<  res << std::endl;
+  std::cout  << "Scan " << cnt << " items took: "  << scan_time_ms << " [ms]" << std::endl;
+  if (scan_time_ms > 0) {
+	  std::cout  << " -> Searches per sec " << cnt*1000/scan_time_ms << std::endl;
+  }
+
+
+
   PLOG("Cleaning up.");
   i_mcas->delete_pool(pool);
 
