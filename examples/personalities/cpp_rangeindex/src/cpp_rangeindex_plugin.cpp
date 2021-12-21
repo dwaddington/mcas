@@ -32,8 +32,8 @@
 #include <boost/lexical_cast.hpp>
 //#define DEBUG_PLUGIN 
 
-//#define ELASTIC 
-#define HOT 
+#define ELASTIC 
+//#define HOT 
 
 
 using namespace rangeindex_ADO_protocol;
@@ -42,9 +42,12 @@ using namespace stx;
 using namespace std;
 using namespace boost;
 
-#define RANGE_NUM 1000
+#define RANGE_NUM 10
 
 #define END 16000
+
+
+uint64_t __builtin_bswap64 (uint64_t x);
 
 
 char *str1 = "string Literal";
@@ -76,8 +79,7 @@ public:
 
     virtual void PrintTreeStats()  = 0;
 
-    virtual void GetRange(const KeyType &key,
-                          std::vector<ValueType> &value_list)  = 0;
+    virtual uint64_t GetRange(const KeyType &key)  = 0;
 
 
     virtual uint64_t GetRangeTime(const KeyType &key,
@@ -144,13 +146,12 @@ public:
    }
    
 
-     void GetRange(const KeyType &key,
-                  std::vector<ValueType> &value_list) {
+     uint64_t GetRange(const KeyType &key) {
         auto it = tree.lower_bound(key);
         for (int i=0; i < 3; i++) {
 		if (it == tree.end())
 			break;
-		value_list.push_back(it->second);
+//		value_list.push_back(it->second);
 		it++;
 	}
     }
@@ -232,21 +233,21 @@ public:
 
 
 
-    void GetRange(const KeyType &key,
-                  std::vector<ValueType> &value_list) {
-
+    uint64_t GetRange(const KeyType &key) {
         auto it = tree.lower_bound(key);
-
-	for (int i=0; i < 1000; i++) {
+	uint64_t sum = it->first.val[0];
+	printf (" key[0] %lu, key[1] %lu\n", it->first.val[0], it->first.val[1]);
+	for (int i=1; i < RANGE_NUM; i++) {
 		if (it.currslot == ENDSLOT) {
-//			std::cout << " Range tree.end END= " << ENDSLOT << std::endl;
-			break;
-		}
-		ValueType v1 = it->second; 
-		value_list.push_back(it->second);
-		it++;
-	}
+			std::cout << " i=" << i << " Range tree.end END= " << ENDSLOT << std::endl;
 
+			return sum;
+		}
+		it++;
+		sum+=it->first.val[0];
+	        printf (" key[0] %lu, key[1] %lu\n", it->first.val[0], it->first.val[1]);
+	}
+	return sum;
     }
 
     uint64_t GetRangeTime(const KeyType &key,
@@ -445,34 +446,22 @@ if(1) {
    std::cout << "num3 " << num3 << std::endl; 
 #endif
 
-   UUID obj_time = {num0, num2};
-   table[row_nu] = {obj_time, num1, num3};
-   
 #ifdef ELASTIC 
+   UUID obj_time;
+   obj_time.val[0] = num0; // time
+   obj_time.val[1] = num2; // obj
+   table[row_nu] = {obj_time, num1, num3};
    idx1->Insert(table[row_nu].obj_time, &table[row_nu].obj_time);
 #endif   
 #ifdef HOT
+   UUID obj_time;
+   obj_time.val[0] = __builtin_bswap64(num2);  
+   obj_time.val[1] = __builtin_bswap64(num0); 
+   table[row_nu] = {obj_time, num1, num3};
    hot1.insert(&(table[row_nu].obj_time)); 
 #endif
 
 
-#ifdef DEBUG_PLUGIN
-   PLOG("fields[0] = %s", fields[0].c_str()); // time
-   PLOG("fields[1] = %s", fields[1].c_str()); // op
-   PLOG("fields[2] = %s", fields[2].c_str()); // obj
-   PLOG("fields[3] = %s", fields[3].c_str()); // size
-#ifdef ELASTIC   
-   std::vector<ValueType> v {};
-   idx1->GetValue(table[row_nu].obj_time, v);
-   std::cout << "end row_nu " << row_nu << std::endl;
-   std::cout << "value = " << v[0] << std::endl;
-#endif 
-#ifdef HOT
-   auto res = hot1.lookup(table[row_nu].obj_time);
-#endif   
-   ValueType key = (ValueType) res.mValue;
-   printf ("HOT ptr %ld key%ld\n", key, key->val);
-#endif
 }
 
    row_nu++;
@@ -519,8 +508,16 @@ if(1){
    uint64_t isrange = lexical_cast<uint64_t>(fields[2]);
 
    KeyType req;
+#ifdef ELASTIC    
    req.val[1]  =  obj;
    req.val[0] = stime;
+#endif
+#ifdef HOT    
+   req.val[1]  =  __builtin_bswap64(stime);
+   req.val[0] = __builtin_bswap64(obj);
+#endif
+
+
 
    if (isrange == 0) {
 #ifdef DEBUG_PLUGIN
@@ -532,6 +529,8 @@ if(1){
     
 #endif
 #ifdef HOT    
+	   req.val[1]  =  __builtin_bswap64(obj);
+	   req.val[0] = __builtin_bswap64(stime);
 	   auto res = hot1.lookup(req);
 
 	   if (res.mIsValid) {
@@ -545,26 +544,37 @@ if(1){
 	   std::cout << " the COUNTER symbol in this range is "<< res0 << std::endl;
 #endif
    }
-   else { // range query
+   else { ////////////////////// RANGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          ////////////////////// RANGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+           ////////////////////// RANGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#ifdef ELASTIC
+	   cnter = idx1->GetRange(req);
+#endif	   
 #ifdef HOT
-	   /// NOT handle arrive to the end of the index 	 
+	   /// NOT handle arrive to the end of the index 	
 	   hot::singlethreaded::HOTSingleThreaded<ValueType, KeyExtractor>::const_iterator res = hot1.lower_bound(req);
+	   std::cout << " line 557 " << std::endl; 
 	   ValueType key = (ValueType) *res;
-//	   printf ("res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", res,  &key->val[0], key->val[0], key->val[1]);
-	   for (int i =0; i < RANGE_NUM ; i++) {
+	   std::cout << " line 559 " << std::endl; 
+	   uint64_t sum = __builtin_bswap64(key->val[1]) ;
+	   printf ("res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", res,  &key->val[0], __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
+	   std::cout << " line 562 " << std::endl; 
+	   for (int i = 1; i < RANGE_NUM ; i++) {
 	   	++res;
 		key = (ValueType) *res;
+		std::cout << " line 564 " << std::endl; 
 		if(key == 0) {
 			printf ("key ++ %lu and  i=%lu\n", key , i);
-			continue;
+			break;
 		}
-//	   printf ("i %lu res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", i, res, &key->val[0],  key->val[0], key->val[1]);
-		   cnter += key->val[0];
+		printf ("i %lu res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", i, res, &key->val[0],  __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
+		sum +=  __builtin_bswap64(key->val[1]);
 	   }
+	   cnter = sum;
 #endif   
 
    }
-  } 
+  }
     auto result = new uint64_t;
     *result = reinterpret_cast<uint64_t>(cnter);
     response_buffers.emplace_back(result, sizeof(uint64_t), response_buffer_t::alloc_type_malloc{});
