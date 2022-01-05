@@ -290,7 +290,6 @@ status_t Map_store::swap_keys(const pool_t           pool,
   return session->pool->swap_keys(key0, key1);
 }
 
-
 status_t Map_store::lock(const pool_t pid,
                          string_view_key key,
                          lock_type_t type,
