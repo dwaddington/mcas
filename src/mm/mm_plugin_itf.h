@@ -322,7 +322,7 @@ public:
                     const common::string_view config = common::string_view(),
                     void * root_ptr = nullptr)
   {
-    _module = dlopen(plugin_path.data(), RTLD_NOW | RTLD_NODELETE); // RTLD_DEEPBIND | 
+    _module = dlopen(std::string(plugin_path).c_str(), RTLD_NOW | RTLD_NODELETE); // RTLD_DEEPBIND |
 
     if(_module == nullptr) {
       char err[1024];
@@ -353,7 +353,7 @@ public:
     //      dlclose(_module);
       
     /* create heap instance */      
-    _ft.mm_plugin_create(config.data() ? config.data() : "", root_ptr, &_heap);
+    _ft.mm_plugin_create(config.data() ? std::string(config).c_str() : "", root_ptr, &_heap);
   }
 
   MM_plugin_wrapper(const MM_plugin_wrapper &) = delete;
