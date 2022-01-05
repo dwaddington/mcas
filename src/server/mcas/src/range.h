@@ -37,10 +37,5 @@ struct range : public std::pair<T, T> {
   std::size_t length() const { return std::size_t(this->second - this->first); }
 };
 
-template <typename T>
-bool operator<(const range<T> &a, const range<T> &b)
-{
-  return a.first < b.first || ((!(b.first < a.first)) && a.second < b.second);
-}
 }  // namespace mcas
 #endif
