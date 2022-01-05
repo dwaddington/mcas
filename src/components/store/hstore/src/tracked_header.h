@@ -20,9 +20,9 @@ struct injectee;
 
 /* The layout of tracked storage:
  *
- * | ...................... | tracked_header | tracked data |........................|
- * |<--------- tracked_header._align ------->|<-(multiple of tracked_header._align) ->
- * |<-------------- tracked_header._size ------------------------------------------->|
+ * contents: | ...................... | tracked_header | tracked data |........................|
+ * size:     |<--------- tracked_header._align ------->|<-(multiple of tracked_header._align) ->
+ * size:     |<-------------- tracked_header._size ------------------------------------------->|
  *
  * Note that tracked_header could perhaps be packed into a smaller space: _prev and
  * _next are at least 16-byte aligned, _align is a power if 2, and _size is a
