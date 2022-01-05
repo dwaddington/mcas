@@ -93,7 +93,6 @@ set(SOURCES
 	src/as_emplace.cpp
 	src/as_extend.cpp
 	src/bad_alloc_cc.cpp
-	src/dax_manager.cpp
  	src/heap.cpp
  	src/hop_hash_exceptions.cpp
 	src/hop_hash_log.cpp
