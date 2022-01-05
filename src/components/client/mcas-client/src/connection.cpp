@@ -237,7 +237,7 @@ auto Connection::open_pool(const string_view name,
       mcas::protocol::Message_pool_request(iobs->length(), auth_id(), /* auth id */
                                            request_id(), 0,           /* size */
                                            0,                         /* expected obj cnt */
-                                           mcas::protocol::OP_OPEN,
+                                           mcas::protocol::OP_TYPE::OPEN,
                                            name,
                                            0, /* flags */
                                            base /* base virtual address */
@@ -330,7 +330,7 @@ auto Connection::create_pool(const string_view  name_,
                                      request_id(),
                                      size_,
                                      expected_obj_count_,
-                                     mcas::protocol::OP_CREATE,
+                                     mcas::protocol::OP_TYPE::CREATE,
                                      name_,
                                      flags_,
                                      base_);
@@ -410,7 +410,7 @@ status_t Connection::close_pool(const pool_t pool)
   const auto iobs = make_iob_ptr_send();
   const auto iobr = make_iob_ptr_recv();
   const auto msg  = new (iobs->base())
-    mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::protocol::OP_CLOSE, pool);
+    mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::protocol::OP_TYPE::CLOSE, pool);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
@@ -447,7 +447,7 @@ status_t Connection::delete_pool(const string_view name)
                                          request_id(),
                                          0, // size
                                          0, // exp obj count
-                                         mcas::protocol::OP_DELETE,
+                                         mcas::protocol::OP_TYPE::DELETE,
                                          name,
                                          0, // flags
                                          0); // base
@@ -481,7 +481,7 @@ status_t Connection::delete_pool(const IMCAS::pool_t pool)
   const auto iobr = make_iob_ptr_recv();
 
   const auto msg = new (iobs->base())
-    mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::protocol::OP_DELETE, pool);
+    mcas::protocol::Message_pool_request(iobs->length(), auth_id(), request_id(), mcas::protocol::OP_TYPE::DELETE, pool);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
@@ -514,7 +514,7 @@ status_t Connection::configure_pool(const IMCAS::pool_t pool, const string_view 
   }
 
   const auto msg = new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                                         mcas::protocol::OP_CONFIGURE,  // op
+                                                                         mcas::protocol::OP_TYPE::CONFIGURE,  // op
                                                                          json);
 
   post_recv(&*iobr);
@@ -566,7 +566,7 @@ status_t Connection::put(const pool_t       pool,
   try {
     const auto msg =
       new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                            mcas::protocol::OP_PUT,  // op
+                                                            mcas::protocol::OP_TYPE::PUT,  // op
                                                             key, value, value_len, flags);
 
     if (_options.short_circuit_backend) msg->add_scbe();
@@ -604,7 +604,7 @@ auto Connection::locate(const pool_t pool_, const std::size_t offset_, const std
 
   /* send advance leader message */
   const auto msg = new (iobs->base())
-    protocol::Message_IO_request(auth_id(), pool_, request_id(), protocol::OP_LOCATE, offset_, size_);
+    protocol::Message_IO_request(auth_id(), pool_, request_id(), protocol::OP_TYPE::LOCATE, offset_, size_);
 
   post_recv(&*iobr);
   sync_inject_send(&*iobs, msg, __func__);
@@ -651,7 +651,7 @@ IMCAS::async_handle_t Connection::put_locate_async(TM_ACTUAL const pool_t       
 
   /* send locate message */
   const auto msg = new (iobs->base()) protocol::Message_IO_request(
-                                                                   iobs->length(), auth_id(), request_id(), pool, protocol::OP_PUT_LOCATE, key, values_size(values), flags);
+                                                                   iobs->length(), auth_id(), request_id(), pool, protocol::OP_TYPE::PUT_LOCATE, key, values_size(values), flags);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
@@ -694,7 +694,7 @@ IMCAS::async_handle_t Connection::get_direct_offset_async(const pool_t          
 
   /* send advance leader message */
   const auto msg = new (iobs->base())
-    protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_LOCATE, offset_, len_);
+    protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_TYPE::LOCATE, offset_, len_);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
@@ -724,7 +724,7 @@ IMCAS::async_handle_t Connection::put_direct_offset_async(const pool_t          
 
   /* send locate message */
   const auto msg = new (iobs->base())
-    protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_LOCATE, offset_, length_);
+    protocol::Message_IO_request(auth_id(), request_id(), pool_, protocol::OP_TYPE::LOCATE, offset_, length_);
   iobs->set_length(msg->msg_len());
 
   post_recv(&*iobr);
@@ -757,7 +757,7 @@ Connection::get_locate_async(TM_ACTUAL const pool_t                        pool,
 
 	/* send advance leader message */
 	const auto msg = new (iobs->base()) protocol::Message_IO_request(
-                                                                   iobs->length(), auth_id(), request_id(), pool, protocol::OP_GET_LOCATE, key, value_len, flags);
+                                                                   iobs->length(), auth_id(), request_id(), pool, protocol::OP_TYPE::GET_LOCATE, key, value_len, flags);
 	{
 		TM_SCOPE(1)
 		iobs->set_length(msg->msg_len());
@@ -863,7 +863,7 @@ status_t Connection::async_put(const IMCAS::pool_t    pool,
   try {
     const auto msg =
       new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                            mcas::protocol::OP_PUT,  // op
+                                                            mcas::protocol::OP_TYPE::PUT,  // op
                                                             key_, value, value_len, flags);
 
     iobs->set_length(msg->msg_len());
@@ -951,7 +951,7 @@ status_t Connection::async_put_direct(const IMCAS::pool_t                       
 
       const auto msg =
         new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool_,
-                                                              mcas::protocol::OP_PUT,  // op
+                                                              mcas::protocol::OP_TYPE::PUT,  // op
                                                               key_, key_len_, size(values_.front()), flags_);
 
       if (_options.short_circuit_backend) msg->add_scbe();
@@ -1105,7 +1105,7 @@ status_t Connection::get(const pool_t pool, const string_view_key key, std::stri
   try {
     const auto msg =
       new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                            mcas::protocol::OP_GET,  // op
+                                                            mcas::protocol::OP_TYPE::GET,  // op
                                                             key, string_view_value(), 0);
 
     if (_options.short_circuit_backend) msg->add_scbe();
@@ -1158,7 +1158,7 @@ status_t Connection::get(const pool_t pool, const string_view_key key, void *&va
   try {
     const auto msg =
       new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,
-                                                            mcas::protocol::OP_GET,  // op
+                                                            mcas::protocol::OP_TYPE::GET,  // op
                                                             key, 0, 0);
 
     /* indicate how much space has been allocated on this side. For
@@ -1376,7 +1376,7 @@ status_t Connection::erase(const pool_t pool, const string_view_key key)
   try {
     const auto msg =
       new (iobs->base()) mcas::protocol::Message_IO_request(
-        iobs->length(), auth_id(), request_id(), pool, mcas::protocol::OP_ERASE, key, 0, 0
+        iobs->length(), auth_id(), request_id(), pool, mcas::protocol::OP_TYPE::ERASE, key, 0, 0
       );
 
     post_recv(&*iobr);
@@ -1416,7 +1416,7 @@ status_t Connection::async_erase(const IMCAS::pool_t    pool,
                                                                            auth_id(),
                                                                            request_id(),
                                                                            pool,
-                                                                           mcas::protocol::OP_ERASE,
+                                                                           mcas::protocol::OP_TYPE::ERASE,
                                                                            key,
                                                                            0, 0);
 

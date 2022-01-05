@@ -47,7 +47,7 @@ enum class MSG_TYPE : uint8_t {
   HANDSHAKE       = 0x1,
   HANDSHAKE_REPLY = 0x2,
   CLOSE_SESSION   = 0x3,
-  /* Note: an INFO_REQUEST with INFO_TYPE_GET_STATS will be answered by STATS, not INFO_RESPONSE */
+  /* Note: an INFO_REQUEST with INFO_TYPE::GET_STATS will be answered by STATS, not INFO_RESPONSE */
   STATS           = 0x4,
   NO_MSG          = 0x5,
   PING            = 0x6,
@@ -84,7 +84,7 @@ enum {
 };
 
 
-enum {
+enum class AUTH_TYPE {
   AUTH_NONE = 0x0,
   AUTH_TLS_HMAC = 0x1,
   AUTH_TLS_FULL = 0x2,
@@ -96,32 +96,32 @@ enum {
   MSG_RESVD_DIRECT = 0x4, /* indicate get_direct from client side */
 };
 
-enum OP_TYPE : uint8_t {
-  OP_NONE   = 0,
-  OP_CREATE = 1,
-  OP_OPEN   = 2,
-  OP_CLOSE  = 3,
-  OP_PUT    = 4,
-  OP_SET    = 4,
-  OP_GET    = 5,
-  OP_PUT_ADVANCE = 6,  // allocate space for subsequence put or partial put
-  OP_PUT_SEGMENT = 7,
-  OP_DELETE      = 8,
-  OP_ERASE       = 8,
-  OP_PREPARE     = 9,  // prepare for immediately following operation
-  OP_COUNT       = 10,
-  OP_CONFIGURE   = 11,
-  OP_STATS       = 12,
-  OP_SYNC        = 13,
-  OP_ASYNC       = 14,
-  OP_PUT_LOCATE  = 15,  // locate (or allocate) and lock value for DMA write
-  OP_PUT_RELEASE = 16,  // free lock from DMA write
-  OP_GET_LOCATE  = 17,  // locate and lock value for DMA read
-  OP_GET_RELEASE = 18,  // free lock from DMA read
-  OP_LOCATE      = 19,  // locate space for DMA access
-  OP_RELEASE     = 20,  // release space located for DMA access
-  OP_RELEASE_WITH_FLUSH = 21,  // flush and release space located for DMA access
-  OP_INVALID     = 0xFE, // not applicable
+enum class OP_TYPE : uint8_t {
+  NONE   = 0,
+  CREATE = 1,
+  OPEN   = 2,
+  CLOSE  = 3,
+  PUT    = 4,
+  SET    = 4,
+  GET    = 5,
+  PUT_ADVANCE = 6,  // allocate space for subsequence put or partial put
+  PUT_SEGMENT = 7,
+  DELETE      = 8,
+  ERASE       = 8,
+  PREPARE     = 9,  // prepare for immediately following operation
+  COUNT       = 10,
+  CONFIGURE   = 11,
+  STATS       = 12,
+  SYNC        = 13,
+  ASYNC       = 14,
+  PUT_LOCATE  = 15,  // locate (or allocate) and lock value for DMA write
+  PUT_RELEASE = 16,  // free lock from DMA write
+  GET_LOCATE  = 17,  // locate and lock value for DMA read
+  GET_RELEASE = 18,  // free lock from DMA read
+  LOCATE      = 19,  // locate space for DMA access
+  RELEASE     = 20,  // release space located for DMA access
+  RELEASE_WITH_FLUSH = 21,  // flush and release space located for DMA access
+  INVALID     = 0xFE, // not applicable
 };
 
 template <>
@@ -365,7 +365,7 @@ struct Message_pool_response : public Message {
   auto data() { return common::pointer_cast<data_t>(this + 1); }
  public:
   Message_pool_response(uint64_t auth_id)
-		: Message(auth_id, (sizeof *this), id, OP_INVALID)
+		: Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID)
 		, pool_id()
 #if CW_TEST
 		, scratchpad_base()
@@ -469,7 +469,7 @@ struct Message_IO_request : public Message_numbered_request {
   {
   }
 
-  /* For OP_LOCATE. max_offset is requested offset + requested size.
+  /* For OP_TYPE::LOCATE. max_offset is requested offset + requested size.
    * Borrow _key_len field to store the region id,
    * and _val_len field to store the max_offset
    */
@@ -557,7 +557,7 @@ struct Message_IO_request : public Message_numbered_request {
 
   auto key_len() const { return _key_len; }
   inline size_t value_len() const { return _val_len; }
-  /* for OP_LOCATE, the (offset, size) pair are in (_key_len, _val_len) */
+  /* for OP_TYPE::LOCATE, the (offset, size) pair are in (_key_len, _val_len) */
   inline size_t get_locate_offset() const { return _key_len; }
   inline size_t get_locate_end() const { return _key_len + _val_len; }
 
@@ -632,7 +632,7 @@ class Message_IO_response : public Message_numbered_response {
  public:
   static constexpr auto        id          = MSG_TYPE::IO_RESPONSE;
   static constexpr const char* description = "Message_IO_response";
-  /* data elements in response to OP_LOCATE */
+  /* data elements in response to OP_TYPE::LOCATE */
   struct locate_element {
     std::uint64_t addr;
     std::uint64_t len;
@@ -652,7 +652,7 @@ class Message_IO_response : public Message_numbered_response {
   Message_IO_response(size_t /* buffer_size */,
                       uint64_t auth_id,
                       uint64_t request_id_)
-      : Message_numbered_response(auth_id, (sizeof *this), id, OP_INVALID, request_id_),
+      : Message_numbered_response(auth_id, (sizeof *this), id, OP_TYPE::INVALID, request_id_),
         _data_len(0),
         addr(),
         key(),
@@ -718,9 +718,9 @@ struct Message_INFO_request : public Message {
 
  public:
   Message_INFO_request(uint64_t auth_id, component::IKVStore::Attribute type_, std::uint64_t pool_id_)
-      : Message(auth_id, (sizeof *this), id, OP_INVALID),
+      : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID),
         _pool_id(pool_id_),
-        _type(type_),
+        _type(uint32_t(type_)),
         pad(),
         offset(),
         key_len(0)
@@ -733,7 +733,7 @@ struct Message_INFO_request : public Message {
   }
 
   Message_INFO_request(uint64_t auth_id, INFO_TYPE type_, uint64_t pool_id_, offset_t offset_)
-      : Message(auth_id, (sizeof *this), id, OP_INVALID),
+      : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID),
         _pool_id(pool_id_),
         _type(type_),
         pad(),
@@ -781,7 +781,7 @@ struct Message_INFO_response : public Message {
   auto cdata() const { return common::pointer_cast<const char>(this + 1); }
   auto data() { return common::pointer_cast<data_t>(this + 1); }
 
-  Message_INFO_response(uint64_t authid_, offset_t offset_) : Message(authid_, (sizeof *this), id, OP_INVALID), _v{}, _offset(offset_) {}
+  Message_INFO_response(uint64_t authid_, offset_t offset_) : Message(authid_, (sizeof *this), id, OP_TYPE::INVALID), _v{}, _offset(offset_) {}
   void set_value(size_t buffer_size, const void* value, size_t len)
   {
     if (UNLIKELY((len + 1 + (sizeof *this)) > buffer_size))
@@ -831,7 +831,7 @@ struct Message_handshake : public Message {
 		, std::uint64_t test_data_size_
 #endif
   )
-      : Message(auth_id, (sizeof *this), id, OP_INVALID),
+      : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID),
         seq(sequence),
         protocol(PROTOCOL_V1),
         security_tls_auth(0)
@@ -886,7 +886,7 @@ struct Message_handshake_reply : public Message {
 		, uint64_t key_
 #endif
 	)
-      : Message(auth_id, (sizeof *this), id, OP_INVALID),
+      : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID),
         seq(sequence),
         session_id(session_id_),
         max_message_size(max_message_size_),
@@ -919,7 +919,7 @@ struct Message_close_session : public Message {
   static constexpr auto        id          = MSG_TYPE::CLOSE_SESSION;
   static constexpr const char* description = "Message_close_session";
 
-  Message_close_session(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID), seq() {}
+  Message_close_session(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID), seq() {}
 
   // fields
   uint64_t seq;
@@ -931,7 +931,7 @@ struct Message_stats : public Message {
   static constexpr const char* description = "Message_stats";
 
   Message_stats(uint64_t auth, const component::IMCAS::Shard_stats& shard_stats)
-      : Message(auth, (sizeof *this), id, OP_INVALID),
+      : Message(auth, (sizeof *this), id, OP_TYPE::INVALID),
         stats(shard_stats)
   {
   }
@@ -949,7 +949,7 @@ struct Message_none : public Message {
   static constexpr auto        id          = MSG_TYPE::NO_MSG;
   static constexpr const char* description = "Message_none";
 
-  Message_none(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID) {}
+  Message_none(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID) {}
 
   // fields
 } __attribute__((packed));
@@ -961,7 +961,7 @@ struct Message_ping : public Message {
   static constexpr auto        id          = MSG_TYPE::PING;
   static constexpr const char* description = "Message_ping";
 
-  Message_ping(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID) {}
+  Message_ping(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID) {}
 
   // fields
 } __attribute__((packed));
@@ -972,7 +972,7 @@ struct Message_pong : public Message {
   static constexpr auto        id          = MSG_TYPE::PONG;
   static constexpr const char* description = "Message_pong";
 
-  Message_pong(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_INVALID) {}
+  Message_pong(uint64_t auth_id) : Message(auth_id, (sizeof *this), id, OP_TYPE::INVALID) {}
 
   // fields
 } __attribute__((packed));
@@ -999,7 +999,7 @@ struct Message_ado_request : public Message_numbered_request {
                       const basic_string_view<byte> invocation_data,
                       uint32_t           flags_,
                       size_t             odvl = 4096)
-      : Message_numbered_request(auth_id, (sizeof *this), id, OP_INVALID, request_id, pool_id_),
+      : Message_numbered_request(auth_id, (sizeof *this), id, OP_TYPE::INVALID, request_id, pool_id_),
         key_len(),
         _ondemand_val_len(odvl),
         invocation_data_len(),
@@ -1057,7 +1057,7 @@ struct Message_put_ado_request : public Message_numbered_request {
                           const basic_string_view<byte> value,
                           size_t             root_len,
                           uint32_t           flags_)
-      : Message_numbered_request(auth_id, (sizeof *this), id, OP_INVALID, request_id, pool_id_),
+      : Message_numbered_request(auth_id, (sizeof *this), id, OP_TYPE::INVALID, request_id, pool_id_),
         key_len(key.size()),
         invocation_data_len(),
         flags(flags_),
@@ -1122,7 +1122,7 @@ struct Message_ado_response : public Message_numbered_response {
   static constexpr const char* description = "Message_ado_response";
 
   Message_ado_response(size_t buffer_size, status_t status, uint64_t auth_id, uint64_t request_id)
-      : Message_numbered_response(auth_id, (sizeof *this), id, OP_INVALID, request_id),
+      : Message_numbered_response(auth_id, (sizeof *this), id, OP_TYPE::INVALID, request_id),
         max_buffer_size(buffer_size)
   {
     set_status(status);

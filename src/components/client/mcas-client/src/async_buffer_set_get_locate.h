@@ -179,7 +179,7 @@ public:
 
 					/* send release message */
 					const auto msg = new (iobs->base())
-					mcas::protocol::Message_IO_request(_auth_id, c->request_id(), _pool, mcas::protocol::OP_TYPE::OP_GET_RELEASE, _addr);
+					mcas::protocol::Message_IO_request(_auth_id, c->request_id(), _pool, mcas::protocol::OP_TYPE::GET_RELEASE, _addr);
 
 					c->post_recv(&*iobr);
 					c->sync_inject_send(&*iobs, msg, __func__);

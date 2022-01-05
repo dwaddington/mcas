@@ -25,7 +25,7 @@ namespace
 	struct msg_attrs
 	{
 		const char *desc;
-		enum category { req, rsp, other } c;
+		enum class category { req, rsp, other } c;
 	};
 
 static const std::map<mcas::protocol::MSG_TYPE, msg_attrs> type_map{
@@ -48,30 +48,30 @@ static const std::map<mcas::protocol::MSG_TYPE, msg_attrs> type_map{
 };
 
 static const std::map<mcas::protocol::OP_TYPE, const char *> op_map{
-    {mcas::protocol::OP_NONE, "NONE"},
-    {mcas::protocol::OP_CREATE, "CREATE"},
-    {mcas::protocol::OP_OPEN, "OPEN"},
-    {mcas::protocol::OP_CLOSE, "CLOSE"},
-    {mcas::protocol::OP_PUT, "PUT"},
-    {mcas::protocol::OP_SET, "SET"},
-    {mcas::protocol::OP_GET, "GET"},
-    {mcas::protocol::OP_PUT_ADVANCE, "PUT_ADVANCE"},
-    {mcas::protocol::OP_PUT_SEGMENT, "PUT_SEGMENT"},
-    {mcas::protocol::OP_DELETE, "DELETE"},
-    {mcas::protocol::OP_ERASE, "ERASE"},
-    {mcas::protocol::OP_PREPARE, "PREPARE"},
-    {mcas::protocol::OP_COUNT, "COUNT"},
-    {mcas::protocol::OP_CONFIGURE, "CONFIGURE"},
-    {mcas::protocol::OP_STATS, "STATS"},
-    {mcas::protocol::OP_SYNC, "SYNC"},
-    {mcas::protocol::OP_ASYNC, "ASYNC"},
-    {mcas::protocol::OP_PUT_LOCATE, "PUT_LOCATE"},
-    {mcas::protocol::OP_PUT_RELEASE, "PUT_RELEASE"},
-    {mcas::protocol::OP_GET_LOCATE, "GET_LOCATE"},
-    {mcas::protocol::OP_GET_RELEASE, "GET_RELEASE"},
-    {mcas::protocol::OP_LOCATE, "LOCATE"},
-    {mcas::protocol::OP_RELEASE, "RELEASE"},
-    {mcas::protocol::OP_INVALID, "N/A"},
+    {mcas::protocol::OP_TYPE::NONE, "NONE"},
+    {mcas::protocol::OP_TYPE::CREATE, "CREATE"},
+    {mcas::protocol::OP_TYPE::OPEN, "OPEN"},
+    {mcas::protocol::OP_TYPE::CLOSE, "CLOSE"},
+    {mcas::protocol::OP_TYPE::PUT, "PUT"},
+    {mcas::protocol::OP_TYPE::SET, "SET"},
+    {mcas::protocol::OP_TYPE::GET, "GET"},
+    {mcas::protocol::OP_TYPE::PUT_ADVANCE, "PUT_ADVANCE"},
+    {mcas::protocol::OP_TYPE::PUT_SEGMENT, "PUT_SEGMENT"},
+    {mcas::protocol::OP_TYPE::DELETE, "DELETE"},
+    {mcas::protocol::OP_TYPE::ERASE, "ERASE"},
+    {mcas::protocol::OP_TYPE::PREPARE, "PREPARE"},
+    {mcas::protocol::OP_TYPE::COUNT, "COUNT"},
+    {mcas::protocol::OP_TYPE::CONFIGURE, "CONFIGURE"},
+    {mcas::protocol::OP_TYPE::STATS, "STATS"},
+    {mcas::protocol::OP_TYPE::SYNC, "SYNC"},
+    {mcas::protocol::OP_TYPE::ASYNC, "ASYNC"},
+    {mcas::protocol::OP_TYPE::PUT_LOCATE, "PUT_LOCATE"},
+    {mcas::protocol::OP_TYPE::PUT_RELEASE, "PUT_RELEASE"},
+    {mcas::protocol::OP_TYPE::GET_LOCATE, "GET_LOCATE"},
+    {mcas::protocol::OP_TYPE::GET_RELEASE, "GET_RELEASE"},
+    {mcas::protocol::OP_TYPE::LOCATE, "LOCATE"},
+    {mcas::protocol::OP_TYPE::RELEASE, "RELEASE"},
+    {mcas::protocol::OP_TYPE::INVALID, "N/A"},
 };
 
 }

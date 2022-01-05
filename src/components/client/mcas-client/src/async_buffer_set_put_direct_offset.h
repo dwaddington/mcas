@@ -185,7 +185,7 @@ public:
 			const auto msg =
 				new (_iobs2->base())
 					Message_IO_request(
-						_auth_id, c->request_id(), _pool, OP_TYPE::OP_RELEASE_WITH_FLUSH, _offset, _length
+						_auth_id, c->request_id(), _pool, OP_TYPE::RELEASE_WITH_FLUSH, _offset, _length
 					);
 
 			c->post_recv(&*_iobr2);

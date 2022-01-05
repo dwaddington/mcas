@@ -16,7 +16,7 @@
 
 namespace ccpm
 {
-	enum sub_state : unsigned char
+	enum class sub_state : unsigned char
 	{
 		reserved = 1, // reserved (part of prefix area)
 		subdivision = 2, // used for smaller allocations

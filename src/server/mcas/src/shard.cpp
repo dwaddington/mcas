@@ -680,10 +680,10 @@ void Shard::process_message_pool_request(Connection_handler *handler,
     /* handle operation */
     switch (msg->op())
       {
-      case mcas::protocol::OP_CREATE: {
+      case mcas::protocol::OP_TYPE::CREATE: {
 
         CPINF(1,"POOL CREATE: op=%u name=%s size=%lu obj-count=%lu base_addr=0x%lx",
-              msg->op(), msg->pool_name(), msg->pool_size(), msg->expected_object_count(),
+              unsigned(msg->op()), msg->pool_name(), msg->pool_size(), msg->expected_object_count(),
               msg->base_addr());
 
         const std::string pool_name = msg->pool_name();
@@ -717,7 +717,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
             response->set_status(S_OK);
           }
 
-          CPINF(1, "OP_CREATE: new pool id: %lx", pool);
+          CPINF(1, "OP_TYPE::CREATE: new pool id: %lx", pool);
 
           /* check for ability to pre-register memory with RDMA stack */
           nupm::region_descriptor regions;
@@ -769,7 +769,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
         CPINF(1, "POOL CREATE: OK, pool_id=%lx", pool);
 
       } break;
-      case mcas::protocol::OP_OPEN: {
+      case mcas::protocol::OP_TYPE::OPEN: {
         CPINF(1, "POOL OPEN: name=%s", msg->pool_name());
 
         IKVStore::pool_t pool;
@@ -825,7 +825,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
           conditional_bootstrap_ado_process(_i_kvstore.get(), handler, pool, ado, desc);
         }
       } break;
-      case mcas::protocol::OP_CLOSE: {
+      case mcas::protocol::OP_TYPE::CLOSE: {
         CPINF(1, "POOL CLOSE: pool_id=%lx", msg->pool_id());
 
         if (!pool_mgr.is_pool_open(msg->pool_id())) {
@@ -864,7 +864,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
           }
         }
       } break;
-      case mcas::protocol::OP_DELETE: {
+      case mcas::protocol::OP_TYPE::DELETE: {
         CPINF(1, "POOL DELETE pool_id=%lx (name %s)", msg->pool_id(), msg->pool_name());
 
         if (msg->pool_id() > 0 && pool_mgr.is_pool_open(msg->pool_id())) {
@@ -936,7 +936,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
       }
   }
   catch (std::exception &e) {
-    PERR("Unhandled exception processing a request OP(%d): %s", msg->op(), e.what());
+    PERR("Unhandled exception processing a request OP(%d): %s", int(msg->op()), e.what());
   }
 
   /* trim response length */
@@ -1211,7 +1211,7 @@ void Shard::io_response_get_locate(Connection_handler *handler,
 /////////////////////////////////////////////////////////////////////////////
 //   GET RELEASE   //
 /////////////////////
-/* ERROR: If client sends OP_GET_LOCATE but closes tne connection without calling OP_GET_RELEASE,
+/* ERROR: If client sends OP_TYPE::GET_LOCATE but closes tne connection without calling OP_TYPE::GET_RELEASE,
  * and instead closes the connection, a memory region registration can outlive the connection.
  * This will assert.
  */
@@ -1770,37 +1770,37 @@ void Shard::process_message_IO_request(Connection_handler *handler, const protoc
 
     ++_stats.op_request_count;
     switch (msg->op()) {
-    case protocol::OP_PUT_LOCATE:
+    case protocol::OP_TYPE::PUT_LOCATE:
       io_response_put_locate(handler, msg, iob);
       break;
-    case protocol::OP_PUT_RELEASE:
+    case protocol::OP_TYPE::PUT_RELEASE:
       io_response_put_release(handler, msg, iob);
       break;
-    case protocol::OP_GET_LOCATE:
+    case protocol::OP_TYPE::GET_LOCATE:
       io_response_get_locate(handler, msg, iob);
       break;
-    case protocol::OP_GET_RELEASE:
+    case protocol::OP_TYPE::GET_RELEASE:
       io_response_get_release(handler, msg, iob);
       break;
-    case protocol::OP_LOCATE:
+    case protocol::OP_TYPE::LOCATE:
       io_response_locate(handler, msg, iob);
       break;
-    case protocol::OP_RELEASE:
+    case protocol::OP_TYPE::RELEASE:
       io_response_release(handler, msg, iob);
       break;
-    case protocol::OP_RELEASE_WITH_FLUSH:
+    case protocol::OP_TYPE::RELEASE_WITH_FLUSH:
       io_response_release_with_flush(handler, msg, iob);
       break;
-    case protocol::OP_PUT:
+    case protocol::OP_TYPE::PUT:
       io_response_put(handler, msg, iob);
       break;
-    case protocol::OP_GET:
+    case protocol::OP_TYPE::GET:
       io_response_get(handler, msg, iob);
       break;
-    case protocol::OP_ERASE:
+    case protocol::OP_TYPE::ERASE:
       io_response_erase(handler, msg, iob);
       break;
-    case protocol::OP_CONFIGURE:
+    case protocol::OP_TYPE::CONFIGURE:
       io_response_configure(handler, msg, iob);
       break;
     default:
@@ -2107,7 +2107,7 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
       PWRN("_i_kvstore->get_attribute failed for value_len (key=%s)", key.c_str());
       response->set_value(0);
     }
-    CPLOG(1, "Shard: INFO reqeust INFO_TYPE_VALUE_LEN rc=%d val=%lu", hr, response->value_numeric());
+    CPLOG(1, "Shard: INFO reqeust INFO_TYPE::VALUE_LEN rc=%d val=%lu", hr, response->value_numeric());
   }
   else {
     std::vector<uint64_t> v;
@@ -2147,7 +2147,7 @@ void Shard::process_info_request(Connection_handler *handler, const protocol::Me
         response->set_value(0);
       }
     }
-    CPLOG(1, "Shard: INFO reqeust INFO_TYPE_VALUE_LEN rc=%d val=%lu", hr, response->value());
+    CPLOG(1, "Shard: INFO reqeust INFO_TYPE::VALUE_LEN rc=%d val=%lu", hr, response->value());
   }
 
   iob->set_length(response->base_message_size());
