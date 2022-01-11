@@ -16,8 +16,10 @@
 
 #include <api/components.h>
 #include <api/registrar_memory_direct.h>
+#include <common/byte.h>
 #include <common/byte_span.h>
 #include <common/errors.h> /* ERROR_BASE */
+#include <common/string_view.h>
 #include <common/time.h>
 #include <gsl/span>
 #include <sys/uio.h> /* iovec */
@@ -71,6 +73,14 @@ protected:
   using key_t           = Opaque_key*;
   using pool_lock_t     = Opaque_lock_handle*;
   using pool_iterator_t = Opaque_pool_iterator*;
+  using byte            = common::byte;
+
+ template <typename C>
+    using basic_string_view = common::basic_string_view<C>;
+  using string_view = common::string_view;
+  using string_view_byte = basic_string_view<byte>;
+  using string_view_key = string_view_byte;
+  using string_view_value = string_view_byte;
 
   static constexpr memory_handle_t HANDLE_NONE = nullptr; /* old name */
   static constexpr memory_handle_t MEMORY_HANDLE_NONE = nullptr; /* better name */
@@ -130,6 +140,7 @@ protected:
                                      written or locked with STORE_LOCK_WRITE */
     MEMORY_TYPE              = 7, /* type of memory */
     MEMORY_SIZE              = 8, /* size of pool or store in bytes */
+    NUMA_MASK                = 9, /* mask of first 64 numa nodes eligible for mapstore allocation */
   };
 
   enum {
@@ -603,7 +614,7 @@ protected:
    * @param type STORE_LOCK_READ | STORE_LOCK_WRITE
    * @param out_value [out] Pointer to data
    * @param inout_value_len [in-out] Size of data in bytes
-   * @param alignment [in] Alignment in bytes.
+   * @param alignment [in] Alignment of new value space in bytes.
    * @param out_key [out]  Handle to key for unlock
    * @param out_key_ptr [out]  Optional request for key-string pointer (set to
    * nullptr if not required)
