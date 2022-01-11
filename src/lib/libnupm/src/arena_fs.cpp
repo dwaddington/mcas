@@ -249,7 +249,7 @@ void arena_fs::region_resize(
 	auto path_map_local = path_map(sr_->path_name());
 	size_ = round_up_t(size_, 1U<<21U);
 	auto r = get_mapping(path_map_local);
-	CPLOG(2, "%s: %s current size %zu, requested size %zu", __func__, sr_->path_name().c_str(), r.second, size_)
+	CPLOG(2, "%s: %s current size %zu, requested size %zu", __func__, sr_->path_name().c_str(), r.second, size_);
 	if ( r.second < size_ )
 	{
 		/* grow: truncate, then add to mapping file, add to in-memory mmap list */
