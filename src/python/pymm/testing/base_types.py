@@ -81,7 +81,7 @@ class TestBaseTypes(unittest.TestCase):
         log("Testing: number OK!")
 
         
-    def test_integer_number(self):    
+    def Xtest_integer_number(self):    
         log("Testing: integer number")
         
         self.s.n = pymm.integer_number(700)

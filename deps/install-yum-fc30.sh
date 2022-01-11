@@ -17,7 +17,6 @@ dnf -y --nodocs --setopt=install_weak_deps=False install automake cmake3 git mak
     python-devel \
     rapidjson-devel \
     openssl-devel golang gnutls gnutls-devel \
-    python3-numpy \
     lcov zeromq-devel czmq-devel \
     libstdc++-static glibc-static
 

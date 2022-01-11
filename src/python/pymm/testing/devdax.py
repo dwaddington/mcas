@@ -9,6 +9,7 @@
 #
 # python3 ~/mcas/src/python/pymm/testing/devdax.py
 #
+import os
 import unittest
 import pymm
 import numpy as np
@@ -22,7 +23,7 @@ def log(*args):
 class TestDevDaxSupport(unittest.TestCase):
 
     def setUp(self):
-        self.s = pymm.shelf('myShelf',size_mb=1024,backend='hstore-cc',pmem_path='/dev/dax0.0')
+        self.s = pymm.shelf('myShelf',size_mb=1024,backend='hstore-cc',pmem_path='/dev/dax1.0',force_new=True)
         print(self.s.items)
 
     def tearDown(self):
@@ -49,4 +50,7 @@ class TestDevDaxSupport(unittest.TestCase):
 
         
 if __name__ == '__main__':
-    unittest.main()
+    if os.path.isdir('/dev/dax1.0'):
+        unittest.main()
+    else:
+        print('Omitting test; no /dev/dax1.0 detected')

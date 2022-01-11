@@ -5,6 +5,8 @@
 #include <libpmem.h>
 #include "mm_plugin_itf.h"
 #include "pymm_config.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 
 class Mmap_memory_provider;
 
@@ -62,15 +64,22 @@ public:
                                    O_RDWR,
                                    &mapped_lenp,
                                    &is_pmem);
-    assert(_mapped_memory);
+
+    if(_mapped_memory == nullptr)
+      throw General_exception("unable to create transient mapped memory");
+    
+    if(mapped_lenp != _mapped_memory_size)
+      throw General_exception("bad mapped size");
+
     assert(is_pmem);
-    assert(mapped_lenp == _mapped_memory_size);
+    
     _base = reinterpret_cast<addr_t>(_mapped_memory);
     _limit = _base + _mapped_memory_size;
 
     /* set up pluggable heap allocator */
     _heap = new MM_plugin_wrapper(RCA_MM_PLUGIN_PATH);
     assert(_heap);
+    
     if(_heap->init() != S_OK)
       throw Constructor_exception("heap init failed");
 
@@ -317,6 +326,7 @@ public:
   }
 };
 
+#pragma GCC diagnostic pop
 
 #endif // __MEMORY_PROVIDERS__
 

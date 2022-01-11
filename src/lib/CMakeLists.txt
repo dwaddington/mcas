@@ -41,6 +41,7 @@ else(BOOTSTRAP_DEPS)
   if(BUILD_MCAS_CLIENT)
     add_subdirectory(libmcasapi)
   endif()
+  add_subdirectory(libkvstore)
   add_subdirectory(libmm)
 endif(BOOTSTRAP_DEPS)
 

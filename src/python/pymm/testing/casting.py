@@ -45,7 +45,7 @@ class TestCasting(unittest.TestCase):
         self.assertTrue(str(type(self.s.x * n)) == "<class 'numpy.ndarray'>")
 
         # shelf type NS * S
-        self.assertTrue(str(type(n * self.s.x)) == "<class 'pymm.ndarray.shelved_ndarray'>")
+        self.assertTrue(str(type(n * self.s.x)) == "<class 'numpy.ndarray'>")
     
         # shelf type S * shelf type S
         self.assertTrue(str(type(self.s.x * self.s.x)) == "<class 'numpy.ndarray'>")
@@ -84,8 +84,8 @@ class TestCasting(unittest.TestCase):
         self.s.x /= 2
     
         self.s.erase('x')
-        log("Testing: torch_tensor OK!")
+        log("Testing: torch_tensor OK")
 
-    
+        
 if __name__ == '__main__':
     unittest.main()

@@ -27,9 +27,6 @@ component::IMCAS * MCAS_client_factory::mcas_create_nsd(const unsigned debug_lev
 
     try {
       /*
-       * The mcas server uses JSON to pass complex structures. The mcas client
-       * uses, well, not JSON
-       *
        * e.g. 10.0.0.21:11911 (verbs)
        * 9.1.75.6:11911:sockets (sockets)
        */

@@ -1,0 +1,6 @@
+*.o
+CMakeLists.txt.in
+build/
+.idea/
+cmake-build-debug/
+/venv/

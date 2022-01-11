@@ -16,7 +16,7 @@ def test_basic_writes():
     s.x = pymm.ndarray((1000,1000),dtype=np.uint8)
 
     if s.x.shape != (1000,1000):
-        raise RuntimeException('demo: s.x.shape check failed')
+        raise RuntimeError('demo: s.x.shape check failed')
 
     s.x[0] = 1
     if s.x[0] != 1:

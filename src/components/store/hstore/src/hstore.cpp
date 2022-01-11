@@ -33,11 +33,6 @@
 
 #include <city.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <tbb/scalable_allocator.h> /* scalable_free */
-#pragma GCC diagnostic pop
-
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
@@ -848,7 +843,7 @@ auto hstore::map_keys(
 
 auto hstore::free_memory(void * p) -> status_t
 {
-  scalable_free(p);
+  ::free(p);
   return S_OK;
 }
 

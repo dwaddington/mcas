@@ -2,20 +2,27 @@
 #include <stdlib.h>
 #include <common/logging.h>
 #include <common/utils.h>
+#include <common/dump_utils.h>
 #include <api/mcas_itf.h>
 #include <api/kvstore_itf.h>
 #include <Python.h>
 #include <structmember.h>
 #include <libpmem.h>
 
+#include "metadata.h"
 #include "pymm_config.h"
+
+namespace globals {
+extern unsigned long debug_level;
+};
+   
 
 /* defaults */
 constexpr const char * DEFAULT_PMEM_PATH = "/mnt/pmem0";
 constexpr const char * DEFAULT_POOL_NAME = "default";
 constexpr const char * DEFAULT_BACKEND = "hstore-cc";
-constexpr uint64_t DEFAULT_LOAD_ADDR = 0x900000000;
-
+constexpr uint64_t DEFAULT_LOAD_ADDR = 0x900000000000;
+constexpr uint64_t DEFAULT_ADDR_CARVEOUT = 0x100000000000; /* 16TB */
 using namespace component;
 
 /* Python type */
@@ -49,9 +56,6 @@ public:
       _map[backend][key] = itf;
       itf->add_ref(); /* extra ref to hold it open */
       return itf;
-    }
-    else {
-      PLOG("Matching backend exists!");
     }
 
     auto itf = _map[backend][key];
@@ -115,10 +119,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
                                                   const uint64_t load_addr,
                                                   const unsigned debug_level)
 {
-  PLOG("load_backend: (%s) (%s) (%s)", backend.c_str(), path.c_str(), mm_plugin_path.c_str());
+  PLOG("load_backend: (%s) (%s) (%s) (0x%lx)", backend.c_str(), path.c_str(), mm_plugin_path.c_str(), load_addr);
   IBase* comp = nullptr;
   std::string checked_mm_plugin_path = mm_plugin_path;
-
   
   if (backend == "hstore-cc") {
     comp = load_component("libcomponent-hstore-cc.so", hstore_factory);
@@ -169,7 +172,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
                           {+component::IKVStore_factory::k_dax_config, ss.str()},
-                          {+component::IKVStore_factory::k_mm_plugin_path, checked_mm_plugin_path}
+                          {+component::IKVStore_factory::k_mm_plugin_path, checked_mm_plugin_path},
+                          {+component::IKVStore_factory::k_dax_base, std::to_string(load_addr)},
+                          {+component::IKVStore_factory::k_dax_size, std::to_string(DEFAULT_ADDR_CARVEOUT) } /* TODO */
                          });
   }
   else if(backend == "hstore" || backend == "hstore-cc") {
@@ -181,7 +186,9 @@ IKVStore * Backend_instance_manager::load_backend(const std::string backend,
     store = fact->create(debug_level,
                          {
                           {+component::IKVStore_factory::k_debug, std::to_string(debug_level)},
-                          {+component::IKVStore_factory::k_dax_config, ss.str()}
+                          {+component::IKVStore_factory::k_dax_config, ss.str()},
+                          {+component::IKVStore_factory::k_dax_base, std::to_string(load_addr)},
+                          {+component::IKVStore_factory::k_dax_size, std::to_string(DEFAULT_ADDR_CARVEOUT) } /* TODO */
                          });
   }
   else {
@@ -214,6 +221,7 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                  "backend",
                                  "mm_plugin",
                                  "force_new",
+                                 "debug_level",
                                  NULL,
   };
 
@@ -225,9 +233,10 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
   PyObject * p_mm_plugin = nullptr;
   int force_new = 0;
   
+  
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwds,
-                                    "s|nssOOp",
+                                    "snssOOp|I",
                                     const_cast<char**>(kwlist),
                                     &p_pool_name,
                                     &size_mb,
@@ -235,8 +244,9 @@ static int MemoryResource_init(MemoryResource *self, PyObject *args, PyObject *k
                                     &p_addr,
                                     &p_backend,
                                     &p_mm_plugin,
-                                    &force_new)) {
-    PyErr_SetString(PyExc_RuntimeError, "bad arguments");
+                                    &force_new,
+                                    &globals::debug_level)) {
+    PyErr_SetString(PyExc_RuntimeError, "MemoryResource_init: bad arguments");
     PWRN("bad arguments or argument types to MemoryResource constructor");
     return -1;
   }
@@ -309,10 +319,10 @@ static PyObject * MemoryResource_create_named_memory(PyObject * self,
     return NULL;
   }
 
-  if (alignment > size) {
-    PyErr_SetString(PyExc_RuntimeError,"alignment greater than size");
-    return NULL;
-  }
+  // if (alignment > size) {
+  //   PyErr_SetString(PyExc_RuntimeError,"alignment greater than size");
+  //   return NULL;
+  // }
 
   if (strlen(name) < 1) {
     PyErr_SetString(PyExc_RuntimeError,"bad name argument");
@@ -508,10 +518,40 @@ static PyObject * MemoryResource_erase_named_memory(PyObject * self,
   }
 
   auto mr = reinterpret_cast<MemoryResource *>(self);
+
+  status_t status;
+
+  void * ptr = nullptr;
+  IKVStore::key_t key_handle;
+  size_t size = 0;
+
+  /* before erasing we need to sanity check for on-going transactions etc. */
+  status = mr->_store->lock(mr->_pool,
+                            name,
+                            IKVStore::STORE_LOCK_WRITE,
+                            ptr,
+                            size, 0, key_handle);
+
+  if(status != S_OK || ptr == nullptr) {
+    PERR("status from store->lock before erase: %d", status);
+    PyErr_SetString(PyExc_RuntimeError,"pre-erase lock (metadata object) failed unexpectedly");
+    return NULL;
+  }
   
-  auto status = mr->_store->erase(mr->_pool, name);
+  auto hdr = reinterpret_cast<MetaHeader*>(ptr);
+  if(hdr->txbits > 0) {
+    mr->_store->unlock(mr->_pool, key_handle);
+    PERR("trying to erase variable that is part of a transaction (0x%x)", hdr->txbits);
+    PyErr_SetString(PyExc_RuntimeError,"attempt to erase variable which is marked as dirty or part of multivar tx");
+    return NULL;
+  }
+  mr->_store->unlock(mr->_pool, key_handle);
+  
+  /* now it is safe to erase the item */
+  status = mr->_store->erase(mr->_pool, name);
   if(status != S_OK) {
-    PyErr_SetString(PyExc_RuntimeError,"erase failed unexpectedly");
+    PERR("status from store->erase: %d", status);
+    PyErr_SetString(PyExc_RuntimeError,"erase (metadata object) failed unexpectedly");
     return NULL;
   }
 
@@ -574,7 +614,8 @@ static PyObject * MemoryResource_put_named_memory(MemoryResource *self, PyObject
                                name,
                                data_ptr,
                                data_len);
-  
+  assert(s == S_OK);
+
   return PyLong_FromLong(s);
 }
 
@@ -610,8 +651,7 @@ static PyObject * MemoryResource_get_named_memory(MemoryResource *self, PyObject
 
 
   auto result = PyByteArray_FromStringAndSize(static_cast<const char *>(data_ptr), data_len);
-  //  ::free(data_ptr);
-  
+  mr->_store->free_memory(data_ptr);
   return result;
 }
 
@@ -648,7 +688,8 @@ static PyObject * MemoryResource_persist_memory_view(MemoryResource *self, PyObj
 
   Py_buffer * pybuffer = PyMemoryView_GET_BUFFER(mview);
 
-  PNOTICE("persisting %p %lu", pybuffer->buf, pybuffer->len);
+  PLOG("persisting memory @%p", pybuffer->buf);
+
   pmem_persist(pybuffer->buf, pybuffer->len); /* part of libpmem */
   
   return PyLong_FromLong(0);

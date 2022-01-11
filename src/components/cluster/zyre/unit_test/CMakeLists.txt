@@ -7,11 +7,7 @@ find_library(GTEST_LIB NAMES GTEST PATHS /usr/local/lib,/usr/lib)
 add_compile_options("$<$<CONFIG:Debug>:-O0>")
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(GTEST_LIB gtest)
-else()
-  set(GTEST_LIB gtestd)
-endif()
+set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)

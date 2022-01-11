@@ -29,7 +29,7 @@
 /* for PyMM we do things slightly different to the Python Personality.
    we'd like to unify PP and PyMM eventually */
 #ifdef PYMM
-#include "meta_generated.h"
+#include "metadata.h"
 #endif
 
 namespace global
@@ -206,24 +206,20 @@ void create_ndarray_header(PyArrayObject * src_ndarray, std::string& out_hdr, co
   std::stringstream hdr;
 
 #ifdef PYMM
-  flatbuffers::FlatBufferBuilder builder;
+  MetaHeader metadata;
+  metadata.magic = HeaderMagic;
+  metadata.txbits = 0;
+  metadata.version = 0;
+  metadata.subtype = 0;
+  metadata.refcnt = 0;
   
-  flatbuffers::Offset<PyMM::Meta::Header> mloc;
-  switch(type) {
-  case 0:
-    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_NumPyArray, PyMM::Meta::Constants_Version);
-    break;
-  case 1:
-    mloc = PyMM::Meta::CreateHeader(builder, PyMM::Meta::Constants_Magic, PyMM::Meta::DataType_TorchTensor, PyMM::Meta::Constants_Version);
-    break;
-  default:
-    throw General_exception("bad type");
-  }
+  if(type == 0)
+    metadata.type = DataType_NumPyArray;
+  else if(type == 1)
+    metadata.type = DataType_TorchTensor;
+  else throw General_exception("bad type");
   
-  FinishSizePrefixedHeaderBuffer(builder, mloc); /* include size prefix */
-  auto meta_hdr = builder.GetBufferPointer();
-  auto meta_hdr_len = builder.GetSize();
-  hdr.write(reinterpret_cast<const char*>(meta_hdr), meta_hdr_len);
+  hdr.write(reinterpret_cast<const char*>(&metadata), sizeof(metadata));
 #endif
 
   /* number of dimensions */
@@ -344,7 +340,7 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
 
   PyObject * bytes_memory_view  = nullptr;
   int type = 0;
-  
+
   if (! PyArg_ParseTupleAndKeywords(args,
                                     kwargs,
                                     "O|i",
@@ -364,36 +360,20 @@ PyObject * pymcas_ndarray_read_header(PyObject * self,
   byte * ptr = (byte *) buffer->buf;
   
 #ifdef PYMM
-  auto total_len = *reinterpret_cast<uint32_t*>(ptr) + sizeof(uint32_t);
-  assert(buffer->len > total_len);
 
-  int expected_type;
-  switch(type) {
-  case 0:
-    expected_type = PyMM::Meta::DataType_NumPyArray;
-    break;
-  case 1:
-    expected_type = PyMM::Meta::DataType_TorchTensor;
-    break;
-  default:
-    throw General_exception("bad type");
-  }
+  auto hdr = reinterpret_cast<MetaHeader*>(ptr);
+  if(hdr->magic != HeaderMagic)
+    throw General_exception("magic check failed");
 
-  try {
-    auto meta_header = PyMM::Meta::GetSizePrefixedHeader(ptr);
+  if(type != 0 && type != 1)
+    throw General_exception("invalid type");
+  
+  if((type == 0 && hdr->type != DataType_NumPyArray) ||
+     (type == 1 && hdr->type != DataType_TorchTensor))
+    throw General_exception("mismatched type");
 
-    
-    if(!meta_header ||
-       meta_header->magic() != PyMM::Meta::Constants_Magic ||
-       meta_header->type() != expected_type) {
-      Py_RETURN_NONE;
-    }
-  }
-  catch(...) {
-    PERR("PyMM::Meta::GetHeader failed");
-  }
-
-  ptr += total_len;
+  ptr += HeaderSize;
+  
 #endif
 
   int ndims = *(reinterpret_cast<int*>(ptr));

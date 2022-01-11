@@ -25,7 +25,8 @@ run_hstore() {
 
 DEVDAX_PFX="$(find_devdax)"
 if test -n "$DEVDAX_PFX"
-then raw_store_size=$(cat "/sys/dev/char/$(ls -l ${DEVDAX_PFX}.0 | awk '{gsub(",",":") ; print $5 $6}')/size")
+then declare -a devices=($(ls -l ${DEVDAX_PFX}.* | awk '{gsub(",",":") ; print $5 $6}'))
+  raw_store_size=$(cat "/sys/dev/char/${devices[0]})/size")
   echo "DAX_PREFIX=${$DEVDAX_PFX} RAW_STORE_SIZE=$raw_store_size run_hstore has_module_mcasmod $1"
   DAX_PREFIX="$DEVDAX_PFX" RAW_STORE_SIZE=$raw_store_size run_hstore has_module_mcasmod $1
 fi

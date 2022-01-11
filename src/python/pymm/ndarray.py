@@ -18,10 +18,10 @@ import numpy as np
 import copy
 import os
 
+from .metadata import *
 from numpy import uint8, ndarray, dtype, float
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 dtypedescr = np.dtype
 wbinvd_threshold = 1073741824
@@ -32,7 +32,7 @@ class ndarray(Shadow):
     '''
     ndarray that is stored in a memory resource
     '''
-    def __init__(self, shape, dtype=float, strides=None, order='C', zero=False):
+    def __init__(self, shape, dtype=np.float64, strides=None, order='C', zero=False):
 
         # todo check params
         # todo check and invalidate param 'buffer'
@@ -61,8 +61,8 @@ class ndarray(Shadow):
         '''
         metadata = memory_resource.get_named_memory(name)
         if metadata is None:
-            return (False, None)
-        
+            raise RuntimeError('bad object name')
+
         if pymmcore.ndarray_read_header(memoryview(metadata)) == None:
             return (False, None)
         else:
@@ -113,13 +113,15 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
             else:
                 raise RuntimeError('unhandled condition in shelved_ndarray shape handling (shape={})'.format(shape))
 
-        # the meta data is always accessible by the key name
+        # the meta data is always accessible by the plain key name
+        # the value if not concated after meta data is in a separate key with -value suffix
         value_key = name + '-value'
         metadata_key = name
 
-        value_named_memory = memory_resource.open_named_memory(value_key)
+        metadata_memory = memory_resource.open_named_memory(metadata_key)
+        value_memory = memory_resource.open_named_memory(value_key)
 
-        if value_named_memory == None: # does not exist yet
+        if value_memory == None: # does not exist yet
             #
             # create a newly allocated named memory from MemoryResource
             #
@@ -128,29 +130,37 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
                 alignment = 1
             else:
                 alignment = 8
-            value_named_memory = memory_resource.create_named_memory(value_key,
-                                                                     msize,
-                                                                     alignment,
-                                                                     zero) # zero memory
+            value_memory = memory_resource.create_named_memory(value_key,
+                                                               msize,
+                                                               alignment,
+                                                               zero) # zero memory
+            assert value_memory != None
+            
             # construct array using supplied memory
             #        shape, dtype=float, buffer=None, offset=0, strides=None, order=None
-            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_named_memory.buffer,
+            self = np.ndarray.__new__(subtype, dtype=dtype, shape=shape, buffer=value_memory.buffer,
                                       strides=strides, order=order)
 
             # create and store metadata header
             metadata = pymmcore.ndarray_header(self,np.dtype(dtype).str, type=type)
             memory_resource.put_named_memory(metadata_key, metadata)
-
+            
+            metadata_memory = memory_resource.open_named_memory(metadata_key)
         else:
-            # entity already exists, load metadata            
-            metadata = memory_resource.get_named_memory(metadata_key)
-            hdr = pymmcore.ndarray_read_header(memoryview(metadata),type=type)
-            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_named_memory.buffer,
+            # entity already exists, load metadata
+            assert metadata_memory != None
+            
+            hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=type)
+            self = np.ndarray.__new__(subtype, dtype=hdr['dtype'], shape=hdr['shape'], buffer=value_memory.buffer,
                                       strides=hdr['strides'], order=order)
 
+        assert value_memory != None
+        assert metadata_memory != None
+            
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = value_named_memory
+        self._value_named_memory = value_memory
+        self._metadata_named_memory = metadata_memory
         self._metadata_key = metadata_key
         self._value_key = value_key
         self.name = name
@@ -178,6 +188,12 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def asndarray(self):
         return self.view(np.ndarray)
 
+    def __str__(self):
+        return str(self.asndarray())
+    
+    def __repr__(self):
+        return repr(self.asndarray())
+
     def dim(self):
         return len(super().shape)
     
@@ -188,12 +204,12 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     # each type will handle its own transaction methodology.  this
     # is because metadata may be dealt with differently
     #
-    def _value_only_transaction(self, F, *args):
+    def _wrap_transaction(self, F, *args):
         if self is None:
             return
-        self._value_named_memory.tx_begin()
+        self._metadata_named_memory.tx_begin(self._value_named_memory)
         result = F(*args)
-        self._value_named_memory.tx_commit()
+        self._metadata_named_memory.tx_commit(self._value_named_memory)
         return result
 
     # all methods that perform writes are implicitly used to define transaction
@@ -204,47 +220,47 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
 
     # in-place methods need to be transactional
     def fill(self, value):
-        return self._value_only_transaction(super().fill, value)
+        return self._wrap_transaction(super().fill, value)
 
     def byteswap(self, inplace):
         if inplace == True:
-            return self._value_only_transaction(super().byteswap, True)
+            return self._wrap_transaction(super().byteswap, True)
         else:
             return super().byteswap(False)
 
     # in-place arithmetic
     def __iadd__(self, value): # +=
-        return self._value_only_transaction(super().__iadd__, value)
+        return self._wrap_transaction(super().__iadd__, value)
 
     def __imul__(self, value): # *=
-        return self._value_only_transaction(super().__imul__, value)
+        return self._wrap_transaction(super().__imul__, value)
 
     def __isub__(self, value): # -=
-        return self._value_only_transaction(super().__isub__, value)
+        return self._wrap_transaction(super().__isub__, value)
 
     def __idiv__(self, value): # /=
-        return self._value_only_transaction(super().__idiv__, value)
+        return self._wrap_transaction(super().__idiv__, value)
 
     def __imod__(self, value): # %=
-        return self._value_only_transaction(super().__imod__, value)
+        return self._wrap_transaction(super().__imod__, value)
 
     def __ipow__(self, value): # **=
-        return self._value_only_transaction(super().__ipow__, value)
+        return self._wrap_transaction(super().__ipow__, value)
 
     def __ilshift__(self, value): # <<=
-        return self._value_only_transaction(super().__ilshift__, value)
+        return self._wrap_transaction(super().__ilshift__, value)
 
     def __irshift__(self, value): # >>=
-        return self._value_only_transaction(super().__irshift__, value)
+        return self._wrap_transaction(super().__irshift__, value)
 
     def __iand__(self, value): # &=
-        return self._value_only_transaction(super().__iand__, value)
+        return self._wrap_transaction(super().__iand__, value)
 
     def __ixor__(self, value): # ^=
-        return self._value_only_transaction(super().__ixor__, value)
+        return self._wrap_transaction(super().__ixor__, value)
 
     def __ior__(self, value): # |=
-        return self._value_only_transaction(super().__ior__, value)
+        return self._wrap_transaction(super().__ior__, value)
 
     
     # out-of-place we need to convert back to ndarray
@@ -296,14 +312,15 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
     def __xor__(self, value):
         return super().__xor__(value).asndarray()
 
+    
 
     # set item, e.g. x[2] = 2
     # if we want transactionality on this we override it - but beware, it will cost!
 #    def __setitem__(self, position, x):
-#        return self._value_only_transaction(super().__setitem__, position, x)
+#        return self._wrap_transaction(super().__setitem__, position, x)
 
     def flip(self, m, axis=None):
-        return self._value_only_transaction(super().flip, m, axis)
+        return self._wrap_transaction(super().flip, m, axis)
 
 
     # operations that return new views on same data.  we want to change
@@ -323,6 +340,7 @@ class shelved_ndarray(np.ndarray, ShelvedCommon):
         self.info = getattr(obj, 'info', None)
         self._memory_resource = getattr(obj, '_memory_resource', None)
         self._value_named_memory = getattr(obj, '_value_named_memory', None)
+        self._metadata_named_memory = getattr(obj, '_metadata_named_memory', None)
         self._metadata_key = getattr(obj, '_metadata_key', None)
         self.name = getattr(obj, 'name', None)
 

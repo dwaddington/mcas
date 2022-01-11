@@ -17,19 +17,12 @@ import torch
 import pymmcore
 import numpy as np
 import copy
-import flatbuffers
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.TorchTensor as TorchTensor
-import PyMM.Meta.DataType as DataType
-from flatbuffers import util
-
-from numpy import uint8, ndarray, dtype, float
+from .metadata import *
 from .memoryresource import MemoryResource
 from .ndarray import ndarray, shelved_ndarray
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
+from numpy import uint8, ndarray, dtype, float
 
 def colored(r, g, b, text):
     return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
@@ -42,16 +35,18 @@ class torch_tensor(Shadow):
     '''
     PyTorch tensor that is stored in a memory resource
     '''
-    def __init__(self, shape, dtype=float, strides=None, order='C'):
+    def __init__(self, shape, dtype=float, strides=None, order='C', requires_grad=False):
 
         print(colored(255,0,0, 'WARNING: torch_tensor is experimental and unstable!'))
+
         # todo check params
         # todo check and invalidate param 'buffer'
         # save constructor parameters and type
-        self.__p_shape = shape
+        self.__p_shape = shape # carries data too
         self.__p_dtype = dtype
         self.__p_strides = strides
         self.__p_order = order
+        self.__requires_grad = requires_grad
 
     def make_instance(self, memory_resource: MemoryResource, name: str):
         '''
@@ -62,7 +57,8 @@ class torch_tensor(Shadow):
                                     shape = self.__p_shape,
                                     dtype = self.__p_dtype,
                                     strides = self.__p_strides,
-                                    order = self.__p_order)
+                                    order = self.__p_order,
+                                    requires_grad = self.__requires_grad)
 
     def existing_instance(memory_resource: MemoryResource, name: str):
         '''
@@ -84,15 +80,17 @@ class torch_tensor(Shadow):
     def build_from_copy(memory_resource: MemoryResource, name: str, tensor):
         new_tensor = shelved_torch_tensor(memory_resource,
                                           name,
-                                          shape = tensor.shape,
-                                          dtype = tensor.dtype)
-
+                                          shape = tensor.detach().numpy(),
+                                          dtype = tensor.dtype,
+                                          requires_grad = tensor.requires_grad)
         
         # now copy the data
-        if tensor.dim() is 0:
-            new_tensor.data = tensor.clone()
-        else:
-            new_tensor[:] = tensor
+        np.copyto(new_tensor._base_ndarray, tensor.to('cpu').detach().numpy())
+
+#        if tensor.dim() is 0:
+#            new_tensor.data = tensor.clone()
+#        else:
+
         return new_tensor
 
     
@@ -104,10 +102,10 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     '''PyTorch tensor that is stored in a memory resource'''
     __array_priority__ = -100.0 # sets subclass as higher priority
 
-    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C'):
-
+    def __new__(subtype, memory_resource, name, shape, dtype=float, strides=None, order='C', requires_grad=False):
+        #print('shelved_torch_tensor: shape={} dtype={}'.format(shape, dtype))
         torch_to_numpy_dtype_dict = {
-            torch.bool  : np.bool,
+            torch.bool  : bool,
             torch.uint8 : np.uint8,
             torch.int8  : np.int8,
             torch.int16 : np.int16,
@@ -119,45 +117,58 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
             torch.complex64 : np.complex64,
             torch.complex128 : np.complex128,
         }
-        np_dtype = torch_to_numpy_dtype_dict.get(dtype,None)
+
+        np_dtype = torch_to_numpy_dtype_dict.get(dtype, None)
 
         value_key = name + '-value'
         metadata_key = name
+
+        metadata_memory = memory_resource.open_named_memory(metadata_key)
+        value_memory = memory_resource.open_named_memory(value_key)
         
-        value_named_memory = memory_resource.open_named_memory(value_key)
+        if value_memory == None: # does not exist yet
 
-        if value_named_memory == None: # does not exist yet
-
-            ndshape = get_shape(shape) # convert to ndarray shape
+            if isinstance(shape, torch.Size):
+                ndshape = [shape.numel()]
+            else:
+                ndshape = np.shape(shape)
 
             # use shelved_ndarray under the hood and make a subclass from it
             base_ndarray = shelved_ndarray(memory_resource, name=name, shape=ndshape, dtype=np_dtype, type=1)
 
+            # copy data
+            if isinstance(shape, list):
+                base_ndarray[:] = shape
+            
             # create and store metadata header : type=1 indicates torch_tensor
             metadata = pymmcore.ndarray_header(base_ndarray, np.dtype(np_dtype).str, type=1)
-            builder = flatbuffers.Builder(32)
 
             memory_resource.put_named_memory(metadata_key, metadata)
-
+            
         else:
             # entity already exists, load metadata
-            del value_named_memory # the shelved_ndarray ctor will need to reopen it
-            metadata = memory_resource.get_named_memory(metadata_key)
-            hdr = pymmcore.ndarray_read_header(memoryview(metadata), type=1) # type=1 indicate torch_tensor
+           
+            hdr = pymmcore.ndarray_read_header(memoryview(metadata_memory.buffer),type=1) # type=1 indicate torch_tensor
+
+            del value_memory # need to release references
+            del metadata_memory # need to release references
 
             base_ndarray = shelved_ndarray(memory_resource, name=name, dtype=hdr['dtype'], shape=hdr['shape'],
                                            strides=hdr['strides'], order=order, type=1)
 
+
+
             
         self = torch.Tensor._make_subclass(subtype, torch.as_tensor(base_ndarray))
         self._base_ndarray = base_ndarray
+        self._metadata_named_memory = base_ndarray._metadata_named_memory
         self._value_named_memory = base_ndarray._value_named_memory
 
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
         self._metadata_key = metadata_key
         self.name_on_shelf = name
-        self.requires_grad = False # by default .grad is not there
+        self.requires_grad = requires_grad # by default .grad is not there
         self.retains_grad = False # by default .grad is not there 
         return self
 
@@ -186,6 +197,12 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
     def as_tensor(self):
         '''Cast class to torch.Tensor subclass'''
         return self.as_subclass(torch.Tensor)
+
+    def __str__(self):
+        return str(self.as_tensor())
+
+    def __repr__(self):
+        return repr(self.as_tensor())
     
     def update_metadata(self, array):
         metadata = pymmcore.ndarray_header(array,np.dtype(dtype).str, type=1)
@@ -198,18 +215,18 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
         if self is None:
             return
         if '_value_named_memory' in self.__dict__:
-            self._value_named_memory.tx_begin()
+            self._tx_begin()
             result = F(*args)
-            self._value_named_memory.tx_commit()            
+            self._tx_commit()            
         else:
             result = F(*args)
         return result
 
     def _tx_begin(self):
-        self._value_named_memory.tx_begin()
+        self._metadata_named_memory.tx_begin(self._value_named_memory)
 
     def _tx_commit(self):
-        self._value_named_memory.tx_commit()
+        self._metadata_named_memory.tx_commit(self._value_named_memory)
 
     # all methods that perform writes are implicitly used to define transaction
     # boundaries (at least most fine-grained)
@@ -323,22 +340,23 @@ class shelved_torch_tensor(torch.Tensor, ShelvedCommon):
 
 
 
-from collections.abc import Sequence
+# from collections.abc import Sequence
 
-def get_shape(lst):
-    def ishape(lst):
-        if isinstance(lst, torch.Size):
-            return lst
-        if isinstance(lst, float):
-            return []
+# def get_shape(lst):
+#     def ishape(lst):
+#         if isinstance(lst, torch.Size):
+#             return lst
+#         if isinstance(lst, float):
+#             return []
         
-        shapes = [ishape(x) if isinstance(x, list) else [] for x in list(lst)]
-        shape = shapes[0]
-        if shapes.count(shape) != len(shapes):
-            raise ValueError('Ragged list')
-        shape.append(len(lst))
-        return shape
+#         shapes = [ishape(x) if isinstance(x, list) else [] for x in list(lst)]
+
+#         shape = shapes[0]
+#         if shapes.count(shape) != len(shapes):
+#             raise ValueError('Ragged list')
+#         shape.append(len(lst))
+#         return shape
 
 
-    return tuple(ishape(lst))
-#    return tuple(reversed(ishape(lst)))
+#     return tuple(ishape(lst))
+# #    return tuple(reversed(ishape(lst)))

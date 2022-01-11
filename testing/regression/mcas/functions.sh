@@ -98,11 +98,14 @@ scale_by_transport () {
 find_devdax () {
  for i in 0 1
  do
-  d=/dev/dax$i
-  if test -c "$d.0"
-  then echo $d
-    return
-  fi
+  for j in $(seq 0 15)
+  do
+   d=/dev/dax$i
+   if test -c "$d.$j"
+   then echo $d
+     return
+   fi
+  done
  done
 }
 

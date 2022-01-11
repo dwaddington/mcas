@@ -25,10 +25,11 @@ execute_process ( COMMAND ${PYTHON} -m site --user-site OUTPUT_VARIABLE PYTHON_S
 execute_process ( COMMAND ${PYTHON} -c "from sysconfig import get_paths as gp; print(gp()['include'])" OUTPUT_VARIABLE PYTHON_INCLUDE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process ( COMMAND ${PYTHON} -c "from sysconfig import get_config_vars as gc; print(gc()['LIBPL'])" OUTPUT_VARIABLE PYTHON_LIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process ( COMMAND ${PYTHON} -c "from sysconfig import get_config_vars as gc; print(gc()['BLDLIBRARY'])" OUTPUT_VARIABLE PYTHON_BLDLIB_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+execute_process ( COMMAND "find ${PYTHON_SITE_PACKAGES} -type d -name numpy" OUTPUT_VARIABLE PYTHON_SITE_NUMPY OUTPUT_STRIP_TRAILING_WHITESPACE )
 message("-- Python    site : ${PYTHON_SITE_PACKAGES}")
 message("--         stdlib : ${PYTHON_LIB_DIR}")
 message("--        include : ${PYTHON_INCLUDE_DIR}")
+message("--          numpy : ${PYTHON_SITE_NUMPY}")
 
 set(GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated/pp_generated.h)
 
@@ -48,12 +49,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/libpmem/common)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libadoproto/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # EASTL
 include_directories(${PYTHON_INCLUDE_DIR})
-
-# uses local site install
-execute_process ( COMMAND ${PYTHON} -c "import numpy; print(numpy.__path__[0])" OUTPUT_VARIABLE NUMPY_SITE_PACKAGE OUTPUT_STRIP_TRAILING_WHITESPACE)
-message("-- Numpy     site : ${NUMPY_SITE_PACKAGE}")
-
-include_directories(${NUMPY_SITE_PACKAGE}/core/include)
+include_directories(${PYTHON_SITE_PACKAGES}/numpy/core/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/python/mcas-python-api/src/)
   
 link_directories(${CMAKE_BINARY_DIR}/src/lib/flatbuffers/)

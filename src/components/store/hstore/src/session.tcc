@@ -23,10 +23,6 @@
 #include "monitor_pin.h"
 #include <common/perf/tm.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <tbb/scalable_allocator.h> /* scalable_malloc */
-#pragma GCC diagnostic pop
 #include <algorithm> /* min, max, transform */
 #include <cstddef> /* size_t */
 #include <cstdlib> /* getenv */
@@ -325,7 +321,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		auto &v = map.at(TM_REF key);
 		auto value_len = std::get<0>(v).size();
 
-		auto value = ::scalable_malloc(value_len);
+		auto value = ::malloc(value_len);
 		if ( ! value )
 		{
 			throw std::bad_alloc();

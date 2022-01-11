@@ -66,8 +66,12 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   add_custom_target(${PROJECT_NAME}-target ALL DEPENDS ${PROTOBUF_GENERATED} ${OUTPUT})
   add_custom_target(${PROJECT_NAME}-wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution
 
-  # install as a site-package
-  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+  # install as a site-package. If CMake new enough, we can propagate a failure
+  if(${CMAKE_VERSION} VERSION_LESS "3.19.0")
+    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+  else()
+    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND_ERROR_IS_FATAL ANY)")
+  endif()
   
   
 else()

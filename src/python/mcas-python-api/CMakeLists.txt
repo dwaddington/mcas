@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5) # may work with earlier versions
 
 project(mcas-python-api CXX)
 
-find_program(PYTHON NAMES "python3.8" "python3.7" "python3.6" "python3.5")
+find_program(PYTHON NAMES "python3.9" "python3.8" "python3.7" "python3.6" "python3.5")
 
 if (PYTHON AND BUILD_PYTHON_SUPPORT)
 
@@ -57,8 +57,12 @@ if (PYTHON AND BUILD_PYTHON_SUPPORT)
   add_custom_target(${PROJECT_NAME}-check COMMAND ${CHECK_COMMAND})
   add_custom_target(${PROJECT_NAME}-wheel COMMAND ${PYTHON} ${SETUP_PY} bdist) # build wheel binary distribution
 
-  # install as a site-package
-  install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+  # install as a site-package. If CMake new enough, we can propagate a failure
+  if(${CMAKE_VERSION} VERSION_LESS "3.19.0")
+    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+  else()
+    install(CODE "execute_process(COMMAND ${PYTHON} ${SETUP_PY} install --user WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND_ERROR_IS_FATAL ANY)")
+  endif()
   
   install(FILES mcas-shell DESTINATION ${CMAKE_INSTALL_PREFIX}/bin PERMISSIONS
     OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE OWNER_READ GROUP_READ WORLD_READ)

@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 from dm import dm
+from glob import glob
 
-# Default locations for devdax and fsdax stores are: /dev/dax<n>.0, /mnt/pmem<n>/a0
+# Locations for fsdax stores are: /mnt/pmem<n>/a<0 ...>
+# Locations for devdax stores are: /dev/dax<n>.*
 
 class fsdax(dm):
     """ fsdax specification (within a shard) """
@@ -18,7 +20,12 @@ class devdax(dm):
     def __init__(self, pfx, accession=0):
         self.pfx = pfx
         self.accession = accession
-        dm.__init__(self, [{"path": "%s.%d" % (pfx, accession), "addr": 0x9000000000 + 0x1000000000 * accession}])
+        self.devices = glob("%s.*" % (pfx,))
+        try:
+            dm.__init__(self, [{"path": self.devices[accession], "addr": 0x9000000000 + 0x1000000000 * accession}])
+        except IndexError as e:
+            print("No dax device device for accession", accession)
+            raise
     def step(self,n):
         return devdax(self.pfx, self.accession+n)
 

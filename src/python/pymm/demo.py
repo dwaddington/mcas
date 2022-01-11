@@ -26,7 +26,7 @@ def demo(force_new=True):
     s.x = pymm.ndarray((1000,1000),dtype=np.float)
 
     if s.x.shape != (1000,1000):
-        raise RuntimeException('demo: s.x.shape check failed')
+        raise RuntimeError('demo: s.x.shape check failed')
 
     # perform in-place (on-shelf) operations
     s.x.fill(3)

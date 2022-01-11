@@ -12,18 +12,12 @@
 #
 
 import pymmcore
-import flatbuffers
 import struct
 import gc
 
-import PyMM.Meta.Header as Header
-import PyMM.Meta.Constants as Constants
-import PyMM.Meta.DataType as DataType
-
-from flatbuffers import util
+from .metadata import *
 from .memoryresource import MemoryResource
-from .shelf import Shadow
-from .shelf import ShelvedCommon
+from .shelf import Shadow, ShelvedCommon
 
 class float_number(Shadow):
     '''
@@ -46,18 +40,10 @@ class float_number(Shadow):
         if buffer is None:
             return (False, None)
 
-        hdr_size = util.GetSizePrefix(buffer, 0)
-        if(hdr_size != 28):
-            return (False, None)
+        hdr = construct_header_from_buffer(buffer)
 
-        root = Header.Header()
-        hdr = root.GetRootAsHeader(buffer[4:], 0) # size prefix is 4 bytes
-
-        if(hdr.Magic() != Constants.Constants().Magic):
-            return (False, None)
-
-        if (hdr.Type() == DataType.DataType().NumberFloat):
-            f = float.fromhex((buffer[hdr_size + 4:]).decode())
+        if (hdr.type == DataType_NumberFloat):
+            f = float.fromhex((buffer[HeaderSize:]).decode())
             return (True, shelved_float_number(memory_resource, name, f))
 
         # not a string
@@ -65,7 +51,6 @@ class float_number(Shadow):
 
     def build_from_copy(memory_resource: MemoryResource, name: str, value):
         return shelved_float_number(memory_resource, name, number_value=value)
-
 
 
 class shelved_float_number(ShelvedCommon):
@@ -77,94 +62,62 @@ class shelved_float_number(ShelvedCommon):
         memref = memory_resource.open_named_memory(name)
 
         if memref == None:
+            
             # create new value
-            builder = flatbuffers.Builder(32)
-            # create header
-            Header.HeaderStart(builder)
-            Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-            Header.HeaderAddVersion(builder, Constants.Constants().Version)
-            Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
-
-            hdr = Header.HeaderEnd(builder)
-            builder.FinishSizePrefixed(hdr)
-            hdr_ba = builder.Output()
-
-            # allocate memory
-            hdr_len = len(hdr_ba)
             value_bytes = str.encode(number_value.hex())
-            value_len = hdr_len + len(value_bytes) 
+            total_len = HeaderSize + len(value_bytes)
+            memref = memory_resource.create_named_memory(name, total_len, 8, False)
 
-            memref = memory_resource.create_named_memory(name, value_len, 1, False)
-            # copy into memory resource
-            memref.tx_begin()
-            memref.buffer[0:hdr_len] = hdr_ba
-            memref.buffer[hdr_len:] = value_bytes
+            memref.tx_begin(value_named_memory=None, check=False)
+            hdr = construct_header_on_buffer(memref.buffer, DataType_NumberFloat, txbits=TXBIT_DIRTY)
+                        
+            # copy data into memory resource
+            memref.buffer[HeaderSize:] = value_bytes
             memref.tx_commit()
         else:
+            # validates
+            construct_header_from_buffer(memref.buffer)
 
-            hdr_size = util.GetSizePrefix(memref.buffer, 0)
-            if hdr_size != 28:
-                raise RuntimeError("invalid header for '{}'; prior version?".format(varname))
-            
-            root = Header.Header()
-            hdr = root.GetRootAsHeader(memref.buffer[4:], 0) # size prefix is 4 bytes
-            
-            if(hdr.Magic() != Constants.Constants().Magic):
-                raise RuntimeError("bad magic number - corrupt data?")
-                
-            self._type = hdr.Type()
-
-        # set up the view of the data
-        # materialization alternative - self._view = memoryview(memref.buffer[32:])
         self._cached_value = float(number_value)
-        self._name = name
+        self.name = name
         # hold a reference to the memory resource
         self._memory_resource = memory_resource
-        self._value_named_memory = memref
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
 
     def _atomic_update_value(self, value):
         if not isinstance(value, float):
             raise TypeError('bad type for atomic_update_value')
 
-        # create new float 
-        builder = flatbuffers.Builder(32)
-        # create header
-        Header.HeaderStart(builder)
-        Header.HeaderAddMagic(builder, Constants.Constants().Magic)
-        Header.HeaderAddVersion(builder, Constants.Constants().Version)
-        Header.HeaderAddType(builder, DataType.DataType().NumberFloat)
-
-        hdr = Header.HeaderEnd(builder)
-        builder.FinishSizePrefixed(hdr)
-        hdr_ba = builder.Output()
-
-        # allocate memory
-        hdr_len = len(hdr_ba)
+        # because we are doing swapping create new new
         value_bytes = str.encode(value.hex())
-        value_len = hdr_len + len(value_bytes) 
+        total_len = HeaderSize + len(value_bytes)
 
         memory = self._memory_resource
-        memref = memory.create_named_memory(self._name + '-tmp', value_len, 1, False)
+        memref = memory.create_named_memory(self.name + '-tmp', total_len, 8, False)
+
+        memref.tx_begin(value_named_memory=None, check=False) # not sure if we need this
+        hdr = construct_header_on_buffer(memref.buffer, DataType_NumberFloat, txbits=TXBIT_DIRTY)
+        
         # copy into memory resource
-        memref.tx_begin()
-        memref.buffer[0:hdr_len] = hdr_ba
-        memref.buffer[hdr_len:] = value_bytes
+        memref.buffer[HeaderSize:] = value_bytes
         memref.tx_commit()
 
         del memref # this will force release
-        del self._value_named_memory # this will force release
+        del self._metadata_named_memory # this will force release
         gc.collect()
 
         # swap names
-        memory.atomic_swap_names(self._name, self._name + "-tmp")
+        memory.atomic_swap_names(self.name, self.name + "-tmp")
 
         # erase old data
-        memory.erase_named_memory(self._name + "-tmp")
+        memory.erase_named_memory(self.name + "-tmp")
         
-        memref = memory.open_named_memory(self._name)
-        self._value_named_memory = memref
+        memref = memory.open_named_memory(self.name)
+        self._metadata_named_memory = memref
+        self._value_named_memory = None
         self._cached_value = value
-        # materialization alternative - self._view = memoryview(memref.buffer[32:])
+        # materialization alternative - self._view = memoryview(memref.buffer[Constants.Constants().HdrSize + 4:])
         return self
 
         
@@ -277,11 +230,14 @@ class shelved_float_number(ShelvedCommon):
     def __ne__(self, x):
         return self._get_value() != x
 
+    def __round__(self, places):
+        return float(self._get_value()).__round__(places)
 
 
     # TODO: MOSHIK TO FINISH
     
     def hex(self):
         return float(self._get_value()).hex()
+
         
 # ['__abs__', '__add__', '__and__', '__bool__', '__ceil__', '__class__', '__delattr__', '__dir__', '__divmod__', '__doc__', '__eq__', '__float__', '__floor__', '__floordiv__', '__format__', '__ge__', '__getattribute__', '__getnewargs__', '__gt__', '__hash__', '__index__', '__init__', '__init_subclass__', '__int__', '__invert__', '__le__', '__lshift__', '__lt__', '__mod__', '__mul__', '__ne__', '__neg__', '__new__', '__or__', '__pos__', '__pow__', '__radd__', '__rand__', '__rdivmod__', '__reduce__', '__reduce_ex__', '__repr__', '__rfloordiv__', '__rlshift__', '__rmod__', '__rmul__', '__ror__', '__round__', '__rpow__', '__rrshift__', '__rshift__', '__rsub__', '__rtruediv__', '__rxor__', '__setattr__', '__sizeof__', '__str__', '__sub__', '__subclasshook__', '__truediv__', '__trunc__', '__xor__', 'bit_length', 'conjugate', 'denominator', 'from_bytes', 'imag', 'numerator', 'real', 'to_bytes']
