@@ -20,9 +20,8 @@
 #define RCA_MM_PLUGIN_PATH "@CMAKE_INSTALL_PREFIX@/lib/libmm-plugin-rcalb.so"
 
 namespace globals {
-  static unsigned long debug_level;
+static unsigned long debug_level = 0;
 };
-  
 
 #endif
 
