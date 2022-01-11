@@ -54,10 +54,6 @@ public:
   using key_t           = KVStore::key_t;
   using Attribute       = KVStore::Attribute;
   using Addr            = KVStore::Addr;
-  using byte            = common::byte;
-
-  template <typename T>
-  using basic_string_view = std::experimental::basic_string_view<T>;
 
   static constexpr async_handle_t  ASYNC_HANDLE_INIT  = nullptr;
 
