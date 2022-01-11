@@ -80,6 +80,8 @@ class IKVStore_factory : public component::IBase {
   static constexpr const char *k_debug = "debug";
   static constexpr const char *k_owner = "owner";
   static constexpr const char *k_name = "name";
+  /* NUMA nodes from which mapstore may allocate memory */
+  static constexpr const char *k_numa_nodes = "numa_nodes";
   static constexpr const char *k_dax_config = "dax_config";
   static constexpr const char *k_mm_plugin_path = "mm_plugin_path";
   static constexpr const char *k_dax_base = "dax_base";

@@ -21,7 +21,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # cityhash
 
-file(GLOB SOURCES src/*.c*)
+set(SOURCES src/map_store.cpp src/map_store_factory.cpp src/pool_instance.cpp src/region_memory_mmap.cpp src/region_memory_numa.cpp src/region_memory_numa_pin.cpp)
 configure_file(src/map_store_env.h.in ${CMAKE_CURRENT_BINARY_DIR}/map_store_env.h)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
