@@ -30,7 +30,7 @@ class TestRecovery(unittest.TestCase):
 
     def test_establish(self):
         log("Testing: establishing shelf and values")
-        shelf = pymm.shelf('myShelf',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
+        shelf = pymm.shelf('myShelfRecovery',size_mb=1024,pmem_path='/mnt/pmem0',force_new=True)
 
         # different types
         shelf.s = 'Hello'
@@ -58,7 +58,7 @@ class TestRecovery(unittest.TestCase):
 
     def test_recovery(self):
         log("Testing: recovering shelf and values")
-        shelf = pymm.shelf('myShelf',pmem_path='/mnt/pmem0',force_new=False)
+        shelf = pymm.shelf('myShelfRecovery',pmem_path='/mnt/pmem0',force_new=False)
 
         print(">{}<".format(shelf.s))
         print(shelf.f)

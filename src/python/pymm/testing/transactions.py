@@ -46,7 +46,7 @@ class TestTransactions(unittest.TestCase):
         shelf.n = pymm.ndarray((100,100),dtype=np.uint8)
         shelf.m = pymm.ndarray((100,100),dtype=np.uint8)
 
-        print(shelf.tx_begin())
+        print(shelf.tx_begin([shelf.m,shelf.n]))
 
         for i in np.arange(0,10):
             shelf.n += 1
