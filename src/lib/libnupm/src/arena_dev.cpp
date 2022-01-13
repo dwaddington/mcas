@@ -61,8 +61,17 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
   /* allocated regions should not contain stale data */
   for ( auto a : d.address_map() )
   {
-    (void)a;
-    assert(std::find_if(a.begin, a.end(), [] (const auto &e) { return e != 0; }) == a.end());
+    const auto s = static_cast<const char *>(a.iov_base);
+    const auto e = s + a.iov_len;
+    (void)e;
+    auto it = std::find_if(s, e, [] (const auto &c) { return c != 0; });
+    (void)it;
+#if ! defined NDEBUG
+    if ( it != e ) { FLOG("in range {}.{:x}, location {} not zero", a.iov_base, a.iov_len, static_cast<const void *>(&*it)); };
+#endif
+#if MCAS_CHECK_POOL_CLEAR
+    assert(it == e);
+#endif
   }
   return d;
 }

@@ -23,7 +23,7 @@ region_memory_mmap::region_memory_mmap(unsigned debug_level_, void *p, std::size
 
 region_memory_mmap::~region_memory_mmap()
 {
-  CFLOGM(1, "freeing region memory ({},{})", iov_base, iov_len);
+  CFLOGM(0, "CLEAR {},{:x}", iov_base, iov_len);
   /* github 185: Clear memory on pool deletion */
   std::memset(iov_base, 0, iov_len);
 

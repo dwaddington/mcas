@@ -15,7 +15,7 @@
 #ifndef __NUPM_DAX_DATA_H__
 #define __NUPM_DAX_DATA_H__
 
-#include <libpmem.h>
+#include <libpmem.h> /* pmem_memset */
 #include <city.h> /* CityHash */
 #include <common/pointer_cast.h>
 #include <common/string_view.h>
@@ -254,6 +254,9 @@ class DM_region_header {
     for (auto & reg : regions ) {
       if (reg.region_id == region_id) {
         auto rp = arena_base() + grain_to_bytes(reg.offset_grain);
+#if 0
+        CFLOGM(0, "CLEAR ({}.{:x}", static_cast<const void *>(rp), grain_to_bytes(reg.length_grain));
+#endif
         pmem_memset_persist(rp, 0, grain_to_bytes(reg.length_grain));
         reg.region_id = 0; /* power-fail atomic */
         pmem_flush(&reg.region_id, sizeof(reg.region_id));

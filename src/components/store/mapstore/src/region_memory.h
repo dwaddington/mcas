@@ -31,9 +31,12 @@ public:
   {
     if ( p_ )
     {
-      auto s = static_cast<char *>(p_);
-      auto e = s+size_;
-      assert(std::find_if(s, e, [] ( auto &c ) { return c != '\0'; }));
+      const auto s = static_cast<const char *>(p_);
+      const auto e = s+size_;
+      (void)e;
+#if MCAS_CHECK_POOL_CLEAR
+      assert(std::find_if(s, e, [] ( const auto &c ) { return c != '\0'; }) == e);
+#endif
     }
   }
   unsigned debug_level() const { return _debug_level; }

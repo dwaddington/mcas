@@ -24,7 +24,7 @@
 #include <sys/types.h> /* open */
 #include <sys/stat.h> /* open stat */
 #include <fcntl.h> /* open */
-#include <unistd.h> /* syncfs */
+#include <unistd.h> /* ftruncate, syncfs */
 
 #define DEFAULT_ALIGNMENT 8
 #define SINGLE_THREADED

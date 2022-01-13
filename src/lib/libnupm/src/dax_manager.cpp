@@ -26,10 +26,12 @@
 #include <common/memory_mapped.h>
 #include <common/utils.h>
 
+#include <libpmem.h> /* pmem_memset */
 #include <fcntl.h>
 #include <sys/mman.h> /* MAP_LOCKED */
 #include <boost/icl/split_interval_map.hpp>
 #include <cinttypes>
+#include <cstring> /* memset */
 #include <fstream>
 #include <mutex>
 #include <set>
@@ -574,6 +576,14 @@ auto dax_manager::recover_metadata(const byte_span iov_,
 
   if ( force_rebuild || ! rh->check_magic() ) {
     PLOG("%s::%s: creating.", _cname, __func__);
+    /* github 185: clear memory on pool deletion (means create will assert
+     * if memory not clear). This step takes too log with large-ish pmem,
+     * so this clear, and the checks for zeroed memory, are normally disabled.
+     * This clear avoids false asserts.
+     */
+#if MCAS_CHECK_POOL_CLEAR
+    assert((pmem_memset_nodrain(::base(iov_), 0, ::size(iov_)), true));
+#endif
     rh = new (::base(iov_)) DM_region_header(::size(iov_));
     PLOG("%s::%s: created.", _cname, __func__);
   }
