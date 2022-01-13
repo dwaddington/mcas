@@ -112,6 +112,8 @@ Pool_instance::~Pool_instance()
 
   if ( 0 <= _fdout )
   {
+    /* github 185: clear memory on pool deletion */
+    ::ftruncate(_fdout, 0);
     syncfs(_fdout);
     close(_fdout);
   }
@@ -783,8 +785,8 @@ std::unique_ptr<region_memory> Pool_instance::allocate_region_memory(size_t size
   if (! rm) {
     if ( numa_bitmask_weight(_numa_node_mask.get()) == 0 )
     {
-    auto addr = reinterpret_cast<char *>(0x800000000) + _nsize; /* help debugging */
-    /* memory to be freed with munmap */
+      auto addr = reinterpret_cast<char *>(0x800000000) + _nsize; /* help debugging */
+      /* memory to be freed with munmap */
       auto p = ::mmap(addr,
              size,
              prot,

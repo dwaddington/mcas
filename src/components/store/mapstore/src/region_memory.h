@@ -15,6 +15,8 @@
 #define _MCAS_REGION_MEMORY_H_
 
 #include <sys/uio.h> /* iovec */
+#include <algorithm> /* find_if */
+#include <cassert>
 #include <cstddef> /* size_t */
 
 struct region_memory
@@ -23,10 +25,17 @@ struct region_memory
 private:
   int _debug_level;
 public:
-  region_memory(unsigned debug_level_, void *p, std::size_t size)
-    : ::iovec{p, size}
+  region_memory(unsigned debug_level_, void *p_, std::size_t size_)
+    : ::iovec{p_, size_}
     , _debug_level(debug_level_)
-  {}
+  {
+    if ( p_ )
+    {
+      auto s = static_cast<char *>(p_);
+      auto e = s+size_;
+      assert(std::find_if(s, e, [] ( auto &c ) { return c != '\0'; }));
+    }
+  }
   unsigned debug_level() const { return _debug_level; }
   virtual ~region_memory() {}
   using ::iovec::iov_base;

@@ -14,6 +14,8 @@
 #include "arena_dev.h"
 
 #include "dax_data.h"
+#include <algorithm> /* find_if */
+#include <cassert>
 #include <cinttypes>
 
 arena_dev::arena_dev(const common::log_source &ls_, string_view path_, gsl::not_null<nupm::DM_region_header *> hdr)
@@ -51,7 +53,7 @@ auto arena_dev::region_create(
   CFLOGM(2, "rounding up to {} grains ({} MiB)",
        size_in_grains, REDUCE_MiB((1UL << DM_REGION_LOG_GRAIN_SIZE)*size_in_grains));
 
-  return
+  const auto d =
     region_descriptor(
       region_descriptor::address_map_t(
         1
@@ -61,6 +63,13 @@ auto arena_dev::region_create(
           )
       )
     ); /* allocates n grains */
+  /* allocated regions should not contain stale data */
+  for ( auto a : d.address_map() )
+  {
+    (void)a;
+    assert(std::find_if(a.begin, a.end(), [] (const auto &e) { return e != 0; }) == a.end());
+  }
+  return d;
 }
 
 void arena_dev::region_erase(const string_view id_, gsl::not_null<registry_memory_mapped *>)

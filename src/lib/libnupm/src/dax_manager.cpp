@@ -424,7 +424,7 @@ auto dax_manager::open_region(
   , unsigned arena_id
 ) -> region_descriptor
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   return lookup_arena(arena_id)->region_get(name);
 }
 
@@ -434,7 +434,7 @@ auto dax_manager::create_region(
   , const size_t size_
 ) -> region_descriptor
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   auto arena = lookup_arena(arena_id_);
   CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name_.begin(), size_, arena_id_);
   try
@@ -461,7 +461,7 @@ auto dax_manager::resize_region(
   , const size_t size_
 ) -> region_descriptor
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   auto arena = lookup_arena(arena_id_);
   CPLOG(1, "%s: %.*s size %zu", __func__, int(id_.size()), id_.begin(), size_);
   auto it = _mapped_spaces.find(std::string(id_));
@@ -479,7 +479,7 @@ auto dax_manager::resize_region(
 
 void dax_manager::erase_region(const string_view name, arena_id_t arena_id)
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   lookup_arena(arena_id)->region_erase(name, this);
 }
 
@@ -491,7 +491,7 @@ std::list<std::string> dax_manager::names_list(arena_id_t arena_id)
 
 size_t dax_manager::get_max_available(arena_id_t arena_id)
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   return lookup_arena(arena_id)->get_max_available();
 }
 
