@@ -17,7 +17,7 @@ RUN git submodule update --init --recursive
 RUN cp /home/mcasuser/mcas/src/mcas/src/python/pymm/sample.py /home/mcasuser
 USER mcasuser
 WORKDIR /home/mcasuser/mcas/src/mcas
-RUN src/python/install-python-deps.sh
+RUN deps/install-python-deps.sh
 RUN rm -rf build && mkdir -p build
 WORKDIR /home/mcasuser/mcas/src/mcas/build
 RUN cmake -DBUILD_KERNEL_SUPPORT=OFF \
