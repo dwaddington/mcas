@@ -565,7 +565,12 @@ xpmem_is_thread_group_stopped(struct xpmem_thread_group *tg)
 	rcu_read_lock();
 	do {
 		if (!(task->flags & PF_EXITING) &&
-		    task->state != TASK_STOPPED) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+		    task->__state != TASK_STOPPED
+#else
+		    task->state != TASK_STOPPED
+#endif
+		    ) {
 			rcu_read_unlock();
 			return 0;
 		}
