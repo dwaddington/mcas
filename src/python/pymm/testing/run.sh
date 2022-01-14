@@ -16,6 +16,7 @@ color_pass () {
 
 
 LOG=log.out
+rm -Rf /mnt/pmem0/*
 for i in *.py;
 do
     if [ -f "$i" ] ; then
@@ -29,6 +30,10 @@ do
             printf "$(color_fail FAILED) (SEGV)\n"
         else
             printf "$(color_pass PASSED)\n"
-        fi    
+        fi
+        # clean up from test
+        if [ "$x" != "recovery_A" ]; then
+            rm -Rf /mnt/pmem0/*
+        fi
     fi
 done
