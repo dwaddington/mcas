@@ -14,6 +14,7 @@
 #include "arena_dev.h"
 
 #include "dax_data.h"
+#include <common/env.h>
 #include <algorithm> /* find_if */
 #include <cassert>
 #include <cinttypes>
@@ -66,12 +67,11 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
     (void)e;
     auto it = std::find_if(s, e, [] (const auto &c) { return c != 0; });
     (void)it;
-#if ! defined NDEBUG
-    if ( it != e ) { FLOG("in range {}.{:x}, location {} not zero", a.iov_base, a.iov_len, static_cast<const void *>(&*it)); };
-#endif
-#if MCAS_CHECK_POOL_CLEAR
-    assert(it == e);
-#endif
+    if ( common::env_value("MCAS_CHECK_POOL_CLEAR", false) )
+    {
+      if ( it != e ) { FLOG("in range {}.{:x}, location {} not zero", a.iov_base, a.iov_len, static_cast<const void *>(&*it)); };
+      assert(it == e);
+    }
   }
   return d;
 }

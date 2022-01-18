@@ -14,6 +14,7 @@
 #ifndef _MCAS_REGION_MEMORY_H_
 #define _MCAS_REGION_MEMORY_H_
 
+#include <common/env.h>
 #include <sys/uio.h> /* iovec */
 #include <algorithm> /* find_if */
 #include <cassert>
@@ -34,9 +35,10 @@ public:
       const auto s = static_cast<const char *>(p_);
       const auto e = s+size_;
       (void)e;
-#if MCAS_CHECK_POOL_CLEAR
-      assert(std::find_if(s, e, [] ( const auto &c ) { return c != '\0'; }) == e);
-#endif
+      if ( common::env_value("MCAS_CHECK_POOL_CLEAR", false) )
+      {
+        assert(std::find_if(s, e, [] ( const auto &c ) { return c != '\0'; }) == e);
+      }
     }
   }
   unsigned debug_level() const { return _debug_level; }
