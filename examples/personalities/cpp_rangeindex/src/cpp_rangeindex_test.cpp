@@ -167,8 +167,8 @@ int main(int argc, char * argv[])
   }
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   uint64_t insert_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-
-  std::cout << "Insert " << count << " took: "  << insert_time_ms << " [ms]" << " -> Inserts per sec " << count/insert_time_ms*1000 << std::endl;
+  uint64_t trput = (uint64_t) (count * 1000.0 /insert_time_ms);
+  std::cout << "Insert " << count << " took: "  << insert_time_ms << " [ms]" << " -> Inserts per sec " << trput << std::endl;
   PMAJOR("Loaded %u rows", count);
  
   table.build_index();

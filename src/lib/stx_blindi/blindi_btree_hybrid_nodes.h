@@ -60,7 +60,7 @@
 //#define LIMIT_CAPACITY 100 // only Blindi 
 //#define LIMIT_CAPACITY 16000000 // Elastic  - start compressing when reaching to 33% of 48M rows
 //#define LIMIT_CAPACITY 24000000 // Elastic50 - start compressing when reaching to 50% of 48M rows.
-//#define LIMIT_CAPACITY 32000000 // Elastic66 - start compressing when reaching to 66% of 48M rows
+// #define LIMIT_CAPACITY 32000000 // Elastic66 - start compressing when reaching to 66% of 48M rows
 //#define LIMIT_CAPACITY 40000000 // Elastic75 - start compressing when reaching to 75% of 48M rows
 #define LIMIT_CAPACITY 100000000 // only BTREE 
 

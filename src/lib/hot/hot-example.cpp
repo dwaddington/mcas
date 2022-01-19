@@ -11,8 +11,12 @@
 //#include "objx/contenthelpers/OptionalValue.hpp"
 
 
+
+uint64_t __builtin_bswap64 (uint64_t x);
+
+
 struct UUID {
-  uint64_t val[2];
+uint64_t val[2];
 
 public:
   bool operator<(const UUID& rhs) const {
@@ -76,6 +80,9 @@ int main(int argc, char **argv)
 	}
 
 
+
+
+
 /*
      rows[0].op_time.val[0] = 30170534 ;
      rows[1].op_time.val[0] = 38843579 ;
@@ -108,39 +115,38 @@ int main(int argc, char **argv)
      rows[28].op_time.val[0] = 25480455 ;
      rows[29].op_time.val[0] = 46810057 ;
 */
-
-
-
-     rows[0].op_time.val[0] = 34 ;
-     rows[1].op_time.val[0] = 79 ;
-     rows[2].op_time.val[0] = 13 ;
-     rows[3].op_time.val[0] = 22 ;
-     rows[4].op_time.val[0] = 12 ;
-     rows[5].op_time.val[0] = 83 ;
-     rows[6].op_time.val[0] = 64 ;
-     rows[7].op_time.val[0] = 80 ;
-     rows[8].op_time.val[0] = 89 ;
-     rows[9].op_time.val[0] = 21 ;
-     rows[10].op_time.val[0] = 54 ;
-     rows[11].op_time.val[0] = 43 ;
-     rows[12].op_time.val[0] = 39 ;
-     rows[13].op_time.val[0] = 40 ;
-     rows[14].op_time.val[0] = 4 ;
-     rows[15].op_time.val[0] = 6 ;
-     rows[16].op_time.val[0] = 55 ;
-     rows[17].op_time.val[0] = 3;
-     rows[18].op_time.val[0] = 26 ;
-     rows[19].op_time.val[0] = 20 ;
-     rows[20].op_time.val[0] = 30 ;
-     rows[21].op_time.val[0] = 4 ;
-     rows[22].op_time.val[0] = 24 ;
-     rows[23].op_time.val[0] = 57 ;
-     rows[24].op_time.val[0] = 19 ;
-     rows[25].op_time.val[0] = 2;
-     rows[26].op_time.val[0] = 256 ;
-     rows[27].op_time.val[0] = 549 ;
-     rows[28].op_time.val[0] = 55 ;
-     rows[29].op_time.val[0] = 557 ;
+     uint64_t num = 257;	
+     printf ( "binary of number %lu blig %x little %lu \n ",num, __builtin_bswap64(num), __builtin_bswap64(__builtin_bswap64(num)));
+     rows[0].op_time.val[0] = __builtin_bswap64(34);
+     rows[1].op_time.val[0] = __builtin_bswap64(79);
+     rows[2].op_time.val[0] = __builtin_bswap64(13);
+     rows[3].op_time.val[0] = __builtin_bswap64(22);
+     rows[4].op_time.val[0] = __builtin_bswap64(12);
+     rows[5].op_time.val[0] = __builtin_bswap64(83);
+     rows[6].op_time.val[0] = __builtin_bswap64(64);
+     rows[7].op_time.val[0] = __builtin_bswap64(80);
+     rows[8].op_time.val[0] = __builtin_bswap64(89);
+     rows[9].op_time.val[0] = __builtin_bswap64(21);
+     rows[10].op_time.val[0] = __builtin_bswap64(54);
+     rows[11].op_time.val[0] = __builtin_bswap64(43);
+     rows[12].op_time.val[0] = __builtin_bswap64(39);
+     rows[13].op_time.val[0] = __builtin_bswap64(40);
+     rows[14].op_time.val[0] = __builtin_bswap64(4);
+     rows[15].op_time.val[0] = __builtin_bswap64(6);
+     rows[16].op_time.val[0] = __builtin_bswap64(55);
+     rows[17].op_time.val[0] = __builtin_bswap64(3);
+     rows[18].op_time.val[0] = __builtin_bswap64(26);
+     rows[19].op_time.val[0] = __builtin_bswap64(20);
+     rows[20].op_time.val[0] = __builtin_bswap64(30);
+     rows[21].op_time.val[0] = __builtin_bswap64(4);
+     rows[22].op_time.val[0] = __builtin_bswap64(24);
+     rows[23].op_time.val[0] = __builtin_bswap64(57);
+     rows[24].op_time.val[0] = __builtin_bswap64(19);
+     rows[25].op_time.val[0] = __builtin_bswap64(2);
+     rows[26].op_time.val[0] = __builtin_bswap64(256);
+     rows[27].op_time.val[0] = __builtin_bswap64(549);
+     rows[28].op_time.val[0] = __builtin_bswap64(55);
+     rows[29].op_time.val[0] = __builtin_bswap64(557);
 
 
 
@@ -153,16 +159,16 @@ int main(int argc, char **argv)
 		hot.insert(&(rows[i].op_time));
 	}
 
-	hot::singlethreaded::HOTSingleThreaded<ValueType, KeyExtractor>::const_iterator res = hot.lower_bound(rows[26].op_time);
-	UUID sk = rows[26].op_time;
+	hot::singlethreaded::HOTSingleThreaded<ValueType, KeyExtractor>::const_iterator res = hot.lower_bound(rows[25].op_time);
+	UUID sk = rows[2].op_time;
 	printf ("search for key %lu key[0] %lu, key[1] %lu\n", &sk, sk.val[0], sk.val[1]);
 	ValueType key = (ValueType) *res;
-	printf ("res %lu key %lu key[0] %lu, key[1] %lu\n", res,key,  key->val[0], key->val[1]);
+	printf ("res %lu key %lu key[0] %lu, key[1] %lu\n", res,key,  __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
 	for (long i = 0; i < 29; i++) {
 		++res;
 		key = (ValueType) *res;
 		if (key != 0) { 
-			printf ("i=%lu ++res %lu key %lu key[0] %lu, key[1] %lu\n", i, res, key,  key->val[0], key->val[1]);
+			printf ("i=%lu ++res %lu key %lu key[0] %lu, key[1] %lu\n", i, res, key,  __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
 			key = (ValueType) *res;
 //			printf ("ptr+1 %lu \n", key);
 		}

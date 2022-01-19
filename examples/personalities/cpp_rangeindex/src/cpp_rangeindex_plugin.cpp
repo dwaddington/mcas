@@ -42,7 +42,7 @@ using namespace stx;
 using namespace std;
 using namespace boost;
 
-#define RANGE_NUM 10
+#define RANGE_NUM 100
 
 #define END 16000
 
@@ -236,16 +236,16 @@ public:
     uint64_t GetRange(const KeyType &key) {
         auto it = tree.lower_bound(key);
 	uint64_t sum = it->first.val[0];
-	printf (" key[0] %lu, key[1] %lu\n", it->first.val[0], it->first.val[1]);
+//	printf (" key[0] %lu, key[1] %lu\n", it->first.val[0], it->first.val[1]);
 	for (int i=1; i < RANGE_NUM; i++) {
+		it++;
 		if (it.currslot == ENDSLOT) {
-			std::cout << " i=" << i << " Range tree.end END= " << ENDSLOT << std::endl;
+//			std::cout << " i=" << i << " Range tree.end END= " << ENDSLOT << std::endl;
 
 			return sum;
 		}
-		it++;
 		sum+=it->first.val[0];
-	        printf (" key[0] %lu, key[1] %lu\n", it->first.val[0], it->first.val[1]);
+//	        printf (" key[0] %lu, key[1] %lu\n", it->first.val[0], it->first.val[1]);
 	}
 	return sum;
     }
@@ -553,21 +553,17 @@ if(1){
 #ifdef HOT
 	   /// NOT handle arrive to the end of the index 	
 	   hot::singlethreaded::HOTSingleThreaded<ValueType, KeyExtractor>::const_iterator res = hot1.lower_bound(req);
-	   std::cout << " line 557 " << std::endl; 
 	   ValueType key = (ValueType) *res;
-	   std::cout << " line 559 " << std::endl; 
 	   uint64_t sum = __builtin_bswap64(key->val[1]) ;
-	   printf ("res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", res,  &key->val[0], __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
-	   std::cout << " line 562 " << std::endl; 
+//	   printf ("res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", res,  &key->val[0], __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
 	   for (int i = 1; i < RANGE_NUM ; i++) {
 	   	++res;
 		key = (ValueType) *res;
-		std::cout << " line 564 " << std::endl; 
 		if(key == 0) {
-			printf ("key ++ %lu and  i=%lu\n", key , i);
+//			printf ("key ++ %lu and  i=%lu\n", key , i);
 			break;
 		}
-		printf ("i %lu res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", i, res, &key->val[0],  __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
+//		printf ("i %lu res %lu &key[0] %lu key[0] %lu, key[1] %lu\n", i, res, &key->val[0],  __builtin_bswap64(key->val[0]), __builtin_bswap64(key->val[1]));
 		sum +=  __builtin_bswap64(key->val[1]);
 	   }
 	   cnter = sum;
