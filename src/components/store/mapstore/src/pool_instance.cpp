@@ -113,7 +113,10 @@ Pool_instance::~Pool_instance()
   if ( 0 <= _fdout )
   {
     /* github 185: clear memory on pool deletion */
-    ::ftruncate(_fdout, 0);
+    if ( 0 != ::ftruncate(_fdout, 0) )
+    {
+      FWRNM("error {} truncating backing file, data may leak", errno);
+    }
     syncfs(_fdout);
     close(_fdout);
   }
