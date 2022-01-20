@@ -1,12 +1,13 @@
 #include <threadipc/queue.h>
 #include <common/utils.h>
+#include <features.h>
 
 namespace threadipc
 {
 // Global static pointer used to ensure a single instance of the class.
 std::mutex  Thread_ipc::_ipc_mutex;
 Thread_ipc *Thread_ipc::_ipc = nullptr;
-
+  
 /** This function is called to create an instance of the class.
     Calling the constructor publicly is not allowed. The constructor
     is private and is only called by this instance function.
@@ -26,7 +27,15 @@ Thread_ipc *Thread_ipc::instance()
   if (!_ipc) {  // Only allow one instance of class to be generated.
     /* Thread_ipc alignment, once handled here, is now handled by Thread_ipc
      * class */
+#if __GNUC__ >= 11
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+#endif
     _ipc = new Thread_ipc();
+
+#if __GNUC__ >= 11    
+#pragma GCC diagnostic pop
+#endif
   }
   return _ipc;
 }
@@ -137,3 +146,5 @@ void Thread_ipc::cleanup()
 
 
 }  // namespace threadipc
+
+
