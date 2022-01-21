@@ -45,18 +45,24 @@ public:
   /**
    * Constructor
    *
-   * @param block_device Block device interface
+   * @param debug_level massage verbosity, 0 is least
+   * @param em_plugin_path path to memory plugin.
+   * @param owner store owner, currently ignored
+   * @param name store name, currently ignored
+   * @param numa-ode_mask comma-separated list of individual numa nodes or
+   *  ranges to use, if any, in the format accepted by numa_parse_nodstring,
+   *  e.g. "0,2,4-6"
    *
    */
   Map_store(const unsigned debug_level,
             common::string_view mm_plugin_path,
             common::string_view owner,
-            common::string_view name);
+            common::string_view name,
+            common::string_view numa_node_mask);
   Map_store(const unsigned debug_level,
             common::string_view mm_plugin_path,
             common::string_view owner,
-            common::string_view name,
-            common::string_view numa_node_mask);
+            common::string_view name);
 
   /**
    * Destructor
