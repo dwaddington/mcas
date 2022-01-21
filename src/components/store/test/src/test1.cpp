@@ -46,6 +46,7 @@ class KVStore_test
 public:
 	using IKVStore = component::IKVStore;
 	using IKVStore_factory = component::IKVStore_factory;
+	using string_view = common::string_view;
 protected:
 	static const std::string test1_pool;
 	static const std::string iterator_test_pool;
@@ -67,12 +68,12 @@ protected:
 	// If the constructor and destructor are not enough for setting up
 	// and cleaning up each test, you can define the following methods:
 
-	auto open_pool(common::string_view pool_name) -> IKVStore::pool_t
+	auto open_pool(string_view pool_name) -> IKVStore::pool_t
 	{
 		return _kvstore->open_pool(std::string(pool_name));
 	}
 
-	auto create_pool(common::string_view pool_name, std::size_t sz = MB(32))
+	auto create_pool(string_view pool_name, std::size_t sz = MB(32))
 	{
 		return pool_instance(_kvstore, pool_name, sz);
 	}
@@ -134,8 +135,11 @@ TEST_F(KVStore_test, BasicMap)
 	                 const void * value,
 	                 const size_t value_len) -> int
 		{
-	                PINF("key:(%.*s) value(%.*s)", int(key_len), static_cast<const char *>(key), int(value_len), static_cast<const char *>(value));
-	                return 0;
+			FINF("key:({}) value({})"
+				, string_view(static_cast<const char *>(key), key_len)
+				, string_view(static_cast<const char *>(value), value_len)
+			);
+			return 0;
 		}
 	);
 }
@@ -151,10 +155,12 @@ TEST_F(KVStore_test, ValueResize)
 			const void * value,
 			size_t value_len) -> int
 		{
-	                PINF("key:(%.*s) value(%.*s-%lu)", int(key_len), static_cast<const char *>(key),
-	                     int(value_len), static_cast<const char *>(value),
-	                     value_len);
-	                return 0;
+			FINF("key:({}) value({}-{})"
+				, string_view(static_cast<const char *>(key), key_len)
+				, string_view(static_cast<const char *>(value), value_len)
+				, value_len
+			);
+			return 0;
 		}
 	);
 
@@ -170,9 +176,11 @@ TEST_F(KVStore_test, ValueResize)
 			const void * value,
 			size_t value_len) -> int
 		{
-	                PINF("key:(%.*s) value(%.*s-%lu)", int(key_len), static_cast<const char *>(key),
-	                     int(value_len), static_cast<const char *>(value),
-	                     value_len);
+			FINF("key:({}) value({}-{})"
+				, string_view(static_cast<const char *>(key), key_len)
+				, string_view(static_cast<const char *>(value), value_len)
+				, value_len
+			);
 	                return 0;
 		}
 	);
@@ -196,7 +204,7 @@ TEST_F(KVStore_test, ReopenPool)
 {
 	auto pool = create_pool(test1_pool);
 	ASSERT_TRUE(pool.handle() != IKVStore::POOL_ERROR);
-	PLOG("re-opened pool: %p", reinterpret_cast<const void *>(pool.handle()));
+	FLOG("re-opened pool: {}", reinterpret_cast<const void *>(pool.handle()));
 }
 
 TEST_F(KVStore_test, ReClosePool)
@@ -211,33 +219,18 @@ TEST_F(KVStore_test, Timestamps)
 	/* if timestamping is enabled */
 	if(_kvstore->get_capability(IKVStore::Capability::WRITE_TIMESTAMPS)) {
 
-	  auto now = common::epoch_now();
+		auto now = common::epoch_now();
 
-	  for(unsigned i=0;i<10;i++) {
-	    auto value = common::random_string(16);
-	    auto key = common::random_string(8);
-	    PLOG("adding key-value pair (%s)", key.c_str());
-	    pool.put(key, value.c_str(), value.size());
-	    sleep(2);
-	  }
+		for(unsigned i=0;i<10;i++) {
+			auto value = common::random_string(16);
+			auto key = common::random_string(8);
+			FLOG("adding key-value pair ({})", key);
+			pool.put(key, value.c_str(), value.size());
+			sleep(2);
+		}
 
-
-	  pool.map([](const void* key,
-	                         const size_t key_len,
-	                         const void* value,
-	                         const size_t value_len,
-	                         const common::tsc_time_t timestamp) -> bool {
-	                  (void)value; // unused
-	                  (void)value_len; // unused
-	                  PLOG("Timestamped record: %.*s @ %lu",
-			 int(key_len),
-			 static_cast<const char *>(key),
-			 timestamp.raw());
-	                  return true;
-	                }, 0, 0);
-
-	  PLOG("After 5 seconds");
-	  pool.map([](const void* key,
+		pool.map(
+			[](const void* key,
 	                         const size_t key_len,
 	                         const void* value,
 	                         const size_t value_len,
@@ -245,15 +238,33 @@ TEST_F(KVStore_test, Timestamps)
 			{
 				(void)value; // unused
 				(void)value_len; // unused
-				PLOG("After 5 Timestamped record: %.*s @ %lu",
-					int(key_len),
-					static_cast<const char *>(key),
-					timestamp.raw()
+				FLOG("Timestamped record: {} @ {}"
+					, string_view(static_cast<const char *>(key), key_len)
+					, timestamp.raw()
+				);
+				return true;
+			}
+			, 0, 0
+		);
+
+		PLOG("After 5 seconds");
+		pool.map(
+			[](const void* key,
+	                         size_t key_len,
+	                         const void* value,
+	                         size_t value_len,
+	                         common::tsc_time_t timestamp) -> bool
+			{
+				(void)value; // unused
+				(void)value_len; // unused
+				FLOG("After 5 Timestamped record: {} @ {}"
+					, string_view(static_cast<const char *>(key), key_len)
+					, timestamp.raw()
 				);
 				return true;
 			}
 			, now.add_seconds(5)
-			, {0,0}
+			, common::epoch_time_t{0,0}
 		);
 	}
 
@@ -275,7 +286,7 @@ TEST_F(KVStore_test, Iterator)
 
 	  if(i==5) { sleep(2); now = common::epoch_now(); }
 
-	  PLOG("(%u) adding key-value pair key(%s) value(%s)", i, key.c_str(),value.c_str());
+	  FLOG("({}) adding key-value pair key({}) value({})", i, key, value);
 	  pool.put(key, value.c_str(), value.size());
 	}
 
@@ -285,8 +296,11 @@ TEST_F(KVStore_test, Iterator)
 	                 const void * value,
 	                 const size_t value_len) -> int
 	              {
-	                PINF("key:(%p %.*s) value(%.*s)", key, int(key_len), static_cast<const char *>(key), int(value_len),
-	                     static_cast<const char *>(value));
+	                FINF("key:({} {}) value({})"
+						, key
+						, string_view(static_cast<const char *>(key), key_len)
+						, string_view(static_cast<const char *>(value), value_len)
+	                    , static_cast<const char *>(value));
 	                return 0;
 	              }
 	              );
@@ -299,10 +313,11 @@ TEST_F(KVStore_test, Iterator)
 	{
 		auto iter = pool.open_iterator();
 		while((rc = iter.deref(0, 0, ref, time_match, true)) == S_OK) {
-		  PLOG("iterator: key(%.*s) value(%.*s) %lu",
-		       int(ref.key_len), static_cast<const char *>(ref.key),
-		       int(ref.value_len), static_cast<const char *>(ref.value),
-		       ref.timestamp.seconds());
+			FLOG("iterator: key({}) value({}) {}"
+				, string_view(static_cast<const char *>(ref.key), ref.key_len)
+				, string_view(static_cast<const char *>(ref.value), ref.value_len)
+				, ref.timestamp.seconds()
+			);
 		}
 	}
 	ASSERT_TRUE(rc == E_OUT_OF_BOUNDS);
@@ -311,33 +326,33 @@ TEST_F(KVStore_test, Iterator)
 		auto iter = pool.open_iterator();
 		ASSERT_TRUE(now.seconds() > 0);
 		while((rc = iter.deref(0, now, ref, time_match, true)) == S_OK) {
-		  PLOG("(time-constrained) iterator: key(%.*s) value(%.*s) %lu (match=%s)",
-		       int(ref.key_len), static_cast<const char *>(ref.key),
-		       int(ref.value_len), static_cast<const char *>(ref.value),
-		       ref.timestamp.seconds(),
-		       time_match ? "y":"n");
+			FLOG("(time-constrained) iterator: key({}) value({}) {} (match={})"
+				, string_view(static_cast<const char *>(ref.key), ref.key_len)
+				, string_view(static_cast<const char *>(ref.value), ref.value_len)
+				, ref.timestamp.seconds()
+				, time_match ? "y":"n"
+			);
 		}
 
 	}
 	ASSERT_TRUE(rc == E_OUT_OF_BOUNDS);
 
-
-
 	PLOG("Disturbed iteration...");
 	unsigned i=0;
 	{
 		auto iter = pool.open_iterator();
-		while((rc = iter.deref(0, 0, ref, time_match, true)) == S_OK) {
-				PLOG("iterator: key(%.*s) value(%.*s) %lu",
-				int(ref.key_len), static_cast<const char *>(ref.key),
-				int(ref.value_len), static_cast<const char *>(ref.value),
-				ref.timestamp.seconds());
+			while((rc = iter.deref(0, 0, ref, time_match, true)) == S_OK) {
+				FLOG("iterator: key({}) value({}) {}"
+					, string_view(static_cast<const char *>(ref.key), ref.key_len)
+					, string_view(static_cast<const char *>(ref.value), ref.value_len)
+					, ref.timestamp.seconds()
+				);
 				i++;
 				if(i == 5) {
 				/* disturb iteration */
 				auto value = common::random_string(16);
 				auto key = common::random_string(8);
-				PLOG("adding key-value pair key(%s) value(%s)", key.c_str(),value.c_str());
+				FLOG("adding key-value pair key({}) value({})", key, value);
 				pool.put(key, value.c_str(), value.size());
 			}
 		}
@@ -370,8 +385,8 @@ TEST_F(KVStore_test, KeySwap)
 	pool.get(left_key, new_left.iov_base, new_left.iov_len);
 	pool.get(right_key, new_right.iov_base, new_right.iov_len);
 
-	PLOG("left: %.*s", int(new_left.iov_len), static_cast<const char *>(new_left.iov_base));
-	PLOG("right: %.*s", int(new_right.iov_len), static_cast<const char *>(new_right.iov_base));
+	FLOG("left: {}", string_view(static_cast<const char *>(new_left.iov_base), new_left.iov_len));
+	FLOG("right: {}", string_view(static_cast<const char *>(new_right.iov_base), new_right.iov_len));
 	ASSERT_TRUE(strncmp(static_cast<const char *>(new_left.iov_base), right_value.c_str(), new_left.iov_len) == 0);
 	ASSERT_TRUE(strncmp(static_cast<const char *>(new_right.iov_base), left_value.c_str(), new_right.iov_len) == 0);
 	pool.free_memory(new_right.iov_base);

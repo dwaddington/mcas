@@ -264,44 +264,17 @@ public:
 	}
 
 	/**
-	 * Apply functor to all objects in the pool
+	 * Apply functor to objects in the pool, possibly according to time constraints
 	 *
 	 * @param args see IKVStore::map
 	 *
 	 * @return see IKVStore::map
 	 */
-		auto map(
-			std::function<int(const void* key,
-	                                       const size_t key_len,
-	                                       const void* value,
-	                                       const size_t value_len)> function
-		)
+	template <typename ... Args>
+		auto map(Args && ... args)
 		{
-		  return _kvstore->map(_pool, function);
+			return _kvstore->map(_pool, std::forward<Args>(args) ...);
 		}
-
-	/**
-	 * Apply functor to all objects in the pool according
-	 * to given time constraints
-	 *
-	 * @param args see IKVStore::map
-	 *
-	 * @return see IKVStore::map
-	 */
-	auto map(
-		std::function<int(
-			const void* key
-			, size_t             key_len
-			, const void*        value
-			, size_t             value_len
-			, common::tsc_time_t timestamp
-		)> function
-		, const common::epoch_time_t t_begin
-		, const common::epoch_time_t t_end
-	)
-	{
-	  return _kvstore->map(_pool, function, t_begin, t_end);
-	}
 
 	/**
 	 * Apply functor to all keys only.
