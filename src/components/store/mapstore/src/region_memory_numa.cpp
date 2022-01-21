@@ -14,7 +14,8 @@
 #include "region_memory_numa.h"
 
 #include <common/logging.h>
-#include <numa.h> /*  numa_alloc_onnode, numa_free */
+#include <numa.h> /* numa_alloc_onnode, numa_free */
+#include <cstring> /* memset */
 
 namespace
 {
@@ -58,6 +59,10 @@ region_memory_numa::~region_memory_numa()
 {
 	if ( iov_base )
 	{
+        /* github 185: Clear memory on pool deletion */
+		CFLOGM(0, "CLEAR {},{:x}", iov_base, iov_len);
+        std::memset(iov_base, 0, iov_len);
+
 		CFLOGM(1, "freeing region memory ({},{})", iov_base, iov_len);
 		numa_free(iov_base, iov_len);
 	}

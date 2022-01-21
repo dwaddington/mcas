@@ -156,8 +156,8 @@ try
   }
   catch ( const std::exception &e )
   {
-    CPLOG(0, "%s: %s", __func__, e.what());
-    return pool_t(E_FAIL);
+    PLOG("%s: %s", __func__, e.what());
+    return pool_t(POOL_ERROR);
   }
 
   auto path = pool_path(name_);

@@ -14,6 +14,7 @@
 #include "region_memory_mmap.h"
 
 #include <common/logging.h>
+#include <cstring> /* memset */
 #include <sys/mman.h> /* munmap */
 
 region_memory_mmap::region_memory_mmap(unsigned debug_level_, void *p, std::size_t size)
@@ -22,9 +23,13 @@ region_memory_mmap::region_memory_mmap(unsigned debug_level_, void *p, std::size
 
 region_memory_mmap::~region_memory_mmap()
 {
-  CFLOGM(1, "freeing region memory ({},{})", iov_base, iov_len);
-  if (::munmap(iov_base, iov_len))
+  CFLOGM(0, "CLEAR {},{:x}", iov_base, iov_len);
+  /* github 185: Clear memory on pool deletion */
+  std::memset(iov_base, 0, iov_len);
+
+  auto rc = ::munmap(iov_base, iov_len);
+  if ( rc != 0 )
   {
-    FLOGM("munmap of region memory {}.{} failed", iov_base, iov_len);
+    FLOGM("munmap of region memory {}.{} failed error {}", iov_base, iov_len, rc);
   }
 }
