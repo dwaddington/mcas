@@ -364,7 +364,7 @@ class MCAS_client_factory : public component::IMCAS_factory {
                               const string_view addr,
                               const string_view device) override;
 
-  component::IKVStore *create(unsigned debug_level, const std::map<std::string, std::string> &) override;
+  component::IKVStore *create(unsigned debug_level, const component::IKVStore_factory::map_create &) override;
 };
 
 #endif
