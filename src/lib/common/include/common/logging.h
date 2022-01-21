@@ -332,15 +332,25 @@ namespace
 		}
 }
 
+/* Simple support for formatting similar to std::format */
+namespace common
+{
+	template <typename ... Args>
+		std::string format(common::string_view fmt, Args && ... args)
+		{
+			std::ostringstream os;
+			faccrete(os, fmt, std::forward<Args>(args) ...);
+			return os.str();
+		}
+}
+
 using pr_fn = void (*)(const char * format, ...);
 
 /* Simple support for logging similar to std::format */
 template <typename ... Args>
 	void EPRINT(pr_fn pr, common::string_view fmt, Args && ... args)
 	{
-		std::ostringstream os;
-		faccrete(os, fmt, std::forward<Args>(args) ...);
-		pr("%s", os.str().c_str());
+		pr("%s", common::format(fmt, std::forward<Args>(args) ...).c_str());
 	}
 
 #if defined DRD_GET_VALGRIND_THREADID
