@@ -41,6 +41,7 @@ Data * Experiment::g_data;
 std::mutex Experiment::g_write_lock;
 double Experiment::g_iops;
 boost::optional<std::string> Experiment::_log_file;
+boost::optional<std::string> Experiment::_numa_nodes;
 
 namespace
 {
@@ -166,6 +167,7 @@ Experiment::Experiment(std::string name_, const ProgramOptions &options)
   , _core_to_device_map(make_core_to_device_map(_cores, _devices))
 {
   _log_file = options.log_file;
+  _numa_nodes = options.numa_nodes;
 }
 
 Experiment::~Experiment()
@@ -353,7 +355,11 @@ int Experiment::initialize_store(unsigned core)
         )
       );
     }
+    else if ( component_is( "mapstore" ) || _numa_nodes ) {
+      _store.reset(fact->create(0, {{+component::IKVStore_factory::k_numa_nodes, *_numa_nodes}}));
+    }
     else {
+      /* basic mapstore */
       _store.reset(fact->create(0, {}));
     }
   }

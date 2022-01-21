@@ -21,15 +21,18 @@
 #include "filesystem.h"
 #include "nd_utils.h"
 
+#include <common/env.h>
 #include <common/exceptions.h>
 #include <common/fd_locked.h>
 #include <common/memory_mapped.h>
 #include <common/utils.h>
 
+#include <libpmem.h> /* pmem_memset */
 #include <fcntl.h>
 #include <sys/mman.h> /* MAP_LOCKED */
 #include <boost/icl/split_interval_map.hpp>
 #include <cinttypes>
+#include <cstring> /* memset */
 #include <fstream>
 #include <mutex>
 #include <set>
@@ -495,7 +498,7 @@ auto dax_manager::open_region(
   , unsigned arena_id
 ) -> region_descriptor
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   return lookup_arena(arena_id)->region_get(name);
 }
 
@@ -505,7 +508,7 @@ auto dax_manager::create_region(
   , const size_t size_
 ) -> region_descriptor
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   auto arena = lookup_arena(arena_id_);
   CPLOG(1, "%s: %s size %zu arena_id %u", __func__, name_.begin(), size_, arena_id_);
   try
@@ -532,7 +535,7 @@ auto dax_manager::resize_region(
   , const size_t size_
 ) -> region_descriptor
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   auto arena = lookup_arena(arena_id_);
   CPLOG(1, "%s: %.*s size %zu", __func__, int(id_.size()), id_.begin(), size_);
   auto it = _mapped_spaces.find(std::string(id_));
@@ -550,7 +553,7 @@ auto dax_manager::resize_region(
 
 void dax_manager::erase_region(const string_view & name, arena_id_t arena_id)
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   lookup_arena(arena_id)->region_erase(name, this);
 }
 
@@ -562,7 +565,7 @@ std::list<std::string> dax_manager::names_list(arena_id_t arena_id)
 
 size_t dax_manager::get_max_available(arena_id_t arena_id)
 {
-  guard_t           g(_reentrant_lock);
+  guard_t g(_reentrant_lock);
   return lookup_arena(arena_id)->get_max_available();
 }
 
@@ -574,6 +577,15 @@ auto dax_manager::recover_metadata(const byte_span iov_,
 
   if ( force_rebuild || ! rh->check_magic() ) {
     PLOG("%s::%s: creating.", _cname, __func__);
+    /* github 185: clear memory on pool deletion (means create will assert
+     * if memory not clear). This step takes minutes with large-ish pmem,
+     * so this clear, and the checks for zeroed memory, are normally disabled.
+     * This clear avoids false asserts.
+     */
+    if ( common::env_value("MCAS_CHECK_POOL_CLEAR", false) )
+    {
+      assert((pmem_memset_nodrain(::base(iov_), 0, ::size(iov_)), true));
+    }
     rh = new (::base(iov_)) DM_region_header(::size(iov_));
     PLOG("%s::%s: created.", _cname, __func__);
   }

@@ -53,6 +53,7 @@ class ProgramOptions {
   boost::optional<std::string>                           src_addr;
   boost::optional<std::string>                           pci_addr;
   boost::optional<std::string>                           log_file;
+  boost::optional<std::string>                           numa_nodes;
   bool                                                   random;
 
   ProgramOptions(const boost::program_options::variables_map &);
