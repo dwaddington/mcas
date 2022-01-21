@@ -39,9 +39,7 @@ struct pool_iterator
 	 * @return see IKVStore::deref_pool_iterator
 	 */
 	template <typename ... Args>
-		auto deref(
-			Args && ... args
-		)
+		auto deref(Args && ... args)
 		{
 			return _kvstore->deref_pool_iterator(_pool, _it, std::forward<Args>(args) ...);
 		}
