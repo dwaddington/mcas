@@ -10,7 +10,11 @@ import sklearn.metrics as mt
 from sklearn.linear_model import *
 import functools
 import math
-import pymm
+#import pymm
+import linear_regression_mult_var  
+import itertools
+
+is_sklearn = 0
 
 def oracle(featuers, target, S, model) :
 
@@ -39,6 +43,8 @@ def oracle(featuers, target, S, model) :
     # linear model
     if model == 'linear' :
         grad, score = Linear_Regression(features, target, S)
+        print (grad.shape)
+        print (score)
         return grad, score
 
 
@@ -56,15 +62,15 @@ def Logistic_Regression(features, target, dims):
     target -- the observations
     dims -- index for the features used for model construction
     GRAD -- if set to TRUE the function returns grad
-    OUTPUTS:
     float grad -- the garadient of the log-likelihood function
     float log_loss -- the log-loss for the trained model
     '''
-
+    
     if (features[:,dims].size > 0) :
     
         # define sparse features
         sparse_features = np.array(features[:,dims])
+        print (sparse_features.shape)
         if sparse_features.ndim == 1 : sparse_features = sparse_features.reshape(sparse_features.shape[0], 1)
         
         # get model, predict probabilities, and predictions
@@ -117,20 +123,27 @@ def Linear_Regression(features, target,dims):
         sstime = time.time()
         sparse_features = features[:,dims]
         if sparse_features.ndim == 1 : sparse_features = sparse_features.reshape(sparse_features.shape[0], 1)
-        print ("create sparse_features " + str(time.time() - sstime))
-
+        print ("[time] create sparse_features " + str(time.time() - sstime))
+        # sparce features
+        print (sparse_features.shape)
+        print (features.shape)
         # get model, predict probabilities, and predictions
         start_time =time.time()
-        model = LinearRegression().fit(sparse_features , target)
-        print ("linear_regration " + str(time.time() - start_time))
-
-        #predict = model.predict(sparse_features)
-        #score = np.sum(target * target) - np.sum((target- predict) * (target- predict))
-
-        start_time =time.time()
-        score = model.score(sparse_features , target)
-        predict = model.predict(sparse_features)
-        print ("score & predict " + str(time.time() - start_time))
+        if (is_sklearn):
+            model = LinearRegression().fit(sparse_features , target)
+            score = model.score(sparse_features , target)
+            predict = model.predict(sparse_features)
+            print ("predict")
+            print (predict.shape)
+            exit(0)
+        else:    
+            sparse_features_list = []
+            for i in range(sparse_features.shape[1]):
+                sparse_features_list.append(list(sparse_features[:,0]))
+            score, predict = linear_regression_mult_var.do_work(sparse_features_list, list(target[:,-1]))
+            print ("predict")
+            print (predict.shape)
+        print ("[time] calculate score & predict  " + str(time.time() - start_time))
 
     else :
         # predict probabilities, and predictions
@@ -138,11 +151,12 @@ def Linear_Regression(features, target,dims):
         predict = (np.zeros((features.shape[0]))).reshape(features.shape[0], -1)
     # compute gradient of log likelihood  
     start_time =time.time()
+    print ("target predict")
+    print (target.shape)
+    print (len(predict))
     grad = np.dot(features.T, target - predict)
-    print ("grad " + str(time.time() - start_time))
+    print ("[time] calculate grad " + str(time.time() - start_time))
     return grad, score
-
-
 
 def do_work(featuers, target, model, k) :
 
@@ -190,7 +204,7 @@ def do_work(featuers, target, model, k) :
 
 
         
-        print ("pick a point: " +  str(time.time() - start_point))
+        print ("[time] pick a point: " +  str(time.time() - start_point))
        
         out = np.array(out, dtype='object')
         rounds_ind += np.max(out[:, -1])
@@ -222,9 +236,9 @@ def do_work(featuers, target, model, k) :
             S  = np.unique(np.append(S,i))
         else : break
         f = time.time()
-        print ("oracle_time " + str(oracle_time - stime))
-        print ("np_max_time " + str(np_max_time - oracle_time))
-        print ("round time " + str(f - stime))
+        print ("[time] oracle_time " + str(oracle_time - stime))
+        print ("[time] np_max_time " + str(np_max_time - oracle_time))
+        print ("[time] round time " + str(f - stime))
         print ("----- ")
         
     # update current time
@@ -273,10 +287,7 @@ else:
 model = 'linear'
 
 # set range for the experiments
-k_range = np.array([50])
+k_range = np.array([10])
 
 # run experiment
 do_work(features, target, model, k_range[-1])
-
-                                                 
-
