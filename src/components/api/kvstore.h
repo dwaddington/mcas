@@ -446,7 +446,7 @@ protected:
    * @param new_size New size of value in bytes (can be more or less)
    *
    * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND,
-   * E_KEY_NOT_FOUND, E_TOO_LARGE, E_ALREADY
+   * E_KEY_NOT_FOUND, E_TOO_LARGE, E_ALREADY(?)
    */
   virtual status_t resize_value(const pool_t       pool,
                                 const std::string& key,
@@ -481,7 +481,7 @@ protected:
    * @param handle Memory registration handle
    *
    * @return S_OK, S_MORE if only a portion of value is read,
-   * E_BAD_ALIGNMENT on invalid alignment, E_POOL_NOT_FOUND, or other
+   * E_BAD_ALIGNMENT on invalid alignment, E_POOL_NOT_FOUND, E_KEY_NOT_FOUND, or other
    * error code
    *
    * Note: S_MORE is reduncant, it could have been inferred from S_OK and

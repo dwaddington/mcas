@@ -12,60 +12,7 @@
 #include <map>
 #include <numeric>
 
-using namespace component;
-using namespace std;
-
-namespace
-{
-	/* things which differ depending on the type of store used */
-	struct custom_store
-	{
-		virtual ~custom_store() {}
-		virtual std::size_t minimum_size(std::size_t s) const { return s; }
-		virtual component::uuid_t factory() const = 0;
-		virtual std::size_t presumed_allocation() const = 0;
-	};
-
-	struct custom_mapstore
-		: public custom_store
-	{
-		virtual component::uuid_t factory() const override { return component::mapstore_factory; }
-		std::size_t minimum_size(std::size_t s) const override { return std::max(std::size_t(8), s); }
-		std::size_t presumed_allocation() const override { return 1ULL << DM_REGION_LOG_GRAIN_SIZE; }
-	};
-
-	struct custom_hstore
-		: public custom_store
-	{
-		virtual component::uuid_t factory() const override { return component::hstore_factory; }
-		std::size_t presumed_allocation() const override { return MiB(32); }
-	};
-
-	struct custom_hstore_cc
-		: public custom_hstore
-	{
-		std::size_t presumed_allocation() const override { return MiB(32); }
-	};
-
-	custom_mapstore custom_mapstore_i{};
-	custom_hstore custom_hstore_i{};
-	custom_hstore_cc custom_hstore_cc_i{};
-}
-
-component::IKVStore* init(string& store, const custom_store &c, const string &daxconfig)
-{
-  string store_lib = "libcomponent-" + store + ".so";
-  IBase* comp = load_component(store_lib.c_str(), c.factory());
-  assert(comp);
-  auto fact    = make_itf_ref(static_cast<IKVStore_factory*>(comp->query_interface(IKVStore_factory::iid())));
-  auto kvstore = fact->create(
-      0, {{+component::IKVStore_factory::k_name, "numa0"},
-          {+component::IKVStore_factory::k_dax_config, daxconfig}
-         });
-
-  return kvstore;
-}
-
+#include "make_kvstore.h"
 
 struct Options {
   bool     aligned;
@@ -74,10 +21,15 @@ struct Options {
   unsigned iteration;
   unsigned minsize;
   unsigned maxsize;
-  string   store;
-  string   daxconfig;
+  std::string store;
+  std::string daxconfig;
 } g_options{};
 
+/*
+ * Memory allocation efficiency test.
+ * Allocates memory in a pool until an allocation fails.
+ * Reports percent utilization.
+ */
 
 int main(int argc, char* argv[])
 try
@@ -100,13 +52,14 @@ try
       "daxconfig", po::value<std::string>()->default_value(
         json::array(
           json::object(
-            json::member("region_id", json::number(0))
-            , json::member("path", "/dev/dax0.0")
+            json::member("path", "/dev/dax0.0")
             , json::member("addr", 0x9000000000)
           )
         ).str()
-  )
-);
+        , "dax configuration, in JSON. default [{\"path\": \"/dev/dax0.0\", \"addr\": \"0x9000000000\"}]"
+      )
+
+    );
 
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(desc).positional(g_pos).run(), vm);
@@ -125,24 +78,16 @@ try
   g_options.daxconfig = vm["daxconfig"].as<std::string>();
   g_options.exponential = vm.count("exponential") || g_options.aligned;
 
-using p = custom_store *;
-using m = std::map<std::string, p>;
-	const m custom_map =
-	{
-		{ "mapstore", &custom_mapstore_i },
-		{ "hstore", &custom_hstore_i },
-		{ "hstore-cc", &custom_hstore_cc_i },
-	};
+	auto cs = locate_custom_store(g_options.store);
+	using IKVStore_factory = component::IKVStore_factory;
+	IKVStore_factory::map_create mc
+		{
+			{+IKVStore_factory::k_name, "numa0"},
+			{+IKVStore_factory::k_dax_config, std::string(g_options.daxconfig)}
+		};
+  auto kvstore = make_kvstore(g_options.store, cs, mc);
 
-	const auto c_it = custom_map.find(g_options.store);
-	if ( c_it == custom_map.end() )
-    {
-      PLOG("store %s not recognized", g_options.store.c_str());
-    }
-
-  auto kvstore = init(g_options.store, *c_it->second, g_options.daxconfig);
-
-  vector<double> utilizations;
+  std::vector<double> utilizations;
 
   for (unsigned i = 0; i < g_options.iteration; i++) {
     PLOG("Running iteration %d", i);
@@ -175,19 +120,21 @@ using m = std::map<std::string, p>;
 
     auto size = rand_size();
 
-    void* addr;
-    while (kvstore->allocate_pool_memory(pool, c_it->second->minimum_size(size), g_options.alignment, addr) == S_OK) {
-      total += size;
-      size = rand_size();
-    }
+    {
+      void* addr;
+      while (kvstore->allocate_pool_memory(pool, cs->minimum_size(size), g_options.alignment, addr) == S_OK) {
+        total += size;
+        size = rand_size();
+      }
 
-    /* The last allocate failed. Try it again, so we can step through with the debugger */
-    kvstore->allocate_pool_memory(pool, c_it->second->minimum_size(size), g_options.alignment, addr);
+      /* The last allocate failed. Try it again, so we can step through with the debugger */
+      kvstore->allocate_pool_memory(pool, cs->minimum_size(size), g_options.alignment, addr);
+    }
 
     unsigned used = 0;
     {
       std::vector<uint64_t> attr;
-      auto r = kvstore->get_attribute(pool, IKVStore::PERCENT_USED, attr, nullptr);
+      auto r = kvstore->get_attribute(pool, component::IKVStore::PERCENT_USED, attr, nullptr);
       if ( S_OK == r )
       {
         used = unsigned(attr[0]);
@@ -200,7 +147,7 @@ using m = std::map<std::string, p>;
 
     kvstore->close_pool(pool);
     kvstore->delete_pool("test.pool");
-    double utilization = static_cast<double>(total) / double(c_it->second->presumed_allocation()) * 100;
+    double utilization = static_cast<double>(total) / double(cs->presumed_allocation()) * 100;
     utilizations.push_back(utilization);
 
     PLOG("Iteration %d: Total allocated %d, Memory utilization measured %lf %% claimed %u %%", i + 1, total, utilization, used);

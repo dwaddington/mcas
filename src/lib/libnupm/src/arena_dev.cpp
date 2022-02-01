@@ -46,8 +46,7 @@ auto arena_dev::region_create(const string_view id_, gsl::not_null<registry_memo
 {
   auto size_in_grains = boost::numeric_cast<nupm::DM_region::grain_offset_t>(div_round_up(size, _hdr->grain_size()));
 
-  CPLOG(2, "%s::%s: rounding up to %" PRIu32 " grains (%" PRIu64 " MiB)", _cname, __func__,
-       size_in_grains, REDUCE_MiB((1UL << DM_REGION_LOG_GRAIN_SIZE)*size_in_grains));
+  CFLOGM(2, "rounding up to {} grains ({} MiB)", size_in_grains, REDUCE_MiB((1UL << DM_REGION_LOG_GRAIN_SIZE)*size_in_grains));
 
   const auto d =
     region_descriptor(

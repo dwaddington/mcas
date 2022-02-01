@@ -17,13 +17,17 @@ prefix()
 run_hstore() {
   typeset ado_prereq="$1"
   shift
+  # mapstore unit tests: basic
+  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo ./src/components/store/test/store-test1 --store mapstore
+                                                ./src/components/store/test/store-test1 --store mapstore
   # hstore unit tests: basic
   #DAX_RESET=1 STORE=hstore ./src/components/store/hstore/unit_test/hstore-test1 # (out of space)
   STORE_LOCATION="$("$DIR/dax.py" --prefix "$DAX_PREFIX")"
-  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo DAX_RESET=1 STORE=hstore-cc STORE_LOCATION=\'"$STORE_LOCATION"\' ./src/components/store/hstore/unit_test/hstore-test1
-  DAX_RESET=1 STORE=hstore-cc STORE_LOCATION="$STORE_LOCATION" ./src/components/store/hstore/unit_test/hstore-test1
-  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo DAX_RESET=1 STORE=hstore-mm STORE_LOCATION=\'"$STORE_LOCATION"\' MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-test1
-  DAX_RESET=1 STORE=hstore-mm STORE_LOCATION="$STORE_LOCATION" MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-test1
+  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo DAX_RESET=1 ./src/components/store/test/store-test1 --store hstore-cc --daxconfig \'"$STORE_LOCATION"\' --many-count 100000
+                                                DAX_RESET=1 ./src/components/store/test/store-test1 --store hstore-cc --daxconfig "$STORE_LOCATION" --many-count 100000
+  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo DAX_RESET=1 ./src/components/store/test/store-test1 --store hstore-mm --mm-plugin-path ./dist/lib/libmm-plugin-ccpm.so --daxconfig \'"$STORE_LOCATION"\' --many-count 100000
+                                                DAX_RESET=1 ./src/components/store/test/store-test1 --store hstore-mm --mm-plugin-path ./dist/lib/libmm-plugin-ccpm.so --daxconfig "$STORE_LOCATION" --many-count 100000
+
   # hstore unit tests: multithreaded lock/unlock
   [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo DAX_RESET=1 STORE=hstore-mt STORE_LOCATION=\'"$STORE_LOCATION"\' MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-testmt
   DAX_RESET=1 STORE=hstore-mt STORE_LOCATION="$STORE_LOCATION" MM_PLUGIN_PATH=./dist/lib/libmm-plugin-ccpm.so ./src/components/store/hstore/unit_test/hstore-testmt

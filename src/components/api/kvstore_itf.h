@@ -68,7 +68,7 @@ class IKVStore_factory : public component::IBase {
     throw API_exception("IKVstore_factory::create(debug_level,owner,param,param2) not implemented");
   }
 
-  using map_create = std::map<std::string, std::string>;
+  using map_create = std::map<std::string, std::string, std::less<>>;
 
   static constexpr const char *k_src_addr = "src_addr";
   static constexpr const char *k_dest_addr = "dest_addr";
