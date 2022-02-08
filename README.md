@@ -104,7 +104,7 @@ make -j install
 | BUILD_KERNEL_SUPPORT   | Build kernel support                | ON      |
 | BUILD_PYTHON_SUPPORT   | Build python APIs and personalities | ON      |
 | BUILD_EXAMPLES_PMDK    | PMDK in ADO example                 | OFF     |
-| BUILD_RUST             | Rust-based dependencies             | OFF     |
+| BUILD_RUST             | Rust client and ADO                 | OFF     |
 | BUILD_MPI_APPS         | Build mcas-mpi-benchmark            | OFF     |
 
 ### Build for PyMM only (fsdax version)

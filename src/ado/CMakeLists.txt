@@ -1,12 +1,10 @@
 cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
-find_program(RUSTC rustc)
-
 add_subdirectory(demo)
 add_subdirectory(passthru)
 add_subdirectory(testing)
 
-if(EXISTS ${RUSTC})
+if(BUILD_RUST AND BUILD_MCAS_SERVER)
   add_subdirectory(rust-wrapper)
 endif()
 
