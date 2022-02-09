@@ -6,9 +6,8 @@ pipeline {
 	      	  steps {
 				        timeout(time: 60, unit: 'MINUTES') 
 				        {
-					          sh "git submodule update --init -f"
-                    sh "./deps/install-python-deps.sh"
-					          sh "mkdir -p debug-build ; cd debug-build ; cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
+					          sh "git submodule update --init -f"                    				
+					          sh "mkdir -p debug-build ; cd debug-build ; cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_PYTHON_SUPPORT=OFF -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
 
 					          dir('debug-build') {
 						            sh "make bootstrap ; make -j ; make -j install"	
