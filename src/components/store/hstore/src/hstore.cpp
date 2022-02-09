@@ -189,7 +189,7 @@ catch ( const pool_error &e )
 catch ( const std::bad_alloc &e )
 {
   CPLOG(0, "%s: %s", __func__, e.what());
-  return POOL_ERROR; // E_TOO_LARGE incorrect type
+  return POOL_ERROR; // E_NO_MEM incorrect type
 }
 
 auto hstore::open_pool(const std::string &name_,
@@ -235,7 +235,7 @@ auto hstore::open_pool(const std::string &name_,
   catch ( const std::bad_alloc &e )
   {
     CPLOG(0, "%s: %s", __func__, e.what());
-    return POOL_ERROR; // E_TOO_LARGE incorrect type
+    return POOL_ERROR; // E_NO_MEM incorrect type
   }
 }
 
@@ -295,7 +295,7 @@ auto hstore::get_pool_names(std::list<std::string> &pool_names) -> status_t
   catch ( const std::bad_alloc &e )
   {
     CPLOG(0, "%s: %s", __func__, e.what());
-    return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+    return E_NO_MEM;
   }
   return S_OK;
 }
@@ -317,7 +317,7 @@ auto hstore::grow_pool( //
   catch ( const std::bad_alloc &e )
   {
     CPLOG(0, "%s: %s", __func__, e.what());
-    return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+    return E_NO_MEM;
   }
   return S_OK;
 }
@@ -341,16 +341,16 @@ auto hstore::put(const pool_t pool,
   /* Strangely, zero is not allowed as a value length */
   if ( value_len == 0 )
   {
-    return E_BAD_PARAM;
+    return E_INVAL;
   }
 
   if ( (flags & ~FLAGS_DONT_STOMP) != 0 )
   {
-    return E_BAD_PARAM;
+    return E_INVAL;
   }
   if ( value == nullptr )
   {
-    return E_BAD_PARAM;
+    return E_INVAL;
   }
 
   const auto session = static_cast<session_type *>(locate_session(pool));
@@ -382,7 +382,7 @@ auto hstore::put(const pool_t pool,
     catch ( const std::bad_alloc &e )
     {
       CPLOG(0, "%s: %s", __func__, e.what());
-      return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+      return E_NO_MEM;
     }
     catch ( const std::invalid_argument &e )
     {
@@ -466,7 +466,7 @@ auto hstore::get(const pool_t pool,
       catch ( const std::bad_alloc &e )
       {
         CPLOG(0, "%s: %s", __func__, e.what());
-        return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+        return E_NO_MEM;
       }
     }
     return S_OK;
@@ -532,7 +532,7 @@ auto hstore::get_attribute(
   case VALUE_LEN:
     if ( ! key )
     {
-      return E_BAD_PARAM;
+      return E_INVAL;
     }
     try
     {
@@ -550,7 +550,7 @@ auto hstore::get_attribute(
     catch ( const std::bad_alloc &e )
     {
       CPLOG(0, "%s: %s", __func__, e.what());
-      return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+      return E_NO_MEM;
     }
     break;
   case AUTO_HASHTABLE_EXPANSION:
@@ -562,7 +562,7 @@ auto hstore::get_attribute(
     catch ( const std::bad_alloc &e )
     {
       CPLOG(0, "%s: %s", __func__, e.what());
-      return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+      return E_NO_MEM;
     }
     break;
   case PERCENT_USED:
@@ -573,7 +573,7 @@ auto hstore::get_attribute(
   case IKVStore::Attribute::WRITE_EPOCH_TIME:
     if ( ! key )
     {
-      return E_BAD_PARAM;
+      return E_INVAL;
     }
     try
     {
@@ -609,7 +609,7 @@ auto hstore::set_attribute(
   case AUTO_HASHTABLE_EXPANSION:
     if ( value.size() < 1 )
     {
-      return E_BAD_PARAM;
+      return E_INVAL;
     }
     {
       session->set_auto_resize(bool(value[0]));
@@ -642,12 +642,12 @@ auto hstore::resize_value(
   catch ( const std::invalid_argument &e )
   {
     CPLOG(0, "%s: %s", __func__, e.what());
-    return E_BAD_ALIGNMENT; /* bad alignment, probably */
+    return E_INVAL; /* bad alignment or bad size, probably */
   }
   catch ( const std::bad_alloc &e )
   {
     CPLOG(0, "%s: %s", __func__, e.what());
-    return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+    return E_NO_MEM;
   }
   catch ( const impl::key_not_found &e )
   {
@@ -720,7 +720,7 @@ try
 catch ( const std::bad_alloc &e )
 {
   PLOG("%s: %s", __func__, e.what());
-  return E_TOO_LARGE;
+  return E_NO_MEM;
 }
 
 auto hstore::unlock(const pool_t pool,
@@ -870,7 +870,7 @@ try
 catch ( const std::bad_alloc &e )
 {
   CPLOG(0, "%s: %s", __func__, e.what());
-  return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+  return E_NO_MEM;
 }
 catch ( const std::invalid_argument &e )
 {
@@ -911,7 +911,7 @@ try
 catch ( const std::bad_alloc &e )
 {
   CPLOG(0, "%s: %s", __func__, e.what());
-  return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+  return E_NO_MEM;
 }
 
 auto hstore::allocate_pool_memory(
@@ -932,12 +932,12 @@ try
 catch ( const std::invalid_argument &e )
 {
   CPLOG(0, "%s: %s", __func__, e.what());
-  return E_BAD_ALIGNMENT; /* ... probably */
+  return E_INVAL;
 }
 catch ( const std::bad_alloc &e )
 {
   CPLOG(0, "%s: %s", __func__, e.what());
-  return E_TOO_LARGE; /* would be E_NO_MEM, if it were in the interface */
+  return E_NO_MEM;
 }
 
 auto hstore::free_pool_memory(

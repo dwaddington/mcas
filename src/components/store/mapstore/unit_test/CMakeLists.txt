@@ -11,7 +11,5 @@ link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
 set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
-add_compile_options(-O2 -fPIC)
-add_executable(mapstore-test1 test1.cpp)
-target_link_libraries(mapstore-test1 ${ASAN_LIB} common numa ${GTEST_LIB} pthread dl)
+# testa moved to store/tests
 

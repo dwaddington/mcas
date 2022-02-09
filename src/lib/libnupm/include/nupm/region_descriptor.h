@@ -39,8 +39,8 @@ namespace nupm
 	public:
 		/* fsdax data */
 		region_descriptor(
-			const string_view &id_
-			, const string_view &data_file_
+			const string_view id_
+			, const string_view data_file_
 			, const address_map_t address_map_
 		)
 			: _id(id_)

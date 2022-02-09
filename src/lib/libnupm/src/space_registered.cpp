@@ -23,7 +23,8 @@ nupm::space_registered::space_registered(
   const common::log_source &ls_
   , dax_manager * dm_
   , common::fd_locked &&fd_
-  , const string_view &name_
+  , const string_view name_
+  , const bool // pin_
   , addr_t base_addr_
 )
   : _pu(ls_, name_)
@@ -35,7 +36,8 @@ nupm::space_registered::space_registered(
   const common::log_source &ls_
   , dax_manager * dm_
   , common::fd_locked &&fd_
-  , const string_view &name_
+  , const string_view name_
+  , const bool // pin_
   , const std::vector<byte_span> &mapping_
 )
   : _pu(ls_, name_)

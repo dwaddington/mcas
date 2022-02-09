@@ -18,7 +18,7 @@ class cfg_hstore(config):
             h.merge({"mm_plugin_path": mm_plugin_path})
         daxtype = re.match("/mnt/",dax_prefix) and "fsdax" or re.match("/dev/dax",dax_prefix) and "devdax" or None
         if not daxtype:
-            raise Exception("Could not determine DAX type from prefix %s" % dax_prefix)
+            raise Exception("Could not determine DAX type from prefix {}".format(dax_prefix))
         dax_ctor = getattr(dax, daxtype) # devdax or fsdax
         config.__init__(self, shard_proto_dax(ipaddr, h, dax_ctor(pfx=dax_prefix, accession=accession), cores=cores), count)
 

@@ -25,7 +25,7 @@ class dm(object):
                 if k in self._value:
                     if type(v) != type(self._value[k]):
                         # not the same types: probably an error
-                        raise TypeError("mismatch %s vs %s" % type(v) % type(self._value[k]))
+                        raise TypeError("mismatch {} vs {}".format(type(v), type(self._value[k])))
                     if isinstance(v, dict):
                         # dictionaries: deep merge
                         self._value[k] = dm(self._value[k]).merge(v).value()
@@ -39,7 +39,7 @@ class dm(object):
                     # new element
                     self._value[k] = v
         else:
-            raise TypeError("other is a %s not a dict" % type(other))
+            raise TypeError("other is a {} not a dict".format(type(other)))
         return self
 
     def value(self):

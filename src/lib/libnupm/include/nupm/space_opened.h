@@ -74,7 +74,7 @@ private:
 
   /* owns the file mapping */
   std::vector<common::memory_mapped> map_dev(int fd, const addr_t base_addr);
-  std::vector<common::memory_mapped> map_fs(int fd, const std::vector<byte_span> &mapping, ::off_t offset);
+  std::vector<common::memory_mapped> map_fs(int fd, const std::vector<byte_span> &mapping, ::off_t offset, bool pin);
 public:
   space_opened(const common::log_source &, dax_manager * dm_, common::fd_locked && fd, const addr_t base_addr);
   space_opened(const common::log_source &, dax_manager * dm_, common::fd_locked && fd, const std::vector<byte_span> &mapping);

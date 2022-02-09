@@ -72,16 +72,7 @@ namespace
 		}
 		return odp;
 	}
-
-	int init_map_lock_mask()
-	{
-		/* On Demand Paging iimplies that mapped memory need not be pinned */
-		return nupm::dax_manager::have_odp ? 0 : MAP_LOCKED;
-	}
 }
-
-const bool nupm::dax_manager::have_odp = init_have_odp();
-const int nupm::dax_manager::effective_map_locked = init_map_lock_mask();
 
 nupm::path_use::path_use(path_use &&other_) noexcept
   : common::log_source(other_)
@@ -91,7 +82,7 @@ nupm::path_use::path_use(path_use &&other_) noexcept
   swap(_name, other_._name);
 }
 
-nupm::path_use::path_use(const common::log_source &ls_, const string_view &name_)
+nupm::path_use::path_use(const common::log_source &ls_, const string_view name_)
   : common::log_source(ls_)
   , _name(name_)
 {
@@ -235,7 +226,7 @@ void nupm::dax_manager::map_register(const fs::directory_entry &de, const std::s
 					_mapped_spaces.insert(
 						mapped_spaces::value_type(
 							id
-							, space_registered(*this, this, common::fd_locked(open_successful(pd.c_str(), O_RDWR, 0666)), id, r.first)
+							, space_registered(*this, this, common::fd_locked(open_successful(pd.c_str(), O_RDWR, 0666)), id, ! has_odp(), r.first)
 						)
 					);
 				if ( ! itb.second )
@@ -281,7 +272,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_fs(
 	, bool force_reset
 )
 {
-	if ( ! have_odp )
+	if ( ! has_odp() )
 	{
 		FWRNM("arena {} is a directory but On Demand Paging is disabled. Run with USE_ODP=1 to enable ODP", p);
 	}
@@ -327,7 +318,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 			_mapped_spaces.insert(
 				mapped_spaces::value_type(
 					id
-					, space_registered(*this, this, common::fd_locked(open_successful(p.c_str(), O_RDWR, 0666)), id, base_)
+					, space_registered(*this, this, common::fd_locked(open_successful(p.c_str(), O_RDWR, 0666)), id, true, base_)
 				)
 			);
 		if ( ! itb.second )
@@ -353,7 +344,8 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 
 bool nupm::dax_manager::enter(
 	common::fd_locked && fd_
-	, const string_view & id_
+	, string_view id_
+	, bool pin_
 	, const std::vector<byte_span> &m_
 )
 {
@@ -361,7 +353,7 @@ bool nupm::dax_manager::enter(
 		_mapped_spaces.insert(
 			mapped_spaces::value_type(
 				std::string(id_)
-				, space_registered(*this, this, std::move(fd_), id_, m_)
+				, space_registered(*this, this, std::move(fd_), id_, pin_, m_)
 			)
 		);
 	if ( ! itb.second )
@@ -372,7 +364,7 @@ bool nupm::dax_manager::enter(
 	return itb.second;
 }
 
-void nupm::dax_manager::remove(const string_view & id_)
+void nupm::dax_manager::remove(const string_view id_)
 {
 	auto itb = _mapped_spaces.find(std::string(id_));
 	if ( itb != _mapped_spaces.end() )
@@ -398,6 +390,7 @@ dax_manager::dax_manager(
 	, common::byte_span address_span_
 )
   : common::log_source(ls_)
+  , _have_odp(init_have_odp())
   , _nd()
   , _address_coverage()
   , _address_fs_available()
@@ -486,7 +479,7 @@ void dax_manager::debug_dump(arena_id_t arena_id)
 }
 
 auto dax_manager::open_region(
-  const string_view & name
+  const string_view name
   , unsigned arena_id
 ) -> region_descriptor
 {
@@ -495,7 +488,7 @@ auto dax_manager::open_region(
 }
 
 auto dax_manager::create_region(
-  const string_view &name_
+  const string_view name_
   , arena_id_t arena_id_
   , const size_t size_
 ) -> region_descriptor
@@ -522,7 +515,7 @@ auto dax_manager::create_region(
 }
 
 auto dax_manager::resize_region(
-  const string_view & id_
+  const string_view id_
   , const arena_id_t arena_id_
   , const size_t size_
 ) -> region_descriptor
@@ -543,7 +536,7 @@ auto dax_manager::resize_region(
   return arena->region_get(id_);
 }
 
-void dax_manager::erase_region(const string_view & name, arena_id_t arena_id)
+void dax_manager::erase_region(const string_view name, arena_id_t arena_id)
 {
   guard_t g(_reentrant_lock);
   lookup_arena(arena_id)->region_erase(name, this);

@@ -25,12 +25,6 @@ link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
 set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
-add_executable(hstore-test1 test1.cpp store_map.cpp)
-target_link_libraries(hstore-test1 ${ASAN_LIB} common numa ${GTEST_LIB} pthread dl)
-
-add_executable(hstore-test1s test1s.cpp store_map.cpp)
-target_link_libraries(hstore-test1s ${ASAN_LIB} common numa ${GTEST_LIB} pthread dl)
-
 add_executable(hstore-test2 test2.cpp store_map.cpp)
 target_link_libraries(hstore-test2 ${ASAN_LIB} common numa ${GTEST_LIB} pthread dl)
 

@@ -157,11 +157,14 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
     /* exchange memory mapping information */
     {
       nupm::region_descriptor regions;
-      auto rc = _i_kvstore->get_pool_regions(pool_id, regions);
 
-      if (rc != S_OK) {
-        PWRN("cannot get pool regions; unable to map to ADO");
-        return rc;
+      {
+         auto rc = _i_kvstore->get_pool_regions(pool_id, regions);
+
+        if (rc != S_OK) {
+          FWRNM("unable to amp ADO because cannot get pool regions (error {})", rc);
+          return rc;
+        }
       }
 
       std::size_t offset = 0;
@@ -194,8 +197,13 @@ status_t Shard::conditional_bootstrap_ado_process(component::IKVStore*        kv
 
               nupm::revoke_memory(token); /* move any prior registration; TODO clean up when ADO goes */
 
-              if (nupm::expose_memory(token, ::base(r), ::size(r)) != S_OK)
-                throw Logic_exception("nupm::expose_memory failed unexpectedly");
+              auto rc = nupm::expose_memory(token, ::base(r), ::size(r));
+              if (rc != S_OK)
+              {
+                auto e = common::format("nupm::expose_memory({}. {}, {}) failed unexpectedly rc {}", token, ::base(r), ::size(r), rc);
+                FLOGM("{}", e);
+                throw Logic_exception(e.c_str());
+              }
 
               if (ado->send_memory_map(token, ::size(r), ::base(r)) != S_OK)
                 throw Logic_exception("initial send_memory_map failed");

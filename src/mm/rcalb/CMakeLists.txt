@@ -6,6 +6,7 @@ project(mm-plugin-rcalb C CXX)
 
 add_definitions(-DCONFIG_DEBUG)
 add_compile_options("-fvisibility=hidden")
+add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/components)

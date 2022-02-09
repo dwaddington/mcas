@@ -18,8 +18,8 @@ run_hstore() {
   typeset ado_prereq="$1"
   shift
   # mapstore unit tests: basic
-  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo ./src/components/store/test/store-test1 --store mapstore
-                                                ./src/components/store/test/store-test1 --store mapstore
+  [ -n "$DEBUG" ] && [ 0 -lt "$DEBUG" ] && echo ./src/components/store/test/store-test1 --store mapstore --many-count 100000
+                                                ./src/components/store/test/store-test1 --store mapstore --many-count 100000
   # hstore unit tests: basic
   #DAX_RESET=1 STORE=hstore ./src/components/store/hstore/unit_test/hstore-test1 # (out of space)
   STORE_LOCATION="$("$DIR/dax.py" --prefix "$DAX_PREFIX")"

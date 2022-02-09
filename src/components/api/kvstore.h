@@ -446,7 +446,11 @@ protected:
    * @param new_size New size of value in bytes (can be more or less)
    *
    * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND,
-   * E_KEY_NOT_FOUND, E_TOO_LARGE, E_ALREADY(?)
+   * E_KEY_NOT_FOUND, E_NO_MEM, E_ALREADY(?), E_INVAL.
+   * As a special case, new_size same as old size yields E_INVAL.
+   * As a special case, new size zero yields E_INVAL.
+   * Plugin allocators may impose additional restrictions.
+   * Behavior when encountering a plugin allocator restriction is unspecified.
    */
   virtual status_t resize_value(const pool_t       pool,
                                 const std::string& key,
@@ -555,6 +559,7 @@ protected:
    * @param len [in] length of memory buffer in bytes
    * @param handle memory handle
    *
+   * @return S_OK, E_INVAL
    */
   virtual status_t allocate_direct_memory(void*& vaddr,
                                           size_t len,
@@ -621,7 +626,7 @@ protected:
    *
    * @return S_OK, S_CREATED_OK (if created on demand), E_KEY_NOT_FOUND,
    * E_LOCKED (already locked), E_INVAL (e.g., no key & no length),
-   * E_TOO_LARGE (cannot allocate space for lock), E_NOT_SUPPORTED
+   * E_NO_MEM (cannot allocate space for lock), E_NOT_SUPPORTED
    * if unable to take lock or other error
    */
   virtual status_t lock(const pool_t       pool,
@@ -851,7 +856,8 @@ protected:
    * @param alignment Alignment hint in bytes, 0 if no alignment is needed
    * @param out_addr Pointer to allocated region
    *
-   * @return S_OK on success, E_BAD_ALIGNMENT, E_POOL_NOT_FOUND, E_NOT_SUPPORTED
+   * @return S_OK on success, E_INVAL (bad alignment, zero size), E_POOL_NOT_FOUND, E_NO_MEM, E_NOT_SUPPORTED
+   * Special case: zero-size allocations are not allowed.
    */
   virtual status_t allocate_pool_memory(const pool_t pool,
                                         const size_t size,

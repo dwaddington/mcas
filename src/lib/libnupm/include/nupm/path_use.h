@@ -36,7 +36,7 @@ private:
    */
   std::string _name;
 public:
-  path_use(const common::log_source &ls, const string_view &name);
+  path_use(const common::log_source &ls, string_view name);
   path_use(const path_use &) = delete;
   path_use &operator=(const path_use &) = delete;
   path_use(path_use &&) noexcept;

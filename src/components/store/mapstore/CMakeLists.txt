@@ -4,7 +4,7 @@ project(component-mapstore CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 # for serious debugging
-#add_compile_options("$<$<CONFIG:Debug>:-O0>")
+add_compile_options("$<$<CONFIG:Debug>:-O0>")
 
 add_definitions(-DCONFIG_DEBUG)
 add_definitions(-DDM_REGION_LOG_GRAIN_SIZE=${DM_REGION_LOG_GRAIN_SIZE})
@@ -22,7 +22,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # cityhash
 
-set(SOURCES src/map_store.cpp src/map_store_factory.cpp src/pool_instance.cpp src/region_memory_mmap.cpp src/region_memory_numa.cpp src/region_memory_numa_pin.cpp)
+set(SOURCES src/map_store.cpp src/map_store_factory.cpp src/pool_instance.cpp src/region_memory_mmap.cpp src/region_memory_numa.cpp)
 configure_file(src/map_store_env.h.in ${CMAKE_CURRENT_BINARY_DIR}/map_store_env.h)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})

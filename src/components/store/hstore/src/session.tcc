@@ -375,11 +375,16 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		, std::size_t alignment_
 	)
 	{
+		/* mapstore disallows zero-size resize */
+		if ( mapstore_compat && new_mapped_len == 0 ) throw std::invalid_argument("zero size disallowed");
+
 		auto & map = locate_map(key);
 		definite_lock_type dl(AK_REF TM_REF map, key, _heap);
 
 		auto &v = map.at(TM_REF key);
 		auto &d = std::get<0>(v);
+		/* mapstore disallows same-size resize */
+		if ( mapstore_compat && d.size() == new_mapped_len ) throw std::invalid_argument("same-size resize");
 		/* Replace the data if the size changes or if the data should be realigned */
 		if ( d.size() != new_mapped_len || reinterpret_cast<std::size_t>(d.data()) % alignment_ != 0 )
 		{
@@ -775,6 +780,8 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 	)
 	{
 		persistent_t<char *> p = nullptr;
+		/* mapstore disalows zero-length allocation */
+		if (  0 == size ) throw std::invalid_argument("zero length allocation");
 		/* ERROR: leaks memory on a crash */
 		allocator().allocate_tracked(AK_REF p, size, clean_align(alignment_, sizeof(void *)));
 		return p;

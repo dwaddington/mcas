@@ -18,17 +18,13 @@ namespace
 		virtual std::size_t minimum_size(std::size_t s) const { return s; }
 		virtual component::uuid_t factory() const = 0;
 		virtual std::size_t presumed_allocation() const = 0;
-		virtual bool uses_numa_nodes() const { return false; }
-		virtual status_t rc_unknown_attribute() const { return E_NOT_SUPPORTED; }
-		virtual status_t rc_percent_used() const { return S_OK; }
-		virtual status_t rc_resize_locked() const { return E_LOCKED; }
-		virtual status_t rc_attribute_key_null_ptr() const { return E_BAD_PARAM; }
-		virtual status_t rc_attribute_key_not_found() const { return component::IKVStore::E_KEY_NOT_FOUND; }
-		virtual status_t rc_attribute_hashtable_expansion() const { return S_OK; }
-		virtual status_t rc_out_of_memory() const { return component::IKVStore::E_TOO_LARGE; }
-		virtual status_t rc_atomic_update() const { return S_OK; }
+
 		virtual status_t rc_allocate_pool_memory_size_0() const { return S_OK; }
 		virtual bool swap_updates_timestamp() const { return false; }
+
+		virtual status_t rc_attribute_numa_mask() const { return S_OK; }
+		virtual status_t rc_attribute_hashtable_expansion() const { return S_OK; }
+		virtual status_t rc_atomic_update() const { return S_OK; }
 	};
 
 	struct custom_mapstore
@@ -37,16 +33,12 @@ namespace
 		virtual component::uuid_t factory() const override { return component::mapstore_factory; }
 		std::size_t minimum_size(std::size_t s) const override { return std::max(std::size_t(8), s); }
 		std::size_t presumed_allocation() const override { return 1ULL << DM_REGION_LOG_GRAIN_SIZE; }
-		bool uses_numa_nodes() const override { return true; }
-		status_t rc_unknown_attribute() const override { return E_INVALID_ARG; }
-		status_t rc_percent_used() const override { return rc_unknown_attribute(); }
-		status_t rc_resize_locked() const override { return E_INVAL; }
-		status_t rc_attribute_key_null_ptr() const override { return E_INVALID_ARG; }
-		status_t rc_attribute_key_not_found() const override { return rc_unknown_attribute(); }
-		status_t rc_attribute_hashtable_expansion() const override { return rc_unknown_attribute(); }
-		status_t rc_out_of_memory() const override { return E_INVAL; }
-		status_t rc_atomic_update() const override { return E_NOT_SUPPORTED; }
+
 		status_t rc_allocate_pool_memory_size_0() const override { return E_INVAL; }
+		bool swap_updates_timestamp() const override { return true; }
+
+		status_t rc_attribute_hashtable_expansion() const override { return E_NOT_SUPPORTED; }
+		status_t rc_atomic_update() const override { return E_NOT_SUPPORTED; }
 	};
 
 	struct custom_hstore
@@ -54,6 +46,9 @@ namespace
 	{
 		virtual component::uuid_t factory() const override { return component::hstore_factory; }
 		std::size_t presumed_allocation() const override { return MiB(32); }
+
+		status_t rc_attribute_numa_mask() const override { return E_NOT_SUPPORTED; }
+		status_t rc_allocate_pool_memory_size_0() const override { return E_INVAL; }
 		bool swap_updates_timestamp() const override { return true; }
 	};
 
@@ -103,7 +98,9 @@ auto make_kvstore(
     }
 
 	const auto fact = make_itf_ref(static_cast<IKVStore_factory*>(comp->query_interface(IKVStore_factory::iid())));
-	const auto kvstore = fact->create(0, mc);
+	auto debug_it = mc.find(component::IKVStore_factory::k_debug);
+	unsigned debug_level = debug_it == mc.end() ? 0U : unsigned(std::stoul(debug_it->second));
+	const auto kvstore = fact->create(debug_level, mc);
 
 	return std::unique_ptr<component::IKVStore>(kvstore);
 }

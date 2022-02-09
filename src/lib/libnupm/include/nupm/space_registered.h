@@ -40,18 +40,25 @@ private:
 public:
   space_opened _or;
 public:
+  /* Note: pin parameter is ignored because memory is mapped with MAP_LOCKED.
+   * But MAP_LOCKED is not as strong as mlock (see mmap(2)), so in some case
+   * we might need a separate mlock call. If that occurs, space_registered
+   * needs to know whether to call mlock. 
+   */
   space_registered(
     const common::log_source &ls
     , dax_manager * dm
     , common::fd_locked &&fd
-    , const string_view &path
+    , string_view path
+    , bool pin
     , addr_t base_addr
   );
   space_registered(
     const common::log_source &ls
     , dax_manager * dm
     , common::fd_locked &&fd
-    , const string_view &name
+    , string_view name
+    , bool pin
     , const std::vector<byte_span> &mapping
   );
 

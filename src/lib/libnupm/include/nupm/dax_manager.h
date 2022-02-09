@@ -65,8 +65,8 @@ struct registry_memory_mapped
   using byte_span = common::byte_span;
   using string_view = common::string_view;
   virtual ~registry_memory_mapped() {}
-  virtual bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) = 0;
-  virtual void remove(const string_view &id) = 0;
+  virtual bool enter(common::fd_locked &&fd, string_view id, bool pin, const std::vector<byte_span> &m) = 0;
+  virtual void remove(string_view id) = 0;
   virtual void * locate_free_address_range(std::size_t size) = 0;
 };
 
@@ -78,18 +78,21 @@ struct registry_memory_mapped
 struct dax_manager : protected common::log_source, private registry_memory_mapped {
  private:
   using byte = common::byte;
+  bool _have_odp;
 
  public:
   using arena_id_t = unsigned;
   using string_view = common::string_view;
-  static const bool have_odp;
-  static const int effective_map_locked;
 
   struct config_t {
     std::string path;
     addr_t addr;
+    config_t(common::string_view path_, addr_t addr_)
+      : path(path_)
+      , addr(addr_)
+    {}
     /* Through no fault of its own, config_t may begin life with no proper values */
-    config_t() : path(), addr(0) {}
+    config_t() : config_t("", 0) {}
   };
 
   struct config_mapped
@@ -132,7 +135,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    *   Until fsdax supports extending a region, the vector will not be more
    *   than one element long.
    */
-  region_descriptor open_region(const string_view & id, arena_id_t arena_id);
+  region_descriptor open_region(string_view id, arena_id_t arena_id);
 
   /**
    * Create a new region of memory
@@ -144,7 +147,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * @return backing file name (empty string if none);
    *   Pointer to and size of mapped memory
    */
-  region_descriptor create_region(const string_view &id, arena_id_t arena_id, const size_t size);
+  region_descriptor create_region(string_view id, arena_id_t arena_id, const size_t size);
 
   /**
    * Resize a region of memory
@@ -162,7 +165,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * locate_region), it can be used to retrieve the new mapping of a resized region.
    *
    */
-  region_descriptor resize_region(const string_view & id, arena_id_t arena_id, size_t size);
+  region_descriptor resize_region(string_view id, arena_id_t arena_id, size_t size);
 
   /**
    * Erase a previously allocated region
@@ -170,7 +173,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
    * @param id Unique region identifier
    * @param arena_id Arena identifier
    */
-  void erase_region(const string_view & id, arena_id_t arena_id);
+  void erase_region(string_view id, arena_id_t arena_id);
 
   /**
    * Return a list of region names
@@ -196,6 +199,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
   void register_range(const void *begin, std::size_t size);
   void deregister_range(const void *begin, std::size_t size);
   void * locate_free_address_range(std::size_t size) override;
+	bool has_odp() const { return _have_odp; }
  private:
   using byte_span = common::byte_span;
   space_opened map_space(const std::string &path, addr_t base_addr);
@@ -204,8 +208,8 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
                          bool    force_rebuild = false);
   arena *lookup_arena(arena_id_t arena_id);
   /* callback for arena_dax to register mapped memory */
-  bool enter(common::fd_locked &&fd, const string_view & id, const std::vector<byte_span> &m) override;
-  void remove(const string_view & id) override;
+  bool enter(common::fd_locked &&fd, const string_view id, bool pin, const std::vector<byte_span> &m) override;
+  void remove(const string_view id) override;
 #if _NUPM_FILESYSTEM_STD_
   using path = std::filesystem::path;
   using directory_entry = std::filesystem::directory_entry;

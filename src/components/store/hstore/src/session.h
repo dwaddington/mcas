@@ -63,6 +63,7 @@ template <typename Handle, typename Allocator, typename Table, typename LockType
 		using definite_lock_type = definite_lock<table_type, allocator_type>;
 		using string_view = common::string_view;
 
+		static constexpr bool mapstore_compat = true; /* match some odd mapstore behavior */
 		allocator_type _heap;
 		bool _is_crash_consistent;
 		bool _pin_seq; /* used only for force undo_redo call */

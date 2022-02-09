@@ -11,7 +11,7 @@ class fsdax(dm):
     def __init__(self, pfx, accession=0):
         self.pfx = pfx
         self.accession = accession
-        dm.__init__(self, [{"path": "%s/a%d" % (pfx,accession)}])
+        dm.__init__(self, [{"path": "{}/a{}".format(pfx,accession)}])
     def step(self,n):
         return fsdax(self.pfx, self.accession+n)
 
@@ -20,11 +20,11 @@ class devdax(dm):
     def __init__(self, pfx, accession=0):
         self.pfx = pfx
         self.accession = accession
-        self.devices = glob("%s.*" % (pfx,))
+        self.devices = glob("{}.*".format(pfx))
         try:
             dm.__init__(self, [{"path": self.devices[accession], "addr": 0x9000000000 + 0x1000000000 * accession}])
         except IndexError as e:
-            print("No dax device device for accession", accession)
+            print("No dax device for accession", accession)
             raise
     def step(self,n):
         return devdax(self.pfx, self.accession+n)

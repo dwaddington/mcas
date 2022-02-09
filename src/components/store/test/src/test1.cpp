@@ -302,7 +302,7 @@ void show_percent_used(pool_opened & pool)
 	using IKVStore = component::IKVStore;
 	std::vector<uint64_t> attr;
 	auto r = pool.get_attribute(IKVStore::PERCENT_USED, attr, nullptr);
-	EXPECT_EQ(cs->rc_percent_used(), r);
+	EXPECT_EQ(S_OK, r);
 	if ( S_OK == r )
 	{
 		EXPECT_GE(100, attr[0]);
@@ -394,6 +394,8 @@ TEST_F(KVStore_test, ValueResize)
 		}
 	);
 
+	/* For some reason, resize which does not change size is invalid */
+	EXPECT_EQ(E_INVAL, pool.resize_value("MyKey", KiB(8), 8));
 	ASSERT_OK(pool.resize_value("MyKey", KB(16), 8));
 
 	pool.map(
@@ -934,7 +936,9 @@ TEST_F(KVStore_test, BasicPutLocked)
 
 		EXPECT_EQ(E_LOCKED, pool->put(single_key, single_value.data(), single_value.size()));
 
-		EXPECT_EQ(cs->rc_resize_locked(), pool->resize_value(single_key, single_value.size(), 64)); /* mapstore: E_INVAL */
+		EXPECT_EQ(E_LOCKED, pool->resize_value(single_key, single_value.size(), 64));
+		EXPECT_EQ(E_INVAL, pool->resize_value(single_key, 0, 64)); /* E_INVAL (zero-length prohibition tested before lock */
+		EXPECT_EQ(E_LOCKED, pool->resize_value(single_key, single_value.size()+64, 64));
 
 		{
 			void * value = nullptr;
@@ -1365,9 +1369,9 @@ TEST_F(KVStore_test, BasicGetAttribute)
 			}
 		}
 		r = pool.get_attribute(IKVStore::Attribute(0), attr, &single_key);
-		EXPECT_EQ(cs->rc_unknown_attribute(), r);
+		EXPECT_EQ(E_NOT_SUPPORTED, r);
 		r = pool.get_attribute(IKVStore::VALUE_LEN, attr, nullptr);
-		EXPECT_EQ(cs->rc_attribute_key_null_ptr(), r);
+		EXPECT_EQ(E_INVAL, r);
 		r = pool.get_attribute(IKVStore::VALUE_LEN, attr, &missing_key);
 		EXPECT_EQ(IKVStore::E_KEY_NOT_FOUND, r);
 	}
@@ -1991,7 +1995,7 @@ TEST_F(KVStore_test, AllocDealloc)
 		/* Removed: unless the free logic validates arguments, might
 		 * corrupt memory rather than failing.
 		 */
-		if ( v128 ) { EXPECT_EQ(E_INVALID_ARG, pool2.free_memory(v128, 128)); } /* not found */
+		if ( v128 ) { EXPECT_EQ(E_INVAL, pool2.free_memory(v128, 128)); } /* not found */
 #endif
 	}
 }
@@ -2022,7 +2026,7 @@ TEST_F(KVStore_test, OutOfMemory)
 			rc = pool.allocate_memory(MiB(1), 8, p);
 			(void) p;
 		}
-		EXPECT_EQ(cs->rc_out_of_memory(), rc); /* IMVStore::E_TOO_LARGE or E_INVAL */
+		EXPECT_EQ(E_NO_MEM, rc);
 	}
 	ASSERT_EQ(S_OK, pool.close());
 }
@@ -2036,6 +2040,7 @@ TEST_F(KVStore_test, NumaMask)
 	{
 		std::vector<uint64_t> numa_mask_result;
 		auto r = pool.get_attribute(component::IKVStore::NUMA_MASK, numa_mask_result);
+		EXPECT_EQ(cs->rc_attribute_numa_mask(), r);
 		if ( r == S_OK )
 		{
 			EXPECT_EQ(1, numa_mask_result.size());

@@ -4,8 +4,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
-DAX_PREFIX="${DAX_PREFIX:-$(choose_dax)}"
-STORETYPE=hstore
+STORE=hstore
+DAX_PREFIX="${DAX_PREFIX:-$(choose_dax_with_ado $STORE)}"
 TESTID="$(basename --suffix .sh -- $0)-$(dax_type $DAX_PREFIX)"
 
 # parameters for MCAS server and client
@@ -13,7 +13,7 @@ NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
 NUMA_NODE=$(numa_node $DAX_PREFIX)
-CONFIG_STR="$("./dist/testing/cfg_hstore_ado_sock.py" "$NODE_IP" "$STORETYPE" "$DAX_PREFIX" "$NODE_IP" --numa-node "$NUMA_NODE)"
+CONFIG_STR="$("./dist/testing/cfg_hstore_ado_sock.py" "$NODE_IP" "$STORE" "$DAX_PREFIX" "$NODE_IP" --numa-node "$NUMA_NODE)"
 # launch MCAS server
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &

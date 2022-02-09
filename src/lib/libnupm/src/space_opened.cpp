@@ -19,6 +19,7 @@
 
 #include <common/memory_mapped.h>
 #include <common/utils.h> /* check_aligned */
+#include <linux/mman.h> /* MAP_HUGE_2MB, MAP_HUGE_1GB */
 
 #include <fcntl.h> /* open */
 #include <sys/mman.h> /* mmap */
@@ -159,25 +160,28 @@ std::vector<common::memory_mapped> nupm::space_opened::map_dev(int fd, const add
 
   FLOGM("fd {} size{}", fd, len);
 
+  static_assert(MAP_HUGE == MAP_HUGE_2MB, "mcasmod kernel module may not support other HUGE sizes");
+  const uint32_t mmap_flags = MAP_SHARED_VALIDATE | MAP_FIXED | MAP_LOCKED;
+
   /* mmap it in */
   common::memory_mapped iovm(
     common::make_byte_span(base_ptr, len) /* length = 0 means whole device (contrary to man 3 mmap??) */
     , PROT_READ | PROT_WRITE
-    , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE | dax_manager::effective_map_locked
+    , mmap_flags | MAP_SYNC
     , fd
   );
-  CFLOGM(1, "{} = mmap({}, 0x{:x}, {}", ::base(iovm), base_ptr, ::size(iovm), dax_manager::effective_map_locked ? "MAP_SYNC|locked" : "MAP_SYNC|not locked");
+  CFLOGM(1, "{} = mmap({}, 0x{:x}, {}", ::base(iovm), base_ptr, ::size(iovm), "MAP_SYNC");
 
   if ( ! iovm ) {
     iovm =
       common::memory_mapped(
         common::make_byte_span(base_ptr, len) /* length = 0 means whole device (contrary to man 3 mmap??) */
         , PROT_READ | PROT_WRITE
-        , MAP_SHARED_VALIDATE | MAP_FIXED | MAP_HUGE | dax_manager::effective_map_locked
+        , mmap_flags
         , fd
       );
 
-    CFLOGM(1, "{} = mmap({}, 0x{:x}, {}", ::base(iovm), base_ptr, ::size(iovm), dax_manager::effective_map_locked ? "locked" : "not locked");
+    CFLOGM(1, "{} = mmap({}, 0x{:x}", ::base(iovm), base_ptr, ::size(iovm));
   }
 
   if ( ! iovm ) {
@@ -199,9 +203,10 @@ std::vector<common::memory_mapped> nupm::space_opened::map_dev(int fd, const add
   return v;
 }
 
-std::vector<common::memory_mapped> nupm::space_opened::map_fs(int fd, const std::vector<byte_span> &mapping, ::off_t offset_)
+std::vector<common::memory_mapped> nupm::space_opened::map_fs(int fd, const std::vector<byte_span> &mapping, ::off_t offset_, bool pin_)
 {
-  return arena_fs::fd_mmap(fd, mapping, MAP_SHARED_VALIDATE | MAP_FIXED | MAP_SYNC | MAP_HUGE, offset_);
+  const uint32_t mmap_flags = MAP_SHARED_VALIDATE | MAP_FIXED | (pin_ ? MAP_LOCKED : 0);
+  return arena_fs::fd_mmap(fd, mapping, mmap_flags, offset_);
 }
 
 /* space_opened constructor for devdax: filename, single address, unknown size */
@@ -234,7 +239,7 @@ nupm::space_opened::space_opened(
 try
   : common::log_source(ls_)
   , _fd_locked(std::move(fd_))
-  , _range(dm_, map_fs(_fd_locked.fd(), mapping, 0))
+  , _range(dm_, map_fs(_fd_locked.fd(), mapping, 0, ! dm_->has_odp()))
 {
 }
 catch ( std::exception &e )
@@ -247,7 +252,7 @@ catch ( std::exception &e )
 void nupm::space_opened::grow(std::vector<byte_span> && mapping)
 try
 {
-  _range.grow(map_fs(_fd_locked.fd(), mapping, _range.size()));
+  _range.grow(map_fs(_fd_locked.fd(), mapping, _range.size(), ! _range.dm()->has_odp()));
 }
 catch ( std::exception &e )
 {

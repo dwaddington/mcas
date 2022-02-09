@@ -158,6 +158,8 @@ private:
                 IKVStore::key_t& out_key,
                 const char ** out_key_ptr);
 
+  std::size_t capacity() const;
+  std::size_t allocated() const;
 public:
   status_t put(string_view_key key, const void *value,
                const size_t value_len, unsigned int flags);
@@ -203,7 +205,7 @@ public:
 
   status_t map_keys(std::function<int(string_view_key key)> function);
 
-  status_t get_pool_regions(nupm::region_descriptor::address_map_t &out_regions);
+  status_t get_pool_regions(nupm::region_descriptor::address_map_t &out_regions) const;
 
   status_t grow_pool(const size_t increment_size, size_t &reconfigured_size);
 
@@ -223,6 +225,8 @@ public:
                                bool increment = true);
 
   status_t close_pool_iterator(IKVStore::pool_iterator_t iter);
+
+  unsigned percent_used() const;
 };
 
 #endif

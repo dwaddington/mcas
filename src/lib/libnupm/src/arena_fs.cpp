@@ -145,7 +145,7 @@ void *arena_fs::region_create_inner(
 	, const std::vector<byte_span> &mapping_
 )
 try {
-	auto entered = mh_->enter(std::move(fd), id_, mapping_);
+	auto entered = mh_->enter(std::move(fd), id_, false, mapping_);
 	/* return the map key, or nullptr if already mapped */
 	return entered ? ::base(mapping_.front()) : nullptr;
 }

@@ -14,9 +14,10 @@
 #include "pool_instance.h"
 
 #include "region_memory_mmap.h"
-#include "region_memory_numa_pin.h"
+#include "region_memory_numa.h"
 
 #include <common/env.h> /* env_value */
+#include <common/memory_pin.h>
 #include <common/rwlock.h> /* RWLock, RWLock_guard */
 #include <common/utils.h> /* wmb */
 #include <common/string_view.h>
@@ -25,6 +26,7 @@
 #include <sys/stat.h> /* open stat */
 #include <fcntl.h> /* open */
 #include <unistd.h> /* ftruncate, syncfs */
+#include <numeric> /* accumulate */
 
 #define DEFAULT_ALIGNMENT 8
 #define SINGLE_THREADED
@@ -226,7 +228,7 @@ status_t Pool_instance::get(const string_view_key key,
   if (i == _map->end()) return IKVStore::E_KEY_NOT_FOUND;
 
   /* if out_value is provided as non-NULL, and its large enough
-     then use it. If it is not large enough, then send back 
+     then use it. If it is not large enough, then send back
      the size needed.
   */
   auto buffer_len = i->second._length;
@@ -291,7 +293,7 @@ status_t Pool_instance::get_attribute(const IKVStore::Attribute attr,
     break;
   }
   case IKVStore::Attribute::VALUE_LEN: {
-    if (key.data() == nullptr) return E_INVALID_ARG;
+    if (key.data() == nullptr) return E_INVAL;
     RWLock_guard guard(_map_lock);
     std::lock_guard g{_mm_plugin_mutex}; /* aac */
     string_t k(key.data(), key.size(), aac);
@@ -313,12 +315,16 @@ status_t Pool_instance::get_attribute(const IKVStore::Attribute attr,
     out_attr.push_back(_map->size());
     break;
   }
+  case IKVStore::Attribute::PERCENT_USED: {
+    out_attr.push_back(percent_used());
+    break;
+  }
   case IKVStore::Attribute::NUMA_MASK: {
     out_attr.push_back(_numa_node_mask.get64());
     break;
   }
   default:
-    return E_INVALID_ARG;
+    return E_NOT_SUPPORTED;
   }
 
   return S_OK;
@@ -354,6 +360,11 @@ status_t Pool_instance::swap_keys(const string_view_key key0,
   left._length = right._length;
   right._ptr = tmp_ptr;
   right._length = tmp_len;
+  /* Swap of keys arguable alters whatever timestamp is tracking.
+   * Update the timestamps.
+   */
+  left._tsc.update();
+  right._tsc.update();
 
   /* release locks */
   left._value_lock->unlock();
@@ -595,17 +606,6 @@ status_t Pool_instance::resize_value(const string_view_key key,
   auto i = _map->find(string_t(key.data(), key.size(), aac));
 
   if (i == _map->end()) return IKVStore::E_KEY_NOT_FOUND;
-  if (i->second._length == new_size) {
-    CFLOGM(2, "resize_value request for same size! {}", new_size);
-    return E_INVAL;
-  }
-
-  write_touch();
-
-  /* perform resize */
-  void * buffer = nullptr;
-  if(_mm_plugin.aligned_allocate(new_size, alignment, &buffer) != S_OK)
-    throw General_exception("memory plufin aligned_allocate failed");
 
   /* lock KV-pair */
   void *out_value;
@@ -622,12 +622,32 @@ status_t Pool_instance::resize_value(const string_view_key key,
 
   if (out_key_handle == IKVStore::KEY_NONE) {
     CFLOGM(2, "bad lock result {}", 0);
+    return E_LOCKED;
+  }
+
+  /* It seems unfair to complain about an invalid argument on a condition which
+   * cannot be checked in advance, but that is how mapstore handles same-size
+   * resize.
+   */
+  if (i->second._length == new_size) {
+    (void) unlock(out_key_handle);
+    CFLOGM(2, "resize_value request for same size! {}", new_size);
     return E_INVAL;
   }
 
   CFLOGM(2, "resize_value locked key-value pair", 0);
 
   size_t size_to_copy = std::min<size_t>(new_size, boost::numeric_cast<size_t>(i->second._length));
+
+  /* perform resize */
+  void * buffer = nullptr;
+  if(_mm_plugin.aligned_allocate(new_size, alignment, &buffer) != S_OK)
+  {
+    (void) unlock(out_key_handle);
+    throw General_exception("memory plugin aligned_allocate failed");
+  }
+
+  write_touch();
 
   memcpy(buffer, i->second._ptr, size_to_copy);
 
@@ -645,7 +665,7 @@ status_t Pool_instance::resize_value(const string_view_key key,
   return s;
 }
 
-status_t Pool_instance::get_pool_regions(nupm::region_descriptor::address_map_t &out_regions)
+status_t Pool_instance::get_pool_regions(nupm::region_descriptor::address_map_t &out_regions) const
 {
   if (_regions.empty())
     return E_INVAL;
@@ -707,18 +727,21 @@ status_t Pool_instance::allocate_pool_memory(const size_t size,
     out_addr = 0;
 
     std::lock_guard g{_mm_plugin_mutex};
-    if( _mm_plugin.aligned_allocate(size, (alignment > 0) && (size % alignment == 0) ?
-                                    alignment : choose_alignment(size), &out_addr) != S_OK)
-      throw General_exception("memory plugin aligned_allocate failed");
-
+    auto rc = _mm_plugin.aligned_allocate(size, (alignment > 0) && (size % alignment == 0) ? alignment : choose_alignment(size), &out_addr);
     CFLOGM(1, "allocated pool memory ({} {})", out_addr, size);
+    switch ( rc )
+    {
+    case S_OK:
+    case E_NO_MEM:
+      return rc;
+    default:
+      return E_FAIL;
+    }
   }
   catch(...) {
     PWRN("Map_store: unable to allocate (%lu) bytes aligned by %lu", size, choose_alignment(size));
-    return E_INVAL;
+    return E_FAIL;
   }
-
-  return S_OK;
 }
 
 
@@ -828,7 +851,7 @@ std::unique_ptr<region_memory> Pool_instance::allocate_region_memory(size_t size
     }
     else
     {
-      rm = std::make_unique<region_memory_numa_pin>(debug_level(), size, _numa_node_mask.get(), needs_pinned_pages);
+      rm = std::make_unique<memory_pin<region_memory_numa>>(needs_pinned_pages, debug_level(), size, _numa_node_mask.get());
     }
   }
 
@@ -841,3 +864,37 @@ std::unique_ptr<region_memory> Pool_instance::allocate_region_memory(size_t size
   _nsize += size;
   return rm;
 }
+
+std::size_t Pool_instance::capacity() const
+{
+	nupm::region_descriptor::address_map_t m;
+	(void) get_pool_regions(m);
+	return
+		std::accumulate(
+			m.begin()
+			, m.end()
+			, std::size_t(0)
+			, [] (size_t a, const auto &b) -> std::size_t
+			{
+				return a + ::size(b);
+			}
+		);
+}
+
+std::size_t Pool_instance::allocated() const
+{
+	std::size_t r;
+	auto rc = _mm_plugin.bytes_remaining(&r);
+	return capacity() - (rc == S_OK ? r : 0);
+}
+
+unsigned Pool_instance::percent_used() const
+{
+    return
+        unsigned(
+            capacity()
+            ? allocated() * 100U / capacity()
+            : 100U
+        );
+}
+

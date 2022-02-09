@@ -37,12 +37,12 @@ def core_clamp(a):
 def core_range(a, b):
     """ clamped range of cores from a to b inclusive """
     c = core_count()-1
-    return "%d-%d" %(min(a, c), min(b, c))
+    return "{}-{}".format(min(a, c), min(b, c))
 
 class ado_mixin(dm):
     def __init__(self, core=1):
         dm.__init__(self, {
-            "ado_path" : "%s/bin/ado" % (install_prefix,),
+            "ado_path" : "{}/bin/ado".format(install_prefix),
             # Special case for CPUs with less than 8 cores
             # CPU range was 6-8, but will lock-up on 4-core system when clamped to 3-3 and client also clamped to 3
             "resources": { "ado_cores": (core_count() < 8 and core_range(1, 2) or core_range(core+5,core+5+2)), "ado_manager_core": core_clamp(core) }

@@ -113,7 +113,7 @@ find_fsdax () {
  for i in 0 1
  do
   d=/mnt/pmem$i
-  if findmnt $d 2>/dev/null -a test -w $d
+  if findmnt $d > /dev/null && test -w $d
   then echo $d
    return
   fi
@@ -133,15 +133,34 @@ has_module_xpmem () {
 }
 
 # Decide whether to use device DAX or FS DAX, depending on whether this system has devdax configured
+# arguments, if any, are modules required for devdax to work.
 choose_dax() {
  t="${DAX_PREFIX:-}"
  if test -z "$t"
  then t="$(find_devdax)"
+   while (( $# ))
+   do :
+     if ! has_module "$1"
+     then t=""
+     fi
+     shift
+   done
  fi
  if test -z "$t"
  then t="$(find_fsdax)"
  fi
  echo $t
+}
+
+choose_dax_with_ado() {
+  # "xpmem" is the module required for mapstore ADO
+  # "mcas" is the module required for devdax to work with hstore* ADO
+  declare -A ado_module
+  ado_module[mapstore]="xpmem"
+  for hs in hstore hstore-cc hstore-cc-pe hstore-mm hstore-mm-pe hstore-mt hstore-nt
+  do ado_module[$hs]="mcasmod"
+  done
+  echo "$(choose_dax ${ado_module[$1]})"
 }
 
 dax_type() {
