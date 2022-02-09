@@ -17,6 +17,7 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include) # daxctl, tbb
 
 link_directories(${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}) # tbb tbbmalloc
 link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64) # tbb tbbmalloc
 
 #set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
@@ -25,7 +26,7 @@ file(GLOB SOURCES src/*.c*)
 add_library(threadipc SHARED ${SOURCES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CONFIG:Debug>:-O0>")
-target_link_libraries(${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} common tbb)
 
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)
 install(DIRECTORY "src/" DESTINATION "include/threadipc" FILES_MATCHING PATTERN "./include/threadipc/*")

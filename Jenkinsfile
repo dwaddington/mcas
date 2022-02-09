@@ -6,7 +6,7 @@ pipeline {
 	      	  steps {
 				        timeout(time: 60, unit: 'MINUTES') 
 				        {
-					          sh "git submodule update --init -f"                    				
+					          sh "git submodule update --init -f"
 					          sh "mkdir -p debug-build ; cd debug-build ; cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_PYTHON_SUPPORT=OFF -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
 
 					          dir('debug-build') {
@@ -39,7 +39,7 @@ pipeline {
 				        timeout(time: 60, unit: 'MINUTES') 
 				        {
 					          sh "git submodule update --init -f"
-					          sh "mkdir -p release-build ; cd release-build ; cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
+					          sh "mkdir -p release-build ; cd release-build ; cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_SUPPORT=OFF -DCMAKE_INSTALL_PREFIX=`pwd`/dist .."
 
 					          dir('release-build') {
 						            sh "make bootstrap ; make -j ; make -j install"	

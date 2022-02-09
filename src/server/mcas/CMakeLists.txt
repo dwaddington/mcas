@@ -40,7 +40,7 @@ src/fabric_connection_base.cpp src/fabric_transport.cpp
 src/config_file.cpp src/tls_session.cpp)
 
 target_link_libraries(mcas ${ASAN_LIB} threadipc common numa pthread
-dl nupm boost_program_options crypto z ado-proto xpmem gnutls
+tbb dl nupm boost_program_options crypto z ado-proto xpmem gnutls
 ${PROFILER} )
 
 #add_subdirectory(unit_test)

@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 3.5.1 FATAL_ERROR)
 
 project(component-mapstore CXX)
 
+set(CMAKE_CXX_STANDARD 17)
 # for serious debugging
 #add_compile_options("$<$<CONFIG:Debug>:-O0>")
 

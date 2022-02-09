@@ -38,11 +38,6 @@
 #include <memory>
 #include <set>
 #include <sstream> /* stringstream */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <tbb/cache_aligned_allocator.h>
-#include <tbb/scalable_allocator.h>
-#pragma GCC diagnostic pop
 
 #define SANITY_CHECK 0
 namespace nupm {
@@ -55,9 +50,8 @@ class Region : private common::log_source {
   Region(const Region &) = delete;
   Region &operator=(const Region &) = delete;
 
-  using list_t = std::forward_list<void *, tbb::scalable_allocator<void *>>;
-  using set_t =
-      std::set<void *, std::less<void *>, tbb::scalable_allocator<void *>>;
+  using list_t = std::forward_list<void *>;
+  using set_t = std::set<void *>;
 
   void mark_used(void *p) {
 #if SANITY_CHECK

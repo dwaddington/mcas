@@ -22,4 +22,4 @@ set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 add_executable(libthreadipc-test4 test4.cpp)
 target_compile_options(libthreadipc-test4 PUBLIC "$<$<CONFIG:Debug>:-O0>")
 
-target_link_libraries(libthreadipc-test4 ${ASAN_LIB} ${GTEST_LIB} pthread dl nupm threadipc boost_system)  # add profiler for google profiler
+target_link_libraries(libthreadipc-test4 ${ASAN_LIB} ${GTEST_LIB} tbb pthread dl nupm threadipc boost_system)  # add profiler for google profiler

@@ -293,6 +293,8 @@ TEST_F(ADO_test, BasicDetachedMemory)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
+/* this test is broken */
+#if 0
 TEST_F(ADO_test, PersistedDetachedMemory)
 {
   const std::string testname = "PersistedDetachedMemory";
@@ -346,6 +348,7 @@ TEST_F(ADO_test, PersistedDetachedMemory)
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }
+#endif
 
 TEST_F(ADO_test, GetReferenceVector)
 {

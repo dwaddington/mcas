@@ -27,6 +27,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <unordered_map>
 
 struct bitmask;
 

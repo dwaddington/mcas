@@ -11,6 +11,8 @@ include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/GSL/include)
 include_directories(${CMAKE_SOURCE_DIR}/src/lib/libthreadipc/include)
 include_directories(${CMAKE_INSTALL_PREFIX}/include) # TBB
+link_directories(${CMAKE_INSTALL_PREFIX}/lib) # tbb tbbmalloc
+link_directories(${CMAKE_INSTALL_PREFIX}/lib64) # tbb tbbmalloc
 
 file(GLOB SOURCES src/*.c*)
 
