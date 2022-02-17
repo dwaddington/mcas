@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 
 from dm import dm
-from glob import glob
+import glob
+import os
 
 # Locations for fsdax stores are: /mnt/pmem<n>/a<0 ...>
 # Locations for devdax stores are: /dev/dax<n>.*
@@ -11,7 +12,11 @@ class fsdax(dm):
     def __init__(self, pfx, accession=0):
         self.pfx = pfx
         self.accession = accession
-        dm.__init__(self, [{"path": "{}/a{}".format(pfx,accession)}])
+        if not os.access(pfx, os.R_OK):
+            raise RuntimeError("path {} not readable".format(pfx))
+        if not os.access(pfx, os.W_OK):
+            raise RuntimeError("path {} not writeable".format(pfx))
+        dm.__init__(self, [{"path": "{}/a{}".format(pfx,accession), "addr": 0x9000000000 + 0x1000000000 * accession}])
     def step(self,n):
         return fsdax(self.pfx, self.accession+n)
 
@@ -20,12 +25,10 @@ class devdax(dm):
     def __init__(self, pfx, accession=0):
         self.pfx = pfx
         self.accession = accession
-        self.devices = glob("{}.*".format(pfx))
-        try:
-            dm.__init__(self, [{"path": self.devices[accession], "addr": 0x9000000000 + 0x1000000000 * accession}])
-        except IndexError as e:
-            print("No dax device for accession", accession)
-            raise
+        self.devices = sorted([f for f in glob.glob("{}.*".format(pfx)) if os.access(f, os.R_OK) and os.access(f, os.W_OK)])
+        if len(self.devices) <= accession:
+            raise RuntimeError("No dax device in {} for accession {}".format(self.devices, accession))
+        dm.__init__(self, [{"path": self.devices[accession], "addr": 0x9000000000 + 0x1000000000 * accession}])
     def step(self,n):
         return devdax(self.pfx, self.accession+n)
 

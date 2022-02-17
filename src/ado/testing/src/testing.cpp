@@ -1,5 +1,5 @@
 /*
-  Copyright [2017-2020] [IBM Corporation]
+  Copyright [2017-2022] [IBM Corporation]
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
@@ -95,11 +95,11 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    const auto value(common::make_byte_span(values_[0].ptr, values_[0].len));
+    const auto value(common::make_byte_span(values_.at(0).ptr, values_.at(0).len));
 
     PLOG("ADO_testing_plugin: running (key=%.*s)", int(key_.size()), key_.begin());
-    PLOG("ADO_testing_plugin: cmd=(%.*s)", int(args_[0].size()), args_[0].begin());
-    ASSERT_TRUE(args_[0] == "RUN!TEST-BasicInvokeAdo", "ADO_testing_plugin: unexpected message");
+    PLOG("ADO_testing_plugin: cmd=(%.*s)", int(args_.at(0).size()), args_.at(0).begin());
+    ASSERT_TRUE(args_.at(0) == "RUN!TEST-BasicInvokeAdo", "ADO_testing_plugin: unexpected message");
 
     status_t rc = S_OK;
 
@@ -194,13 +194,13 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    const auto value(common::make_byte_span(values_[0].ptr, values_[0].len));
+    const auto value(common::make_byte_span(values_.at(0).ptr, values_.at(0).len));
     string_view val(static_cast<const char *>(::base(value)), ::size(value));
     PLOG("ADO_testing_plugin: (key=%.*s,value=%.*s)", int(key_.size()), key_.begin(), int(val.size()), val.begin());
 
-    PLOG("ADO_testing_plugin: (request=%.*s)", int(args_[0].size()), args_[0].begin());
+    PLOG("ADO_testing_plugin: (request=%.*s)", int(args_.at(0).size()), args_.at(0).begin());
 
-    ASSERT_TRUE("RUN!TEST-BasicInvokePutAdo" == args_[0], "ADO_testing_plugin: invoke_put_ado failed");
+    ASSERT_TRUE("RUN!TEST-BasicInvokePutAdo" == args_.at(0), "ADO_testing_plugin: invoke_put_ado failed");
     ASSERT_TRUE("VALUE_TO_PUT" == val, "ADO_testing_plugin: invoke_put_ado failed");
     return S_OK;
   }
@@ -222,7 +222,7 @@ namespace
     status_t rc = ap_->cb_allocate_pool_memory(size, 4096 /* alignment */, src);
     ASSERT_TRUE(rc == S_OK, "first cb_allocate_pool_memory (64K) failed");
     PLOG("invokeAdoCreateOnDemand: first cb_allocate_pool_memory OK");
-    
+
     rc = ap_->cb_allocate_pool_memory(size, 4096 /* alignment */, dst);
     ASSERT_TRUE(rc == S_OK, "second cb_allocate_pool_memory (64K) failed");
     PLOG("invokeAdoCreateOnDemand: first cb_allocate_pool_memory OK");
@@ -307,8 +307,8 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    ASSERT_TRUE(values_[1].ptr != nullptr, "BasicDetachedMemory::invalid detached ptr");
-    const common::byte_span detached_value(common::make_byte_span(values_[1].ptr, values_[1].len));
+    ASSERT_TRUE(values_.at(1).ptr != nullptr, "BasicDetachedMemory::invalid detached ptr");
+    const common::byte_span detached_value(common::make_byte_span(values_.at(1).ptr, values_.at(1).len));
 
     /* free detached memory */
     status_t rc = ap_->cb_free_pool_memory(::size(detached_value), ::base(detached_value));
@@ -326,9 +326,9 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    ASSERT_TRUE(values_[0].ptr != nullptr, "addDetachedMemory::invalid space");
+    ASSERT_TRUE(values_.at(0).ptr != nullptr, "addDetachedMemory::invalid space");
     std::array<void *, 17> p;
-    ASSERT_TRUE(values_[0].len == p.size() * sizeof(void *), "addDetachedMemory::invalid space");
+    ASSERT_TRUE(values_.at(0).len == p.size() * sizeof(void *), "addDetachedMemory::invalid space");
     constexpr size_t align = 8;
     for ( auto i = 0U; i != p.size(); ++i )
     {
@@ -338,9 +338,9 @@ namespace
       /* fill the allocated space with a checkable value */
       std::fill_n(static_cast<char *>(p[i]), sz, char('0' + i));
     }
-    ASSERT_TRUE(values_[0].len == p.size() * sizeof(&p[0]), "%s: mismatch values_[0].len %zu vs p.size %zu, sizeof(&p[0]) %zu", __func__, values_[0].len, p.size(), sizeof(&p[0]));
+    ASSERT_TRUE(values_.at(0).len == p.size() * sizeof(&p.at(0)), "%s: mismatch values_[0].len %zu vs p.size %zu, sizeof(&p[0]) %zu", __func__, values_.at(0).len, p.size(), sizeof(&p.at(0)));
     /* preserve the pointers in the value location */
-    memcpy(values_[0].ptr, &p[0], p.size() * sizeof(&p[0]));
+    memcpy(values_.at(0).ptr, &p.at(0), p.size() * sizeof(&p.at(0)));
     return S_OK;
   }
 
@@ -354,11 +354,11 @@ namespace
     , response_buffer_vector_t & // response_buffers_
   )
   {
-    ASSERT_TRUE(values_[1].ptr != nullptr, "compareDetachedMemory::invalid detached ptr");
+    ASSERT_TRUE(values_.at(0).ptr != nullptr, "compareDetachedMemory::invalid detached ptr");
     std::array<void *, 17> p;
-    ASSERT_TRUE(values_[0].len == p.size() * sizeof(&p[0]), "%s: mismatch values_[0].len %zu vs p.size %zu, sizeof(&p[0]) %zu", __func__, values_[0].len, p.size(), sizeof(&p[0]));
+    ASSERT_TRUE(values_.at(0).len == p.size() * sizeof(&p.at(0)), "%s: mismatch values_.at(0).len %zu vs p.size %zu, sizeof(&p.at(0)) %zu", __func__, values_.at(0).len, p.size(), sizeof(&p.at(0)));
     /* Recover the pointers from the value location */
-    memcpy(&p[0], values_[0].ptr, p.size() * sizeof(&p[0]));
+    memcpy(&p.at(0), values_.at(0).ptr, p.size() * sizeof(&p.at(0)));
     for ( auto i = 0U; i != p.size(); ++i )
     {
       std::size_t sz = 1 << i;
@@ -440,7 +440,7 @@ namespace
   )
   {
     ASSERT_TRUE(1 < args_.size(), "%s: missing time point argument", __func__);
-    common::epoch_time_t ts(std::strtoull(args_[1].begin(), nullptr, 0), 0);
+    common::epoch_time_t ts(std::strtoull(args_.at(1).begin(), nullptr, 0), 0);
 
     PLOG("IteratorTS: requested begin timestamp: %lu seconds", ts.seconds());
     status_t rc = S_OK;
@@ -505,11 +505,11 @@ namespace
   )
   {
     PMAJOR("baseAddr: key(%.*s) value at %p (%lu)",
-            boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
+            boost::numeric_cast<int>(key_.size()), key_.data(), values_.at(0).ptr, values_.at(0).len);
     ASSERT_TRUE(strncmp(key_.data(), "BaseAddr", 8) == 0, "data corrupt");
-    ASSERT_TRUE(values_[0].len == 4096, "value length invalid");
-    ASSERT_FALSE(reinterpret_cast<uint64_t>(values_[0].ptr) < 0xBB00000000, "value address corrupt");
-    memset(values_[0].ptr, 0xEE, values_[0].len);
+    ASSERT_TRUE(values_.at(0).len == 4096, "value length invalid");
+    ASSERT_FALSE(reinterpret_cast<uint64_t>(values_.at(0).ptr) < 0xBB00000000, "value address corrupt");
+    memset(values_.at(0).ptr, 0xEE, values_.at(0).len);
     return S_OK;
   }
 
@@ -522,9 +522,9 @@ namespace
     , response_buffer_vector_t & //response_buffers_
   )
   {
-    std::string s(args_[0].begin(),args_[0].end());
+    std::string s(args_.at(0).begin(),args_.at(0).end());
     PNOTICE("(%s) \tkey(%.*s) \tvalue at %p \t(%lu)",
-            s.c_str(), boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
+            s.c_str(), boost::numeric_cast<int>(key_.size()), key_.data(), values_.at(0).ptr, values_.at(0).len);
     return S_OK;
   }
 
@@ -537,14 +537,14 @@ namespace
     , response_buffer_vector_t & response_buffers_
   )
   {
-    std::string s(args_[0].begin(),args_[0].end());
+    std::string s(args_.at(0).begin(),args_.at(0).end());
     PNOTICE("(%s) \tkey(%.*s) \tvalue at %p \t(%lu)",
-            s.c_str(), boost::numeric_cast<int>(key_.size()), key_.data(), values_[0].ptr, values_[0].len);
-    
+            s.c_str(), boost::numeric_cast<int>(key_.size()), key_.data(), values_.at(0).ptr, values_.at(0).len);
+
     std::stringstream ss;
     ss << "Hello " << key_ << "!";
-    if(values_[0].len > 0) {
-      std::string value_str(reinterpret_cast<const char*>(values_[0].ptr), values_[0].len);
+    if(values_.at(0).len > 0) {
+      std::string value_str(reinterpret_cast<const char*>(values_.at(0).ptr), values_.at(0).len);
       PNOTICE("Adding value string:(%s)", value_str.c_str());
       ss << value_str;
     }
@@ -710,7 +710,7 @@ namespace
   )
   {
 #if 0
-    const common::byte_span value(common::make_byte_span(values_[0].ptr, values_[0].len);
+    const common::byte_span value(common::make_byte_span(values_.at(0).ptr, values_.at(0).len);
     pmem_memset(::data(value), 0x1, ::size(value), 0);
 #else
     (void)values_;
@@ -748,10 +748,10 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
 {
   (void)new_root; // unused
 
-  if(values[0].ptr)    
-    ASSERT_TRUE(values[0].len != 0, "ADO_testing_plugin:%s: value_len is 0", __func__);
+  if(values.at(0).ptr)
+    ASSERT_TRUE(values.at(0).len != 0, "ADO_testing_plugin:%s: value_len is 0", __func__);
 
-  
+
   ASSERT_TRUE(key_addr != nullptr, "ADO_testing_plugin:%s: bad key parameter", __func__);
   ASSERT_TRUE(key_len != 0, "ADO_testing_plugin:%s: bad key parameter", __func__);
 
@@ -801,8 +801,8 @@ status_t ADO_testing_plugin::do_work(uint64_t                     work_key,
   std::vector<string_view> args = split(cmd);
 
   assert(0 != args.size());
-  const auto it = ops.find(args[0]);
-  ASSERT_TRUE(it != ops.end(), "%s command %.*s not found", __func__, int(args[0].size()), args[0].begin());
+  const auto it = ops.find(args.at(0));
+  ASSERT_TRUE(it != ops.end(), "%s command %.*s not found", __func__, int(args.at(0).size()), args.at(0).begin());
   status_t rc = (it->second)(this, work_key, args, key, values, response_buffers);
 
   if(option_DEBUG)
