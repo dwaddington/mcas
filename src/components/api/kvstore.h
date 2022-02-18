@@ -264,7 +264,7 @@ protected:
                              uint64_t           expected_obj_count = 0,
                              const Addr         base_addr = Addr{0})
   {
-    PERR("create_pool not implemented");
+    FERRM("{}", "POOL_ERROR: not implemented");
     return error_value(POOL_ERROR, pool_name, size, flags, expected_obj_count, base_addr);
   }
 
@@ -292,6 +292,7 @@ protected:
                            flags_t flags = 0,
                            const Addr base_addr_unused = Addr{0})
   {
+    FERRM("{}", "POOL_ERROR: not implemented");
     return error_value(POOL_ERROR, pool_name, flags, base_addr_unused);
   }
 

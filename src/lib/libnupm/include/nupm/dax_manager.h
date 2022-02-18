@@ -65,7 +65,7 @@ struct registry_memory_mapped
   using byte_span = common::byte_span;
   using string_view = common::string_view;
   virtual ~registry_memory_mapped() {}
-  virtual bool enter(common::fd_locked &&fd, string_view id, bool pin, const std::vector<byte_span> &m) = 0;
+  virtual void enter(common::fd_locked &&fd, string_view id, bool pin, const std::vector<byte_span> &m) = 0;
   virtual void remove(string_view id) = 0;
   virtual void * locate_free_address_range(std::size_t size) = 0;
 };
@@ -208,7 +208,7 @@ struct dax_manager : protected common::log_source, private registry_memory_mappe
                          bool    force_rebuild = false);
   arena *lookup_arena(arena_id_t arena_id);
   /* callback for arena_dax to register mapped memory */
-  bool enter(common::fd_locked &&fd, const string_view id, bool pin, const std::vector<byte_span> &m) override;
+  void enter(common::fd_locked &&fd, const string_view id, bool pin, const std::vector<byte_span> &m) override;
   void remove(const string_view id) override;
 #if _NUPM_FILESYSTEM_STD_
   using path = std::filesystem::path;

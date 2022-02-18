@@ -650,8 +650,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
         IKVStore::pool_t pool;
         if (pool_mgr.check_for_open_pool(pool_name, pool)) {
           if (msg->flags() & IMCAS::ADO_FLAG_CREATE_ONLY) {
-            if (debug_level() > 0)
-              PWRN("request to create pool denied, create only specified on existing pool");
+            FWRNM("request to create pool {} denied, create only specified on existing pool", msg->pool_name());
             response->pool_id = IKVStore::POOL_ERROR;
             response->set_status(E_FAIL);
           }
@@ -669,7 +668,7 @@ void Shard::process_message_pool_request(Connection_handler *handler,
           if (pool == IKVStore::POOL_ERROR) {
             response->pool_id = 0;
             response->set_status(E_FAIL);
-            PWRN("unable to create pool (%s)", pool_name.c_str());
+            FWRN("unable to create pool ({})", pool_name);
           }
           else {
             response->pool_id = pool;
@@ -981,6 +980,10 @@ bool is_locked(status_t rc)
     return false;
   case IKVStore::E_KEY_NOT_FOUND:
     PWRN("%s failed to lock value: E_KEY_NOT_FOUND", __func__);
+    return false;
+  case E_NO_MEM:
+    PWRN("%s failed to lock value: E_NO_MEM", __func__);
+    dump_backtrace();
     return false;
   case IKVStore::E_TOO_LARGE:
     PWRN("%s failed to lock value: E_TOO_LARGE", __func__);

@@ -15,6 +15,7 @@
 #ifndef _MCAS_HSTORE_POOL_ERROR_H
 #define _MCAS_HSTORE_POOL_ERROR_H
 
+#include <common/logging.h>
 #include <string>
 #include <system_error>
 
@@ -46,7 +47,7 @@ private:
   std::string _msg;
 public:
   pool_error(const std::string &msg, pool_ec val);
-
+	std::string message() const { return common::format("{}: {}", std::error_condition::message(), _msg); }
 };
 
 #endif

@@ -125,7 +125,7 @@ public:
 #ifdef FEATURE_POOL_ACL
     /* refuse to open pools that have metadata pool prefix */
     if(pool_name.compare(0, METADATA_POOL_PREFIX_LEN, METADATA_POOL_PREFIX)) {
-      PWRN("Pool_manager: opening metadata pool directly disallowed");
+      FWRNM("{}", "opening metadata pool directly disallowed");
       return component::IKVStore::POOL_ERROR;
     }
     
@@ -188,7 +188,7 @@ public:
 #ifdef FEATURE_POOL_ACL
     /* refuse to open pools that have metadata pool prefix */
     if(pool_name.compare(0, METADATA_POOL_PREFIX_LEN, METADATA_POOL_PREFIX)) {
-      PWRN("Pool_manager: creating metadata pool directly disallowed");
+      FWRNM("{}", "creating metadata pool directly disallowed");
       return component::IKVStore::POOL_ERROR;
     }
     

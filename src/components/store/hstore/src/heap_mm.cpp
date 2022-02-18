@@ -544,9 +544,15 @@ auto heap_mm::grow(
 						{
 							/* probably means that the uuid is in use */
 						}
-						catch ( const General_exception & )
+						catch ( const General_exception &e )
 						{
+							FLOGM("could not grow: {}", e.cause());
 							/* probably means that the space cannot be allocated */
+							throw std::bad_alloc();
+						}
+						catch ( const std::exception  &e )
+						{
+							FLOGM("could not grow: {}", e.what());
 							throw std::bad_alloc();
 						}
 					}
@@ -637,9 +643,15 @@ auto heap_mm::grow(
 						{
 							/* probably means that the uuid is in use */
 						}
-						catch ( const General_exception & )
+						catch ( const General_exception &e )
 						{
+							FLOGM("could not grow: {}", e.cause());
 							/* probably means that the space cannot be allocated */
+							throw std::bad_alloc();
+						}
+						catch ( const std::exception &e )
+						{
+							FLOGM("could not grow: {}", e.what());
 							throw std::bad_alloc();
 						}
 					}

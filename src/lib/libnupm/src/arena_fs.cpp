@@ -22,8 +22,13 @@
 
 #include <fcntl.h> /* ::open, ::posix_fallocate */
 #include <boost/scope_exit.hpp>
+
 #include <sys/mman.h> /* ::mmap */
-#include <sys/stat.h> /* ::open */
+#include <sys/stat.h> /* ::open, ::stat */
+#include <sys/types.h> /* ::stat */
+#include <unistd.h> /* ::stat */
+#include <sys/vfs.h>  /* ::statfs */
+
 #include <cinttypes>
 #include <fstream>
 #include <mutex>
@@ -145,9 +150,8 @@ void *arena_fs::region_create_inner(
 	, const std::vector<byte_span> &mapping_
 )
 try {
-	auto entered = mh_->enter(std::move(fd), id_, false, mapping_);
-	/* return the map key, or nullptr if already mapped */
-	return entered ? ::base(mapping_.front()) : nullptr;
+	mh_->enter(std::move(fd), id_, false, mapping_);
+	return ::base(mapping_.front());
 }
 catch ( const std::runtime_error &e )
 {
@@ -224,10 +228,7 @@ auto arena_fs::region_create(
 	using namespace nupm;
 
 	auto v = region_create_inner(std::move(fd), id_, mh_, std::vector<byte_span>({common::make_byte_span(base_addr, size)}));
-	if ( v )
-	{
-		commit = true;
-	}
+	commit = true;
 	return
 		region_descriptor(
 			id_
@@ -333,7 +334,27 @@ void arena_fs::region_erase(const string_view id_, gsl::not_null<registry_memory
 
 std::size_t arena_fs::get_max_available()
 {
-  return 0; /* .. until someone needs an actual value */
+	struct stat st;
+	{
+		auto rc = ::stat(_dir.c_str(), &st);
+		if ( rc != 0 )
+		{
+			auto e = errno;
+			FWRNM("stat {} fail: {}", _dir.c_str(), ::strerror(e));
+			return 0;
+		}
+	}
+	struct statfs f;
+	{
+		auto rc = ::statfs(_dir.c_str(), &f);
+		if ( rc != 0 )
+		{
+			auto e = errno;
+			FWRNM("statfs {} fail: {}", _dir.c_str(), ::strerror(e));
+			return 0;
+		}
+	}
+	return std::size_t(st.st_blksize) * f.f_bavail;
 }
 
 namespace

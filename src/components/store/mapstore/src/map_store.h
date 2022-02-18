@@ -79,8 +79,8 @@ public:
                          0x21, 0xa1, 0x21);
 
   void *query_interface(component::uuid_t &itf_uuid) override {
-    if (itf_uuid == component::IKVStore::iid()) {
-      return static_cast<component::IKVStore *>(this);
+    if (itf_uuid == IKVStore::iid()) {
+      return static_cast<IKVStore *>(this);
     }
     else {
       return NULL;  // we don't support this interface
@@ -89,7 +89,7 @@ public:
 
   void unload() override { delete this; }
 
-  status_t map(const IKVStore::pool_t pool,
+  status_t map(const pool_t pool,
     std::function<int(string_view_key key, string_view_value value)>
     function);
 
@@ -110,11 +110,11 @@ public:
   virtual pool_t create_pool(const std::string &name, const size_t size,
                              flags_t flags = 0,
                              uint64_t expected_obj_count = 0,
-                             component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}) override;
+                             Addr base_addr_unused = Addr{0}) override;
 
   virtual pool_t open_pool(const std::string &name,
                            flags_t flags = 0,
-                           component::IKVStore::Addr base_addr_unused = component::IKVStore::Addr{0}) override;
+                           Addr base_addr_unused = Addr{0}) override;
 
   virtual status_t close_pool(const pool_t pid) override;
 
@@ -131,11 +131,11 @@ public:
 
   virtual status_t get_direct(const pool_t pool, const std::string &key, void *out_value,
                               size_t &out_value_len,
-                              IKVStore::memory_handle_t handle) override;
+                              memory_handle_t handle) override;
 
   virtual status_t put_direct(const pool_t pool, const std::string &key,
                               const void *value, const size_t value_len,
-                              IKVStore::memory_handle_t handle = HANDLE_NONE,
+                              memory_handle_t handle = HANDLE_NONE,
                               flags_t flags = FLAGS_NONE) override;
 
   virtual status_t resize_value(const pool_t pool, const std::string &key,
@@ -156,12 +156,12 @@ public:
                         void *&out_value,
                         size_t &inout_value_len,
                         size_t alignment,
-                        IKVStore::key_t &out_key,
+                        key_t &out_key,
                         const char ** out_key_ptr) override;
 
   virtual status_t unlock(const pool_t pool,
                           key_t key,
-                          IKVStore::unlock_flags_t flags) override;
+                          unlock_flags_t flags) override;
 
   virtual status_t erase(const pool_t pool, const std::string &key) override;
 
@@ -202,7 +202,7 @@ public:
                                         const size_t alignment,
                                         void *&out_addr) override;
 
-  virtual IKVStore::pool_iterator_t open_pool_iterator(const pool_t pool) override;
+  virtual pool_iterator_t open_pool_iterator(const pool_t pool) override;
 
   virtual status_t deref_pool_iterator(const pool_t pool,
                                        pool_iterator_t iter,

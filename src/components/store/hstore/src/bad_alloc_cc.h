@@ -18,7 +18,7 @@
 #include <new> /* bad_alloc */
 
 /* Every function which takes an alloc_key may throw bad_alloc.
- * Every constructor of an alloc_key must catch BAD_ALLOC and return an error, e.g. E_TOO_LARGE.
+ * Every constructor of an alloc_key must catch BAD_ALLOC and return an error, e.g. E_NO_MEM.
  */
 #include "alloc_key.h" /* AK_FORMAL */
 

@@ -114,29 +114,34 @@ template <typename Region, typename Table, typename Allocator, typename LockType
     /* Attempt to create a new pool. */
     try
     {
-      CPLOG(1, PREFIX "id %s: creating region length 0x%zx", LOCATION, path_.str().c_str(), size);
+      CFLOGM(1, "id {}: creating region length 0x{:x}", path_.str(), size);
       auto v = _dax_manager->create_region(path_.str(), _numa_node, size);
       /* Guess that nullptr indicate a failure */
       if ( v.address_map().empty() )
       {
-        CPLOG(0, PREFIX ": fail: %.*s size %zu", LOCATION, int(path_.str().size()), path_.str().c_str(), size);
-        throw pool_error("create_region fail: '" + path_.str() + "'", pool_ec::region_fail);
+        auto e = common::format("fail: {} size {}", path_.str(), size);
+        CFLOGM(0, "{}", e);
+        throw pool_error(e, pool_ec::region_fail);
       }
-      CPLOG(1, PREFIX "id %s: created region at %p:0x%zx", LOCATION, path_.str().c_str(), ::base(v.address_map().front()), ::size(v.address_map().front()));
+      CFLOGM(1, "id {}: created region at {}:0x{:x}", path_.str(), ::base(v.address_map().front()), ::size(v.address_map().front()));
       return v;
     }
     catch ( const General_exception &e )
     {
-      throw pool_error("create_region fail: '" + path_.str() + "' " + e.cause(), pool_ec::region_fail_general_exception);
+      throw pool_error(common::format("create_region fail: '{}' {}", path_.str(), e.cause()), pool_ec::region_fail_general_exception);
     }
     catch ( const std::bad_alloc& e)
     {
       /* Note: nupm::DM_region_header::allocate_region uses bad_alloc to signal attempt to create an existing region */
-      throw pool_error("create_region fail: '" + path_.str() + "'", pool_ec::region_fail);
+      throw pool_error(common::format("create_region fail: '{}' {}", path_.str(), e.what()), pool_ec::region_fail);
     }
     catch ( const API_exception &e )
     {
-      throw pool_error("create_region fail: '" + path_.str() + "' " + e.cause(), pool_ec::region_fail_api_exception);
+      throw pool_error(common::format("create_region fail: '{}' {}", path_.str(), e.cause()), pool_ec::region_fail_api_exception);
+    }
+    catch ( const std::exception &e )
+    {
+      throw pool_error(common::format("create_region fail: '{}' {}", path_.str(), e.what()), pool_ec::region_fail);
     }
   }
 
@@ -202,7 +207,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
 
     if ( iovs.address_map().empty() )
     {
-      throw pool_error("in Devdax_manger::open_region faili: " + path_.str(), pool_ec::region_fail);
+      throw pool_error("in dax_manger::open_region fail: " + path_.str(), pool_ec::region_fail);
     }
 
     return iovs;
@@ -239,7 +244,7 @@ template <typename Region, typename Table, typename Allocator, typename LockType
           )
       );
 #if 0
-    PLOG(PREFIX "in open_2 region at %p", LOCATION, ra_.address_map().front().iov_base);
+    FLOGM("in open_2 region at {}", ra_.address_map().front().iov_base);
 #endif
     /* open_pool_handle is a managed region * */
 		auto s =

@@ -53,7 +53,23 @@ thread_local std::map<void *, hstore::open_pool_type *> tls_cache = {};
 
 /* forced because pool_t is an integral type, not a pointer */
 void *to_ptr(component::IKVStore::pool_t p) { return reinterpret_cast<void *>(p); }
-component::IKVStore::pool_t to_pool_t(void *v) { return reinterpret_cast<component::IKVStore::pool_t>(v); }
+
+component::IKVStore::pool_t to_pool_t(void *v)
+{
+	auto p = reinterpret_cast<component::IKVStore::pool_t>(v);
+	/* POOL_ERROR contains no hint as to *why* the pool could not be returned.
+     * Anyone creating a POOL_ERROR value should log the conditions which led
+     * to POOL_ERROR.
+     * (But .... some code uses POOL_ERROR for a moved-from pool_t. If
+     * construction of a POOL_ERROR were *required" to emit a warning, this
+     * would lead to spurious warnings. Need to make that a special case.
+     */
+	if ( p == component::IKVStore::POOL_ERROR )
+	{
+		FWRN("{}", "POOL_ERROR: via cast");
+	}
+	return p;
+}
 
 auto hstore::locate_session(const pool_t p) -> open_pool_type *
 {
@@ -148,14 +164,15 @@ auto hstore::create_pool(const std::string & name_,
                          Addr base_addr_unused) -> pool_t
 try
 {
-  CPLOG(1, PREFIX "pool_name=%s size %zu", LOCATION, name_.c_str(), size_);
+  CFLOGM(1, "pool_name={} size {}", name_, size_);
+  FWRNM("pool_name={} size {}", name_, size_);
   try
   {
     _pool_manager->pool_create_check(size_);
   }
   catch ( const std::exception &e )
   {
-    PLOG("%s: %s", __func__, e.what());
+    FLOGM("POOL_ERROR: {}", e.what());
     return pool_t(POOL_ERROR);
   }
 
@@ -182,13 +199,13 @@ try
 catch ( const pool_error &e )
 {
   return e.value() != int(pool_ec::region_fail) || flags_ & FLAGS_CREATE_ONLY
-    ? static_cast<IKVStore::pool_t>(POOL_ERROR)
+    ? static_cast<IKVStore::pool_t>((FLOGM("POOL_ERROR: {}", e.message())), POOL_ERROR)
     : open_pool(name_, flags_ & ~FLAGS_SET_SIZE, base_addr_unused)
     ;
 }
 catch ( const std::bad_alloc &e )
 {
-  CPLOG(0, "%s: %s", __func__, e.what());
+  FLOGM("POOL_ERROR: {}", e.what());
   return POOL_ERROR; // E_NO_MEM incorrect type
 }
 
@@ -204,6 +221,7 @@ auto hstore::open_pool(const std::string &name_,
     /* open pools are indexed by the base address of their first (contiguous) segment */
     if ( v.address_map().empty() )
     {
+      FLOGM("POOL_ERROR: pool {} not found", name_);
       return POOL_ERROR; /* pool not found (by name) */
     }
     else
@@ -225,17 +243,17 @@ auto hstore::open_pool(const std::string &name_,
     }
   }
   catch( const pool_error &e ) {
-    CPLOG(0, "%s: %s", __func__, e.message().c_str());
+    FLOGM("POOL_ERROR: pool {}: {}", name_, e.message().c_str());
     return POOL_ERROR;
   }
   catch( const std::invalid_argument &e ) {
-    CPLOG(0, "%s: %s", __func__, e.what());
+    FLOGM("POOL_ERROR: pool {} invalid argument: {}", name_, e.what());
     return POOL_ERROR;
   }
   catch ( const std::bad_alloc &e )
   {
-    CPLOG(0, "%s: %s", __func__, e.what());
-    return POOL_ERROR; // E_NO_MEM incorrect type
+    FLOGM("POOL_ERROR: pool {} bad_alloc: {}", name_, e.what());
+    return POOL_ERROR;
   }
 }
 

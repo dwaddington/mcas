@@ -342,7 +342,7 @@ std::unique_ptr<arena> nupm::dax_manager::make_arena_dev(const path &p, addr_t b
 	}
 }
 
-bool nupm::dax_manager::enter(
+void nupm::dax_manager::enter(
 	common::fd_locked && fd_
 	, string_view id_
 	, bool pin_
@@ -358,10 +358,11 @@ bool nupm::dax_manager::enter(
 		);
 	if ( ! itb.second )
 	{
-		FLOGM("failed to insert {} (duplicate instance?)", id_);
+		auto e = common::format("failed to insert {} (duplicate instance?)", id_);
+		FLOGM("{}", e);
+		throw std::runtime_error(e);
 	}
 	CFLOGM(1, "region {} at {}", itb.first->first, ::base(itb.first->second._or.range()[0]));
-	return itb.second;
 }
 
 void nupm::dax_manager::remove(const string_view id_)
@@ -504,12 +505,12 @@ auto dax_manager::create_region(
   }
   catch ( const General_exception &e )
   {
-    CFLOGM(2,"path {} id {} size req 0x{:x} create failed (available 0x{:x}) {}", arena->describe().data(), name_, size_, arena->get_max_available(), e.cause());
+    FLOGM("path {} id {} size req 0x{:x} create failed (available 0x{:x}) {}", arena->describe().data(), name_, size_, arena->get_max_available(), e.cause());
     return region_descriptor();
   }
   catch ( const std::exception &e )
   {
-    CFLOGM(2,"path {} id {} size req 0x{:x} create failed (available 0x{:x}) {}", arena->describe().data(), name_, size_, arena->get_max_available(), e.what());
+    FLOGM("path {} id {} size req 0x{:x} create failed (available 0x{:x}) {}", arena->describe().data(), name_, size_, arena->get_max_available(), e.what());
     return region_descriptor();
   }
 }

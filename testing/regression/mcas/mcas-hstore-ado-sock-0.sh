@@ -5,7 +5,7 @@ DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
 STORE=hstore
-DAX_PREFIX="${DAX_PREFIX:-$(choose_dax_with_ado $STORE)}"
+DAX_PREFIX="${DAX_PREFIX:-$(choose_dax mcasmod)}"
 TESTID="$(basename --suffix .sh -- $0)-$(dax_type $DAX_PREFIX)"
 
 # parameters for MCAS server and client

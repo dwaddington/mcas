@@ -41,6 +41,7 @@ struct arena
   virtual ~arena() {}
   virtual void debug_dump() const = 0;
   virtual region_descriptor region_get(string_view id) = 0;
+  /* a call which returns will return one region */
   virtual region_descriptor region_create(string_view id, gsl::not_null<registry_memory_mapped *> mh, std::size_t size) = 0;
   virtual void region_resize(gsl::not_null<space_registered *> mh, std::size_t size) = 0;
   /* It is unknown whether region_erase may be used on an open region.

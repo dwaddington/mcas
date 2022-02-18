@@ -293,8 +293,6 @@ TEST_F(ADO_test, BasicDetachedMemory)
   ASSERT_OK(mcas->delete_pool(poolname));
 }
 
-/* this test is broken */
-#if 0
 TEST_F(ADO_test, PersistedDetachedMemory)
 {
   const std::string testname = "PersistedDetachedMemory";
@@ -339,7 +337,7 @@ TEST_F(ADO_test, PersistedDetachedMemory)
     rc = mcas->put(pool, key_saturate + std::to_string(j), std::string(4096, 'x'));
   }
   /* expect to use up all pool space */
-  ASSERT_EQ(IKVStore::E_TOO_LARGE, rc);
+  ASSERT_EQ(E_NO_MEM, rc);
 
   /* RUN!TEST-CompareDetachedMemory shall verify that the 17 areas of detached memory written by RUN!TEST-AddDetachedMemory are intact */
   rc = mcas->invoke_ado(pool, key, "RUN!TEST-CompareDetachedMemory", IMCAS::ADO_FLAG_NONE, response);
@@ -348,7 +346,6 @@ TEST_F(ADO_test, PersistedDetachedMemory)
   ASSERT_OK(mcas->close_pool(pool));
   ASSERT_OK(mcas->delete_pool(poolname));
 }
-#endif
 
 TEST_F(ADO_test, GetReferenceVector)
 {

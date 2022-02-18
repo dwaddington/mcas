@@ -1032,11 +1032,11 @@ Connection_handler::pool_t Connection_handler::open_pool(const std::string name,
     pool_id = response_msg->pool_id;
   }
   catch (const Exception &e) {
-    PLOG("%s %s fail %s", __FILE__, __func__, e.cause());
+    FLOGM("POOL_ERROR: ail {}", e.cause());
     pool_id = IKVStore::POOL_ERROR;
   }
   catch (const std::exception &e) {
-    PLOG("%s %s fail %s", __FILE__, __func__, e.what());
+    FLOGM("POOL_ERROR: fail {}", e.what());
     pool_id = IKVStore::POOL_ERROR;
   }
   return pool_id;
@@ -1083,11 +1083,11 @@ Connection_handler::create_pool(const std::string  name,
     pool_id = response_msg->pool_id;
   }
   catch (const Exception &e) {
-    PLOG("%s %s fail %s", __FILE__, __func__, e.cause());
+    FLOGM("POOL_ERROR: ail {}", e.cause());
     pool_id = IKVStore::POOL_ERROR;
   }
   catch (const std::exception &e) {
-    PLOG("%s %s fail %s", __FILE__, __func__, e.what());
+    FLOGM("POOL_ERROR: fail {}", e.what());
     pool_id = IKVStore::POOL_ERROR;
   }
 
@@ -1206,7 +1206,7 @@ status_t Connection_handler::configure_pool(const IMCAS::pool_t pool, const std:
   const auto iobr = make_iob_ptr_recv();
 
   if (!mcas::protocol::Message_IO_request::would_fit(json.length(), iobs->original_length())) {
-    return IKVStore::E_TOO_LARGE;
+    return E_NO_MEM;
   }
 
   const auto msg = new (iobs->base()) mcas::protocol::Message_IO_request(iobs->length(), auth_id(), request_id(), pool,

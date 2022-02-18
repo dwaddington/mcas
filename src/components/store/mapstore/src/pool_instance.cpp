@@ -244,7 +244,7 @@ status_t Pool_instance::get(const string_view_key key,
 
   if ( out_value == nullptr )  {
     PWRN("Map_store: malloc failed");
-    return IKVStore::E_TOO_LARGE;
+    return E_NO_MEM;
   }
 
   memcpy(out_value, i->second._ptr, i->second._length);
