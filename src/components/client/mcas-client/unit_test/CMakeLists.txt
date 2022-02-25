@@ -11,7 +11,7 @@ set(GTEST_LIB "gtest$<$<CONFIG:Debug>:d>")
 
 include_directories(${CMAKE_SOURCE_DIR}/src/components)
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
-
+include_directories(${CMAKE_SOURCE_DIR}/src/lib/common/include)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib64)
 
