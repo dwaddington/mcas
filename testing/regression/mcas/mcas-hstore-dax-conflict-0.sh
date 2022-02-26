@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/bash -eu
 
 # test server's detection of two servers using the same /dev/dax devices
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:`pwd`/dist/lib
 
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
@@ -33,7 +33,7 @@ kill $SERVER_PID
 kill $SERVER2_PID
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $SERVER2_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $SERVER2_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $SERVER_PID

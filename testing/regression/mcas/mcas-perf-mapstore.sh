@@ -1,14 +1,15 @@
-#!/bin/bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
+#!/bin/bash -eu
+
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:`pwd`/dist/lib
 
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
-RECOMMENDED_ELEMENT_COUNT=2000000
-ELEMENT_COUNT=${ELEMENT_COUNT:-$RECOMMENDED_ELEMENT_COUNT}
+STORE=mapstore
+ELEMENT_COUNT=${ELEMENT_COUNT:-2000000}
 RECOMMENDED_STORE_SIZE=$((ELEMENT_COUNT*2000)) # should not need this - efficiency issue?
 STORE_SIZE=${STORE_SIZE:-$RECOMMENDED_STORE_SIZE}
-STORE=mapstore
+KEY_LENGTH=${KEY_LENGTH:-8}
 # testname-keylength-valuelength-store-netprovider
 TESTID="mcas-$STORE-$PERFTEST-$KEY_LENGTH-$VALUE_LENGTH"
 
@@ -40,7 +41,7 @@ ELEMENT_COUNT=$(scale $ELEMENT_COUNT $SCALE)
 CLIENT_PID=$!
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $CLIENT_PID; CLIENT_RC=$?

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from dm import dm
-import glob
+from devdax import candidates
 import os
 
 # Locations for fsdax stores are: /mnt/pmem<n>/a<0 ...>
@@ -25,7 +25,7 @@ class devdax(dm):
     def __init__(self, pfx, accession=0):
         self.pfx = pfx
         self.accession = accession
-        self.devices = sorted([f for f in glob.glob("{}.*".format(pfx)) if os.access(f, os.R_OK) and os.access(f, os.W_OK)])
+        self.devices = candidates(pfx)
         if len(self.devices) <= accession:
             raise RuntimeError("No dax device in {} for accession {}".format(self.devices, accession))
         dm.__init__(self, [{"path": self.devices[accession], "addr": 0x9000000000 + 0x1000000000 * accession}])

@@ -26,7 +26,7 @@ CLIENT_LOG="test$TESTID-client.log"
 CLIENT_PID=$!
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $CLIENT_PID; CLIENT_RC=$?

@@ -1,5 +1,5 @@
-#!/bin/bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
+#!/bin/bash -eu
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:`pwd`/dist/lib
 
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
@@ -30,7 +30,7 @@ OBJECT_COUNT=5500 ./dist/bin/kv-test --server $NODE_IP  --src_addr $NODE_IP --de
 CLIENT_PID=$!
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $CLIENT_PID; CLIENT_RC=$?

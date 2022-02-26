@@ -318,7 +318,10 @@ class DM_region_header {
                       new_offset, size_in_grain, region_id);
       return rp;
     }
-    throw General_exception("no more regions (size in grain=%u)", size_in_grain);
+    unsigned largest = 0;
+    for ( const auto &r : regions ) { largest = std::max(largest, r.length_grain); }
+    
+    throw General_exception("no more regions (size in grain=%u, max available %u)", size_in_grain, largest);
   }
 
   size_t get_max_available() const

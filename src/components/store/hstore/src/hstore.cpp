@@ -165,7 +165,6 @@ auto hstore::create_pool(const std::string & name_,
 try
 {
   CFLOGM(1, "pool_name={} size {}", name_, size_);
-  FWRNM("pool_name={} size {}", name_, size_);
   try
   {
     _pool_manager->pool_create_check(size_);

@@ -1,11 +1,12 @@
-#!/bin/bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
+#!/bin/bash -eu
+
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:`pwd`/dist/lib
 
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
 
 DAX_PREFIX="${DAX_PREFIX:-$(choose_dax)}"
-STORETYPE=hstore
+STORE=hstore
 KEY_LENGTH=${KEY_LENGTH:-8}
 VALUE_LENGTH=${VALUE_LENGTH:-8}
 SOCKET_SCALE=1000
@@ -20,10 +21,9 @@ NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 
 # parameters for MCAS server
-SERVER_CONFIG="hstore-$(dax_type $DAX_PREFIX)-sock-0"
 
 NUMA_NODE=$(numa_node $DAX_PREFIX)
-CONFIG_STR="$("./dist/testing/$SERVER_CONFIG.py" "$NODE_IP" --numa-node "$NUMA_NODE")"
+CONFIG_STR="$("./dist/testing/cfg_hstore.py" "$NODE_IP" "$STORE" "$DAX_PREFIX" --numa-node "$NUMA_NODE")"
 # launch MCAS server
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
@@ -46,7 +46,7 @@ CLIENT_LOG="test$TESTID-client.log"
 CLIENT_PID=$!
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $CLIENT_PID; CLIENT_RC=$?

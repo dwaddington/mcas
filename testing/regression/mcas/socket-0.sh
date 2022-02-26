@@ -27,7 +27,7 @@ SERVER=$NODE_IP ./src/components/net/fabric/unit_test/fabric-test1 --gtest_filte
 CLIENT_PID=$!
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
 tail --pid=$CLIENT_PID -f /dev/null

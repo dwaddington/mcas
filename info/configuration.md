@@ -163,7 +163,7 @@ Alothough not checked in the schema, addr/port combinations must be unique.
 Three back ends are available:
  - mapstore: a non-persistent KV store, for speed and for testing
  - hstore: a persistent KV store
- - hstore-cc: a variation fo hstore with less steady-state speed but faster crash build.
+ - hstore-cc: a variation of hstore with less steady-state speed but faster crash build.
 
 Lists of cores are comma-separated list of cores and/or ranges of cores, on which to pin ADO threads. Cores are integer strings; a range of cores is either an inclusive ranet of cores separated byu a hyphen, e.g. 4-6, or an initial core and count of cores separated by a colon, e.g 4:3.
 

@@ -16,7 +16,7 @@ TEST_LOG="test$TESTID-test.log"
 TEST_PID=$!
 
 # arm cleanup
-trap "kill -9 $TEST_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $TEST_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $TEST_PID

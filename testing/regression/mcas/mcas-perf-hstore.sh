@@ -1,8 +1,24 @@
-#!/bin/bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/dist/lib
+#!/bin/bash -eu
+
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:`pwd`/dist/lib
 
 DIR="$(cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/functions.sh"
+
+declare -A expansion
+expansion[hstore]=100
+expansion[hstore-cc]=240
+expansion_factor=${expansion[$STORE]}
+
+KEY_LENGTH=${KEY_LENGTH:-8}
+STORE_AVAILABLE=${STORE_AVAILABLE:-100000000}
+MAX_ELEMENT_COUNT=$((STORE_AVAILABLE*100/expansion_factor/(200+KEY_LENGTH+VALUE_LENGTH)))
+if [ $MAX_ELEMENT_COUNT -lt $ELEMENT_COUNT ]
+then ELEMENT_COUNT=$MAX_ELEMENT_COUNT
+fi
+
+STORE_SIZE=${STORE_SIZE:-$STORE_AVAILABLE} \
+SCALE=${SCALE:-100} \
 
 DAX_PREFIX="${DAX_PREFIX:-$(choose_dax)}"
 # testname-keylength-valuelength-store-netprovider
@@ -13,8 +29,7 @@ NODE_IP="$(node_ip)"
 DEBUG=${DEBUG:-0}
 PERF_OPTS=${PERF_OPTS:-"--skip_json_reporting"}
 
-NUMA_NODE=$(numa_node $DAX_PREFIX)
-CONFIG_STR="$("./dist/testing/cfg_hstore.py" "$NODE_IP" "$STORE" "$DAX_PREFIX" --numa-node "$NUMA_NODE")"
+CONFIG_STR="$("./dist/testing/cfg_hstore.py" "$NODE_IP" "$STORE" "$DAX_PREFIX" --numa-node "$(numa_node $DAX_PREFIX)")"
 # launch MCAS server
 [ 0 -lt $DEBUG ] && echo DAX_RESET=1 ./dist/bin/mcas --config \'"$CONFIG_STR"\' --forced-exit --debug $DEBUG
 DAX_RESET=1 ./dist/bin/mcas --config "$CONFIG_STR" --forced-exit --debug $DEBUG &> test$TESTID-server.log &
@@ -36,7 +51,7 @@ ELEMENT_COUNT=$(scale $ELEMENT_COUNT $SCALE)
 CLIENT_PID=$!
 
 # arm cleanup
-trap "kill -9 $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
+trap "set +e; kill -s KILL $SERVER_PID $CLIENT_PID &> /dev/null" EXIT
 
 # wait for client to complete
 wait $CLIENT_PID; CLIENT_RC=$?
