@@ -138,7 +138,7 @@ void ProgramOptions::add_program_options(boost::program_options::options_descrip
   desc_.add_options()("help", "Show help")("test", po::value<std::string>()->default_value("all"), test_names.c_str())
     ("component", po::value<std::string>()->default_value(DEFAULT_COMPONENT),
      "Implementation selection <mcas|mapstore|hstore|filestore>. Default: mcas.")
-    ("cores", po::value<std::string>()->default_value("0"),
+    ("cores", po::value<std::string>()->default_value("2"),
      "Comma-separated ranges of core indexes to use for test. A range may be specified by a single index, a pair of "
      "indexes separated by a hyphen, or an index followed by a colon followed by a count of additional indexes. These "
      "examples all specify cores 2 through 4 inclusive: '2,3,4', '2-4', '2:3'. Default: 0."

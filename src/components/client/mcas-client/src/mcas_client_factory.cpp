@@ -15,12 +15,12 @@
 #include <regex>
 
 component::IMCAS * MCAS_client_factory::mcas_create_nsd(const unsigned debug_level,
-                                                    const unsigned patience,
-                                                    const string_view,  // owner
-                                                    const string_view src_device,
-                                                    const string_view src_addr,
-                                                    const string_view dest_addr_port_str,
-                                                    const string_view other)
+                                                        const unsigned patience,
+                                                        const string_view,  // owner
+                                                        const string_view src_device,
+                                                        const string_view src_addr,
+                                                        const string_view dest_addr_port_str,
+                                                        const string_view other)
 {
   try {
     std::match_results<string_view::const_iterator> m;
@@ -44,42 +44,42 @@ component::IMCAS * MCAS_client_factory::mcas_create_nsd(const unsigned debug_lev
     const auto                         port = std::uint16_t(strtoul(m[2].str().c_str(), &end, 10));
 
     if ( 0 < debug_level )
-    {
-      PLOG("build IMCAS (mcas client(dev \"%.*s\" src \"%.*s\" prov \"%.*s\" dst \"%.*s\" port %u))"
-        , int(src_device.size()), src_device.data()
-        , int(src_addr.size()), src_addr.data()
-        , int(provider.size()), provider.data()
-        , int(dst_addr.size()), dst_addr.data()
-        , port
-      );
-    }
+      {
+        PLOG("build IMCAS (mcas client(dev \"%.*s\" src \"%.*s\" prov \"%.*s\" dst \"%.*s\" port %u))"
+             , int(src_device.size()), src_device.data()
+             , int(src_addr.size()), src_addr.data()
+             , int(provider.size()), provider.data()
+             , int(dst_addr.size()), dst_addr.data()
+             , port
+             );
+      }
 
     try {
       component::IMCAS *obj =
-      static_cast<component::IMCAS *>(new MCAS_client(debug_level,
-                                                      src_device,
-                                                      src_addr,
-                                                      provider,
-                                                      dst_addr,
-                                                      port,
-                                                      patience,  // seconds to wait for single fabric completion
-                                                      other
-                                                      ));
+        static_cast<component::IMCAS *>(new MCAS_client(debug_level,
+                                                        src_device,
+                                                        src_addr,
+                                                        provider,
+                                                        dst_addr,
+                                                        port,
+                                                        patience,  // seconds to wait for single fabric completion
+                                                        other
+                                                        ));
       obj->add_ref();
       return obj;
     }
     catch (const std::exception &)
-    {
-      PLOG("libcomponent-mcasclient.so: failed to build IMCAS (mcas client(dap \"%.*s\" dev \"%.*s\" src \"%.*s\" prov \"%.*s\" dst \"%.*s\" port %u))"
-        , int(dest_addr_port_str.size()), dest_addr_port_str.data()
-        , int(src_device.size()), src_device.data()
-        , int(src_addr.size()), src_addr.data()
-        , int(provider.size()), provider.data()
-        , int(dst_addr.size()), dst_addr.data()
-        , port
-      );
-      throw;
-    }
+      {
+        PLOG("libcomponent-mcasclient.so: failed to build IMCAS (mcas client(dap \"%.*s\" dev \"%.*s\" src \"%.*s\" prov \"%.*s\" dst \"%.*s\" port %u))"
+             , int(dest_addr_port_str.size()), dest_addr_port_str.data()
+             , int(src_device.size()), src_device.data()
+             , int(src_addr.size()), src_addr.data()
+             , int(provider.size()), provider.data()
+             , int(dst_addr.size()), dst_addr.data()
+             , port
+             );
+        throw;
+      }
   }
   catch (const std::exception &e) {
     PLOG("libcomponent-mcasclient.so: failed to build IMCAS (mcas client): %s", e.what());

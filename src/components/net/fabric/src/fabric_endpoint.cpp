@@ -1050,7 +1050,7 @@ fid_mr * fabric_endpoint::make_fid_mr_reg_ptr(
     if ( _paging_test )
     {
       auto rc = ::madvise(const_cast<common::byte *>(::data(buf)), ::size(buf), MADV_DONTNEED);
-      PLOG("Paging test madvisee(%p, 0x%zx, MADV_DONTNEED) %s", ::base(buf), ::size(buf), rc ? " refused" : " accepted");
+      PLOG("Paging test madvise(%p, 0x%zx, MADV_DONTNEED) %s", ::base(buf), ::size(buf), rc ? " refused" : " accepted");
     }
   }
   catch ( const fabric_runtime_error &e )
