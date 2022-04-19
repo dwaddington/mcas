@@ -26,13 +26,12 @@ env:
     - CONTAINER_NAME="mcas-build-fedora27"
       DOCKERIMG="fedora:27"
       BOOTSTRAP_FILE="./install-yum-fc27.sh"
-#      HOSTMODULE="-v /lib/modules:/lib/modules:ro -v /usr/src:/usr/src:ro"
     - CONTAINER_NAME="mcas-build-fedora30"
       DOCKERIMG="fedora:30"
       BOOTSTRAP_FILE="./install-yum-fc30.sh"
-    - CONTAINER_NAME="mcas-build-ubuntu20"
-      DOCKERIMG="ubuntu:20.04"
-      BOOTSTRAP_FILE="./install-apts-ubuntu-20.sh"
+#    - CONTAINER_NAME="mcas-build-ubuntu20"
+#      DOCKERIMG="ubuntu:20.04"
+#      BOOTSTRAP_FILE="./install-apts-ubuntu-20.sh"
       
 
 # for local building testing, remember to run git submodule init/update
