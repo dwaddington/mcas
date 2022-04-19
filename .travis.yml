@@ -30,7 +30,7 @@ env:
     - CONTAINER_NAME="mcas-build-fedora30"
       DOCKERIMG="fedora:30"
       BOOTSTRAP_FILE="./install-yum-fc30.sh"
-    - CONTAINER_NAME="mcas-build-ubuntu1804"
+    - CONTAINER_NAME="mcas-build-ubuntu20"
       DOCKERIMG="ubuntu:20.04"
       BOOTSTRAP_FILE="./install-apts-ubuntu-20.sh"
       
